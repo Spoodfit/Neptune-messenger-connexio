@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import type { ReactNode } from "react";
+import type { ColorValue } from "react-native";
 
 import { colors } from "@/theme";
 
@@ -17,12 +19,16 @@ function icon(
   active: TabIconName,
   inactive: TabIconName
 ): ({ color, size, focused }: {
-  color: string;
+  color: ColorValue;
   size: number;
   focused: boolean;
-}) => React.ReactNode {
+}) => ReactNode {
   return ({ color, size, focused }) => (
-    <Ionicons name={focused ? active : inactive} size={size} color={color} />
+    <Ionicons
+      name={focused ? active : inactive}
+      size={size}
+      color={String(color)}
+    />
   );
 }
 
