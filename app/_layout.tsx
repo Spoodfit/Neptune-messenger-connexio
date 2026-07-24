@@ -1,6 +1,7 @@
 import { Stack, router } from "expo-router";
 import { useEffect } from "react";
 import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 
 import { MessagingProvider } from "@/providers/MessagingProvider";
@@ -15,6 +16,10 @@ configureNotificationPresentation();
 
 export default function RootLayout() {
   useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
     void registerForPushNotifications();
 
     const subscription =
