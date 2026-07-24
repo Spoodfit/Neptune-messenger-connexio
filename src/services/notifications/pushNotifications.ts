@@ -6,6 +6,10 @@ import { Platform } from "react-native";
 import { env } from "@/config/env";
 
 export function configureNotificationPresentation(): void {
+  if (Platform.OS === "web") {
+    return;
+  }
+
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -17,7 +21,7 @@ export function configureNotificationPresentation(): void {
 }
 
 export async function registerForPushNotifications(): Promise<string | null> {
-  if (!Device.isDevice) {
+  if (Platform.OS === "web" || !Device.isDevice) {
     return null;
   }
 
