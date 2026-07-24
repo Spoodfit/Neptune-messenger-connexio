@@ -11,7 +11,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     orientation: "portrait",
     scheme: "neptuneconnexio",
     userInterfaceStyle: "automatic",
-    newArchEnabled: true,
     ios: {
       supportsTablet: false,
       bundleIdentifier: "com.neptunebusiness.connexio",
