@@ -49,13 +49,6 @@ jobs:
           EXPO_PUBLIC_MOCK_MODE: "true"
         run: npx expo export -p web
 
-      - name: Upload downloadable build
-        uses: actions/upload-artifact@v4
-        with:
-          name: connexio-web-preview
-          path: dist
-          retention-days: 14
-
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
