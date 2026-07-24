@@ -2,6 +2,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+  const isGithubPages = process.env.EXPO_PUBLIC_GITHUB_PAGES === "true";
 
   return {
     ...config,
@@ -11,6 +12,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     orientation: "portrait",
     scheme: "neptuneconnexio",
     userInterfaceStyle: "automatic",
+    web: {
+      bundler: "metro",
+      output: "single"
+    },
+    experiments: isGithubPages
+      ? {
+          baseUrl: "/Neptune-messenger-connexio"
+        }
+      : undefined,
     ios: {
       supportsTablet: false,
       bundleIdentifier: "com.neptunebusiness.connexio",
@@ -35,7 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-notifications",
         {
-          "defaultChannel": "messages"
+          defaultChannel: "messages"
         }
       ]
     ],
