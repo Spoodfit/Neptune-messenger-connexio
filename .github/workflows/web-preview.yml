@@ -6,6 +6,7 @@ on:
       - main
   push:
     branches:
+      - feat/production-hardening
       - feat/mvp-mobile-messenger
       - main
   workflow_dispatch:
