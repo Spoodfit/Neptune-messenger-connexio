@@ -29,9 +29,11 @@ const normalTextPairs: Array<[string, string, string]> = [
   ["primary sur fond doux", colors.primary, colors.primarySoft],
   ["texte atténué sur surface", colors.textMuted, colors.surface],
   ["texte atténué sur fond", colors.textMuted, colors.background],
+  ["texte atténué sur surface douce", colors.textMuted, colors.surfaceMuted],
   ["succès sur fond succès", colors.success, colors.successSoft],
   ["avertissement sur fond avertissement", colors.warning, colors.warningSoft],
   ["erreur sur fond erreur", colors.danger, colors.dangerSoft],
+  ["blanc sur bleu primaire", colors.white, colors.primary],
   ["blanc sur bleu nuit", colors.white, colors.navy],
   ["blanc sur magenta du gradient", colors.white, colors.magenta]
 ];
