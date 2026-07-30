@@ -23,6 +23,7 @@ import { currentUser as demoUser } from "../data/mockData";
 import { ApiError } from "../services/api/httpClient";
 import { NeptuneMessagingApi } from "../services/api/neptuneApi";
 import { NeptuneSessionApi } from "../services/api/sessionApi";
+import { normalizeAppUser } from "../services/api/wire";
 import { configureSessionRuntime } from "../services/auth/sessionRuntime";
 import {
   getRegisteredPushToken,
@@ -150,7 +151,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
           await invalidateSession();
           return null;
         }
-        // Une panne réseau ou serveur ne doit jamais supprimer le refresh token.
         return accessTokenRef.current;
       }
     })().finally(() => {
@@ -190,7 +190,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
         ]);
         if (storedUser) {
           try {
-            setCurrentUser(JSON.parse(storedUser) as AppUser);
+            const parsed = JSON.parse(storedUser) as unknown;
+            setCurrentUser(normalizeAppUser(parsed));
           } catch {
             await secureDelete(USER_KEY);
           }
@@ -248,7 +249,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const refreshTokenToRevoke = refreshTokenRef.current ?? refreshToken;
     const registeredPushToken = await getRegisteredPushToken();
 
-    // La purge doit réussir avant d'autoriser un autre compte sur cet appareil.
     await invalidateSession();
 
     const revocations: Promise<unknown>[] = [
