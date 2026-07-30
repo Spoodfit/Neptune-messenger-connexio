@@ -77,6 +77,14 @@ async function secureDelete(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(key);
 }
 
+async function restoreSecureValue(
+  key: string,
+  previousValue: string | null
+): Promise<void> {
+  if (previousValue === null) await secureDelete(key);
+  else await secureSet(key, previousValue);
+}
+
 async function getDeviceId(): Promise<string> {
   const existing = await secureGet(DEVICE_ID_KEY);
   if (existing) return existing;
@@ -99,6 +107,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
 
   const persistSession = useCallback(async (session: SessionPayload) => {
+    const serializedUser = JSON.stringify(session.user);
+    const previousUser = await secureGet(USER_KEY);
+    try {
+      await secureSet(USER_KEY, serializedUser);
+      await secureSet(REFRESH_TOKEN_KEY, session.refreshToken);
+    } catch (error) {
+      await restoreSecureValue(USER_KEY, previousUser).catch(() => undefined);
+      throw error;
+    }
+
     const expiresAt = calculateAccessTokenExpiry(session.expiresIn);
     accessTokenRef.current = session.accessToken;
     refreshTokenRef.current = session.refreshToken;
@@ -106,23 +124,19 @@ export function SessionProvider({ children }: PropsWithChildren) {
     setAccessToken(session.accessToken);
     setRefreshToken(session.refreshToken);
     setCurrentUser(session.user);
-    await Promise.all([
-      secureSet(REFRESH_TOKEN_KEY, session.refreshToken),
-      secureSet(USER_KEY, JSON.stringify(session.user))
-    ]);
   }, []);
 
   const clearSession = useCallback(async () => {
+    // Le refresh token est la donnée critique : la vue ne se déconnecte qu’après sa suppression.
+    await secureDelete(REFRESH_TOKEN_KEY);
+    await secureDelete(USER_KEY).catch(() => undefined);
+
     accessTokenRef.current = null;
     refreshTokenRef.current = null;
     accessTokenExpiresAtRef.current = null;
     setAccessToken(null);
     setRefreshToken(null);
     setCurrentUser(env.mockMode ? demoUser : signedOutUser);
-    await Promise.all([
-      secureDelete(REFRESH_TOKEN_KEY),
-      secureDelete(USER_KEY)
-    ]);
   }, []);
 
   const invalidateSession = useCallback(async () => {
