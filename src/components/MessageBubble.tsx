@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
 import {
   Image,
@@ -8,7 +9,7 @@ import {
   View
 } from "react-native";
 
-import { colors, radii, spacing, typography } from "../theme";
+import { colors, gradients, radii, spacing, typography } from "../theme";
 import type { ChatMessage, MessageStatus } from "../types/messaging";
 import { formatMessageTime } from "../utils/date";
 
@@ -47,6 +48,35 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
     setAvatarFailed(false);
   }, [message.senderAvatarUrl]);
 
+  const bubbleContent = (
+    <>
+      <Text
+        selectable
+        style={[
+          styles.body,
+          message.isMine ? styles.mineBody : styles.otherBody
+        ]}
+      >
+        {message.body}
+      </Text>
+      <View style={styles.metadata}>
+        <Text
+          style={[
+            styles.time,
+            message.isMine ? styles.mineTime : styles.otherTime
+          ]}
+        >
+          {formatMessageTime(message.createdAt)}
+        </Text>
+        {message.isMine ? (
+          <Text accessibilityLiveRegion="polite" style={styles.status}>
+            {statusLabel}
+          </Text>
+        ) : null}
+      </View>
+    </>
+  );
+
   return (
     <View
       accessibilityLabel={`${message.senderName}. ${message.body}. ${formatMessageTime(
@@ -58,19 +88,28 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
       ]}
     >
       {!message.isMine ? (
-        <View style={styles.avatar} accessibilityElementsHidden>
-          {message.senderAvatarUrl && !avatarFailed ? (
-            <Image
-              source={{ uri: message.senderAvatarUrl }}
-              onError={() => setAvatarFailed(true)}
-              resizeMode="cover"
-              style={styles.avatarImage}
-            />
-          ) : (
-            <Text style={styles.avatarText}>{message.senderInitials}</Text>
-          )}
-        </View>
+        <LinearGradient
+          colors={gradients.primaryWarm}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatarShell}
+          accessibilityElementsHidden
+        >
+          <View style={styles.avatar}>
+            {message.senderAvatarUrl && !avatarFailed ? (
+              <Image
+                source={{ uri: message.senderAvatarUrl }}
+                onError={() => setAvatarFailed(true)}
+                resizeMode="cover"
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Text style={styles.avatarText}>{message.senderInitials}</Text>
+            )}
+          </View>
+        </LinearGradient>
       ) : null}
+
       <View
         style={[
           styles.wrapper,
@@ -83,44 +122,34 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
             {message.senderName}
           </Text>
         ) : null}
-        <View
-          style={[styles.bubble, message.isMine ? styles.mine : styles.other]}
-        >
-          <Text
-            selectable
-            style={[
-              styles.body,
-              message.isMine ? styles.mineBody : styles.otherBody
-            ]}
+
+        {message.isMine ? (
+          <LinearGradient
+            colors={[colors.primary, colors.violet]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.bubble, styles.mine]}
           >
-            {message.body}
-          </Text>
-          <View style={styles.metadata}>
-            <Text
-              style={[
-                styles.time,
-                message.isMine ? styles.mineTime : styles.otherTime
-              ]}
-            >
-              {formatMessageTime(message.createdAt)}
-            </Text>
-            {message.isMine ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                style={styles.status}
-              >
-                {statusLabel}
-              </Text>
-            ) : null}
-          </View>
-        </View>
+            {bubbleContent}
+          </LinearGradient>
+        ) : (
+          <LinearGradient
+            colors={gradients.glass}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
+            style={[styles.bubble, styles.other]}
+          >
+            {bubbleContent}
+          </LinearGradient>
+        )}
+
         {retryable ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Réessayer l’envoi de ce message"
             hitSlop={8}
             onPress={() => onRetry?.(message.clientMessageId!)}
-            style={styles.retry}
+            style={({ pressed }) => [styles.retry, pressed && styles.retryPressed]}
           >
             <Text style={styles.retryText}>Réessayer</Text>
           </Pressable>
@@ -139,20 +168,29 @@ const styles = StyleSheet.create({
   },
   mineRow: { justifyContent: "flex-end" },
   otherRow: { justifyContent: "flex-start" },
-  avatar: {
+  avatarShell: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
+    padding: 2,
     borderRadius: 12,
+    flexShrink: 0,
+    shadowColor: colors.violet,
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 }
+  },
+  avatar: {
+    flex: 1,
     overflow: "hidden",
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
-    borderColor: colors.border,
-    flexShrink: 0
+    borderColor: colors.surface
   },
   avatarImage: { width: "100%", height: "100%" },
-  avatarText: { color: colors.primary, fontSize: 11, fontWeight: "900" },
+  avatarText: { color: colors.text, fontSize: 10, fontWeight: "900" },
   wrapper: { minWidth: 0, flexShrink: 1 },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
@@ -161,23 +199,30 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     color: colors.textMuted,
     marginLeft: spacing.sm,
-    marginBottom: 4
+    marginBottom: 4,
+    fontSize: 10,
+    fontWeight: "800"
   },
   bubble: {
     maxWidth: "100%",
-    borderRadius: radii.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderRadius: 17,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
     gap: 6
   },
-  mine: { backgroundColor: colors.primary, borderBottomRightRadius: 5 },
+  mine: {
+    borderBottomRightRadius: 5,
+    shadowColor: colors.violet,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 }
+  },
   other: {
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderSoft,
     borderBottomLeftRadius: 5
   },
-  body: { ...typography.body, flexShrink: 1 },
+  body: { ...typography.body, flexShrink: 1, fontSize: 13, lineHeight: 19 },
   mineBody: { color: colors.white },
   otherBody: { color: colors.text },
   metadata: {
@@ -189,16 +234,22 @@ const styles = StyleSheet.create({
     columnGap: 6,
     rowGap: 2
   },
-  time: { ...typography.caption, flexShrink: 0 },
-  mineTime: { color: colors.white },
+  time: { fontSize: 9, lineHeight: 12, fontWeight: "600", flexShrink: 0 },
+  mineTime: { color: colors.whiteMuted },
   otherTime: { color: colors.textMuted },
   status: {
-    color: colors.white,
-    fontSize: 10,
+    color: colors.whiteMuted,
+    fontSize: 9,
+    lineHeight: 12,
     fontWeight: "700",
     flexShrink: 1,
     textAlign: "right"
   },
-  retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
+  retry: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 8
+  },
+  retryPressed: { opacity: 0.72 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
 });
