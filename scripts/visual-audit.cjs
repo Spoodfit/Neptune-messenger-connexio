@@ -7,8 +7,9 @@ const cases = [
   { name: "messages-390x844", width: 390, height: 844, route: "/" },
   { name: "messages-tablet-768x1024", width: 768, height: 1024, route: "/" },
   { name: "messages-landscape-1024x768", width: 1024, height: 768, route: "/" },
-  { name: "communities-280x568", width: 280, height: 568, route: "/communities" },
-  { name: "contacts-280x568", width: 280, height: 568, route: "/contacts" },
+  { name: "highlights-feed-280x568", width: 280, height: 568, route: "/highlights" },
+  { name: "highlights-map-390x844", width: 390, height: 844, route: "/highlights", clickLabel: "Afficher la carte" },
+  { name: "calls-280x568", width: 280, height: 568, route: "/calls" },
   { name: "settings-280x568", width: 280, height: 568, route: "/settings" },
   { name: "settings-zoom140", width: 320, height: 568, route: "/settings", zoom: 1.4 },
   { name: "chat-280x568", width: 280, height: 568, route: "/chat/carcassonne" },
@@ -77,7 +78,7 @@ async function inspectPage(page) {
       });
 
     const controls = Array.from(
-      document.querySelectorAll('button, [role="button"], a, input, textarea')
+      document.querySelectorAll('button, [role="button"], [role="tab"], a, input, textarea')
     ).filter(reachable);
     const smallTargets = controls
       .filter((element) => {
@@ -179,38 +180,32 @@ async function run() {
         if (message.type() === "error") consoleErrors.push(message.text());
       });
       page.on("pageerror", (error) => pageErrors.push(String(error)));
-      await page.goto(`${BASE_URL}${testCase.route}`, {
-        waitUntil: "networkidle",
-        timeout: 30_000
-      });
-      await page.waitForTimeout(400);
+      await page.goto(`${BASE_URL}${testCase.route}`, { waitUntil: "networkidle" });
       if (testCase.zoom) {
         await page.evaluate((zoom) => {
-          document.body.style.zoom = String(zoom);
+          document.documentElement.style.zoom = String(zoom);
         }, testCase.zoom);
-        await page.waitForTimeout(200);
       }
+      if (testCase.clickLabel) {
+        await page.getByLabel(testCase.clickLabel).click();
+        await page.waitForTimeout(350);
+      }
+      await page.waitForTimeout(200);
       const metrics = await inspectPage(page);
       findings.push({ ...testCase, url: page.url(), metrics, consoleErrors, pageErrors });
       await context.close();
     }
 
-    const interactionContext = await browser.newContext({
-      viewport: { width: 320, height: 568 },
-      locale: "fr-FR"
-    });
+    const interactionContext = await browser.newContext({ viewport: { width: 320, height: 568 } });
     const interactionPage = await interactionContext.newPage();
-    await interactionPage.goto(`${BASE_URL}/chat/carcassonne`, {
-      waitUntil: "networkidle",
-      timeout: 30_000
-    });
+    await interactionPage.goto(`${BASE_URL}/chat/carcassonne`, { waitUntil: "networkidle" });
     const input = interactionPage.getByLabel("Écrire un message");
-    const sendButton = interactionPage.getByLabel("Envoyer le message");
-    const uniqueText = `Audit double envoi ${Date.now()}`;
-    await input.fill(uniqueText);
-    await sendButton.dblclick({ delay: 30 });
-    await interactionPage.waitForTimeout(900);
-    const duplicateCount = await interactionPage.getByText(uniqueText, { exact: true }).count();
+    const send = interactionPage.getByLabel("Envoyer le message");
+    const uniqueBody = `Audit doublon ${Date.now()}`;
+    await input.fill(uniqueBody);
+    await send.dblclick({ delay: 20 });
+    await interactionPage.waitForTimeout(650);
+    const duplicateCount = await interactionPage.getByText(uniqueBody, { exact: true }).count();
     const composerValue = await input.inputValue();
     findings.push({
       name: "send-double-click",
@@ -218,27 +213,26 @@ async function run() {
       composerValue,
       passed: duplicateCount === 1 && composerValue === ""
     });
+    await interactionContext.close();
 
-    await interactionPage.goto(`${BASE_URL}/chat/carcassonne`, {
-      waitUntil: "networkidle",
-      timeout: 30_000
-    });
-    await interactionPage.getByLabel("Retour aux discussions").click();
-    await interactionPage.waitForTimeout(300);
+    const navigationContext = await browser.newContext({ viewport: { width: 320, height: 568 } });
+    const navigationPage = await navigationContext.newPage();
+    await navigationPage.goto(`${BASE_URL}/chat/carcassonne`, { waitUntil: "networkidle" });
+    await navigationPage.getByLabel("Retour aux discussions").click();
+    await navigationPage.waitForTimeout(250);
     findings.push({
       name: "direct-chat-back-navigation",
-      url: interactionPage.url(),
-      passed:
-        /\/messages(?:$|[?#])/.test(interactionPage.url()) ||
-        interactionPage.url().endsWith("/")
+      url: navigationPage.url(),
+      passed: new URL(navigationPage.url()).pathname.endsWith("/messages")
     });
-    await interactionContext.close();
+    await navigationContext.close();
   } finally {
     await browser.close();
   }
 
-  const failures = findings.filter((finding) => {
-    if (typeof finding.passed === "boolean") return !finding.passed;
+  console.log(JSON.stringify(findings, null, 2));
+  const failed = findings.some((finding) => {
+    if ("passed" in finding) return !finding.passed;
     return (
       finding.metrics.horizontalOverflow ||
       finding.metrics.horizontalClipping.length > 0 ||
@@ -249,15 +243,10 @@ async function run() {
       finding.pageErrors.length > 0
     );
   });
-  console.log(JSON.stringify(findings, null, 2));
-  if (failures.length > 0) {
-    console.error("VISUAL_AUDIT_FAILURES");
-    console.error(JSON.stringify(failures, null, 2));
-    process.exit(1);
-  }
+  if (failed) process.exitCode = 1;
 }
 
 run().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });
