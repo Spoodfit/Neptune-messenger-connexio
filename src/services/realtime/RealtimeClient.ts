@@ -1,28 +1,9 @@
-import type { ChatMessage } from "../../types/messaging";
+import {
+  normalizeRealtimeEvent,
+  type RealtimeEvent
+} from "./realtimeEvents";
 
-export type RealtimeEvent =
-  | { type: "message.created"; payload: ChatMessage }
-  | { type: "message.updated"; payload: ChatMessage }
-  | {
-      type: "message.deleted";
-      payload: { conversationId: string; messageId: string };
-    }
-  | {
-      type: "conversation.read";
-      payload: {
-        conversationId: string;
-        userId: string;
-        lastReadMessageId: string;
-      };
-    }
-  | {
-      type: "presence.changed";
-      payload: { userId: string; online: boolean };
-    }
-  | {
-      type: "conversation.membership.changed";
-      payload: { conversationId: string; active: boolean };
-    };
+export type { RealtimeEvent } from "./realtimeEvents";
 
 interface RealtimeClientOptions {
   url: string;
@@ -32,35 +13,18 @@ interface RealtimeClientOptions {
   random?: () => number;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function isRealtimeEvent(value: unknown): value is RealtimeEvent {
-  if (!isRecord(value) || typeof value.type !== "string" || !("payload" in value)) {
-    return false;
-  }
-  return [
-    "message.created",
-    "message.updated",
-    "message.deleted",
-    "conversation.read",
-    "presence.changed",
-    "conversation.membership.changed"
-  ].includes(value.type);
-}
-
 export class RealtimeClient {
   private socket: WebSocket | null = null;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closedByClient = false;
   private generation = 0;
+  private opening = false;
 
   constructor(private readonly options: RealtimeClientOptions) {}
 
   connect(): void {
-    if (this.socket) return;
+    if (this.socket || this.opening || this.reconnectTimer) return;
     this.closedByClient = false;
     this.generation += 1;
     void this.openSocket(this.generation);
@@ -69,16 +33,20 @@ export class RealtimeClient {
   disconnect(): void {
     this.closedByClient = true;
     this.generation += 1;
+    this.opening = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.socket?.close();
+    const socket = this.socket;
     this.socket = null;
+    socket?.close();
     this.options.onConnectionChange?.(false);
   }
 
   private async openSocket(generation: number): Promise<void> {
+    if (this.opening || this.closedByClient || generation !== this.generation) return;
+    this.opening = true;
     try {
       const ticket = await this.options.ticketProvider();
       if (this.closedByClient || generation !== this.generation) return;
@@ -96,14 +64,23 @@ export class RealtimeClient {
       socket.onmessage = (event) => {
         try {
           const parsed: unknown = JSON.parse(String(event.data));
-          if (isRealtimeEvent(parsed)) this.options.onEvent(parsed);
+          const normalized = normalizeRealtimeEvent(parsed);
+          if (normalized) this.options.onEvent(normalized);
         } catch {
           // Un événement invalide est ignoré sans interrompre la connexion.
         }
       };
 
       socket.onerror = () => {
-        if (socket === this.socket) this.options.onConnectionChange?.(false);
+        if (socket !== this.socket) return;
+        this.options.onConnectionChange?.(false);
+        // Certains environnements ne déclenchent pas toujours onclose après onerror.
+        try {
+          socket.close();
+        } catch {
+          this.socket = null;
+          if (!this.closedByClient) this.scheduleReconnect();
+        }
       };
 
       socket.onclose = () => {
@@ -114,15 +91,20 @@ export class RealtimeClient {
       };
     } catch {
       this.options.onConnectionChange?.(false);
-      if (!this.closedByClient) this.scheduleReconnect();
+      if (!this.closedByClient && generation === this.generation) {
+        this.scheduleReconnect();
+      }
+    } finally {
+      if (generation === this.generation) this.opening = false;
     }
   }
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer || this.closedByClient) return;
     const random = this.options.random ?? Math.random;
+    const randomValue = Math.min(1, Math.max(0, random()));
     const base = Math.min(30_000, 1_000 * 2 ** this.reconnectAttempt);
-    const delay = base + Math.floor(base * 0.2 * random());
+    const delay = base + Math.floor(base * 0.2 * randomValue);
     this.reconnectAttempt += 1;
     const generation = this.generation;
     this.reconnectTimer = setTimeout(() => {
