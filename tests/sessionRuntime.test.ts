@@ -1,5 +1,5 @@
-import assert from "node:assert/strict";
-import test from "node:test";
+import { strictEqual } from "node:assert";
+import { afterEach, test } from "node:test";
 
 import {
   configureSessionRuntime,
@@ -8,11 +8,11 @@ import {
   resolveSessionAccessToken
 } from "../src/services/auth/sessionRuntime";
 
-test.afterEach(() => resetSessionRuntimeForTests());
+afterEach(() => resetSessionRuntimeForTests());
 
 test("utilise le token de secours sans runtime configuré", async () => {
-  assert.equal(await resolveSessionAccessToken("fallback"), "fallback");
-  assert.equal(await refreshSessionAccessToken(), null);
+  strictEqual(await resolveSessionAccessToken("fallback"), "fallback");
+  strictEqual(await refreshSessionAccessToken(), null);
 });
 
 test("le runtime devient la source de vérité de la session", async () => {
@@ -21,8 +21,8 @@ test("le runtime devient la source de vérité de la session", async () => {
     refreshAccessToken: async () => "refreshed-token"
   });
 
-  assert.equal(await resolveSessionAccessToken("fallback"), "runtime-token");
-  assert.equal(await refreshSessionAccessToken(), "refreshed-token");
+  strictEqual(await resolveSessionAccessToken("fallback"), "runtime-token");
+  strictEqual(await refreshSessionAccessToken(), "refreshed-token");
 });
 
 test("le nettoyage d'un ancien runtime ne supprime pas le runtime courant", async () => {
@@ -36,5 +36,5 @@ test("le nettoyage d'un ancien runtime ne supprime pas le runtime courant", asyn
   });
 
   cleanupFirst();
-  assert.equal(await resolveSessionAccessToken(), "second");
+  strictEqual(await resolveSessionAccessToken(), "second");
 });
