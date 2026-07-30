@@ -1,7 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 import { router, Stack, useSegments } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 
 import { MessagingProvider } from "../src/providers/MessagingProvider";
@@ -9,55 +9,86 @@ import { SessionProvider, useSession } from "../src/providers/SessionProvider";
 import { NeptuneMessagingApi } from "../src/services/api/neptuneApi";
 import {
   configureNotificationPresentation,
-  registerForPushNotifications
+  registerForPushNotifications,
+  rememberRegisteredPushToken
 } from "../src/services/notifications/pushNotifications";
 import { colors } from "../src/theme";
 
 configureNotificationPresentation();
 
 function AuthenticatedApp() {
-  const { sessionReady, isAuthenticated, accessToken } = useSession();
+  const { sessionReady, isAuthenticated, getAccessToken } = useSession();
   const segments = useSegments();
+  const pendingConversationId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionReady) return;
     const onSignInRoute = segments[0] === "sign-in";
     if (!isAuthenticated && !onSignInRoute) {
       router.replace("/sign-in");
-    } else if (isAuthenticated && onSignInRoute) {
-      router.replace("/(tabs)/messages");
+      return;
+    }
+    if (isAuthenticated && onSignInRoute) {
+      const conversationId = pendingConversationId.current;
+      pendingConversationId.current = null;
+      router.replace(
+        conversationId ? `/chat/${conversationId}` : "/(tabs)/messages"
+      );
     }
   }, [isAuthenticated, segments, sessionReady]);
 
   useEffect(() => {
-    if (Platform.OS === "web" || !accessToken) return;
+    if (Platform.OS === "web" || !sessionReady || !isAuthenticated) return;
     let cancelled = false;
     void (async () => {
+      const token = await getAccessToken();
+      if (!token || cancelled) return;
       const registration = await registerForPushNotifications();
       if (!registration || cancelled) return;
-      await new NeptuneMessagingApi(accessToken).registerPushToken(registration);
+      await new NeptuneMessagingApi(token).registerPushToken(registration);
+      if (!cancelled) await rememberRegisteredPushToken(registration.token);
     })().catch(() => {
       // Le refus ou l’échec d’enregistrement push ne bloque pas la messagerie.
     });
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [getAccessToken, isAuthenticated, sessionReady]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
-    const openConversation = (response: Notifications.NotificationResponse | null) => {
-      const conversationId = response?.notification.request.content.data?.conversationId;
-      if (typeof conversationId === "string" && conversationId.length > 0) {
-        router.push(`/chat/${conversationId}`);
+
+    const openConversation = (
+      response: Notifications.NotificationResponse | null
+    ) => {
+      if (!response) return;
+      if (
+        response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER
+      ) {
+        return;
       }
+      const conversationId =
+        response.notification.request.content.data?.conversationId;
+      if (typeof conversationId !== "string" || conversationId.length === 0) {
+        return;
+      }
+      pendingConversationId.current = conversationId;
+      if (!sessionReady) return;
+      if (isAuthenticated) {
+        pendingConversationId.current = null;
+        router.push(`/chat/${conversationId}`);
+      } else {
+        router.replace("/sign-in");
+      }
+      void Notifications.clearLastNotificationResponseAsync();
     };
+
     void Notifications.getLastNotificationResponseAsync().then(openConversation);
     const subscription = Notifications.addNotificationResponseReceivedListener(
       openConversation
     );
     return () => subscription.remove();
-  }, []);
+  }, [isAuthenticated, sessionReady]);
 
   if (!sessionReady) {
     return (
