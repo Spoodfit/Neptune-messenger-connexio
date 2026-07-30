@@ -12,7 +12,10 @@ import {
 } from "react";
 
 import { env } from "../config/env";
-import { mergeMessagesNewestFirst } from "../domain/messageCollections";
+import {
+  latestPersistedMessageId,
+  mergeMessagesNewestFirst
+} from "../domain/messageCollections";
 import {
   calculateBackoffMs,
   type OutboxItem
@@ -66,11 +69,18 @@ interface MessagingContextValue {
 const MessagingContext = createContext<MessagingContextValue | null>(null);
 const sleep = (duration: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, duration));
+const demoConversations: Conversation[] = initialConversations.map(
+  (conversation) => ({
+    ...conversation,
+    canPost:
+      conversation.canPost ?? conversation.type !== "announcement"
+  })
+);
 
 export function MessagingProvider({ children }: PropsWithChildren) {
   const { currentUser, accessToken } = useSession();
   const [conversations, setConversations] = useState<Conversation[]>(
-    env.mockMode ? initialConversations : []
+    env.mockMode ? demoConversations : []
   );
   const [messagesByConversation, setMessagesByConversation] = useState<
     Record<string, ChatMessage[]>
@@ -281,7 +291,8 @@ export function MessagingProvider({ children }: PropsWithChildren) {
           return next;
         });
       }
-    }, [api, nextCursorByConversation, normalizeMessagesForCurrentUser]
+    },
+    [api, nextCursorByConversation, normalizeMessagesForCurrentUser]
   );
 
   const flushOutbox = useCallback(async (): Promise<void> => {
@@ -334,7 +345,11 @@ export function MessagingProvider({ children }: PropsWithChildren) {
           const retryable = !(error instanceof ApiError) || error.retryable;
           const backoff = calculateBackoffMs(attempts);
           const nextAttemptAt = retryable
-            ? Date.now() + Math.max(backoff, error instanceof ApiError ? error.retryAfterMs ?? 0 : 0)
+            ? Date.now() +
+              Math.max(
+                backoff,
+                error instanceof ApiError ? error.retryAfterMs ?? 0 : 0
+              )
             : Number.MAX_SAFE_INTEGER;
           await outbox.markFailure(
             item.clientMessageId,
@@ -417,8 +432,8 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const markConversationRead = useCallback(
     async (conversationId: string) => {
       const messages = messagesByConversation[conversationId] ?? [];
-      const lastMessage = messages[0];
-      if (!lastMessage) return;
+      const lastReadMessageId = latestPersistedMessageId(messages);
+      if (!lastReadMessageId) return;
       setConversations((previous) =>
         previous.map((conversation) =>
           conversation.id === conversationId
@@ -428,7 +443,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       );
       if (!env.mockMode && api) {
         try {
-          await api.markConversationRead(conversationId, lastMessage.id);
+          await api.markConversationRead(conversationId, lastReadMessageId);
         } catch {
           // Le serveur recalculera le non-lu lors de la prochaine synchronisation.
         }
