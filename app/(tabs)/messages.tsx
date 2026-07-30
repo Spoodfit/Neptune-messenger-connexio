@@ -1,10 +1,19 @@
 import { useMemo } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { ConversationRow } from "@/components/ConversationRow";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { colors, spacing, typography } from "@/theme";
+
+const MAX_CONTENT_WIDTH = 720;
 
 export default function MessagesScreen() {
   const {
@@ -65,7 +74,10 @@ export default function MessagesScreen() {
           </Pressable>
         </View>
       ) : loadingConversations && sortedConversations.length === 0 ? (
-        <View style={styles.feedback} accessibilityLabel="Chargement des discussions">
+        <View
+          style={styles.feedback}
+          accessibilityLabel="Chargement des discussions"
+        >
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
@@ -74,6 +86,7 @@ export default function MessagesScreen() {
           data={sortedConversations}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ConversationRow conversation={item} />}
+          style={styles.listViewport}
           contentContainerStyle={[
             styles.list,
             sortedConversations.length === 0 && styles.emptyList
@@ -85,7 +98,8 @@ export default function MessagesScreen() {
             <View style={styles.emptyState}>
               <Text style={styles.feedbackTitle}>Aucune discussion</Text>
               <Text style={styles.feedbackText}>
-                Les groupes autorisés apparaîtront ici après la synchronisation Neptune.
+                Les groupes autorisés apparaîtront ici après la synchronisation
+                Neptune.
               </Text>
             </View>
           }
@@ -101,6 +115,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   sectionHeader: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center",
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
@@ -110,7 +127,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.heading3,
-    color: colors.text
+    color: colors.text,
+    flexShrink: 1
   },
   sectionCount: {
     minWidth: 26,
@@ -121,7 +139,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     textAlignVertical: "center",
     fontWeight: "800",
-    lineHeight: 26
+    lineHeight: 26,
+    flexShrink: 0
+  },
+  listViewport: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center"
   },
   list: {
     paddingHorizontal: spacing.md,
@@ -129,6 +153,9 @@ const styles = StyleSheet.create({
   },
   emptyList: { flexGrow: 1 },
   feedback: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center",
     flex: 1,
     paddingHorizontal: spacing.xl,
     alignItems: "center",
@@ -142,8 +169,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.sm
   },
-  feedbackTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
-  feedbackText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
+  feedbackTitle: {
+    ...typography.heading3,
+    color: colors.text,
+    textAlign: "center"
+  },
+  feedbackText: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: "center"
+  },
   retryButton: {
     minHeight: 48,
     minWidth: 124,
