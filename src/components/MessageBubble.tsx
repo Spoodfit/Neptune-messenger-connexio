@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, typography } from "../theme";
 import type { ChatMessage, MessageStatus } from "../types/messaging";
@@ -35,7 +35,15 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
     >
       {!message.isMine ? (
         <View style={styles.avatar} accessibilityElementsHidden>
-          <Text style={styles.avatarText}>{message.senderInitials}</Text>
+          {message.senderAvatarUrl ? (
+            <Image
+              source={{ uri: message.senderAvatarUrl }}
+              resizeMode="cover"
+              style={styles.avatarImage}
+            />
+          ) : (
+            <Text style={styles.avatarText}>{message.senderInitials}</Text>
+          )}
         </View>
       ) : null}
       <View
@@ -105,12 +113,14 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 12,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primarySoft,
     borderWidth: 1,
     borderColor: colors.border
   },
+  avatarImage: { width: "100%", height: "100%" },
   avatarText: { color: colors.primary, fontSize: 11, fontWeight: "900" },
   wrapper: { maxWidth: "82%" },
   mineWrapper: { alignItems: "flex-end" },
