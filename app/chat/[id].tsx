@@ -18,6 +18,8 @@ import { MessageBubble } from "../../src/components/MessageBubble";
 import { useMessaging } from "../../src/providers/MessagingProvider";
 import { colors, radii, spacing, typography } from "../../src/theme";
 
+const SUBMIT_LOCK_MS = 320;
+
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
@@ -41,6 +43,9 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const lastMarkedReadMessageId = useRef<string | null>(null);
+  const submitLockRef = useRef(false);
+  const submitUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
   const conversation = useMemo(
     () => getConversation(conversationId),
@@ -63,6 +68,15 @@ export default function ChatScreen() {
     }
     router.replace("/(tabs)/messages");
   };
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      if (submitUnlockTimerRef.current) {
+        clearTimeout(submitUnlockTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -105,21 +119,33 @@ export default function ChatScreen() {
     );
   }
 
-  const submit = async () => {
-    if (submitting) return;
+  const submit = () => {
+    if (submitLockRef.current) return;
     const body = draft.trim();
     if (!conversation.canPost || !body) return;
 
+    submitLockRef.current = true;
     setSubmitting(true);
     setDraft("");
-    try {
-      const accepted = await sendMessage(conversation.id, body);
-      if (!accepted) {
-        setDraft((currentDraft) => currentDraft || body);
-      }
-    } finally {
-      setSubmitting(false);
-    }
+
+    const operation = sendMessage(conversation.id, body);
+    submitUnlockTimerRef.current = setTimeout(() => {
+      submitLockRef.current = false;
+      submitUnlockTimerRef.current = null;
+      if (mountedRef.current) setSubmitting(false);
+    }, SUBMIT_LOCK_MS);
+
+    void operation
+      .then((accepted) => {
+        if (!accepted && mountedRef.current) {
+          setDraft((currentDraft) => currentDraft || body);
+        }
+      })
+      .catch(() => {
+        if (mountedRef.current) {
+          setDraft((currentDraft) => currentDraft || body);
+        }
+      });
   };
 
   const connectionLabel =
@@ -266,7 +292,7 @@ export default function ChatScreen() {
             accessibilityRole="button"
             accessibilityLabel="Envoyer le message"
             accessibilityState={{ disabled: !canSubmit, busy: submitting }}
-            onPress={() => void submit()}
+            onPress={submit}
             style={({ pressed }) => [
               styles.sendButton,
               pressed && canSubmit && styles.sendPressed,
