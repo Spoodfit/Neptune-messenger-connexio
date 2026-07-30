@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { ConversationRow } from "@/components/ConversationRow";
@@ -6,7 +6,12 @@ import { useMessaging } from "@/providers/MessagingProvider";
 import { colors, spacing, typography } from "@/theme";
 
 export default function MessagesScreen() {
-  const { visibleConversations } = useMessaging();
+  const {
+    visibleConversations,
+    refreshConversations,
+    loadingConversations,
+    lastError
+  } = useMessaging();
 
   return (
     <View style={styles.screen}>
@@ -16,19 +21,62 @@ export default function MessagesScreen() {
       />
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Discussions récentes</Text>
-        <Text style={styles.sectionCount}>
+        <Text accessibilityRole="header" style={styles.sectionTitle}>
+          Discussions récentes
+        </Text>
+        <Text
+          accessibilityLabel={`${visibleConversations.length} discussions visibles`}
+          style={styles.sectionCount}
+        >
           {visibleConversations.length}
         </Text>
       </View>
 
-      <FlatList
-        data={visibleConversations}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ConversationRow conversation={item} />}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-      />
+      {lastError && visibleConversations.length === 0 ? (
+        <View style={styles.feedback}>
+          <Text accessibilityRole="alert" style={styles.feedbackTitle}>
+            Discussions indisponibles
+          </Text>
+          <Text style={styles.feedbackText}>{lastError}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Réessayer de charger les discussions"
+            onPress={() => void refreshConversations()}
+            style={({ pressed }) => [
+              styles.retryButton,
+              pressed && styles.retryPressed
+            ]}
+          >
+            <Text style={styles.retryText}>Réessayer</Text>
+          </Pressable>
+        </View>
+      ) : loadingConversations && visibleConversations.length === 0 ? (
+        <View style={styles.feedback} accessibilityLabel="Chargement des discussions">
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          accessibilityLabel="Liste des discussions Neptune"
+          data={visibleConversations}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => <ConversationRow conversation={item} />}
+          contentContainerStyle={[
+            styles.list,
+            visibleConversations.length === 0 && styles.emptyList
+          ]}
+          refreshing={loadingConversations}
+          onRefresh={() => void refreshConversations()}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.feedbackTitle}>Aucune discussion</Text>
+              <Text style={styles.feedbackText}>
+                Les groupes autorisés apparaîtront ici après la synchronisation Neptune.
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -64,5 +112,34 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: spacing.md,
     paddingBottom: 96
-  }
+  },
+  emptyList: { flexGrow: 1 },
+  feedback: {
+    flex: 1,
+    paddingHorizontal: spacing.xl,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm
+  },
+  feedbackTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
+  feedbackText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
+  retryButton: {
+    minHeight: 48,
+    minWidth: 124,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary
+  },
+  retryPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
+  retryText: { color: colors.white, fontWeight: "900" }
 });
