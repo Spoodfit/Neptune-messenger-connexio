@@ -16,6 +16,11 @@ import {
   latestPersistedMessageId,
   mergeMessagesNewestFirst
 } from "../domain/messageCollections";
+import {
+  hasKnownMessage,
+  rememberMessage,
+  rememberMessages
+} from "../domain/messageIdentity";
 import { calculateBackoffMs, type OutboxItem } from "../domain/outbox";
 import {
   createOptimisticMessage,
@@ -100,6 +105,12 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const loadingMoreRef = useRef(new Set<string>());
   const refreshingConversationsRef = useRef<Promise<void> | null>(null);
   const realtimeClientRef = useRef<RealtimeClient | null>(null);
+  const knownMessageKeys = useRef(new Set<string>()).current;
+  const seededMockMessagesRef = useRef(false);
+  if (env.mockMode && !seededMockMessagesRef.current) {
+    rememberMessages(knownMessageKeys, Object.values(initialMessages).flat());
+    seededMockMessagesRef.current = true;
+  }
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneMessagingApi(accessToken)),
     [accessToken]
@@ -147,6 +158,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         ...incoming,
         isMine: incoming.isMine || incoming.senderId === currentUser.id
       };
+      rememberMessage(knownMessageKeys, normalized);
       setMessagesByConversation((previous) => {
         const current = previous[normalized.conversationId] ?? [];
         const index = current.findIndex(
@@ -168,7 +180,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         return { ...previous, [normalized.conversationId]: next };
       });
     },
-    [currentUser.id]
+    [currentUser.id, knownMessageKeys]
   );
 
   const updateLocalMessage = useCallback(
@@ -227,6 +239,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       try {
         const page = await api.listMessages(conversationId);
         const normalized = normalizeMessagesForCurrentUser(page.items);
+        rememberMessages(knownMessageKeys, normalized);
         setMessagesByConversation((previous) => ({
           ...previous,
           [conversationId]: mergeMessagesNewestFirst(
@@ -250,7 +263,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         });
       }
     },
-    [api, normalizeMessagesForCurrentUser]
+    [api, knownMessageKeys, normalizeMessagesForCurrentUser]
   );
 
   const loadMoreMessages = useCallback(
@@ -266,6 +279,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       try {
         const page = await api.listMessages(conversationId, cursor);
         const normalized = normalizeMessagesForCurrentUser(page.items);
+        rememberMessages(knownMessageKeys, normalized);
         setMessagesByConversation((previous) => ({
           ...previous,
           [conversationId]: mergeMessagesNewestFirst(
@@ -289,7 +303,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         });
       }
     },
-    [api, nextCursorByConversation, normalizeMessagesForCurrentUser]
+    [api, knownMessageKeys, nextCursorByConversation, normalizeMessagesForCurrentUser]
   );
 
   const flushOutbox = useCallback(async (): Promise<void> => {
@@ -438,6 +452,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         return false;
       }
 
+      rememberMessage(knownMessageKeys, optimistic);
       setMessagesByConversation((previous) => ({
         ...previous,
         [conversationId]: [optimistic, ...(previous[conversationId] ?? [])]
@@ -452,7 +467,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       await flushOutbox();
       return true;
     },
-    [currentUser, flushOutbox, getConversation, outbox]
+    [currentUser, flushOutbox, getConversation, knownMessageKeys, outbox]
   );
 
   const retryMessage = useCallback(
@@ -486,11 +501,12 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         try {
           await api.markConversationRead(conversationId, lastReadMessageId);
         } catch {
-          // Le serveur recalculera le non-lu lors de la prochaine synchronisation.
+          // Restaure la source de vérité si l’optimisme local n’a pas été confirmé.
+          void refreshConversations();
         }
       }
     },
-    [api, messagesByConversation]
+    [api, messagesByConversation, refreshConversations]
   );
 
   useEffect(() => {
@@ -500,8 +516,9 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const handleRealtimeEvent = useCallback(
     (event: RealtimeEvent) => {
       if (event.type === "message.created" || event.type === "message.updated") {
+        const isNewMessage = !hasKnownMessage(knownMessageKeys, event.payload);
         upsertMessage(event.payload);
-        if (event.type === "message.created") {
+        if (event.type === "message.created" && isNewMessage) {
           setConversations((previous) =>
             previous.map((conversation) =>
               conversation.id === event.payload.conversationId
@@ -565,7 +582,13 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         }
       }
     },
-    [currentUser.id, outbox, refreshConversations, upsertMessage]
+    [
+      currentUser.id,
+      knownMessageKeys,
+      outbox,
+      refreshConversations,
+      upsertMessage
+    ]
   );
 
   useEffect(() => {
