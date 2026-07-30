@@ -12,6 +12,7 @@
   },
   "include": [
     "src/domain/**/*.ts",
+    "src/services/auth/**/*.ts",
     "src/types/messaging.ts",
     "src/utils/redact.ts",
     "tests/**/*.ts"
