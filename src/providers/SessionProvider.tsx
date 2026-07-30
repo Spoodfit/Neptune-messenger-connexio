@@ -28,6 +28,7 @@ import {
   getRegisteredPushToken,
   unregisterDeviceFromPushNotifications
 } from "../services/notifications/pushNotifications";
+import { purgeOutboxData } from "../storage/outboxStore";
 import type { AppUser, SessionPayload } from "../types/messaging";
 
 const REFRESH_TOKEN_KEY = "connexio.session.refresh-token";
@@ -230,6 +231,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const refreshTokenToRevoke = refreshTokenRef.current ?? refreshToken;
     const registeredPushToken = await getRegisteredPushToken();
 
+    // La purge doit réussir avant d'autoriser un autre compte sur cet appareil.
+    await purgeOutboxData();
     await clearSession();
 
     const revocations: Promise<unknown>[] = [
