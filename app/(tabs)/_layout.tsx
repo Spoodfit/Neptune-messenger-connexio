@@ -1,7 +1,6 @@
 import { Tabs } from "expo-router";
 
 import { NeptuneTabBar } from "@/components/NeptuneTabBar";
-import { env } from "@/config/env";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { colors } from "@/theme";
 
@@ -32,12 +31,11 @@ export default function TabsLayout() {
             unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined
         }}
       />
-      <Tabs.Screen name="communities" options={{ title: "Espaces" }} />
-      <Tabs.Screen
-        name="contacts"
-        options={{ href: env.mockMode ? undefined : null, title: "Membres" }}
-      />
+      <Tabs.Screen name="highlights" options={{ title: "Temps forts" }} />
+      <Tabs.Screen name="calls" options={{ title: "Appels" }} />
       <Tabs.Screen name="settings" options={{ title: "Profil" }} />
+      <Tabs.Screen name="communities" options={{ href: null, title: "Espaces" }} />
+      <Tabs.Screen name="contacts" options={{ href: null, title: "Membres" }} />
     </Tabs>
   );
 }
