@@ -33,16 +33,27 @@ function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 }
 
+function isJsonContentType(contentType: string): boolean {
+  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
+  return mediaType === "application/json" || mediaType.endsWith("+json");
+}
+
 async function parsePayload(response: Response): Promise<unknown> {
   if (response.status === 204) return null;
   const text = await response.text();
   if (!text) return null;
   const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
+  if (isJsonContentType(contentType)) {
     try {
       return JSON.parse(text) as unknown;
     } catch {
-      throw new ApiError("Réponse JSON invalide.", response.status);
+      throw new ApiError(
+        "Réponse JSON invalide.",
+        response.ok ? 502 : response.status,
+        undefined,
+        response.headers.get("x-request-id") ?? undefined,
+        "invalid-json"
+      );
     }
   }
   return text;
@@ -96,7 +107,11 @@ export async function apiRequest<T>(
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15_000);
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs ?? 15_000);
   const externalSignal = options.signal;
   const abortFromExternal = () => controller.abort();
   if (externalSignal?.aborted) controller.abort();
@@ -137,9 +152,12 @@ export async function apiRequest<T>(
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (controller.signal.aborted) {
-      throw new ApiError("Requête interrompue ou expirée.", 408);
+      if (!timedOut && externalSignal?.aborted) {
+        throw new ApiError("Requête annulée.", 499, undefined, undefined, "client-aborted");
+      }
+      throw new ApiError("Requête expirée.", 408, undefined, undefined, "timeout");
     }
-    throw new ApiError("Backend Neptune indisponible.", 0, error);
+    throw new ApiError("Backend Neptune indisponible.", 0, error, undefined, "network");
   } finally {
     clearTimeout(timeout);
     externalSignal?.removeEventListener("abort", abortFromExternal);
