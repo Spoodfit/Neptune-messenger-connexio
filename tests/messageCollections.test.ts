@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { mergeMessagesNewestFirst } from "../src/domain/messageCollections";
+import {
+  latestPersistedMessageId,
+  mergeMessagesNewestFirst
+} from "../src/domain/messageCollections";
 import type { ChatMessage } from "../src/types/messaging";
 
 const message = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
@@ -58,6 +61,21 @@ test("déduplique les pages et trie du plus récent au plus ancien", () => {
     ]
   );
   assert.deepEqual(result.map((item) => item.id), ["m2", "m1"]);
+});
+
+test("ignore les messages locaux lors du calcul de l'accusé de lecture", () => {
+  const messages = [
+    message({ id: "failed-local", status: "failed" }),
+    message({ id: "sending-local", status: "sending" }),
+    message({ id: "queued-local", status: "queued" }),
+    message({ id: "server-delivered", status: "delivered" })
+  ];
+
+  assert.equal(latestPersistedMessageId(messages), "server-delivered");
+  assert.equal(
+    latestPersistedMessageId(messages.slice(0, 3)),
+    null
+  );
 });
 
 test("fusionne 500 messages paginés sans perte ni doublon", () => {
