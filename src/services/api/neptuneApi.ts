@@ -1,9 +1,13 @@
-import { apiRequest } from "./httpClient";
+import { ApiError, apiRequest } from "./httpClient";
 import type {
   CursorPage,
   MessagingApi,
   SendMessageInput
 } from "./contracts";
+import {
+  refreshSessionAccessToken,
+  resolveSessionAccessToken
+} from "../auth/sessionRuntime";
 import type {
   ChatMessage,
   Conversation,
@@ -11,13 +15,32 @@ import type {
   RealtimeTicket
 } from "../../types/messaging";
 
+interface AuthenticatedRequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
 export class NeptuneMessagingApi implements MessagingApi {
-  constructor(private readonly accessToken: string) {}
+  constructor(private readonly fallbackAccessToken?: string | null) {}
+
+  private async request<T>(
+    path: string,
+    options: AuthenticatedRequestOptions = {}
+  ): Promise<T> {
+    const token = await resolveSessionAccessToken(this.fallbackAccessToken);
+    if (!token) throw new ApiError("Session Neptune absente.", 401);
+
+    try {
+      return await apiRequest<T>(path, { ...options, token });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      const refreshedToken = await refreshSessionAccessToken();
+      if (!refreshedToken) throw error;
+      return apiRequest<T>(path, { ...options, token: refreshedToken });
+    }
+  }
 
   listConversations(): Promise<Conversation[]> {
-    return apiRequest<Conversation[]>("/v1/conversations", {
-      token: this.accessToken
-    });
+    return this.request<Conversation[]>("/v1/conversations");
   }
 
   listMessages(
@@ -25,9 +48,8 @@ export class NeptuneMessagingApi implements MessagingApi {
     cursor?: string
   ): Promise<CursorPage<ChatMessage>> {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-    return apiRequest<CursorPage<ChatMessage>>(
-      `/v1/conversations/${encodeURIComponent(conversationId)}/messages${query}`,
-      { token: this.accessToken }
+    return this.request<CursorPage<ChatMessage>>(
+      `/v1/conversations/${encodeURIComponent(conversationId)}/messages${query}`
     );
   }
 
@@ -35,11 +57,11 @@ export class NeptuneMessagingApi implements MessagingApi {
     conversationId: string,
     input: SendMessageInput
   ): Promise<ChatMessage> {
-    return apiRequest<ChatMessage>(
+    return this.request<ChatMessage>(
       `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
       {
         method: "POST",
-        token: this.accessToken,
+        headers: { "Idempotency-Key": input.clientMessageId },
         body: JSON.stringify({
           client_message_id: input.clientMessageId,
           body: input.body,
@@ -53,11 +75,10 @@ export class NeptuneMessagingApi implements MessagingApi {
     conversationId: string,
     lastReadMessageId: string
   ): Promise<void> {
-    await apiRequest(
+    await this.request(
       `/v1/conversations/${encodeURIComponent(conversationId)}/read`,
       {
         method: "POST",
-        token: this.accessToken,
         body: JSON.stringify({ last_read_message_id: lastReadMessageId })
       }
     );
@@ -66,25 +87,22 @@ export class NeptuneMessagingApi implements MessagingApi {
   async registerPushToken(
     registration: PushTokenRegistration
   ): Promise<void> {
-    await apiRequest("/v1/devices/push-tokens", {
+    await this.request("/v1/devices/push-tokens", {
       method: "POST",
-      token: this.accessToken,
       body: JSON.stringify(registration)
     });
   }
 
   async unregisterPushToken(token: string): Promise<void> {
-    await apiRequest("/v1/devices/push-tokens/revoke", {
+    await this.request("/v1/devices/push-tokens/revoke", {
       method: "POST",
-      token: this.accessToken,
       body: JSON.stringify({ token })
     });
   }
 
   requestRealtimeTicket(): Promise<RealtimeTicket> {
-    return apiRequest<RealtimeTicket>("/v1/realtime/ticket", {
-      method: "POST",
-      token: this.accessToken
+    return this.request<RealtimeTicket>("/v1/realtime/ticket", {
+      method: "POST"
     });
   }
 }
