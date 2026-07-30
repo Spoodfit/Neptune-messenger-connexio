@@ -49,15 +49,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       : undefined,
     ios: {
       supportsTablet: false,
-      bundleIdentifier: "com.neptunebusiness.connexio",
-      infoPlist: {
-        NSCameraUsageDescription:
-          "Connexio utilise l’appareil photo uniquement lorsque vous choisissez d’envoyer une photo.",
-        NSMicrophoneUsageDescription:
-          "Connexio utilise le micro uniquement lorsque vous enregistrez un message vocal ou lancez un appel.",
-        NSPhotoLibraryUsageDescription:
-          "Connexio utilise votre photothèque uniquement pour joindre les médias que vous sélectionnez."
-      }
+      bundleIdentifier: "com.neptunebusiness.connexio"
     },
     android: {
       package: "com.neptunebusiness.connexio",
@@ -72,8 +64,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-sqlite",
         {
-          useSQLCipher: true,
-          enableFTS: true
+          useSQLCipher: true
         }
       ],
       [
