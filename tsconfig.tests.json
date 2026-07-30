@@ -13,6 +13,8 @@
   "include": [
     "src/domain/**/*.ts",
     "src/services/auth/**/*.ts",
+    "src/services/api/contracts.ts",
+    "src/services/api/wire.ts",
     "src/types/messaging.ts",
     "src/utils/redact.ts",
     "tests/**/*.ts"
