@@ -20,6 +20,7 @@
     "src/services/realtime/realtimeEvents.ts",
     "src/storage/outboxStore.memory.ts",
     "src/storage/outboxStore.types.ts",
+    "src/theme/**/*.ts",
     "src/types/messaging.ts",
     "src/utils/redact.ts",
     "tests/**/*.ts"
