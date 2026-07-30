@@ -1,23 +1,29 @@
 import type { SessionApi } from "./contracts";
 import { apiRequest } from "./httpClient";
+import { normalizeSessionPayload } from "./wire";
 import type { SessionPayload } from "../../types/messaging";
 
 export class NeptuneSessionApi implements SessionApi {
-  exchangeOneTimeCode(code: string, deviceId: string): Promise<SessionPayload> {
-    return apiRequest<SessionPayload>("/v1/mobile/session/exchange", {
+  async exchangeOneTimeCode(
+    code: string,
+    deviceId: string
+  ): Promise<SessionPayload> {
+    const payload = await apiRequest<unknown>("/v1/mobile/session/exchange", {
       method: "POST",
       body: JSON.stringify({
         one_time_code: code,
         device_id: deviceId
       })
     });
+    return normalizeSessionPayload(payload);
   }
 
-  refreshSession(refreshToken: string): Promise<SessionPayload> {
-    return apiRequest<SessionPayload>("/v1/mobile/session/refresh", {
+  async refreshSession(refreshToken: string): Promise<SessionPayload> {
+    const payload = await apiRequest<unknown>("/v1/mobile/session/refresh", {
       method: "POST",
       body: JSON.stringify({ refresh_token: refreshToken })
     });
+    return normalizeSessionPayload(payload);
   }
 
   async revokeSession(refreshToken: string): Promise<void> {
