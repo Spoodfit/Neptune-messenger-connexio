@@ -42,27 +42,38 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!databasePromise) {
     databasePromise = (async () => {
       const database = await SQLite.openDatabaseAsync(DATABASE_NAME);
-      const key = await getDatabaseKey();
-      await database.execAsync(`PRAGMA key = "x'${key}'";`);
-      await database.execAsync(`
-        PRAGMA journal_mode = WAL;
-        CREATE TABLE IF NOT EXISTS message_outbox (
-          client_message_id TEXT PRIMARY KEY NOT NULL,
-          conversation_id TEXT NOT NULL,
-          body TEXT NOT NULL,
-          reply_to_message_id TEXT,
-          created_at TEXT NOT NULL,
-          attempts INTEGER NOT NULL DEFAULT 0,
-          next_attempt_at INTEGER NOT NULL,
-          state TEXT NOT NULL,
-          last_error TEXT
-        );
-        UPDATE message_outbox SET state = 'pending' WHERE state = 'sending';
-      `);
-      return database;
+      try {
+        const key = await getDatabaseKey();
+        await database.execAsync(`PRAGMA key = "x'${key}'";`);
+        await database.execAsync(`
+          PRAGMA journal_mode = WAL;
+          CREATE TABLE IF NOT EXISTS message_outbox (
+            client_message_id TEXT PRIMARY KEY NOT NULL,
+            conversation_id TEXT NOT NULL,
+            body TEXT NOT NULL,
+            reply_to_message_id TEXT,
+            created_at TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            next_attempt_at INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            last_error TEXT
+          );
+          UPDATE message_outbox SET state = 'pending' WHERE state = 'sending';
+        `);
+        return database;
+      } catch (error) {
+        await database.closeAsync().catch(() => undefined);
+        throw error;
+      }
     })();
   }
-  return databasePromise;
+
+  try {
+    return await databasePromise;
+  } catch (error) {
+    databasePromise = null;
+    throw error;
+  }
 }
 
 function rowToItem(row: OutboxRow): OutboxItem {
