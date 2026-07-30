@@ -70,6 +70,7 @@ export default function ChatScreen() {
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (submitUnlockTimerRef.current) {
