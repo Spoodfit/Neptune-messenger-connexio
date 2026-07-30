@@ -3,12 +3,16 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSession } from "../src/providers/SessionProvider";
 import { ApiError } from "../src/services/api/httpClient";
@@ -74,68 +78,94 @@ export default function SignInScreen() {
   }, [params.code, submit]);
 
   return (
-    <View style={styles.screen}>
-      <LinearGradient colors={gradients.primary} style={styles.logo}>
-        <Text style={styles.logoText}>N</Text>
-      </LinearGradient>
-      <Text accessibilityRole="header" style={styles.title}>
-        Connexion à Connexio
-      </Text>
-      <Text style={styles.description}>
-        Utilisez le code à usage unique généré depuis votre compte Neptune Business.
-      </Text>
-      <TextInput
-        value={code}
-        onChangeText={setCode}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="one-time-code"
-        textContentType="oneTimeCode"
-        accessibilityLabel="Code de connexion Neptune"
-        accessibilityHint="Ce code est à usage unique et expire rapidement"
-        placeholder="Code de connexion"
-        placeholderTextColor={colors.textMuted}
-        style={styles.input}
-        returnKeyType="go"
-        onSubmitEditing={() => void submit(code)}
-      />
-      {error ? (
-        <Text
-          accessibilityRole="alert"
-          accessibilityLiveRegion="assertive"
-          style={styles.error}
-        >
-          {error}
-        </Text>
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Se connecter à Connexio"
-        accessibilityState={{ disabled: loading || !code.trim(), busy: loading }}
-        disabled={loading || !code.trim()}
-        onPress={() => void submit(code)}
-        style={({ pressed }) => [
-          styles.button,
-          pressed && styles.pressed,
-          (loading || !code.trim()) && styles.disabled
-        ]}
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.keyboard}
       >
-        {loading ? (
-          <ActivityIndicator color={colors.white} />
-        ) : (
-          <Text style={styles.buttonText}>Se connecter</Text>
-        )}
-      </Pressable>
-    </View>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+        >
+          <View style={styles.form}>
+            <LinearGradient
+              accessibilityElementsHidden
+              colors={gradients.primary}
+              style={styles.logo}
+            >
+              <Text style={styles.logoText}>N</Text>
+            </LinearGradient>
+            <Text accessibilityRole="header" style={styles.title}>
+              Connexion à Connexio
+            </Text>
+            <Text style={styles.description}>
+              Utilisez le code à usage unique généré depuis votre compte Neptune Business.
+            </Text>
+            <TextInput
+              value={code}
+              onChangeText={setCode}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="one-time-code"
+              textContentType="oneTimeCode"
+              accessibilityLabel="Code de connexion Neptune"
+              accessibilityHint="Ce code est à usage unique et expire rapidement"
+              placeholder="Code de connexion"
+              placeholderTextColor={colors.textMuted}
+              style={styles.input}
+              returnKeyType="go"
+              onSubmitEditing={() => void submit(code)}
+            />
+            {error ? (
+              <Text
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+                style={styles.error}
+              >
+                {error}
+              </Text>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Se connecter à Connexio"
+              accessibilityState={{ disabled: loading || !code.trim(), busy: loading }}
+              disabled={loading || !code.trim()}
+              onPress={() => void submit(code)}
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.pressed,
+                (loading || !code.trim()) && styles.disabled
+              ]}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.buttonText}>Se connecter</Text>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
-    justifyContent: "center",
-    padding: spacing.lg,
     backgroundColor: colors.navy
+  },
+  keyboard: { flex: 1 },
+  content: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: spacing.lg
+  },
+  form: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center"
   },
   logo: {
     width: 72,
