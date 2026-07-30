@@ -28,6 +28,13 @@ const pendingSettings = [
   }
 ];
 
+function getEnvironmentLabel(): string {
+  const buildProfile = Constants.expoConfig?.extra?.buildProfile;
+  if (buildProfile === "production") return "Production";
+  if (buildProfile === "preview") return "Préproduction";
+  return "Développement";
+}
+
 export default function SettingsScreen() {
   const { currentUser, signOut } = useSession();
   const [signingOut, setSigningOut] = useState(false);
@@ -135,7 +142,7 @@ export default function SettingsScreen() {
       </View>
 
       <Text style={styles.version}>
-        Connexio {Constants.expoConfig?.version ?? "0.2.0"} · Préproduction
+        Connexio {Constants.expoConfig?.version ?? "0.2.0"} · {getEnvironmentLabel()}
       </Text>
     </View>
   );
