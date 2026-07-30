@@ -9,9 +9,12 @@ import { SessionProvider, useSession } from "../src/providers/SessionProvider";
 import { NeptuneMessagingApi } from "../src/services/api/neptuneApi";
 import {
   configureNotificationPresentation,
+  getRegisteredPushToken,
   registerForPushNotifications,
+  registrationFromDevicePushToken,
   rememberRegisteredPushToken
 } from "../src/services/notifications/pushNotifications";
+import type { PushTokenRegistration } from "../src/types/messaging";
 import { colors } from "../src/theme";
 
 configureNotificationPresentation();
@@ -47,19 +50,53 @@ function AuthenticatedApp() {
     ) {
       return;
     }
+
     let cancelled = false;
+    let tokenSubscription: Notifications.EventSubscription | null = null;
+
     void (async () => {
       const token = await getAccessToken();
       if (!token || cancelled) return;
+      const api = new NeptuneMessagingApi(token);
+      let synchronization = Promise.resolve();
+
+      const synchronize = (registration: PushTokenRegistration) => {
+        synchronization = synchronization.then(async () => {
+          if (cancelled) return;
+          const previousToken = await getRegisteredPushToken();
+          await api.registerPushToken(registration);
+          if (previousToken && previousToken !== registration.token) {
+            await api.unregisterPushToken(previousToken).catch(() => undefined);
+          }
+          if (!cancelled) {
+            await rememberRegisteredPushToken(registration.token);
+          }
+        });
+        return synchronization;
+      };
+
       const registration = await registerForPushNotifications();
-      if (!registration || cancelled) return;
-      await new NeptuneMessagingApi(token).registerPushToken(registration);
-      if (!cancelled) await rememberRegisteredPushToken(registration.token);
+      if (registration && !cancelled) await synchronize(registration);
+      if (cancelled) return;
+
+      tokenSubscription = Notifications.addPushTokenListener(
+        (devicePushToken) => {
+          void registrationFromDevicePushToken(devicePushToken)
+            .then((rotatedRegistration) =>
+              rotatedRegistration ? synchronize(rotatedRegistration) : undefined
+            )
+            .catch(() => {
+              // Une rotation échouée sera retentée au prochain démarrage actif.
+            });
+        }
+      );
     })().catch(() => {
       // Le refus ou l’échec d’enregistrement push ne bloque pas la messagerie.
     });
+
     return () => {
       cancelled = true;
+      tokenSubscription?.remove();
     };
   }, [getAccessToken, hasAccessToken, isAuthenticated, sessionReady]);
 
