@@ -26,10 +26,13 @@ export default function ChatScreen() {
     getConversation,
     getMessages,
     loadMessages,
+    loadMoreMessages,
+    hasMoreMessages,
     sendMessage,
     retryMessage,
     markConversationRead,
     loadingConversationIds,
+    loadingMoreConversationIds,
     connectionState,
     lastError
   } = useMessaging();
@@ -45,6 +48,8 @@ export default function ChatScreen() {
     [conversationId, getMessages]
   );
   const loading = loadingConversationIds.has(conversationId);
+  const loadingMore = loadingMoreConversationIds.has(conversationId);
+  const hasMore = hasMoreMessages(conversationId);
   const latestMessageId = messages[0]?.id;
 
   useEffect(() => {
@@ -153,6 +158,20 @@ export default function ChatScreen() {
           inverted
           keyboardShouldPersistTaps="handled"
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          onEndReachedThreshold={0.25}
+          onEndReached={() => {
+            if (hasMore && !loadingMore) void loadMoreMessages(conversationId);
+          }}
+          ListFooterComponent={
+            loadingMore ? (
+              <View
+                style={styles.historyLoader}
+                accessibilityLabel="Chargement des messages précédents"
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
             <Text style={styles.empty}>Aucun message. Lancez la discussion.</Text>
           }
@@ -231,6 +250,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm
   },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
+  historyLoader: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
   empty: { ...typography.body, color: colors.textMuted, textAlign: "center", marginTop: 64 },
   composer: {
