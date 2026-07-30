@@ -3,6 +3,7 @@ import { Tabs } from "expo-router";
 import type { ReactNode } from "react";
 import type { ColorValue } from "react-native";
 
+import { useMessaging } from "@/providers/MessagingProvider";
 import { colors } from "@/theme";
 
 type TabIconName =
@@ -33,6 +34,12 @@ function icon(
 }
 
 export default function TabsLayout() {
+  const { visibleConversations } = useMessaging();
+  const unreadCount = visibleConversations.reduce(
+    (total, conversation) => total + conversation.unreadCount,
+    0
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -49,6 +56,12 @@ export default function TabsLayout() {
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: "700"
+        },
+        tabBarBadgeStyle: {
+          backgroundColor: colors.primary,
+          color: colors.white,
+          fontSize: 10,
+          fontWeight: "900"
         }
       }}
     >
@@ -56,6 +69,11 @@ export default function TabsLayout() {
         name="messages"
         options={{
           title: "Discussions",
+          tabBarAccessibilityLabel:
+            unreadCount > 0
+              ? `Discussions, ${unreadCount} message${unreadCount > 1 ? "s" : ""} non lu${unreadCount > 1 ? "s" : ""}`
+              : "Discussions, aucun message non lu",
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
           tabBarIcon: icon(
             "chatbubble-ellipses",
             "chatbubble-ellipses-outline"
