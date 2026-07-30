@@ -13,7 +13,7 @@ export const colors = {
   border: "#E0E5EF",
   text: "#10213D",
   textSecondary: "#40516D",
-  textMuted: "#647086",
+  textMuted: "#606C82",
   white: "#FFFFFF",
   whiteMuted: "rgba(255,255,255,0.72)",
   success: "#11754C",
