@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+import { strictEqual, throws } from "node:assert";
 import test from "node:test";
 
 import {
@@ -17,19 +17,19 @@ test("normalise une session snake_case sans donner de privilèges par défaut", 
     user: { id: "user-1", name: "Léa Neptune", role: "member" }
   });
 
-  assert.equal(session.accessToken, "access");
-  assert.equal(session.refreshToken, "refresh");
-  assert.equal(session.user.initials, "LN");
-  assert.equal(session.user.role, "member");
-  assert.equal(session.user.roleLabel, "Triton");
+  strictEqual(session.accessToken, "access");
+  strictEqual(session.refreshToken, "refresh");
+  strictEqual(session.user.initials, "LN");
+  strictEqual(session.user.role, "member");
+  strictEqual(session.user.roleLabel, "Triton");
 });
 
 test("refuse une session sans jetons ou durée valide", () => {
-  assert.throws(
+  throws(
     () => normalizeSessionPayload({ expires_in: 900, user: {} }),
     WireValidationError
   );
-  assert.throws(
+  throws(
     () =>
       normalizeSessionPayload({
         access_token: "a",
@@ -54,21 +54,21 @@ test("normalise conversations et compteurs snake_case en lecture seule par défa
     }
   ]);
 
-  assert.equal(conversations[0]?.memberCount, 68);
-  assert.equal(conversations[0]?.unreadCount, 5);
-  assert.equal(conversations[0]?.lastMessage, "Bonjour");
-  assert.equal(conversations[0]?.canPost, false);
+  strictEqual(conversations[0]?.memberCount, 68);
+  strictEqual(conversations[0]?.unreadCount, 5);
+  strictEqual(conversations[0]?.lastMessage, "Bonjour");
+  strictEqual(conversations[0]?.canPost, false);
 });
 
 test("refuse un type de conversation absent ou inconnu", () => {
-  assert.throws(
+  throws(
     () =>
       normalizeConversationList([
         { id: "club", name: "Club sans type", can_post: true }
       ]),
     WireValidationError
   );
-  assert.throws(
+  throws(
     () =>
       normalizeConversationList([
         { id: "club", name: "Club inconnu", type: "forbidden", can_post: true }
@@ -86,10 +86,10 @@ test("normalise un message temps réel minimal", () => {
     createdAt: "2026-07-30T10:00:00.000Z"
   });
 
-  assert.equal(message.senderName, "Membre Neptune");
-  assert.equal(message.senderInitials, "MN");
-  assert.equal(message.status, "sent");
-  assert.equal(message.isMine, false);
+  strictEqual(message.senderName, "Membre Neptune");
+  strictEqual(message.senderInitials, "MN");
+  strictEqual(message.status, "sent");
+  strictEqual(message.isMine, false);
 });
 
 test("valide une page curseur et refuse un curseur non textuel", () => {
@@ -105,10 +105,10 @@ test("valide une page curseur et refuse un curseur non textuel", () => {
     ],
     next_cursor: "cursor-2"
   });
-  assert.equal(page.nextCursor, "cursor-2");
-  assert.equal(page.items[0]?.conversationId, "club");
+  strictEqual(page.nextCursor, "cursor-2");
+  strictEqual(page.items[0]?.conversationId, "club");
 
-  assert.throws(
+  throws(
     () => normalizeMessagePage({ items: [], next_cursor: 42 }),
     WireValidationError
   );
