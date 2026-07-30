@@ -59,3 +59,25 @@ test("déduplique les pages et trie du plus récent au plus ancien", () => {
   );
   assert.deepEqual(result.map((item) => item.id), ["m2", "m1"]);
 });
+
+test("fusionne 500 messages paginés sans perte ni doublon", () => {
+  const allMessages = Array.from({ length: 500 }, (_, index) =>
+    message({
+      id: `message-${index}`,
+      body: `Message ${index}`,
+      createdAt: new Date(Date.UTC(2026, 6, 30, 10, 0, index)).toISOString()
+    })
+  );
+
+  let state: ChatMessage[] = [];
+  for (let offset = 0; offset < allMessages.length; offset += 50) {
+    const page = allMessages.slice(offset, offset + 50);
+    const overlap = offset === 0 ? [] : allMessages.slice(offset - 5, offset);
+    state = mergeMessagesNewestFirst(state, [...overlap, ...page]);
+  }
+
+  assert.equal(state.length, 500);
+  assert.equal(new Set(state.map((item) => item.id)).size, 500);
+  assert.equal(state[0]?.id, "message-499");
+  assert.equal(state.at(-1)?.id, "message-0");
+});
