@@ -85,10 +85,19 @@ export default function ChatScreen() {
 
   const submit = async () => {
     const body = draft.trim();
-    if (!body) return;
+    if (!conversation.canPost || !body) return;
     setDraft("");
     await sendMessage(conversation.id, body);
   };
+
+  const connectionLabel =
+    connectionState === "online"
+      ? `${conversation.memberCount} membres`
+      : connectionState === "connecting"
+        ? "Connexion…"
+        : conversation.canPost
+          ? "Hors ligne — envois mis en attente"
+          : "Hors ligne";
 
   return (
     <KeyboardAvoidingView
@@ -111,17 +120,16 @@ export default function ChatScreen() {
             {conversation.name}
           </Text>
           <Text accessibilityLiveRegion="polite" style={styles.headerSubtitle}>
-            {connectionState === "online"
-              ? `${conversation.memberCount} membres`
-              : connectionState === "connecting"
-                ? "Connexion…"
-                : "Hors ligne — envois mis en attente"}
+            {connectionLabel}
           </Text>
         </View>
       </View>
 
       {conversation.pinnedMessage ? (
-        <View style={styles.pinned} accessibilityLabel={`Message épinglé. ${conversation.pinnedMessage}`}>
+        <View
+          style={styles.pinned}
+          accessibilityLabel={`Message épinglé. ${conversation.pinnedMessage}`}
+        >
           <Ionicons name="pin" size={16} color={colors.primary} />
           <Text style={styles.pinnedText} numberOfLines={2}>
             {conversation.pinnedMessage}
@@ -173,39 +181,56 @@ export default function ChatScreen() {
             ) : null
           }
           ListEmptyComponent={
-            <Text style={styles.empty}>Aucun message. Lancez la discussion.</Text>
+            <Text style={styles.empty}>
+              {conversation.canPost
+                ? "Aucun message. Lancez la discussion."
+                : "Aucun message publié dans cet espace."}
+            </Text>
           }
         />
       )}
 
-      <View style={styles.composer}>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          accessibilityLabel="Écrire un message"
-          accessibilityHint="Le message sera placé en attente si la connexion est indisponible"
-          placeholder="Écrire un message…"
-          placeholderTextColor={colors.textMuted}
-          multiline
-          style={styles.input}
-          maxLength={4_000}
-          returnKeyType="default"
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Envoyer le message"
-          accessibilityState={{ disabled: !draft.trim() }}
-          onPress={() => void submit()}
-          style={({ pressed }) => [
-            styles.sendButton,
-            pressed && styles.sendPressed,
-            !draft.trim() && styles.sendDisabled
-          ]}
-          disabled={!draft.trim()}
+      {conversation.canPost ? (
+        <View style={styles.composer}>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            accessibilityLabel="Écrire un message"
+            accessibilityHint="Le message sera placé en attente si la connexion est indisponible"
+            placeholder="Écrire un message…"
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={styles.input}
+            maxLength={4_000}
+            returnKeyType="default"
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Envoyer le message"
+            accessibilityState={{ disabled: !draft.trim() }}
+            onPress={() => void submit()}
+            style={({ pressed }) => [
+              styles.sendButton,
+              pressed && styles.sendPressed,
+              !draft.trim() && styles.sendDisabled
+            ]}
+            disabled={!draft.trim()}
+          >
+            <Ionicons name="send" size={19} color={colors.white} />
+          </Pressable>
+        </View>
+      ) : (
+        <View
+          accessible
+          accessibilityLabel="Conversation en lecture seule"
+          style={styles.readOnly}
         >
-          <Ionicons name="send" size={19} color={colors.white} />
-        </Pressable>
-      </View>
+          <Ionicons name="lock-closed" size={17} color={colors.textMuted} />
+          <Text style={styles.readOnlyText}>
+            Lecture seule — seuls les responsables autorisés peuvent publier.
+          </Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -256,7 +281,12 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
-  empty: { ...typography.body, color: colors.textMuted, textAlign: "center", marginTop: 64 },
+  empty: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: 64
+  },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -288,6 +318,25 @@ const styles = StyleSheet.create({
   },
   sendPressed: { transform: [{ scale: 0.96 }] },
   sendDisabled: { opacity: 0.45 },
+  readOnly: {
+    minHeight: 64,
+    paddingHorizontal: spacing.md,
+    paddingBottom: Platform.OS === "ios" ? 22 : spacing.sm,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm
+  },
+  readOnlyText: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    textAlign: "center",
+    flexShrink: 1
+  },
   missing: {
     flex: 1,
     alignItems: "center",
@@ -296,6 +345,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   missingTitle: { ...typography.heading2, color: colors.text },
-  missingButton: { minWidth: 88, minHeight: 48, alignItems: "center", justifyContent: "center" },
+  missingButton: {
+    minWidth: 88,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   backLink: { color: colors.primary, fontWeight: "800" }
 });
