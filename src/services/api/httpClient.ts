@@ -1,4 +1,9 @@
 import { env } from "../../config/env";
+import {
+  classifyAbort,
+  isJsonMediaType,
+  parseRetryAfterMs
+} from "../../domain/httpProtocol";
 
 export class ApiError extends Error {
   readonly retryable: boolean;
@@ -33,17 +38,12 @@ function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 }
 
-function isJsonContentType(contentType: string): boolean {
-  const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-  return mediaType === "application/json" || mediaType.endsWith("+json");
-}
-
 async function parsePayload(response: Response): Promise<unknown> {
   if (response.status === 204) return null;
   const text = await response.text();
   if (!text) return null;
   const contentType = response.headers.get("content-type") ?? "";
-  if (isJsonContentType(contentType)) {
+  if (isJsonMediaType(contentType)) {
     try {
       return JSON.parse(text) as unknown;
     } catch {
@@ -87,15 +87,6 @@ function getErrorDetails(
     return { message: `Erreur API ${status}`, code };
   }
   return { message: `Erreur API ${status}` };
-}
-
-function parseRetryAfter(value: string | null): number | undefined {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1_000);
-  const date = Date.parse(value);
-  if (!Number.isFinite(date)) return undefined;
-  return Math.max(0, date - Date.now());
 }
 
 export async function apiRequest<T>(
@@ -144,7 +135,7 @@ export async function apiRequest<T>(
         payload,
         requestId,
         details.code,
-        parseRetryAfter(response.headers.get("retry-after"))
+        parseRetryAfterMs(response.headers.get("retry-after"))
       );
     }
 
@@ -152,10 +143,17 @@ export async function apiRequest<T>(
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (controller.signal.aborted) {
-      if (!timedOut && externalSignal?.aborted) {
-        throw new ApiError("Requête annulée.", 499, undefined, undefined, "client-aborted");
-      }
-      throw new ApiError("Requête expirée.", 408, undefined, undefined, "timeout");
+      const classification = classifyAbort(
+        timedOut,
+        Boolean(externalSignal?.aborted)
+      );
+      throw new ApiError(
+        classification.message,
+        classification.status,
+        undefined,
+        undefined,
+        classification.code
+      );
     }
     throw new ApiError("Backend Neptune indisponible.", 0, error, undefined, "network");
   } finally {
