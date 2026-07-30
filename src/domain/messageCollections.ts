@@ -1,6 +1,20 @@
 import { reconcileServerMessage } from "./messageLifecycle";
 import type { ChatMessage } from "../types/messaging";
 
+const PERSISTED_STATUSES = new Set<ChatMessage["status"]>([
+  "sent",
+  "delivered",
+  "read"
+]);
+
+export function latestPersistedMessageId(
+  messages: readonly ChatMessage[]
+): string | null {
+  return (
+    messages.find((message) => PERSISTED_STATUSES.has(message.status))?.id ?? null
+  );
+}
+
 export function mergeMessagesNewestFirst(
   current: readonly ChatMessage[],
   incoming: readonly ChatMessage[]
