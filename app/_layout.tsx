@@ -23,6 +23,10 @@ import { colors } from "../src/theme";
 
 configureNotificationPresentation();
 
+function chatPath(conversationId: string): `/chat/${string}` {
+  return `/chat/${encodeURIComponent(conversationId)}`;
+}
+
 function AuthenticatedApp() {
   const {
     sessionReady,
@@ -33,22 +37,26 @@ function AuthenticatedApp() {
   } = useSession();
   const segments = useSegments();
   const pendingConversationId = useRef<string | null>(null);
+  const processedNotificationResponseId = useRef<string | null>(null);
   const hasAccessToken = Boolean(accessToken);
 
   useEffect(() => {
     if (!sessionReady) return;
     const onSignInRoute = segments[0] === "sign-in";
-    if (!isAuthenticated && !onSignInRoute) {
-      router.replace("/sign-in");
+
+    if (!isAuthenticated) {
+      if (!onSignInRoute) router.replace("/sign-in");
       return;
     }
-    if (isAuthenticated && onSignInRoute) {
-      const conversationId = pendingConversationId.current;
+
+    const conversationId = pendingConversationId.current;
+    if (conversationId) {
       pendingConversationId.current = null;
-      router.replace(
-        conversationId ? `/chat/${conversationId}` : "/(tabs)/messages"
-      );
+      router.replace(chatPath(conversationId));
+      return;
     }
+
+    if (onSignInRoute) router.replace("/(tabs)/messages");
   }, [isAuthenticated, segments, sessionReady]);
 
   useEffect(() => {
@@ -122,20 +130,25 @@ function AuthenticatedApp() {
       ) {
         return;
       }
+
+      const responseId = response.notification.request.identifier;
+      if (processedNotificationResponseId.current === responseId) return;
+
       const conversationId =
         response.notification.request.content.data?.conversationId;
-      if (typeof conversationId !== "string" || conversationId.length === 0) {
-        return;
-      }
-      pendingConversationId.current = conversationId;
+      if (typeof conversationId !== "string" || !conversationId.trim()) return;
+
+      processedNotificationResponseId.current = responseId;
+      pendingConversationId.current = conversationId.trim();
+      void Notifications.clearLastNotificationResponseAsync();
+
       if (!sessionReady) return;
       if (isAuthenticated) {
         pendingConversationId.current = null;
-        router.push(`/chat/${conversationId}`);
+        router.push(chatPath(conversationId.trim()));
       } else {
         router.replace("/sign-in");
       }
-      void Notifications.clearLastNotificationResponseAsync();
     };
 
     void Notifications.getLastNotificationResponseAsync().then(openConversation);
@@ -166,9 +179,7 @@ function AuthenticatedApp() {
     </>
   );
 
-  if (!isAuthenticated) {
-    return applicationStack;
-  }
+  if (!isAuthenticated) return applicationStack;
 
   return (
     <MessagingProvider key={`user:${currentUser.id}`}>
