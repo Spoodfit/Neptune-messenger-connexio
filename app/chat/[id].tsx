@@ -39,6 +39,7 @@ export default function ChatScreen() {
     lastError
   } = useMessaging();
   const [draft, setDraft] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const lastMarkedReadMessageId = useRef<string | null>(null);
 
   const conversation = useMemo(
@@ -53,6 +54,15 @@ export default function ChatScreen() {
   const loadingMore = loadingMoreConversationIds.has(conversationId);
   const hasMore = hasMoreMessages(conversationId);
   const latestMessageId = messages[0]?.id;
+  const canSubmit = Boolean(conversation?.canPost && draft.trim() && !submitting);
+
+  const goBackToDiscussions = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/(tabs)/messages");
+  };
 
   useEffect(() => {
     if (!conversationId) return;
@@ -86,7 +96,7 @@ export default function ChatScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Revenir aux discussions"
-          onPress={() => router.back()}
+          onPress={goBackToDiscussions}
           style={styles.missingButton}
         >
           <Text style={styles.backLink}>Retour</Text>
@@ -96,11 +106,20 @@ export default function ChatScreen() {
   }
 
   const submit = async () => {
+    if (submitting) return;
     const body = draft.trim();
     if (!conversation.canPost || !body) return;
+
+    setSubmitting(true);
     setDraft("");
-    const accepted = await sendMessage(conversation.id, body);
-    if (!accepted) setDraft(body);
+    try {
+      const accepted = await sendMessage(conversation.id, body);
+      if (!accepted) {
+        setDraft((currentDraft) => currentDraft || body);
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const connectionLabel =
@@ -132,16 +151,24 @@ export default function ChatScreen() {
           accessibilityRole="button"
           accessibilityLabel="Retour aux discussions"
           hitSlop={4}
-          onPress={() => router.back()}
+          onPress={goBackToDiscussions}
           style={styles.headerButton}
         >
           <Ionicons name="chevron-back" size={25} color={colors.white} />
         </Pressable>
         <View style={styles.headerContent}>
-          <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>
+          <Text
+            accessibilityRole="header"
+            style={styles.headerTitle}
+            numberOfLines={1}
+          >
             {conversation.name}
           </Text>
-          <Text accessibilityLiveRegion="polite" style={styles.headerSubtitle}>
+          <Text
+            accessibilityLiveRegion="polite"
+            numberOfLines={2}
+            style={styles.headerSubtitle}
+          >
             {connectionLabel}
           </Text>
         </View>
@@ -238,16 +265,20 @@ export default function ChatScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Envoyer le message"
-            accessibilityState={{ disabled: !draft.trim() }}
+            accessibilityState={{ disabled: !canSubmit, busy: submitting }}
             onPress={() => void submit()}
             style={({ pressed }) => [
               styles.sendButton,
-              pressed && styles.sendPressed,
-              !draft.trim() && styles.sendDisabled
+              pressed && canSubmit && styles.sendPressed,
+              !canSubmit && styles.sendDisabled
             ]}
-            disabled={!draft.trim()}
+            disabled={!canSubmit}
           >
-            <Ionicons name="send" size={19} color={colors.white} />
+            {submitting ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Ionicons name="send" size={19} color={colors.white} />
+            )}
           </Pressable>
         </View>
       ) : (
@@ -287,11 +318,16 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 16,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    flexShrink: 0
   },
-  headerContent: { flex: 1 },
+  headerContent: { flex: 1, minWidth: 0 },
   headerTitle: { ...typography.heading2, color: colors.white },
-  headerSubtitle: { ...typography.caption, color: colors.whiteMuted, marginTop: 2 },
+  headerSubtitle: {
+    ...typography.caption,
+    color: colors.whiteMuted,
+    marginTop: 2
+  },
   pinned: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -302,7 +338,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border
   },
-  pinnedText: { ...typography.caption, color: colors.textSecondary, flex: 1 },
+  pinnedText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    flex: 1,
+    minWidth: 0
+  },
   errorBanner: {
     ...typography.bodySmall,
     color: colors.danger,
@@ -334,6 +375,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     minHeight: 48,
     maxHeight: 132,
     borderRadius: radii.xl,
@@ -349,7 +391,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primary
+    backgroundColor: colors.primary,
+    flexShrink: 0
   },
   sendPressed: { transform: [{ scale: 0.96 }] },
   sendDisabled: { opacity: 0.45 },
@@ -377,7 +420,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     backgroundColor: colors.background
   },
-  missingTitle: { ...typography.heading2, color: colors.text },
+  missingTitle: {
+    ...typography.heading2,
+    color: colors.text,
+    textAlign: "center"
+  },
   missingButton: {
     minWidth: 88,
     minHeight: 48,
