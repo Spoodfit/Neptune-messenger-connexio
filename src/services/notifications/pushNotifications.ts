@@ -38,6 +38,15 @@ export async function forgetRegisteredPushToken(): Promise<void> {
   await SecureStore.deleteItemAsync(REGISTERED_PUSH_TOKEN_KEY);
 }
 
+export async function unregisterDeviceFromPushNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
+  try {
+    await Notifications.unregisterForNotificationsAsync();
+  } finally {
+    await forgetRegisteredPushToken();
+  }
+}
+
 export async function registerForPushNotifications(): Promise<PushTokenRegistration | null> {
   if (Platform.OS === "web" || !Device.isDevice) return null;
 
