@@ -5,7 +5,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   const realtimeUrl = process.env.EXPO_PUBLIC_REALTIME_URL ?? "";
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
-  const buildProfile = process.env.EAS_BUILD_PROFILE;
+  const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
   const isGithubPages = process.env.EXPO_PUBLIC_GITHUB_PAGES === "true";
 
   if (buildProfile === "production") {
@@ -87,6 +87,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       apiBaseUrl,
       realtimeUrl,
       mockMode,
+      buildProfile,
       ...(easProjectId
         ? {
             eas: {
