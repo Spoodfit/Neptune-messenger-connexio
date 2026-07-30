@@ -102,7 +102,12 @@ function booleanOrDefault(
 
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "NB";
+  return (
+    parts
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "NB"
+  );
 }
 
 function normalizeRole(value: unknown): UserRole {
@@ -111,10 +116,14 @@ function normalizeRole(value: unknown): UserRole {
     : "triton";
 }
 
-function normalizeConversationType(value: unknown): ConversationType {
-  return typeof value === "string" && CONVERSATION_TYPES.has(value as ConversationType)
-    ? (value as ConversationType)
-    : "topic";
+function requireConversationType(value: unknown): ConversationType {
+  if (
+    typeof value !== "string" ||
+    !CONVERSATION_TYPES.has(value as ConversationType)
+  ) {
+    throw new WireValidationError("Type de conversation manquant ou invalide.");
+  }
+  return value as ConversationType;
 }
 
 function normalizeMessageStatus(value: unknown): MessageStatus {
@@ -150,8 +159,18 @@ export function normalizeSessionPayload(value: unknown): SessionPayload {
     throw new WireValidationError("Durée de session absente ou invalide.");
   }
   return {
-    accessToken: requireString(value, "Jeton d'accès", "accessToken", "access_token"),
-    refreshToken: requireString(value, "Jeton de renouvellement", "refreshToken", "refresh_token"),
+    accessToken: requireString(
+      value,
+      "Jeton d'accès",
+      "accessToken",
+      "access_token"
+    ),
+    refreshToken: requireString(
+      value,
+      "Jeton de renouvellement",
+      "refreshToken",
+      "refresh_token"
+    ),
     expiresIn,
     user: normalizeAppUser(readUnknown(value, "user"))
   };
@@ -172,15 +191,21 @@ export function normalizeConversation(value: unknown): Conversation {
     description: optionalString(value, "description"),
     categoryLabel:
       optionalString(value, "categoryLabel", "category_label") ?? "Discussion",
-    type: normalizeConversationType(readUnknown(value, "type")),
-    memberCount: Math.max(0, numberOrDefault(value, 0, "memberCount", "member_count")),
-    unreadCount: Math.max(0, numberOrDefault(value, 0, "unreadCount", "unread_count")),
+    type: requireConversationType(readUnknown(value, "type")),
+    memberCount: Math.max(
+      0,
+      numberOrDefault(value, 0, "memberCount", "member_count")
+    ),
+    unreadCount: Math.max(
+      0,
+      numberOrDefault(value, 0, "unreadCount", "unread_count")
+    ),
     lastMessage: optionalString(value, "lastMessage", "last_message"),
     lastMessageAt: optionalString(value, "lastMessageAt", "last_message_at"),
     pinnedMessage: optionalString(value, "pinnedMessage", "pinned_message"),
     restricted: booleanOrDefault(value, false, "restricted"),
     allowedRoles,
-    canPost: booleanOrDefault(value, true, "canPost", "can_post"),
+    canPost: booleanOrDefault(value, false, "canPost", "can_post"),
     avatarUrl: optionalString(value, "avatarUrl", "avatar_url")
   };
 }
@@ -229,13 +254,18 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
       "replyToMessageId",
       "reply_to_message_id"
     ),
-    retryCount: Math.max(0, numberOrDefault(value, 0, "retryCount", "retry_count")),
+    retryCount: Math.max(
+      0,
+      numberOrDefault(value, 0, "retryCount", "retry_count")
+    ),
     errorCode: optionalString(value, "errorCode", "error_code")
   };
 }
 
 export function normalizeMessagePage(value: unknown): CursorPage<ChatMessage> {
-  if (!isRecord(value)) throw new WireValidationError("Page de messages invalide.");
+  if (!isRecord(value)) {
+    throw new WireValidationError("Page de messages invalide.");
+  }
   const items = readUnknown(value, "items");
   if (!Array.isArray(items)) {
     throw new WireValidationError("Liste de messages invalide.");
