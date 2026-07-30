@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: connexio-provider-hardening-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   patch:
     if: github.actor != 'github-actions[bot]'
