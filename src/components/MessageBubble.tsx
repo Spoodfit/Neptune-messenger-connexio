@@ -1,4 +1,12 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View
+} from "react-native";
 
 import { colors, radii, spacing, typography } from "../theme";
 import type { ChatMessage, MessageStatus } from "../types/messaging";
@@ -18,10 +26,26 @@ const STATUS_LABELS: Record<MessageStatus, string> = {
   failed: "Échec de l’envoi"
 };
 
+const AVATAR_SIZE = 34;
+const MAX_BUBBLE_WIDTH = 520;
+
 export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const statusLabel = STATUS_LABELS[message.status];
   const retryable =
     message.isMine && message.status === "failed" && message.clientMessageId;
+  const availableRowWidth = Math.max(180, viewportWidth - spacing.md * 2);
+  const maxBubbleWidth = Math.min(
+    message.isMine
+      ? availableRowWidth * 0.82
+      : availableRowWidth - AVATAR_SIZE - spacing.sm,
+    MAX_BUBBLE_WIDTH
+  );
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [message.senderAvatarUrl]);
 
   return (
     <View
@@ -35,9 +59,10 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
     >
       {!message.isMine ? (
         <View style={styles.avatar} accessibilityElementsHidden>
-          {message.senderAvatarUrl ? (
+          {message.senderAvatarUrl && !avatarFailed ? (
             <Image
               source={{ uri: message.senderAvatarUrl }}
+              onError={() => setAvatarFailed(true)}
               resizeMode="cover"
               style={styles.avatarImage}
             />
@@ -49,11 +74,14 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
       <View
         style={[
           styles.wrapper,
+          { maxWidth: maxBubbleWidth },
           message.isMine ? styles.mineWrapper : styles.otherWrapper
         ]}
       >
         {!message.isMine ? (
-          <Text style={styles.sender}>{message.senderName}</Text>
+          <Text numberOfLines={1} style={styles.sender}>
+            {message.senderName}
+          </Text>
         ) : null}
         <View
           style={[styles.bubble, message.isMine ? styles.mine : styles.other]}
@@ -106,32 +134,40 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm },
+  row: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm
+  },
   mineRow: { justifyContent: "flex-end" },
   otherRow: { justifyContent: "flex-start" },
   avatar: {
-    width: 34,
-    height: 34,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
     borderRadius: 12,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primarySoft,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: colors.border,
+    flexShrink: 0
   },
   avatarImage: { width: "100%", height: "100%" },
   avatarText: { color: colors.primary, fontSize: 11, fontWeight: "900" },
-  wrapper: { maxWidth: "82%" },
+  wrapper: { minWidth: 0, flexShrink: 1 },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
   sender: {
     ...typography.caption,
+    maxWidth: "100%",
     color: colors.textMuted,
     marginLeft: spacing.sm,
     marginBottom: 4
   },
   bubble: {
+    maxWidth: "100%",
     borderRadius: radii.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -144,19 +180,28 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderBottomLeftRadius: 5
   },
-  body: { ...typography.body },
+  body: { ...typography.body, flexShrink: 1 },
   mineBody: { color: colors.white },
   otherBody: { color: colors.text },
   metadata: {
+    maxWidth: "100%",
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 6
+    columnGap: 6,
+    rowGap: 2
   },
-  time: { ...typography.caption },
+  time: { ...typography.caption, flexShrink: 0 },
   mineTime: { color: colors.whiteMuted },
   otherTime: { color: colors.textMuted },
-  status: { color: colors.whiteMuted, fontSize: 10, fontWeight: "700" },
+  status: {
+    color: colors.whiteMuted,
+    fontSize: 10,
+    fontWeight: "700",
+    flexShrink: 1,
+    textAlign: "right"
+  },
   failedStatus: { color: "#FFE1E4" },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
