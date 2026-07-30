@@ -1,11 +1,11 @@
 export const colors = {
   navy: "#07162F",
   navyLight: "#102A54",
-  primary: "#4F63FF",
-  primaryDark: "#3446D8",
+  primary: "#4658EB",
+  primaryDark: "#3040C7",
   primarySoft: "#ECEEFF",
   violet: "#7B3FF2",
-  magenta: "#D94CFF",
+  magenta: "#A83BCE",
   orange: "#FF7A45",
   background: "#F5F7FC",
   surface: "#FFFFFF",
@@ -13,14 +13,14 @@ export const colors = {
   border: "#E0E5EF",
   text: "#10213D",
   textSecondary: "#40516D",
-  textMuted: "#7B879B",
+  textMuted: "#647086",
   white: "#FFFFFF",
   whiteMuted: "rgba(255,255,255,0.72)",
-  success: "#168A5B",
+  success: "#11754C",
   successSoft: "#E1F7EE",
-  warning: "#B66A10",
+  warning: "#955308",
   warningSoft: "#FFF1D6",
-  danger: "#C33F4A",
+  danger: "#B52F3E",
   dangerSoft: "#FFE6E9"
 } as const;
 
