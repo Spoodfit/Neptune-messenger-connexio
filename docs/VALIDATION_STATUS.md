@@ -13,15 +13,20 @@ Date de revue : 30 juillet 2026.
 | Domaine | Statut | Preuve / limite |
 |---|---|---|
 | TypeScript strict | Validé dépôt | Typecheck Expo séparé du projet de tests Node |
-| Tests de domaine | Validé dépôt | Tests compilés avec les types Node officiels et exécutés dans la CI |
+| Tests de domaine | Validé dépôt | Types Node officiels, tests compilés puis exécutés dans la CI |
 | Installation reproductible | Validé dépôt | `package-lock.json` synchronisé et gate `npm ci` verte |
+| Audit des dépendances runtime | Validé dépôt | `npm audit --omit=dev --audit-level=high` vert |
 | Configuration Expo publique | Validé dépôt | `npx expo config --type public` |
 | Compatibilité Expo | Validé dépôt | `npx expo install --check` vert |
 | Mode mock | Validé dépôt | Actif uniquement si explicitement demandé |
 | Configuration production | Validé dépôt | API/EAS obligatoires, mock interdit, HTTPS/WSS exigés |
+| Environnement affiché | Validé dépôt | Développement, Préproduction ou Production dérivé du profil EAS réel |
 | Cibles tactiles principales | Validé dépôt | Actions principales de 48 dp ou plus |
-| Erreurs et états vides | Validé dépôt | Discussions, chat, annuaire et réglages |
-| État hors authentification | Validé dépôt | Le provider de messagerie est démonté et aucun transport ne tourne sur l’écran de connexion |
+| Contraste | Validé dépôt | Palette renforcée et test automatique WCAG AA des paires de texte principales |
+| En-têtes | Validé dépôt | En-têtes compacts, sans sous-titres explicatifs visibles répétés |
+| Erreurs et états vides | Validé dépôt | Discussions, chat, espaces, annuaire et réglages |
+| Annuaire | Validé dépôt | Route conservée pour le développement, onglet masqué hors démo tant que l’API n’existe pas |
+| État hors authentification | Validé dépôt | Provider démonté et aucun transport actif sur l’écran de connexion |
 | VoiceOver / TalkBack | Non validé | Test physique obligatoire |
 
 ## Identité et session
@@ -29,11 +34,13 @@ Date de revue : 30 juillet 2026.
 | Domaine | Statut | Preuve / limite |
 |---|---|---|
 | Code mobile à usage unique | Validé partiellement | Client anti-double soumission ; expiration/non-rejeu à prouver côté Neptune |
+| Identité hors session | Validé dépôt | Aucun compte Neptune fictif hors démo ; identité neutre Triton |
+| État authentifié | Validé dépôt | Requiert un access token réellement obtenu, pas la seule présence d’un refresh token |
 | Refresh token | Validé dépôt | SecureStore, révocation locale et serveur |
 | Refresh proactif | Validé dépôt | Expiration, marge et single-flight testés |
 | Retry après HTTP 401 | Validé dépôt | Une seule tentative après rafraîchissement |
-| Panne backend temporaire | Validé dépôt | La session locale n’est pas détruite sur réseau/5xx |
-| Changement de compte | Validé dépôt | État de messagerie démonté et outbox chiffrée purgée avant une nouvelle session |
+| Panne backend temporaire | Validé dépôt | Le refresh token n’est pas détruit sur réseau/5xx et une reprise est tentée au retour actif |
+| Changement de compte | Validé dépôt | État démonté et outbox chiffrée purgée avant une nouvelle session |
 | Autorisations par rôle | Non validé | Le serveur Neptune doit rester source de vérité |
 
 ## Messages
@@ -41,6 +48,7 @@ Date de revue : 30 juillet 2026.
 | Domaine | Statut | Preuve / limite |
 |---|---|---|
 | Envoi optimiste | Validé dépôt | L’entrée d’outbox est persistée avant l’apparition optimiste |
+| Brouillon après échec local | Validé dépôt | Le texte est restauré si l’outbox refuse l’écriture |
 | Outbox persistante | Validé dépôt | SQLite / SQLCipher et reprise après relance |
 | Échec du stockage local | Validé dépôt | Erreur capturée, aucun envoi fantôme sans outbox |
 | Idempotence client | Validé dépôt | `client_message_id` + `Idempotency-Key` |
@@ -48,8 +56,11 @@ Date de revue : 30 juillet 2026.
 | Retry borné | Validé dépôt | Backoff, `Retry-After` et échec non réessayable |
 | Pagination curseur | Validé dépôt | Curseur conservé et chargement incrémental |
 | Fusion/déduplication | Validé dépôt | REST, temps réel et optimiste |
+| Non-lus temps réel | Validé dépôt | Événement rejoué identifié par ID serveur ou ID client et non recompté |
 | Test 500 messages | Validé dépôt | Aucun doublon ni perte dans le test de domaine |
+| Dates backend | Validé dépôt | Timestamps invalides rejetés à la frontière ; formateurs UI défensifs |
 | Permission locale d’envoi | Validé dépôt | Le provider refuse toute conversation absente ou en lecture seule |
+| Photos de profil | Validé dépôt | Photos réelles dans la liste et les bulles, fallback non bloquant |
 | Livraison / lecture réelle | Validé partiellement | Client prêt ; accusés serveur à prouver |
 | Édition/suppression/réactions | Non validé | Endpoints et autorisations serveur absents |
 | Pièces jointes / vocaux | Non validé | Feature flag obligatoire |
@@ -75,6 +86,7 @@ Date de revue : 30 juillet 2026.
 | Rotation du token | Validé dépôt | Listener Expo, nouvel enregistrement et révocation de l’ancien |
 | Déconnexion | Validé dépôt | Révocation backend, native et locale |
 | Deep link conversation | Validé dépôt | App ouverte ou authentification différée |
+| Badge global | Validé dépôt | Agrégation plafonnée à `99+` et libellé accessible |
 | APNs / FCM réels | Non validé | Certificats, EAS et appareils physiques requis |
 | Confidentialité écran verrouillé | Validé partiellement | Canal Android privé ; payload serveur à auditer |
 
@@ -83,13 +95,21 @@ Date de revue : 30 juillet 2026.
 | Domaine | Statut | Preuve / limite |
 |---|---|---|
 | Transport production | Validé dépôt | HTTPS/WSS obligatoires |
-| Validation des réponses réseau | Validé dépôt | Sessions, conversations, messages, tickets et événements WebSocket |
-| Principe du moindre privilège | Validé dépôt | Rôle inconnu normalisé vers Triton, publication refusée sans permission explicite |
+| Validation des réponses réseau | Validé dépôt | Sessions, conversations, messages, dates, tickets et événements WebSocket |
+| Principe du moindre privilège | Validé dépôt | Rôle inconnu vers Triton, publication refusée sans permission explicite |
 | Base locale chiffrée | Validé partiellement | SQLCipher configuré ; build natif et extraction à tester |
 | Logs sensibles | Validé partiellement | Redaction présente ; audit runtime à effectuer |
 | Blocage / signalement / modération | Non validé | Backend et UI à construire |
 | Export / suppression de compte | Non validé | Parcours Neptune global requis |
 | Map / localisation / Ghost Mode | Non validé | Ne pas activer en production |
+
+## Tickets de release externes
+
+- #4 — API Neptune, permissions et idempotence ;
+- #5 — APNs, FCM, deep links et builds appareils ;
+- #6 — modération, confidentialité et droits utilisateur ;
+- #7 — QA appareils, accessibilité, réseau et stockage chiffré ;
+- #8 — fonctions complètes de messagerie, médias, vocaux et appels.
 
 ## Release gates externes
 
