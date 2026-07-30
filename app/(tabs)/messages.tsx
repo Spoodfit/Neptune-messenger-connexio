@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useMemo } from "react";
 import {
   ActivityIndicator,
@@ -11,7 +12,7 @@ import {
 import { BrandHeader } from "@/components/BrandHeader";
 import { ConversationRow } from "@/components/ConversationRow";
 import { useMessaging } from "@/providers/MessagingProvider";
-import { colors, spacing, typography } from "@/theme";
+import { colors, gradients, radii, spacing, typography } from "@/theme";
 
 const MAX_CONTENT_WIDTH = 720;
 
@@ -57,48 +58,49 @@ export default function MessagesScreen() {
   );
 
   return (
-    <View style={styles.screen}>
-      <BrandHeader
-        title="Connexio"
-        subtitle="Les échanges Neptune, au même endroit."
-      />
+    <LinearGradient colors={gradients.screen} style={styles.screen}>
+      <BrandHeader title="Messages" subtitle="Les échanges Neptune, au même endroit." />
 
       <View style={styles.sectionHeader}>
         <Text accessibilityRole="header" style={styles.sectionTitle}>
-          Discussions récentes
+          Discussions
         </Text>
-        <Text
-          accessibilityLabel={`${sortedConversations.length} discussions visibles`}
-          style={styles.sectionCount}
-        >
-          {sortedConversations.length}
-        </Text>
+        <View style={styles.sectionCountShell}>
+          <Text
+            accessibilityLabel={`${sortedConversations.length} discussions visibles`}
+            style={styles.sectionCount}
+          >
+            {sortedConversations.length}
+          </Text>
+        </View>
       </View>
 
       {lastError && sortedConversations.length === 0 ? (
-        <View style={styles.feedback}>
-          <Text accessibilityRole="alert" style={styles.feedbackTitle}>
-            Discussions indisponibles
-          </Text>
-          <Text style={styles.feedbackText}>{lastError}</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Réessayer de charger les discussions"
-            onPress={() => void refreshConversations()}
-            style={({ pressed }) => [
-              styles.retryButton,
-              pressed && styles.retryPressed
-            ]}
-          >
-            <Text style={styles.retryText}>Réessayer</Text>
-          </Pressable>
+        <View style={styles.feedbackWrap}>
+          <LinearGradient colors={gradients.glass} style={styles.feedback}>
+            <Text accessibilityRole="alert" style={styles.feedbackTitle}>
+              Discussions indisponibles
+            </Text>
+            <Text style={styles.feedbackText}>{lastError}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Réessayer de charger les discussions"
+              onPress={() => void refreshConversations()}
+              style={({ pressed }) => [
+                styles.retryButton,
+                pressed && styles.retryPressed
+              ]}
+            >
+              <Text style={styles.retryText}>Réessayer</Text>
+            </Pressable>
+          </LinearGradient>
         </View>
       ) : loadingConversations && sortedConversations.length === 0 ? (
         <View
-          style={styles.feedback}
+          style={styles.feedbackWrap}
           accessibilityLabel="Chargement des discussions"
         >
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.violet} />
         </View>
       ) : (
         <FlatList
@@ -125,22 +127,19 @@ export default function MessagesScreen() {
           }
         />
       )}
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
+  screen: { flex: 1 },
   sectionHeader: {
     width: "100%",
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: "center",
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: 14,
+    paddingBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm
@@ -148,19 +147,25 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...typography.heading3,
     color: colors.text,
-    flexShrink: 1
+    flex: 1,
+    flexShrink: 1,
+    fontWeight: "900"
+  },
+  sectionCountShell: {
+    minWidth: 28,
+    height: 28,
+    paddingHorizontal: 7,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: "rgba(107,79,234,0.18)",
+    alignItems: "center",
+    justifyContent: "center"
   },
   sectionCount: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.primarySoft,
-    color: colors.primary,
-    textAlign: "center",
-    textAlignVertical: "center",
-    fontWeight: "800",
-    lineHeight: 26,
-    flexShrink: 0
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: "900"
   },
   listViewport: {
     width: "100%",
@@ -168,18 +173,27 @@ const styles = StyleSheet.create({
     alignSelf: "center"
   },
   list: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: 96
+    paddingHorizontal: 10,
+    paddingBottom: 22
   },
   emptyList: { flexGrow: 1 },
-  feedback: {
+  feedbackWrap: {
     width: "100%",
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: "center",
     flex: 1,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.md,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
+  },
+  feedback: {
+    width: "100%",
+    maxWidth: 430,
+    padding: spacing.lg,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    alignItems: "center",
     gap: spacing.sm
   },
   emptyState: {
