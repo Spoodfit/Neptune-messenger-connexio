@@ -4,6 +4,7 @@ import type {
   MessagingApi,
   SendMessageInput
 } from "./contracts";
+import { normalizeRealtimeTicket } from "./realtimeTicketWire";
 import {
   normalizeChatMessage,
   normalizeConversationList,
@@ -108,9 +109,10 @@ export class NeptuneMessagingApi implements MessagingApi {
     });
   }
 
-  requestRealtimeTicket(): Promise<RealtimeTicket> {
-    return this.request<RealtimeTicket>("/v1/realtime/ticket", {
+  async requestRealtimeTicket(): Promise<RealtimeTicket> {
+    const payload = await this.request<unknown>("/v1/realtime/ticket", {
       method: "POST"
     });
+    return normalizeRealtimeTicket(payload);
   }
 }
