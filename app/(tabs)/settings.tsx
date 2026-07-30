@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -14,7 +15,7 @@ import {
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { useSession } from "@/providers/SessionProvider";
-import { colors, radii, spacing, typography } from "@/theme";
+import { colors, gradients, radii, spacing, typography } from "@/theme";
 
 const MAX_CONTENT_WIDTH = 720;
 
@@ -60,31 +61,46 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <BrandHeader title="Réglages" subtitle="Compte et préférences Connexio." />
+    <LinearGradient colors={gradients.screen} style={styles.screen}>
+      <BrandHeader title="Profil" subtitle="Compte et préférences Connexio." />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentColumn}>
-          <View
+          <LinearGradient
+            colors={gradients.glass}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
             accessible
             accessibilityLabel={`${currentUser.name}. ${currentUser.company}. ${currentUser.roleLabel}`}
             style={styles.profile}
           >
-            <View style={styles.avatar} accessibilityElementsHidden>
-              <Text style={styles.initials} numberOfLines={1}>
-                {currentUser.initials}
-              </Text>
-            </View>
+            <LinearGradient
+              colors={gradients.primaryWarm}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatarShell}
+              accessibilityElementsHidden
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.initials} numberOfLines={1}>
+                  {currentUser.initials}
+                </Text>
+              </View>
+            </LinearGradient>
             <View style={styles.profileContent}>
               <Text style={styles.name}>{currentUser.name}</Text>
               <Text style={styles.role}>
                 {currentUser.company || "Neptune Business"} · {currentUser.roleLabel}
               </Text>
+              <View style={styles.roleChip}>
+                <View style={styles.roleDot} />
+                <Text style={styles.roleChipText}>{currentUser.roleLabel}</Text>
+              </View>
             </View>
-          </View>
+          </LinearGradient>
 
           <View style={styles.list}>
             <Pressable
@@ -94,12 +110,13 @@ export default function SettingsScreen() {
               onPress={() => void Linking.openSettings()}
               style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={colors.primary}
-                style={styles.rowIcon}
-              />
+              <View style={styles.iconShell}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={21}
+                  color={colors.text}
+                />
+              </View>
               <View style={styles.rowContent}>
                 <Text style={styles.rowTitle}>Notifications</Text>
                 <Text style={styles.rowSubtitle}>
@@ -109,7 +126,7 @@ export default function SettingsScreen() {
               <Ionicons
                 accessibilityElementsHidden
                 name="open-outline"
-                size={19}
+                size={18}
                 color={colors.textMuted}
                 style={styles.trailingIcon}
               />
@@ -122,12 +139,9 @@ export default function SettingsScreen() {
                 key={item.title}
                 style={styles.row}
               >
-                <Ionicons
-                  name={item.icon}
-                  size={22}
-                  color={colors.textMuted}
-                  style={styles.rowIcon}
-                />
+                <View style={[styles.iconShell, styles.iconShellMuted]}>
+                  <Ionicons name={item.icon} size={21} color={colors.textMuted} />
+                </View>
                 <View style={styles.rowContent}>
                   <Text style={styles.rowTitle}>{item.title}</Text>
                   <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
@@ -177,18 +191,15 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
+  screen: { flex: 1 },
   scrollContent: {
     width: "100%",
-    paddingBottom: 112
+    paddingBottom: 28
   },
   contentColumn: {
     width: "100%",
@@ -197,33 +208,45 @@ const styles = StyleSheet.create({
   },
   profile: {
     margin: spacing.md,
-    padding: spacing.lg,
+    padding: spacing.md,
     borderRadius: radii.xl,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderSoft,
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.md
+    alignItems: "center",
+    gap: spacing.md,
+    shadowColor: "#000000",
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 7
+  },
+  avatarShell: {
+    width: 64,
+    height: 64,
+    padding: 3,
+    borderRadius: 22,
+    flexShrink: 0,
+    shadowColor: colors.violet,
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 }
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    flex: 1,
+    borderRadius: 19,
+    borderWidth: 2,
+    borderColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primary,
-    flexShrink: 0
+    backgroundColor: colors.surfaceStrong
   },
   initials: {
-    color: colors.white,
+    color: colors.text,
     fontSize: 18,
     fontWeight: "900"
   },
-  profileContent: {
-    flex: 1,
-    minWidth: 0
-  },
+  profileContent: { flex: 1, minWidth: 0 },
   name: {
     ...typography.heading2,
     color: colors.text,
@@ -232,8 +255,34 @@ const styles = StyleSheet.create({
   role: {
     ...typography.bodySmall,
     color: colors.textMuted,
-    marginTop: 4,
+    marginTop: 3,
     flexShrink: 1
+  },
+  roleChip: {
+    alignSelf: "flex-start",
+    marginTop: 9,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: "rgba(107,79,234,0.34)",
+    backgroundColor: "rgba(107,79,234,0.12)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  roleDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.orange
+  },
+  roleChipText: {
+    color: colors.text,
+    fontSize: 9,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.6
   },
   list: {
     marginHorizontal: spacing.md,
@@ -244,20 +293,31 @@ const styles = StyleSheet.create({
     minHeight: 72,
     padding: spacing.md,
     borderRadius: radii.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.glass,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderSoft,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: spacing.md
+    gap: 12
   },
-  rowPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
-  rowIcon: { marginTop: 1, flexShrink: 0 },
-  trailingIcon: { marginTop: 1, flexShrink: 0 },
-  rowContent: {
-    flex: 1,
-    minWidth: 0
+  rowPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
+  iconShell: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,72,186,0.20)",
+    borderWidth: 1,
+    borderColor: "rgba(0,72,186,0.30)",
+    flexShrink: 0
   },
+  iconShellMuted: {
+    backgroundColor: colors.glass,
+    borderColor: colors.borderSoft
+  },
+  trailingIcon: { marginTop: 10, flexShrink: 0 },
+  rowContent: { flex: 1, minWidth: 0 },
   rowTitle: {
     ...typography.heading3,
     color: colors.text,
@@ -275,7 +335,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radii.pill,
-    backgroundColor: colors.surfaceMuted
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.borderSoft
   },
   pendingLabel: {
     color: colors.textMuted,
@@ -287,6 +349,8 @@ const styles = StyleSheet.create({
     color: colors.danger,
     backgroundColor: colors.dangerSoft,
     borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: "rgba(255,123,134,0.22)",
     padding: spacing.sm
   },
   signOutButton: {
@@ -296,7 +360,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.danger,
+    borderColor: "rgba(255,123,134,0.36)",
     backgroundColor: colors.dangerSoft,
     flexDirection: "row",
     flexWrap: "wrap",
