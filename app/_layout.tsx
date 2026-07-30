@@ -3,6 +3,10 @@ import * as Notifications from "expo-notifications";
 import { router, Stack, useSegments } from "expo-router";
 import { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import {
+  initialWindowMetrics,
+  SafeAreaProvider
+} from "react-native-safe-area-context";
 
 import { MessagingProvider } from "../src/providers/MessagingProvider";
 import { SessionProvider, useSession } from "../src/providers/SessionProvider";
@@ -175,9 +179,11 @@ function AuthenticatedApp() {
 
 export default function RootLayout() {
   return (
-    <SessionProvider>
-      <AuthenticatedApp />
-    </SessionProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+      <SessionProvider>
+        <AuthenticatedApp />
+      </SessionProvider>
+    </SafeAreaProvider>
   );
 }
 
