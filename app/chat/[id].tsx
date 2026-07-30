@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -34,6 +34,7 @@ export default function ChatScreen() {
     lastError
   } = useMessaging();
   const [draft, setDraft] = useState("");
+  const lastMarkedReadMessageId = useRef<string | null>(null);
 
   const conversation = useMemo(
     () => getConversation(conversationId),
@@ -44,12 +45,20 @@ export default function ChatScreen() {
     [conversationId, getMessages]
   );
   const loading = loadingConversationIds.has(conversationId);
+  const latestMessageId = messages[0]?.id;
 
   useEffect(() => {
     if (!conversationId) return;
+    lastMarkedReadMessageId.current = null;
     void loadMessages(conversationId);
+  }, [conversationId, loadMessages]);
+
+  useEffect(() => {
+    if (!conversationId || !latestMessageId) return;
+    if (lastMarkedReadMessageId.current === latestMessageId) return;
+    lastMarkedReadMessageId.current = latestMessageId;
     void markConversationRead(conversationId);
-  }, [conversationId, loadMessages, markConversationRead]);
+  }, [conversationId, latestMessageId, markConversationRead]);
 
   if (!conversation) {
     return (
@@ -96,7 +105,7 @@ export default function ChatScreen() {
           <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>
             {conversation.name}
           </Text>
-          <Text style={styles.headerSubtitle}>
+          <Text accessibilityLiveRegion="polite" style={styles.headerSubtitle}>
             {connectionState === "online"
               ? `${conversation.memberCount} membres`
               : connectionState === "connecting"
@@ -116,7 +125,11 @@ export default function ChatScreen() {
       ) : null}
 
       {lastError ? (
-        <Text accessibilityRole="alert" style={styles.errorBanner}>
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+          style={styles.errorBanner}
+        >
           {lastError}
         </Text>
       ) : null}
@@ -151,6 +164,7 @@ export default function ChatScreen() {
           value={draft}
           onChangeText={setDraft}
           accessibilityLabel="Écrire un message"
+          accessibilityHint="Le message sera placé en attente si la connexion est indisponible"
           placeholder="Écrire un message…"
           placeholderTextColor={colors.textMuted}
           multiline
@@ -161,6 +175,7 @@ export default function ChatScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Envoyer le message"
+          accessibilityState={{ disabled: !draft.trim() }}
           onPress={() => void submit()}
           style={({ pressed }) => [
             styles.sendButton,
