@@ -16,10 +16,7 @@ import {
   latestPersistedMessageId,
   mergeMessagesNewestFirst
 } from "../domain/messageCollections";
-import {
-  calculateBackoffMs,
-  type OutboxItem
-} from "../domain/outbox";
+import { calculateBackoffMs, type OutboxItem } from "../domain/outbox";
 import {
   createOptimisticMessage,
   markMessageFailed,
@@ -56,7 +53,7 @@ interface MessagingContextValue {
     conversationId: string,
     body: string,
     replyToMessageId?: string
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   retryMessage: (clientMessageId: string) => Promise<void>;
   markConversationRead: (conversationId: string) => Promise<void>;
   loadingConversations: boolean;
@@ -72,8 +69,7 @@ const sleep = (duration: number) =>
 const demoConversations: Conversation[] = initialConversations.map(
   (conversation) => ({
     ...conversation,
-    canPost:
-      conversation.canPost ?? conversation.type !== "announcement"
+    canPost: conversation.canPost ?? conversation.type !== "announcement"
   })
 );
 
@@ -103,6 +99,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const loadingInitialRef = useRef(new Set<string>());
   const loadingMoreRef = useRef(new Set<string>());
   const refreshingConversationsRef = useRef<Promise<void> | null>(null);
+  const realtimeClientRef = useRef<RealtimeClient | null>(null);
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneMessagingApi(accessToken)),
     [accessToken]
@@ -298,11 +295,24 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const flushOutbox = useCallback(async (): Promise<void> => {
     if (flushing.current) return flushing.current;
     const operation = (async () => {
-      const dueItems = await outbox.listDue(Date.now());
+      let dueItems: OutboxItem[];
+      try {
+        dueItems = await outbox.listDue(Date.now());
+      } catch {
+        setLastError("Le stockage local des messages est indisponible.");
+        return;
+      }
+
       for (const item of dueItems) {
         if (!env.mockMode && !api) continue;
-        await outbox.markSending(item.clientMessageId);
+        try {
+          await outbox.markSending(item.clientMessageId);
+        } catch {
+          setLastError("Le stockage local des messages est indisponible.");
+          break;
+        }
         updateLocalMessage(item.clientMessageId, markMessageSending);
+
         try {
           let serverMessage: ChatMessage;
           if (env.mockMode) {
@@ -333,10 +343,15 @@ export function MessagingProvider({ children }: PropsWithChildren) {
           setLastError(null);
         } catch (error) {
           if (error instanceof ApiError && error.status === 409 && api) {
-            await outbox.remove(item.clientMessageId);
-            await loadMessages(item.conversationId);
+            try {
+              await outbox.remove(item.clientMessageId);
+              await loadMessages(item.conversationId);
+            } catch {
+              setLastError("Le stockage local des messages est indisponible.");
+            }
             continue;
           }
+
           const attempts = item.attempts + 1;
           const errorCode =
             error instanceof ApiError
@@ -351,12 +366,16 @@ export function MessagingProvider({ children }: PropsWithChildren) {
                 error instanceof ApiError ? error.retryAfterMs ?? 0 : 0
               )
             : Number.MAX_SAFE_INTEGER;
-          await outbox.markFailure(
-            item.clientMessageId,
-            attempts,
-            nextAttemptAt,
-            errorCode
-          );
+          try {
+            await outbox.markFailure(
+              item.clientMessageId,
+              attempts,
+              nextAttemptAt,
+              errorCode
+            );
+          } catch {
+            setLastError("Le stockage local des messages est indisponible.");
+          }
           updateLocalMessage(item.clientMessageId, (message) =>
             markMessageFailed(message, errorCode)
           );
@@ -375,9 +394,19 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       conversationId: string,
       body: string,
       replyToMessageId?: string
-    ) => {
+    ): Promise<boolean> => {
+      const conversation = getConversation(conversationId);
       const cleanBody = body.trim();
-      if (!cleanBody) return;
+      if (!conversation || conversation.canPost !== true) {
+        setLastError("Vous n’êtes pas autorisé à publier dans cette conversation.");
+        return false;
+      }
+      if (!cleanBody) return false;
+      if (cleanBody.length > 4_000) {
+        setLastError("Le message dépasse la limite de 4 000 caractères.");
+        return false;
+      }
+
       const clientMessageId = Crypto.randomUUID();
       const createdAt = new Date().toISOString();
       const optimistic = createOptimisticMessage({
@@ -401,30 +430,42 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         nextAttemptAt: Date.now(),
         state: "pending"
       };
+
+      try {
+        await outbox.enqueue(outboxItem);
+      } catch {
+        setLastError("Impossible d’enregistrer le message sur cet appareil.");
+        return false;
+      }
+
       setMessagesByConversation((previous) => ({
         ...previous,
         [conversationId]: [optimistic, ...(previous[conversationId] ?? [])]
       }));
       setConversations((previous) =>
-        previous.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, lastMessage: cleanBody, lastMessageAt: createdAt }
-            : conversation
+        previous.map((item) =>
+          item.id === conversationId
+            ? { ...item, lastMessage: cleanBody, lastMessageAt: createdAt }
+            : item
         )
       );
-      await outbox.enqueue(outboxItem);
       await flushOutbox();
+      return true;
     },
-    [currentUser, flushOutbox, outbox]
+    [currentUser, flushOutbox, getConversation, outbox]
   );
 
   const retryMessage = useCallback(
     async (clientMessageId: string) => {
-      const existing = await outbox.get(clientMessageId);
-      if (!existing) return;
-      await outbox.requeue(clientMessageId);
-      updateLocalMessage(clientMessageId, queueMessageForRetry);
-      await flushOutbox();
+      try {
+        const existing = await outbox.get(clientMessageId);
+        if (!existing) return;
+        await outbox.requeue(clientMessageId);
+        updateLocalMessage(clientMessageId, queueMessageForRetry);
+        await flushOutbox();
+      } catch {
+        setLastError("Le stockage local des messages est indisponible.");
+      }
     },
     [flushOutbox, outbox, updateLocalMessage]
   );
@@ -478,7 +519,9 @@ export function MessagingProvider({ children }: PropsWithChildren) {
           );
         }
         if (event.payload.clientMessageId) {
-          void outbox.remove(event.payload.clientMessageId);
+          void outbox.remove(event.payload.clientMessageId).catch(() => {
+            setLastError("Le stockage local des messages est indisponible.");
+          });
         }
         return;
       }
@@ -527,7 +570,6 @@ export function MessagingProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (env.mockMode || !api || !env.realtimeUrl) return;
-    setConnectionState("connecting");
     const client = new RealtimeClient({
       url: env.realtimeUrl,
       ticketProvider: async () => (await api.requestRealtimeTicket()).ticket,
@@ -540,16 +582,33 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         }
       }
     });
-    client.connect();
-    return () => client.disconnect();
+    realtimeClientRef.current = client;
+    if (AppState.currentState === "active") {
+      setConnectionState("connecting");
+      client.connect();
+    }
+    return () => {
+      if (realtimeClientRef.current === client) realtimeClientRef.current = null;
+      client.disconnect();
+    };
   }, [api, flushOutbox, handleRealtimeEvent, refreshConversations]);
 
   useEffect(() => {
-    const interval = setInterval(() => void flushOutbox(), 12_000);
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") void flushOutbox();
+    }, 12_000);
     const subscription = AppState.addEventListener("change", (state) => {
+      const realtimeClient = realtimeClientRef.current;
       if (state === "active") {
+        if (realtimeClient) {
+          setConnectionState("connecting");
+          realtimeClient.connect();
+        }
         void flushOutbox();
         void refreshConversations();
+      } else {
+        realtimeClient?.disconnect();
+        if (!env.mockMode) setConnectionState("offline");
       }
     });
     void flushOutbox();
