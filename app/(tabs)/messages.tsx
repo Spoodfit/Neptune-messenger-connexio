@@ -18,22 +18,42 @@ const MAX_CONTENT_WIDTH = 720;
 export default function MessagesScreen() {
   const {
     visibleConversations,
+    getMessages,
     refreshConversations,
     loadingConversations,
     lastError
   } = useMessaging();
   const sortedConversations = useMemo(
     () =>
-      [...visibleConversations].sort((first, second) => {
-        const firstTime = first.lastMessageAt
-          ? Date.parse(first.lastMessageAt)
-          : 0;
-        const secondTime = second.lastMessageAt
-          ? Date.parse(second.lastMessageAt)
-          : 0;
-        return secondTime - firstTime;
-      }),
-    [visibleConversations]
+      visibleConversations
+        .map((conversation) => {
+          const localLatestMessage = getMessages(conversation.id)[0];
+          if (!localLatestMessage) return conversation;
+
+          const serverTimestamp = conversation.lastMessageAt
+            ? Date.parse(conversation.lastMessageAt)
+            : 0;
+          const localTimestamp = Date.parse(localLatestMessage.createdAt);
+          if (!Number.isFinite(localTimestamp) || localTimestamp <= serverTimestamp) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            lastMessage: localLatestMessage.body,
+            lastMessageAt: localLatestMessage.createdAt
+          };
+        })
+        .sort((first, second) => {
+          const firstTime = first.lastMessageAt
+            ? Date.parse(first.lastMessageAt)
+            : 0;
+          const secondTime = second.lastMessageAt
+            ? Date.parse(second.lastMessageAt)
+            : 0;
+          return secondTime - firstTime;
+        }),
+    [getMessages, visibleConversations]
   );
 
   return (
