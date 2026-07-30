@@ -7,14 +7,21 @@ const dayFormatter = new Intl.DateTimeFormat("fr-FR", {
   weekday: "short"
 });
 
+function parseDate(value: string): Date | null {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
 export function formatMessageTime(value: string): string {
-  return timeFormatter.format(new Date(value));
+  const date = parseDate(value);
+  return date ? timeFormatter.format(date) : "Heure inconnue";
 }
 
 export function formatConversationTime(value?: string): string {
   if (!value) return "";
+  const date = parseDate(value);
+  if (!date) return "";
 
-  const date = new Date(value);
   const now = new Date();
   const sameDay =
     date.getFullYear() === now.getFullYear() &&
