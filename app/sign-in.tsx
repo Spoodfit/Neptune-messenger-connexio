@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -11,7 +11,30 @@ import {
 } from "react-native";
 
 import { useSession } from "../src/providers/SessionProvider";
+import { ApiError } from "../src/services/api/httpClient";
+import { WireValidationError } from "../src/services/api/wire";
 import { colors, gradients, radii, spacing, typography } from "../src/theme";
+
+function getSignInErrorMessage(error: unknown): string {
+  if (error instanceof WireValidationError) {
+    return "La réponse du serveur Neptune est invalide. Connexion refusée par sécurité.";
+  }
+  if (error instanceof ApiError) {
+    if (error.status === 0 || error.status >= 500) {
+      return "Le service Neptune est temporairement indisponible. Réessayez dans quelques instants.";
+    }
+    if (error.status === 408) {
+      return "La connexion a expiré. Vérifiez votre réseau puis réessayez.";
+    }
+    if (error.status === 429) {
+      return "Trop de tentatives. Patientez avant de réessayer.";
+    }
+    if (error.status === 400 || error.status === 401 || error.status === 403) {
+      return "Code invalide, expiré ou déjà utilisé.";
+    }
+  }
+  return "Connexion impossible. Réessayez sans réutiliser un ancien code.";
+}
 
 export default function SignInScreen() {
   const params = useLocalSearchParams<{ code?: string }>();
@@ -19,33 +42,45 @@ export default function SignInScreen() {
   const [code, setCode] = useState(params.code ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
+  const processedDeepLinkCodeRef = useRef<string | null>(null);
 
-  const submit = async (value = code) => {
-    if (loading || !value.trim()) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await exchangeOneTimeCode(value);
-      router.replace("/(tabs)/messages");
-    } catch {
-      setError("Code invalide, expiré ou déjà utilisé.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const submit = useCallback(
+    async (value: string) => {
+      const cleanCode = value.trim();
+      if (submittingRef.current || !cleanCode) return;
+      submittingRef.current = true;
+      setLoading(true);
+      setError(null);
+      try {
+        await exchangeOneTimeCode(cleanCode);
+        router.replace("/(tabs)/messages");
+      } catch (caught) {
+        setError(getSignInErrorMessage(caught));
+      } finally {
+        submittingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [exchangeOneTimeCode]
+  );
 
   useEffect(() => {
-    if (params.code) void submit(params.code);
-    // Le code du lien profond n’est traité qu’une seule fois.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.code]);
+    const deepLinkCode = params.code?.trim();
+    if (!deepLinkCode || processedDeepLinkCodeRef.current === deepLinkCode) return;
+    processedDeepLinkCodeRef.current = deepLinkCode;
+    setCode(deepLinkCode);
+    void submit(deepLinkCode);
+  }, [params.code, submit]);
 
   return (
     <View style={styles.screen}>
       <LinearGradient colors={gradients.primary} style={styles.logo}>
         <Text style={styles.logoText}>N</Text>
       </LinearGradient>
-      <Text style={styles.title}>Connexion à Connexio</Text>
+      <Text accessibilityRole="header" style={styles.title}>
+        Connexion à Connexio
+      </Text>
       <Text style={styles.description}>
         Utilisez le code à usage unique généré depuis votre compte Neptune Business.
       </Text>
@@ -54,23 +89,31 @@ export default function SignInScreen() {
         onChangeText={setCode}
         autoCapitalize="none"
         autoCorrect={false}
+        autoComplete="one-time-code"
+        textContentType="oneTimeCode"
         accessibilityLabel="Code de connexion Neptune"
+        accessibilityHint="Ce code est à usage unique et expire rapidement"
         placeholder="Code de connexion"
         placeholderTextColor={colors.textMuted}
         style={styles.input}
         returnKeyType="go"
-        onSubmitEditing={() => void submit()}
+        onSubmitEditing={() => void submit(code)}
       />
       {error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+          style={styles.error}
+        >
           {error}
         </Text>
       ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Se connecter à Connexio"
+        accessibilityState={{ disabled: loading || !code.trim(), busy: loading }}
         disabled={loading || !code.trim()}
-        onPress={() => void submit()}
+        onPress={() => void submit(code)}
         style={({ pressed }) => [
           styles.button,
           pressed && styles.pressed,
