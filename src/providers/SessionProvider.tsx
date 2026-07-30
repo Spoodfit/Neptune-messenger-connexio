@@ -112,6 +112,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
     ]);
   }, []);
 
+  const invalidateSession = useCallback(async () => {
+    await purgeOutboxData();
+    await clearSession();
+  }, [clearSession]);
+
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
     if (env.mockMode) return accessTokenRef.current;
     if (refreshInFlightRef.current) return refreshInFlightRef.current;
@@ -130,7 +135,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           error instanceof ApiError &&
           shouldClearSessionAfterRefreshFailure(error.status)
         ) {
-          await clearSession();
+          await invalidateSession();
           return null;
         }
         // Une panne réseau ou serveur ne doit jamais déconnecter l'utilisateur.
@@ -142,7 +147,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     refreshInFlightRef.current = operation;
     return operation;
-  }, [clearSession, persistSession]);
+  }, [invalidateSession, persistSession]);
 
   const getAccessToken = useCallback(async (): Promise<string | null> => {
     if (env.mockMode) return accessTokenRef.current;
@@ -189,7 +194,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           error instanceof ApiError &&
           shouldClearSessionAfterRefreshFailure(error.status)
         ) {
-          await clearSession();
+          await invalidateSession();
         }
       } finally {
         if (!cancelled) setSessionReady(true);
@@ -198,7 +203,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [clearSession, persistSession]);
+  }, [invalidateSession, persistSession]);
 
   useEffect(() => {
     if (env.mockMode || accessToken || !refreshToken) return;
@@ -232,8 +237,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const registeredPushToken = await getRegisteredPushToken();
 
     // La purge doit réussir avant d'autoriser un autre compte sur cet appareil.
-    await purgeOutboxData();
-    await clearSession();
+    await invalidateSession();
 
     const revocations: Promise<unknown>[] = [
       unregisterDeviceFromPushNotifications()
@@ -249,7 +253,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       revocations.push(sessionApi.revokeSession(refreshTokenToRevoke));
     }
     await Promise.allSettled(revocations);
-  }, [clearSession, refreshToken]);
+  }, [invalidateSession, refreshToken]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
