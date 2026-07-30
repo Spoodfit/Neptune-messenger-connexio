@@ -21,8 +21,13 @@ import {
 } from "../domain/sessionTokens";
 import { currentUser as demoUser } from "../data/mockData";
 import { ApiError } from "../services/api/httpClient";
+import { NeptuneMessagingApi } from "../services/api/neptuneApi";
 import { NeptuneSessionApi } from "../services/api/sessionApi";
 import { configureSessionRuntime } from "../services/auth/sessionRuntime";
+import {
+  getRegisteredPushToken,
+  unregisterDeviceFromPushNotifications
+} from "../services/notifications/pushNotifications";
 import type { AppUser, SessionPayload } from "../types/messaging";
 
 const REFRESH_TOKEN_KEY = "connexio.session.refresh-token";
@@ -196,10 +201,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (env.mockMode || accessToken || !refreshToken) return;
+    const retryTimer = setTimeout(() => void refreshAccessToken(), 5_000);
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void refreshAccessToken();
     });
-    return () => subscription.remove();
+    return () => {
+      clearTimeout(retryTimer);
+      subscription.remove();
+    };
   }, [accessToken, refreshAccessToken, refreshToken]);
 
   const exchangeOneTimeCode = useCallback(
@@ -217,15 +226,26 @@ export function SessionProvider({ children }: PropsWithChildren) {
   );
 
   const signOut = useCallback(async () => {
-    const tokenToRevoke = refreshTokenRef.current ?? refreshToken;
+    const accessTokenToRevoke = accessTokenRef.current;
+    const refreshTokenToRevoke = refreshTokenRef.current ?? refreshToken;
+    const registeredPushToken = await getRegisteredPushToken();
+
     await clearSession();
-    if (tokenToRevoke) {
-      try {
-        await sessionApi.revokeSession(tokenToRevoke);
-      } catch {
-        // La session locale est supprimée même si le backend est indisponible.
-      }
+
+    const revocations: Promise<unknown>[] = [
+      unregisterDeviceFromPushNotifications()
+    ];
+    if (registeredPushToken && accessTokenToRevoke) {
+      revocations.push(
+        new NeptuneMessagingApi(accessTokenToRevoke).unregisterPushToken(
+          registeredPushToken
+        )
+      );
     }
+    if (refreshTokenToRevoke) {
+      revocations.push(sessionApi.revokeSession(refreshTokenToRevoke));
+    }
+    await Promise.allSettled(revocations);
   }, [clearSession, refreshToken]);
 
   const value = useMemo<SessionContextValue>(
