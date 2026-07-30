@@ -34,6 +34,16 @@ import type { AppUser, SessionPayload } from "../types/messaging";
 const REFRESH_TOKEN_KEY = "connexio.session.refresh-token";
 const USER_KEY = "connexio.session.user";
 const DEVICE_ID_KEY = "connexio.device.id";
+const signedOutUser: AppUser = {
+  id: "",
+  name: "Membre Neptune",
+  initials: "MN",
+  company: "",
+  city: "",
+  role: "triton",
+  roleLabel: "Triton",
+  online: false
+};
 
 interface SessionContextValue {
   currentUser: AppUser;
@@ -75,7 +85,9 @@ async function getDeviceId(): Promise<string> {
 }
 
 export function SessionProvider({ children }: PropsWithChildren) {
-  const [currentUser, setCurrentUser] = useState<AppUser>(demoUser);
+  const [currentUser, setCurrentUser] = useState<AppUser>(
+    env.mockMode ? demoUser : signedOutUser
+  );
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(env.mockMode);
@@ -105,7 +117,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     accessTokenExpiresAtRef.current = null;
     setAccessToken(null);
     setRefreshToken(null);
-    setCurrentUser(demoUser);
+    setCurrentUser(env.mockMode ? demoUser : signedOutUser);
     await Promise.all([
       secureDelete(REFRESH_TOKEN_KEY),
       secureDelete(USER_KEY)
@@ -138,7 +150,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
           await invalidateSession();
           return null;
         }
-        // Une panne réseau ou serveur ne doit jamais déconnecter l'utilisateur.
+        // Une panne réseau ou serveur ne doit jamais supprimer le refresh token.
         return accessTokenRef.current;
       }
     })().finally(() => {
@@ -259,7 +271,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     () => ({
       currentUser,
       accessToken,
-      isAuthenticated: env.mockMode || Boolean(accessToken || refreshToken),
+      isAuthenticated: env.mockMode || Boolean(accessToken),
       sessionReady,
       getAccessToken,
       refreshAccessToken,
@@ -272,7 +284,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
       exchangeOneTimeCode,
       getAccessToken,
       refreshAccessToken,
-      refreshToken,
       sessionReady,
       signOut
     ]
