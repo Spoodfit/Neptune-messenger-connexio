@@ -1,6 +1,7 @@
 name: Apply UX provider hardening
 
 on:
+  pull_request:
   push:
     branches:
       - feat/production-hardening
