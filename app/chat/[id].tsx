@@ -12,6 +12,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MessageBubble } from "../../src/components/MessageBubble";
 import { useMessaging } from "../../src/providers/MessagingProvider";
@@ -19,6 +20,7 @@ import { colors, radii, spacing, typography } from "../../src/theme";
 
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
+  const insets = useSafeAreaInsets();
   const conversationId = Array.isArray(params.id)
     ? (params.id[0] ?? "")
     : (params.id ?? "");
@@ -67,7 +69,17 @@ export default function ChatScreen() {
 
   if (!conversation) {
     return (
-      <View style={styles.missing}>
+      <View
+        style={[
+          styles.missing,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: spacing.md + insets.left,
+            paddingRight: spacing.md + insets.right
+          }
+        ]}
+      >
         <Text accessibilityRole="header" style={styles.missingTitle}>
           Conversation introuvable
         </Text>
@@ -106,7 +118,16 @@ export default function ChatScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={0}
     >
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingTop: Math.max(insets.top, spacing.sm),
+            paddingLeft: spacing.sm + insets.left,
+            paddingRight: spacing.sm + insets.right
+          }
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Retour aux discussions"
@@ -192,7 +213,16 @@ export default function ChatScreen() {
       )}
 
       {conversation.canPost ? (
-        <View style={styles.composer}>
+        <View
+          style={[
+            styles.composer,
+            {
+              paddingLeft: spacing.sm + insets.left,
+              paddingRight: spacing.sm + insets.right,
+              paddingBottom: Math.max(insets.bottom, spacing.sm)
+            }
+          ]}
+        >
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -224,7 +254,14 @@ export default function ChatScreen() {
         <View
           accessible
           accessibilityLabel="Conversation en lecture seule"
-          style={styles.readOnly}
+          style={[
+            styles.readOnly,
+            {
+              paddingLeft: spacing.md + insets.left,
+              paddingRight: spacing.md + insets.right,
+              paddingBottom: Math.max(insets.bottom, spacing.sm)
+            }
+          ]}
         >
           <Ionicons name="lock-closed" size={17} color={colors.textMuted} />
           <Text style={styles.readOnlyText}>
@@ -239,9 +276,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   header: {
-    paddingTop: Platform.OS === "ios" ? 54 : 22,
     paddingBottom: spacing.md,
-    paddingHorizontal: spacing.sm,
     backgroundColor: colors.navy,
     flexDirection: "row",
     alignItems: "center",
@@ -292,8 +327,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: spacing.sm,
-    padding: spacing.sm,
-    paddingBottom: Platform.OS === "ios" ? 24 : spacing.sm,
+    paddingTop: spacing.sm,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border
@@ -321,8 +355,6 @@ const styles = StyleSheet.create({
   sendDisabled: { opacity: 0.45 },
   readOnly: {
     minHeight: 64,
-    paddingHorizontal: spacing.md,
-    paddingBottom: Platform.OS === "ios" ? 22 : spacing.sm,
     paddingTop: spacing.sm,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
