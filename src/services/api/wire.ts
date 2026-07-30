@@ -74,12 +74,48 @@ function requireString(
   return value.trim();
 }
 
+function requireBoundedString(
+  record: Record<string, unknown>,
+  label: string,
+  maxLength: number,
+  ...keys: string[]
+): string {
+  const value = requireString(record, label, ...keys);
+  if (value.length > maxLength) {
+    throw new WireValidationError(`${label} trop long.`);
+  }
+  return value;
+}
+
 function optionalString(
   record: Record<string, unknown>,
   ...keys: string[]
 ): string | undefined {
   const value = readUnknown(record, ...keys);
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function optionalBoundedString(
+  record: Record<string, unknown>,
+  maxLength: number,
+  ...keys: string[]
+): string | undefined {
+  const value = optionalString(record, ...keys);
+  return value && value.length <= maxLength ? value : undefined;
+}
+
+function optionalHttpsUrl(
+  record: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  const value = optionalBoundedString(record, 2_048, ...keys);
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function requireDateString(
@@ -114,6 +150,14 @@ function numberOrDefault(
 ): number {
   const value = readUnknown(record, ...keys);
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function nonNegativeInteger(
+  record: Record<string, unknown>,
+  fallback: number,
+  ...keys: string[]
+): number {
+  return Math.max(0, Math.trunc(numberOrDefault(record, fallback, ...keys)));
 }
 
 function booleanOrDefault(
@@ -159,40 +203,56 @@ function normalizeMessageStatus(value: unknown): MessageStatus {
 
 export function normalizeAppUser(value: unknown): AppUser {
   if (!isRecord(value)) throw new WireValidationError("Utilisateur invalide.");
-  const name = requireString(value, "Nom utilisateur", "name", "full_name");
+  const name = requireBoundedString(
+    value,
+    "Nom utilisateur",
+    160,
+    "name",
+    "full_name"
+  );
   const role = normalizeRole(readUnknown(value, "role", "neptune_role"));
   return {
-    id: requireString(value, "Identifiant utilisateur", "id", "user_id"),
+    id: requireBoundedString(
+      value,
+      "Identifiant utilisateur",
+      256,
+      "id",
+      "user_id"
+    ),
     name,
-    initials: optionalString(value, "initials") ?? initialsFromName(name),
-    company: optionalString(value, "company", "company_name") ?? "",
-    city: optionalString(value, "city") ?? "",
+    initials:
+      optionalBoundedString(value, 8, "initials") ?? initialsFromName(name),
+    company:
+      optionalBoundedString(value, 160, "company", "company_name") ?? "",
+    city: optionalBoundedString(value, 160, "city") ?? "",
     role,
-    roleLabel:
-      optionalString(value, "roleLabel", "role_label") ??
-      ROLE_LABELS[normalizeUserRole(role)],
+    roleLabel: ROLE_LABELS[normalizeUserRole(role)],
     online: booleanOrDefault(value, false, "online", "is_online"),
-    avatarUrl: optionalString(value, "avatarUrl", "avatar_url"),
-    phone: optionalString(value, "phone", "phone_number")
+    avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url"),
+    phone: optionalBoundedString(value, 32, "phone", "phone_number")
   };
 }
 
 export function normalizeSessionPayload(value: unknown): SessionPayload {
   if (!isRecord(value)) throw new WireValidationError("Session invalide.");
-  const expiresIn = numberOrDefault(value, 0, "expiresIn", "expires_in");
+  const expiresIn = Math.trunc(
+    numberOrDefault(value, 0, "expiresIn", "expires_in")
+  );
   if (expiresIn <= 0) {
     throw new WireValidationError("Durée de session absente ou invalide.");
   }
   return {
-    accessToken: requireString(
+    accessToken: requireBoundedString(
       value,
       "Jeton d'accès",
+      16_384,
       "accessToken",
       "access_token"
     ),
-    refreshToken: requireString(
+    refreshToken: requireBoundedString(
       value,
       "Jeton de renouvellement",
+      16_384,
       "refreshToken",
       "refresh_token"
     ),
@@ -211,32 +271,32 @@ export function normalizeConversation(value: unknown): Conversation {
       )
     : undefined;
   return {
-    id: requireString(value, "Identifiant conversation", "id"),
-    name: requireString(value, "Nom conversation", "name"),
-    description: optionalString(value, "description"),
+    id: requireBoundedString(value, "Identifiant conversation", 256, "id"),
+    name: requireBoundedString(value, "Nom conversation", 160, "name"),
+    description: optionalBoundedString(value, 2_000, "description"),
     categoryLabel:
-      optionalString(value, "categoryLabel", "category_label") ?? "Discussion",
+      optionalBoundedString(value, 80, "categoryLabel", "category_label") ??
+      "Discussion",
     type: requireConversationType(readUnknown(value, "type")),
-    memberCount: Math.max(
-      0,
-      numberOrDefault(value, 0, "memberCount", "member_count")
-    ),
-    unreadCount: Math.max(
-      0,
-      numberOrDefault(value, 0, "unreadCount", "unread_count")
-    ),
-    lastMessage: optionalString(value, "lastMessage", "last_message"),
+    memberCount: nonNegativeInteger(value, 0, "memberCount", "member_count"),
+    unreadCount: nonNegativeInteger(value, 0, "unreadCount", "unread_count"),
+    lastMessage: optionalBoundedString(value, 4_000, "lastMessage", "last_message"),
     lastMessageAt: optionalDateString(
       value,
       "Date du dernier message",
       "lastMessageAt",
       "last_message_at"
     ),
-    pinnedMessage: optionalString(value, "pinnedMessage", "pinned_message"),
+    pinnedMessage: optionalBoundedString(
+      value,
+      4_000,
+      "pinnedMessage",
+      "pinned_message"
+    ),
     restricted: booleanOrDefault(value, false, "restricted"),
     allowedRoles,
     canPost: booleanOrDefault(value, false, "canPost", "can_post"),
-    avatarUrl: optionalString(value, "avatarUrl", "avatar_url")
+    avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url")
   };
 }
 
@@ -250,31 +310,40 @@ export function normalizeConversationList(value: unknown): Conversation[] {
 export function normalizeChatMessage(value: unknown): ChatMessage {
   if (!isRecord(value)) throw new WireValidationError("Message invalide.");
   const senderName =
-    optionalString(value, "senderName", "sender_name") ?? "Membre Neptune";
+    optionalBoundedString(value, 160, "senderName", "sender_name") ??
+    "Membre Neptune";
   return {
-    id: requireString(value, "Identifiant message", "id", "message_id"),
-    clientMessageId: optionalString(
+    id: requireBoundedString(value, "Identifiant message", 256, "id", "message_id"),
+    clientMessageId: optionalBoundedString(
       value,
+      256,
       "clientMessageId",
       "client_message_id"
     ),
-    conversationId: requireString(
+    conversationId: requireBoundedString(
       value,
       "Identifiant conversation du message",
+      256,
       "conversationId",
       "conversation_id"
     ),
-    senderId: requireString(value, "Expéditeur", "senderId", "sender_id"),
+    senderId: requireBoundedString(
+      value,
+      "Expéditeur",
+      256,
+      "senderId",
+      "sender_id"
+    ),
     senderName,
     senderInitials:
-      optionalString(value, "senderInitials", "sender_initials") ??
+      optionalBoundedString(value, 8, "senderInitials", "sender_initials") ??
       initialsFromName(senderName),
-    senderAvatarUrl: optionalString(
+    senderAvatarUrl: optionalHttpsUrl(
       value,
       "senderAvatarUrl",
       "sender_avatar_url"
     ),
-    body: requireString(value, "Contenu message", "body"),
+    body: requireBoundedString(value, "Contenu message", 4_000, "body"),
     createdAt: requireDateString(
       value,
       "Date message",
@@ -289,16 +358,14 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
     ),
     status: normalizeMessageStatus(readUnknown(value, "status")),
     isMine: booleanOrDefault(value, false, "isMine", "is_mine"),
-    replyToMessageId: optionalString(
+    replyToMessageId: optionalBoundedString(
       value,
+      256,
       "replyToMessageId",
       "reply_to_message_id"
     ),
-    retryCount: Math.max(
-      0,
-      numberOrDefault(value, 0, "retryCount", "retry_count")
-    ),
-    errorCode: optionalString(value, "errorCode", "error_code")
+    retryCount: nonNegativeInteger(value, 0, "retryCount", "retry_count"),
+    errorCode: optionalBoundedString(value, 160, "errorCode", "error_code")
   };
 }
 
@@ -314,8 +381,11 @@ export function normalizeMessagePage(value: unknown): CursorPage<ChatMessage> {
   if (cursor !== null && cursor !== undefined && typeof cursor !== "string") {
     throw new WireValidationError("Curseur de messages invalide.");
   }
+  if (typeof cursor === "string" && cursor.length > 2_048) {
+    throw new WireValidationError("Curseur de messages trop long.");
+  }
   return {
     items: items.map(normalizeChatMessage),
-    nextCursor: typeof cursor === "string" && cursor ? cursor : null
+    nextCursor: typeof cursor === "string" && cursor.trim() ? cursor.trim() : null
   };
 }
