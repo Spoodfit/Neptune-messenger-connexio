@@ -1,5 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 
@@ -9,8 +10,19 @@ interface BrandHeaderProps {
 }
 
 export function BrandHeader({ title, subtitle }: BrandHeaderProps) {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.wrapper}>
+    <View
+      style={[
+        styles.wrapper,
+        {
+          paddingTop: Math.max(insets.top, spacing.sm),
+          paddingLeft: spacing.md + insets.left,
+          paddingRight: spacing.md + insets.right
+        }
+      ]}
+    >
       <LinearGradient
         accessibilityElementsHidden
         colors={gradients.primary}
@@ -35,10 +47,8 @@ export function BrandHeader({ title, subtitle }: BrandHeaderProps) {
 
 const styles = StyleSheet.create({
   wrapper: {
-    paddingTop: Platform.OS === "ios" ? 50 : 18,
     paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    minHeight: Platform.OS === "ios" ? 96 : 64,
+    minHeight: 52,
     backgroundColor: colors.navy,
     flexDirection: "row",
     alignItems: "center",
