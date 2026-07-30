@@ -101,6 +101,9 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const [lastError, setLastError] = useState<string | null>(null);
   const outbox = useRef(createOutboxStore()).current;
   const flushing = useRef<Promise<void> | null>(null);
+  const flushRequested = useRef(false);
+  const outboxHydrated = useRef(env.mockMode);
+  const outboxHydrationStarted = useRef(false);
   const loadingInitialRef = useRef(new Set<string>());
   const loadingMoreRef = useRef(new Set<string>());
   const refreshingConversationsRef = useRef<Promise<void> | null>(null);
@@ -307,101 +310,174 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   );
 
   const flushOutbox = useCallback(async (): Promise<void> => {
-    if (flushing.current) return flushing.current;
-    const operation = (async () => {
-      let dueItems: OutboxItem[];
-      try {
-        dueItems = await outbox.listDue(Date.now());
-      } catch {
-        setLastError("Le stockage local des messages est indisponible.");
-        return;
-      }
+    if (!outboxHydrated.current) return;
+    if (flushing.current) {
+      flushRequested.current = true;
+      return flushing.current;
+    }
 
-      for (const item of dueItems) {
-        if (!env.mockMode && !api) continue;
+    const operation = (async () => {
+      do {
+        flushRequested.current = false;
+        let dueItems: OutboxItem[];
         try {
-          await outbox.markSending(item.clientMessageId);
+          dueItems = await outbox.listDue(Date.now());
         } catch {
           setLastError("Le stockage local des messages est indisponible.");
-          break;
+          return;
         }
-        updateLocalMessage(item.clientMessageId, markMessageSending);
 
-        try {
-          let serverMessage: ChatMessage;
-          if (env.mockMode) {
-            await sleep(260);
-            serverMessage = {
-              id: `mock-${item.clientMessageId}`,
-              clientMessageId: item.clientMessageId,
-              conversationId: item.conversationId,
-              senderId: currentUser.id,
-              senderName: currentUser.name,
-              senderInitials: currentUser.initials,
-              senderAvatarUrl: currentUser.avatarUrl,
-              body: item.body,
-              createdAt: item.createdAt,
-              status: "sent",
-              isMine: true,
-              replyToMessageId: item.replyToMessageId
-            };
-          } else {
-            serverMessage = await api!.sendMessage(item.conversationId, {
-              clientMessageId: item.clientMessageId,
-              body: item.body,
-              replyToMessageId: item.replyToMessageId
-            });
+        for (const item of dueItems) {
+          if (!env.mockMode && !api) continue;
+          try {
+            await outbox.markSending(item.clientMessageId);
+          } catch {
+            setLastError("Le stockage local des messages est indisponible.");
+            break;
           }
-          upsertMessage(serverMessage);
-          await outbox.remove(item.clientMessageId);
-          setLastError(null);
-        } catch (error) {
-          if (error instanceof ApiError && error.status === 409 && api) {
+          updateLocalMessage(item.clientMessageId, markMessageSending);
+
+          try {
+            let serverMessage: ChatMessage;
+            if (env.mockMode) {
+              await sleep(260);
+              serverMessage = {
+                id: `mock-${item.clientMessageId}`,
+                clientMessageId: item.clientMessageId,
+                conversationId: item.conversationId,
+                senderId: currentUser.id,
+                senderName: currentUser.name,
+                senderInitials: currentUser.initials,
+                senderAvatarUrl: currentUser.avatarUrl,
+                body: item.body,
+                createdAt: item.createdAt,
+                status: "sent",
+                isMine: true,
+                replyToMessageId: item.replyToMessageId
+              };
+            } else {
+              serverMessage = await api!.sendMessage(item.conversationId, {
+                clientMessageId: item.clientMessageId,
+                body: item.body,
+                replyToMessageId: item.replyToMessageId
+              });
+            }
+            upsertMessage(serverMessage);
+            await outbox.remove(item.clientMessageId);
+            setLastError(null);
+          } catch (error) {
+            if (error instanceof ApiError && error.status === 409 && api) {
+              try {
+                await outbox.remove(item.clientMessageId);
+                await loadMessages(item.conversationId);
+              } catch {
+                setLastError("Le stockage local des messages est indisponible.");
+              }
+              continue;
+            }
+
+            const attempts = item.attempts + 1;
+            const errorCode =
+              error instanceof ApiError
+                ? error.code ?? `api-${error.status}`
+                : "network";
+            const retryable = !(error instanceof ApiError) || error.retryable;
+            const backoff = calculateBackoffMs(attempts);
+            const nextAttemptAt = retryable
+              ? Date.now() +
+                Math.max(
+                  backoff,
+                  error instanceof ApiError ? error.retryAfterMs ?? 0 : 0
+                )
+              : Number.MAX_SAFE_INTEGER;
             try {
-              await outbox.remove(item.clientMessageId);
-              await loadMessages(item.conversationId);
+              await outbox.markFailure(
+                item.clientMessageId,
+                attempts,
+                nextAttemptAt,
+                errorCode
+              );
             } catch {
               setLastError("Le stockage local des messages est indisponible.");
             }
-            continue;
-          }
-
-          const attempts = item.attempts + 1;
-          const errorCode =
-            error instanceof ApiError
-              ? error.code ?? `api-${error.status}`
-              : "network";
-          const retryable = !(error instanceof ApiError) || error.retryable;
-          const backoff = calculateBackoffMs(attempts);
-          const nextAttemptAt = retryable
-            ? Date.now() +
-              Math.max(
-                backoff,
-                error instanceof ApiError ? error.retryAfterMs ?? 0 : 0
-              )
-            : Number.MAX_SAFE_INTEGER;
-          try {
-            await outbox.markFailure(
-              item.clientMessageId,
-              attempts,
-              nextAttemptAt,
-              errorCode
+            updateLocalMessage(item.clientMessageId, (message) =>
+              markMessageFailed(message, errorCode)
             );
-          } catch {
-            setLastError("Le stockage local des messages est indisponible.");
+            setLastError("Un message n’a pas été envoyé.");
           }
-          updateLocalMessage(item.clientMessageId, (message) =>
-            markMessageFailed(message, errorCode)
-          );
-          setLastError("Un message n’a pas été envoyé.");
         }
-      }
+      } while (flushRequested.current);
     })().finally(() => {
       flushing.current = null;
     });
     flushing.current = operation;
     return operation;
   }, [api, currentUser, loadMessages, outbox, updateLocalMessage, upsertMessage]);
+
+  useEffect(() => {
+    if (outboxHydrationStarted.current) return;
+    outboxHydrationStarted.current = true;
+    if (env.mockMode) {
+      outboxHydrated.current = true;
+      return;
+    }
+
+    let cancelled = false;
+    void outbox
+      .listDue(Number.MAX_SAFE_INTEGER)
+      .then((items) => {
+        if (cancelled) return;
+        const hydratedByConversation: Record<string, ChatMessage[]> = {};
+        for (const item of items) {
+          let message = createOptimisticMessage({
+            clientMessageId: item.clientMessageId,
+            conversationId: item.conversationId,
+            senderId: currentUser.id,
+            senderName: currentUser.name,
+            senderInitials: currentUser.initials,
+            senderAvatarUrl: currentUser.avatarUrl,
+            body: item.body,
+            createdAt: item.createdAt,
+            replyToMessageId: item.replyToMessageId
+          });
+          if (item.state === "sending") message = markMessageSending(message);
+          if (item.state === "failed") {
+            message = markMessageFailed(message, item.lastError ?? "send-failed");
+          }
+          rememberMessage(knownMessageKeys, message);
+          hydratedByConversation[item.conversationId] = [
+            message,
+            ...(hydratedByConversation[item.conversationId] ?? [])
+          ];
+        }
+        setMessagesByConversation((previous) => {
+          const next = { ...previous };
+          for (const [conversationId, hydrated] of Object.entries(
+            hydratedByConversation
+          )) {
+            next[conversationId] = mergeMessagesNewestFirst(
+              previous[conversationId] ?? [],
+              hydrated
+            );
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLastError("Le stockage local des messages est indisponible.");
+        }
+      })
+      .finally(() => {
+        if (cancelled) return;
+        outboxHydrated.current = true;
+        void flushOutbox();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, flushOutbox, knownMessageKeys, outbox]);
 
   const sendMessage = useCallback(
     async (
@@ -501,7 +577,6 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         try {
           await api.markConversationRead(conversationId, lastReadMessageId);
         } catch {
-          // Restaure la source de vérité si l’optimisme local n’a pas été confirmé.
           void refreshConversations();
         }
       }
@@ -535,6 +610,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
             )
           );
         }
+        if (event.type === "message.updated") void refreshConversations();
         if (event.payload.clientMessageId) {
           void outbox.remove(event.payload.clientMessageId).catch(() => {
             setLastError("Le stockage local des messages est indisponible.");
@@ -549,6 +625,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
             previous[event.payload.conversationId] ?? []
           ).filter((message) => message.id !== event.payload.messageId)
         }));
+        void refreshConversations();
         return;
       }
       if (event.type === "conversation.read") {
