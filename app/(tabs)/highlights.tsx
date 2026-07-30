@@ -123,7 +123,7 @@ export default function HighlightsScreen() {
                   colors={gradients.activeTab}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFillObject}
+                  style={StyleSheet.absoluteFill}
                 />
               ) : null}
               <Ionicons
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   cityGhost: { position: "absolute", color: "rgba(210,219,239,0.28)", fontSize: 8, fontWeight: "900", letterSpacing: 0.6 },
   mapMarkerTouch: { position: "absolute", width: 58, height: 58, marginLeft: -29, marginTop: -29, alignItems: "center", justifyContent: "center" },
   mapPulse: { position: "absolute", width: 54, height: 54, borderRadius: 27, borderWidth: 2, borderColor: "rgba(24,168,255,0.30)" },
-  mapPulseSelected: { width: 62, height: 62, borderRadius: 31, borderColor: "rgba(169,80,216,0.50)" },
+  mapPulseSelected: { width: 62, height: 62, borderRadius: 31, borderColor: "rgba(160,68,200,0.50)" },
   mapMarker: { width: 44, height: 44, padding: 2, borderRadius: 22 },
   mapMarkerSelected: { transform: [{ scale: 1.08 }] },
   mapMarkerInner: { flex: 1, borderRadius: 20, borderWidth: 2, borderColor: colors.white, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
