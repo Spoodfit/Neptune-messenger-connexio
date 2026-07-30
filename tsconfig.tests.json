@@ -16,6 +16,8 @@
     "src/services/api/contracts.ts",
     "src/services/api/wire.ts",
     "src/services/realtime/realtimeEvents.ts",
+    "src/storage/outboxStore.memory.ts",
+    "src/storage/outboxStore.types.ts",
     "src/types/messaging.ts",
     "src/utils/redact.ts",
     "tests/**/*.ts"
