@@ -3,6 +3,7 @@ import { Tabs } from "expo-router";
 import type { ReactNode } from "react";
 import type { ColorValue } from "react-native";
 
+import { env } from "@/config/env";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { colors } from "@/theme";
 
@@ -90,6 +91,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="contacts"
         options={{
+          href: env.mockMode ? undefined : null,
           title: "Membres",
           tabBarIcon: icon("person-circle", "person-circle-outline")
         }}
