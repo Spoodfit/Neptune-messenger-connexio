@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
-      - name: Regenerate lockfile
+      - name: Regenerate lockfile from package.json
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Commit lockfile when changed
         run: |
