@@ -16,6 +16,8 @@ import { BrandHeader } from "@/components/BrandHeader";
 import { useSession } from "@/providers/SessionProvider";
 import { colors, radii, spacing, typography } from "@/theme";
 
+const MAX_CONTENT_WIDTH = 720;
+
 const pendingSettings = [
   {
     icon: "shield-checkmark-outline" as const,
@@ -65,90 +67,115 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View
-          accessible
-          accessibilityLabel={`${currentUser.name}. ${currentUser.company}. ${currentUser.roleLabel}`}
-          style={styles.profile}
-        >
-          <View style={styles.avatar} accessibilityElementsHidden>
-            <Text style={styles.initials}>{currentUser.initials}</Text>
-          </View>
-          <View style={styles.profileContent}>
-            <Text style={styles.name}>{currentUser.name}</Text>
-            <Text style={styles.role}>
-              {currentUser.company || "Neptune Business"} · {currentUser.roleLabel}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.list}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Ouvrir les réglages de notifications du téléphone"
-            accessibilityHint="Ouvre les réglages système de Connexio"
-            onPress={() => void Linking.openSettings()}
-            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        <View style={styles.contentColumn}>
+          <View
+            accessible
+            accessibilityLabel={`${currentUser.name}. ${currentUser.company}. ${currentUser.roleLabel}`}
+            style={styles.profile}
           >
-            <Ionicons name="notifications-outline" size={22} color={colors.primary} />
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>Notifications</Text>
-              <Text style={styles.rowSubtitle}>Autorisations système et alertes</Text>
+            <View style={styles.avatar} accessibilityElementsHidden>
+              <Text style={styles.initials} numberOfLines={1}>
+                {currentUser.initials}
+              </Text>
             </View>
-            <Ionicons name="open-outline" size={19} color={colors.textMuted} />
-          </Pressable>
+            <View style={styles.profileContent}>
+              <Text style={styles.name}>{currentUser.name}</Text>
+              <Text style={styles.role}>
+                {currentUser.company || "Neptune Business"} · {currentUser.roleLabel}
+              </Text>
+            </View>
+          </View>
 
-          {pendingSettings.map((item) => (
-            <View
-              accessible
-              accessibilityLabel={`${item.title}. Non disponible dans ce build.`}
-              key={item.title}
-              style={[styles.row, styles.pendingRow]}
+          <View style={styles.list}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir les réglages de notifications du téléphone"
+              accessibilityHint="Ouvre les réglages système de Connexio"
+              onPress={() => void Linking.openSettings()}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             >
-              <Ionicons name={item.icon} size={22} color={colors.textMuted} />
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={colors.primary}
+                style={styles.rowIcon}
+              />
               <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>{item.title}</Text>
-                <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
+                <Text style={styles.rowTitle}>Notifications</Text>
+                <Text style={styles.rowSubtitle}>
+                  Autorisations système et alertes
+                </Text>
               </View>
-              <Text style={styles.pendingLabel}>À finaliser</Text>
-            </View>
-          ))}
+              <Ionicons
+                accessibilityElementsHidden
+                name="open-outline"
+                size={19}
+                color={colors.textMuted}
+                style={styles.trailingIcon}
+              />
+            </Pressable>
 
-          {signOutError ? (
-            <Text
-              accessibilityRole="alert"
-              accessibilityLiveRegion="assertive"
-              style={styles.signOutError}
+            {pendingSettings.map((item) => (
+              <View
+                accessible
+                accessibilityLabel={`${item.title}. Non disponible dans ce build.`}
+                key={item.title}
+                style={[styles.row, styles.pendingRow]}
+              >
+                <Ionicons
+                  name={item.icon}
+                  size={22}
+                  color={colors.textMuted}
+                  style={styles.rowIcon}
+                />
+                <View style={styles.rowContent}>
+                  <Text style={styles.rowTitle}>{item.title}</Text>
+                  <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingLabel}>À finaliser</Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+
+            {signOutError ? (
+              <Text
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+                style={styles.signOutError}
+              >
+                {signOutError}
+              </Text>
+            ) : null}
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Se déconnecter de Connexio"
+              accessibilityState={{ disabled: signingOut, busy: signingOut }}
+              disabled={signingOut}
+              onPress={() => void handleSignOut()}
+              style={({ pressed }) => [
+                styles.signOutButton,
+                pressed && styles.rowPressed,
+                signingOut && styles.disabled
+              ]}
             >
-              {signOutError}
-            </Text>
-          ) : null}
+              {signingOut ? (
+                <ActivityIndicator color={colors.danger} />
+              ) : (
+                <>
+                  <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+                  <Text style={styles.signOutText}>Se déconnecter</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Se déconnecter de Connexio"
-            accessibilityState={{ disabled: signingOut, busy: signingOut }}
-            disabled={signingOut}
-            onPress={() => void handleSignOut()}
-            style={({ pressed }) => [
-              styles.signOutButton,
-              pressed && styles.rowPressed,
-              signingOut && styles.disabled
-            ]}
-          >
-            {signingOut ? (
-              <ActivityIndicator color={colors.danger} />
-            ) : (
-              <>
-                <Ionicons name="log-out-outline" size={22} color={colors.danger} />
-                <Text style={styles.signOutText}>Se déconnecter</Text>
-              </>
-            )}
-          </Pressable>
+          <Text style={styles.version}>
+            Connexio {Constants.expoConfig?.version ?? "0.2.0"} ·{" "}
+            {getEnvironmentLabel()}
+          </Text>
         </View>
-
-        <Text style={styles.version}>
-          Connexio {Constants.expoConfig?.version ?? "0.2.0"} · {getEnvironmentLabel()}
-        </Text>
       </ScrollView>
     </View>
   );
@@ -160,7 +187,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   scrollContent: {
-    paddingBottom: spacing.xxl
+    width: "100%",
+    paddingBottom: 112
+  },
+  contentColumn: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center"
   },
   profile: {
     margin: spacing.md,
@@ -170,7 +203,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md
   },
   avatar: {
@@ -179,7 +212,8 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primary
+    backgroundColor: colors.primary,
+    flexShrink: 0
   },
   initials: {
     color: colors.white,
@@ -187,22 +221,26 @@ const styles = StyleSheet.create({
     fontWeight: "900"
   },
   profileContent: {
-    flex: 1
+    flex: 1,
+    minWidth: 0
   },
   name: {
     ...typography.heading2,
-    color: colors.text
+    color: colors.text,
+    flexShrink: 1
   },
   role: {
     ...typography.bodySmall,
     color: colors.textMuted,
-    marginTop: 4
+    marginTop: 4,
+    flexShrink: 1
   },
   list: {
     marginHorizontal: spacing.md,
     gap: spacing.sm
   },
   row: {
+    width: "100%",
     minHeight: 72,
     padding: spacing.md,
     borderRadius: radii.lg,
@@ -210,22 +248,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md
   },
   rowPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
-  pendingRow: { opacity: 0.72 },
+  pendingRow: { opacity: 0.78 },
+  rowIcon: { marginTop: 1, flexShrink: 0 },
+  trailingIcon: { marginTop: 1, flexShrink: 0 },
   rowContent: {
-    flex: 1
+    flex: 1,
+    minWidth: 0
   },
   rowTitle: {
     ...typography.heading3,
-    color: colors.text
+    color: colors.text,
+    flexShrink: 1
   },
   rowSubtitle: {
     ...typography.caption,
     color: colors.textMuted,
-    marginTop: 3
+    marginTop: 3,
+    flexShrink: 1
+  },
+  pendingBadge: {
+    alignSelf: "flex-start",
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceMuted
   },
   pendingLabel: {
     color: colors.textMuted,
@@ -243,21 +294,29 @@ const styles = StyleSheet.create({
     minHeight: 52,
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.danger,
     backgroundColor: colors.dangerSoft,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm
   },
-  signOutText: { color: colors.danger, fontWeight: "900", fontSize: 15 },
+  signOutText: {
+    color: colors.danger,
+    fontWeight: "900",
+    fontSize: 15,
+    textAlign: "center"
+  },
   disabled: { opacity: 0.5 },
   version: {
     ...typography.caption,
     color: colors.textMuted,
     textAlign: "center",
-    marginTop: spacing.xl
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.md
   }
 });
