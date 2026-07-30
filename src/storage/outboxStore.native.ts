@@ -96,8 +96,8 @@ export async function purgeOutboxData(): Promise<void> {
     const currentDatabase = databasePromise;
     databasePromise = null;
     if (currentDatabase) {
-      const database = await currentDatabase;
-      await database.closeAsync();
+      const database = await currentDatabase.catch(() => null);
+      await database?.closeAsync().catch(() => undefined);
     }
     await SQLite.deleteDatabaseAsync(DATABASE_NAME);
     await SecureStore.deleteItemAsync(DATABASE_KEY);
