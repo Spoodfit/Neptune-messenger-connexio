@@ -62,10 +62,15 @@ export default function TabsLayout() {
           fontWeight: "700"
         },
         tabBarBadgeStyle: {
+          minWidth: 36,
+          height: 20,
+          paddingHorizontal: 5,
           backgroundColor: colors.primary,
           color: colors.white,
           fontSize: 10,
-          fontWeight: "900"
+          lineHeight: 20,
+          fontWeight: "900",
+          textAlign: "center"
         }
       }}
     >
@@ -77,7 +82,8 @@ export default function TabsLayout() {
             unreadCount > 0
               ? `Discussions, ${unreadCount} message${unreadCount > 1 ? "s" : ""} non lu${unreadCount > 1 ? "s" : ""}`
               : "Discussions, aucun message non lu",
-          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
+          tabBarBadge:
+            unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined,
           tabBarIcon: icon(
             "chatbubble-ellipses",
             "chatbubble-ellipses-outline"
