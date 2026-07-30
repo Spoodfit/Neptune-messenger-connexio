@@ -7,6 +7,8 @@ import { BrandHeader } from "@/components/BrandHeader";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { colors, radii, spacing, typography } from "@/theme";
 
+const MAX_CONTENT_WIDTH = 720;
+
 export default function CommunitiesScreen() {
   const {
     visibleConversations,
@@ -33,6 +35,7 @@ export default function CommunitiesScreen() {
         accessibilityLabel="Espaces Neptune accessibles"
         data={spaces}
         keyExtractor={(item) => item.id}
+        style={styles.listViewport}
         contentContainerStyle={[
           styles.list,
           spaces.length === 0 && styles.emptyList
@@ -62,18 +65,24 @@ export default function CommunitiesScreen() {
               />
             </View>
             <View style={styles.content}>
-              <Text style={styles.title}>{item.name}</Text>
-              <Text style={styles.meta}>
+              <Text style={styles.title} numberOfLines={2}>
+                {item.name}
+              </Text>
+              <Text style={styles.meta} numberOfLines={2}>
                 {item.memberCount} membres · {item.categoryLabel}
               </Text>
               {item.description ? (
-                <Text style={styles.description}>{item.description}</Text>
+                <Text style={styles.description} numberOfLines={3}>
+                  {item.description}
+                </Text>
               ) : null}
             </View>
             <Ionicons
+              accessibilityElementsHidden
               name={item.canPost ? "chevron-forward" : "lock-closed"}
               size={18}
               color={colors.textMuted}
+              style={styles.trailingIcon}
             />
           </Pressable>
         )}
@@ -81,7 +90,8 @@ export default function CommunitiesScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Aucun espace accessible</Text>
             <Text style={styles.emptyText}>
-              Les espaces apparaîtront après la synchronisation de votre club et de votre rôle Neptune.
+              Les espaces apparaîtront après la synchronisation de votre club et
+              de votre rôle Neptune.
             </Text>
           </View>
         }
@@ -95,6 +105,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background
   },
+  listViewport: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center"
+  },
   list: {
     padding: spacing.md,
     gap: spacing.sm,
@@ -102,6 +117,7 @@ const styles = StyleSheet.create({
   },
   emptyList: { flexGrow: 1 },
   card: {
+    width: "100%",
     minHeight: 78,
     flexDirection: "row",
     alignItems: "center",
@@ -119,10 +135,12 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     backgroundColor: colors.primarySoft,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    flexShrink: 0
   },
   content: {
     flex: 1,
+    minWidth: 0,
     gap: 3
   },
   title: {
@@ -137,6 +155,7 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary
   },
+  trailingIcon: { flexShrink: 0 },
   emptyState: {
     flex: 1,
     alignItems: "center",
@@ -144,6 +163,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.sm
   },
-  emptyTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
-  emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }
+  emptyTitle: {
+    ...typography.heading3,
+    color: colors.text,
+    textAlign: "center"
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: "center"
+  }
 });
