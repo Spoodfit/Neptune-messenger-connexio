@@ -18,7 +18,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { env } from "@/config/env";
 import { colors, gradients, radii } from "@/theme";
 
 type TabsProps = ComponentProps<typeof Tabs>;
@@ -30,15 +29,15 @@ const ICONS = {
     inactive: "chatbubble-ellipses-outline" as const,
     label: "Messages"
   },
-  communities: {
-    active: "grid" as const,
-    inactive: "grid-outline" as const,
-    label: "Espaces"
+  highlights: {
+    active: "sparkles" as const,
+    inactive: "sparkles-outline" as const,
+    label: "Temps forts"
   },
-  contacts: {
-    active: "people" as const,
-    inactive: "people-outline" as const,
-    label: "Membres"
+  calls: {
+    active: "call" as const,
+    inactive: "call-outline" as const,
+    label: "Appels"
   },
   settings: {
     active: "person" as const,
@@ -58,10 +57,11 @@ export function NeptuneTabBar({
 
   const visibleRoutes = useMemo(
     () =>
-      state.routes.filter(
-        (route) => route.name !== "contacts" || env.mockMode
-      ),
-    [state.routes]
+      state.routes.filter((route) => {
+        const options = descriptors[route.key]?.options;
+        return options?.href !== null && route.name in ICONS;
+      }),
+    [descriptors, state.routes]
   );
 
   const currentKey = state.routes[state.index]?.key;
