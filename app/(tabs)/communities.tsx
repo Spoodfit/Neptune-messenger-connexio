@@ -1,12 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { colors, radii, spacing, typography } from "@/theme";
 
 export default function CommunitiesScreen() {
-  const { visibleConversations } = useMessaging();
+  const {
+    visibleConversations,
+    refreshConversations,
+    loadingConversations
+  } = useMessaging();
 
   return (
     <View style={styles.screen}>
@@ -16,12 +21,23 @@ export default function CommunitiesScreen() {
       />
 
       <FlatList
+        accessibilityLabel="Espaces Neptune accessibles"
         data={visibleConversations}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          visibleConversations.length === 0 && styles.emptyList
+        ]}
+        refreshing={loadingConversations}
+        onRefresh={() => void refreshConversations()}
         renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.icon}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Ouvrir ${item.name}. ${item.memberCount} membres. ${item.categoryLabel}`}
+            onPress={() => router.push(`/chat/${item.id}`)}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+          >
+            <View style={styles.icon} accessibilityElementsHidden>
               <Ionicons
                 name={item.type === "announcement" ? "megaphone" : "people"}
                 size={22}
@@ -37,11 +53,21 @@ export default function CommunitiesScreen() {
                 <Text style={styles.description}>{item.description}</Text>
               ) : null}
             </View>
-            {item.restricted ? (
-              <Ionicons name="lock-closed" size={17} color={colors.textMuted} />
-            ) : null}
-          </View>
+            <Ionicons
+              name={item.restricted ? "lock-closed" : "chevron-forward"}
+              size={18}
+              color={colors.textMuted}
+            />
+          </Pressable>
         )}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Aucun espace accessible</Text>
+            <Text style={styles.emptyText}>
+              Les espaces apparaîtront après la synchronisation de votre club et de votre rôle Neptune.
+            </Text>
+          </View>
+        }
       />
     </View>
   );
@@ -57,7 +83,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: 96
   },
+  emptyList: { flexGrow: 1 },
   card: {
+    minHeight: 78,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
@@ -67,6 +95,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
+  cardPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
   icon: {
     width: 46,
     height: 46,
@@ -90,5 +119,14 @@ const styles = StyleSheet.create({
   description: {
     ...typography.bodySmall,
     color: colors.textSecondary
-  }
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm
+  },
+  emptyTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
+  emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }
 });
