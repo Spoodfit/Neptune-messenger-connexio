@@ -39,10 +39,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     scheme: "neptuneconnexio",
     userInterfaceStyle: "light",
     backgroundColor: "#F5F7FC",
-    androidNavigationBar: {
-      backgroundColor: "#FFFFFF",
-      barStyle: "dark-content"
-    },
     web: {
       bundler: "metro",
       output: "single"
