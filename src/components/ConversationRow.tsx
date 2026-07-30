@@ -20,7 +20,7 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
       accessibilityRole="button"
       accessibilityLabel={`${conversation.name}. ${conversation.lastMessage ?? "Aucun message"}. ${unreadLabel}`}
       accessibilityHint="Ouvre la conversation"
-      onPress={() => router.push(`/chat/${conversation.id}`)}
+      onPress={() => router.push(`/chat/${encodeURIComponent(conversation.id)}`)}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.avatar} accessibilityElementsHidden>
