@@ -1,64 +1,64 @@
  UPDATE  The latest version of `serve` is 14.2.6
  INFO  Accepting connections at http://localhost:4173
- HTTP  7/30/2026 7:38:43 PM 127.0.0.1 GET /
- HTTP  7/30/2026 7:38:43 PM 127.0.0.1 Returned 200 in 12 ms
- HTTP  7/30/2026 7:38:44 PM 127.0.0.1 GET /
- HTTP  7/30/2026 7:38:44 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:44 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:44 PM 127.0.0.1 Returned 200 in 15 ms
- HTTP  7/30/2026 7:38:44 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:44 PM 127.0.0.1 Returned 200 in 13 ms
- HTTP  7/30/2026 7:38:46 PM 127.0.0.1 GET /
- HTTP  7/30/2026 7:38:46 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:46 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:46 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:46 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:46 PM 127.0.0.1 Returned 200 in 5 ms
- HTTP  7/30/2026 7:38:47 PM 127.0.0.1 GET /
- HTTP  7/30/2026 7:38:47 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:47 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:47 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:47 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:47 PM 127.0.0.1 Returned 200 in 3 ms
- HTTP  7/30/2026 7:38:49 PM 127.0.0.1 GET /communities
- HTTP  7/30/2026 7:38:49 PM 127.0.0.1 Returned 200 in 0 ms
- HTTP  7/30/2026 7:38:49 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:49 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:49 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:49 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:50 PM 127.0.0.1 GET /contacts
- HTTP  7/30/2026 7:38:50 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:50 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:50 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:50 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:50 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:51 PM 127.0.0.1 GET /settings
- HTTP  7/30/2026 7:38:51 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:51 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:51 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:52 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:52 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:53 PM 127.0.0.1 GET /chat/carcassonne
- HTTP  7/30/2026 7:38:53 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:53 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:53 PM 127.0.0.1 Returned 200 in 5 ms
- HTTP  7/30/2026 7:38:53 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:53 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:54 PM 127.0.0.1 GET /chat/carcassonne
- HTTP  7/30/2026 7:38:54 PM 127.0.0.1 Returned 200 in 0 ms
- HTTP  7/30/2026 7:38:54 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:54 PM 127.0.0.1 Returned 200 in 3 ms
- HTTP  7/30/2026 7:38:55 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:55 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:56 PM 127.0.0.1 GET /chat/annonces
- HTTP  7/30/2026 7:38:56 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:56 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:56 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:56 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:56 PM 127.0.0.1 Returned 200 in 1 ms
- HTTP  7/30/2026 7:38:57 PM 127.0.0.1 GET /settings
- HTTP  7/30/2026 7:38:57 PM 127.0.0.1 Returned 200 in 2 ms
- HTTP  7/30/2026 7:38:57 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
- HTTP  7/30/2026 7:38:57 PM 127.0.0.1 Returned 200 in 3 ms
- HTTP  7/30/2026 7:38:57 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
- HTTP  7/30/2026 7:38:57 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:11 PM 127.0.0.1 GET /
+ HTTP  7/30/2026 7:46:11 PM 127.0.0.1 Returned 200 in 11 ms
+ HTTP  7/30/2026 7:46:11 PM 127.0.0.1 GET /
+ HTTP  7/30/2026 7:46:11 PM 127.0.0.1 Returned 200 in 3 ms
+ HTTP  7/30/2026 7:46:11 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:11 PM 127.0.0.1 Returned 200 in 7 ms
+ HTTP  7/30/2026 7:46:12 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:12 PM 127.0.0.1 Returned 200 in 9 ms
+ HTTP  7/30/2026 7:46:13 PM 127.0.0.1 GET /
+ HTTP  7/30/2026 7:46:13 PM 127.0.0.1 Returned 200 in 2 ms
+ HTTP  7/30/2026 7:46:13 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:13 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:13 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:13 PM 127.0.0.1 Returned 200 in 3 ms
+ HTTP  7/30/2026 7:46:14 PM 127.0.0.1 GET /
+ HTTP  7/30/2026 7:46:14 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:14 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:14 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:15 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:15 PM 127.0.0.1 Returned 200 in 3 ms
+ HTTP  7/30/2026 7:46:16 PM 127.0.0.1 GET /communities
+ HTTP  7/30/2026 7:46:16 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:16 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:16 PM 127.0.0.1 Returned 200 in 0 ms
+ HTTP  7/30/2026 7:46:16 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:16 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:17 PM 127.0.0.1 GET /contacts
+ HTTP  7/30/2026 7:46:17 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:17 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:17 PM 127.0.0.1 Returned 200 in 2 ms
+ HTTP  7/30/2026 7:46:18 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:18 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:19 PM 127.0.0.1 GET /settings
+ HTTP  7/30/2026 7:46:19 PM 127.0.0.1 Returned 200 in 4 ms
+ HTTP  7/30/2026 7:46:19 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:19 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:19 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:19 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:20 PM 127.0.0.1 GET /chat/carcassonne
+ HTTP  7/30/2026 7:46:20 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:20 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:20 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:20 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:20 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:22 PM 127.0.0.1 GET /chat/carcassonne
+ HTTP  7/30/2026 7:46:22 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:22 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:22 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:22 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:22 PM 127.0.0.1 Returned 200 in 2 ms
+ HTTP  7/30/2026 7:46:23 PM 127.0.0.1 GET /chat/annonces
+ HTTP  7/30/2026 7:46:23 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:23 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:23 PM 127.0.0.1 Returned 200 in 2 ms
+ HTTP  7/30/2026 7:46:23 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:23 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:24 PM 127.0.0.1 GET /settings
+ HTTP  7/30/2026 7:46:24 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:24 PM 127.0.0.1 GET /_expo/static/js/web/entry-f8adf6031b8ffdc5eed1663a3fcba832.js
+ HTTP  7/30/2026 7:46:24 PM 127.0.0.1 Returned 200 in 1 ms
+ HTTP  7/30/2026 7:46:25 PM 127.0.0.1 GET /assets/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf
+ HTTP  7/30/2026 7:46:25 PM 127.0.0.1 Returned 200 in 1 ms
