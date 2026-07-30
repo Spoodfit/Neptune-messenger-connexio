@@ -2,7 +2,27 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
+  const realtimeUrl = process.env.EXPO_PUBLIC_REALTIME_URL ?? "";
+  const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
+  const buildProfile = process.env.EAS_BUILD_PROFILE;
   const isGithubPages = process.env.EXPO_PUBLIC_GITHUB_PAGES === "true";
+
+  if (buildProfile === "production") {
+    const missing = [
+      !apiBaseUrl && "EXPO_PUBLIC_API_BASE_URL",
+      !realtimeUrl && "EXPO_PUBLIC_REALTIME_URL",
+      !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID"
+    ].filter(Boolean);
+    if (mockMode) {
+      throw new Error("EXPO_PUBLIC_MOCK_MODE doit être false en production.");
+    }
+    if (missing.length > 0) {
+      throw new Error(
+        `Configuration Connexio production incomplète : ${missing.join(", ")}`
+      );
+    }
+  }
 
   return {
     ...config,
@@ -58,9 +78,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ]
     ],
     extra: {
-      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? "",
-      realtimeUrl: process.env.EXPO_PUBLIC_REALTIME_URL ?? "",
-      mockMode: process.env.EXPO_PUBLIC_MOCK_MODE !== "false",
+      apiBaseUrl,
+      realtimeUrl,
+      mockMode,
       ...(easProjectId
         ? {
             eas: {
