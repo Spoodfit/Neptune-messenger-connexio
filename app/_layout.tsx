@@ -20,7 +20,13 @@ import { colors } from "../src/theme";
 configureNotificationPresentation();
 
 function AuthenticatedApp() {
-  const { sessionReady, isAuthenticated, accessToken, getAccessToken } = useSession();
+  const {
+    sessionReady,
+    isAuthenticated,
+    accessToken,
+    currentUser,
+    getAccessToken
+  } = useSession();
   const segments = useSegments();
   const pendingConversationId = useRef<string | null>(null);
   const hasAccessToken = Boolean(accessToken);
@@ -144,7 +150,9 @@ function AuthenticatedApp() {
   }
 
   return (
-    <MessagingProvider>
+    <MessagingProvider
+      key={isAuthenticated ? `user:${currentUser.id}` : "signed-out"}
+    >
       <StatusBar style="light" />
       <Stack
         screenOptions={{
