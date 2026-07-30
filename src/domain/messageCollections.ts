@@ -1,32 +1,46 @@
 import { reconcileServerMessage } from "./messageLifecycle";
 import type { ChatMessage } from "../types/messaging";
 
-function sameMessage(a: ChatMessage, b: ChatMessage): boolean {
-  return (
-    a.id === b.id ||
-    Boolean(
-      a.clientMessageId &&
-        b.clientMessageId &&
-        a.clientMessageId === b.clientMessageId
-    )
-  );
-}
-
 export function mergeMessagesNewestFirst(
   current: readonly ChatMessage[],
   incoming: readonly ChatMessage[]
 ): ChatMessage[] {
   const merged = [...current];
+  const indexById = new Map<string, number>();
+  const indexByClientId = new Map<string, number>();
+
+  merged.forEach((message, index) => {
+    indexById.set(message.id, index);
+    if (message.clientMessageId) {
+      indexByClientId.set(message.clientMessageId, index);
+    }
+  });
 
   for (const message of incoming) {
-    const index = merged.findIndex((candidate) => sameMessage(candidate, message));
-    if (index < 0) {
+    const index =
+      indexById.get(message.id) ??
+      (message.clientMessageId
+        ? indexByClientId.get(message.clientMessageId)
+        : undefined);
+
+    if (index === undefined) {
+      const nextIndex = merged.length;
       merged.push(message);
+      indexById.set(message.id, nextIndex);
+      if (message.clientMessageId) {
+        indexByClientId.set(message.clientMessageId, nextIndex);
+      }
       continue;
     }
+
     const existing = merged[index];
     if (!existing) continue;
-    merged[index] = reconcileServerMessage(existing, message);
+    const reconciled = reconcileServerMessage(existing, message);
+    merged[index] = reconciled;
+    indexById.set(reconciled.id, index);
+    if (reconciled.clientMessageId) {
+      indexByClientId.set(reconciled.clientMessageId, index);
+    }
   }
 
   return merged.sort((a, b) => {
