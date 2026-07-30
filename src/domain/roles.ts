@@ -35,7 +35,7 @@ export function canAccessAllowedRoles(
   role: UserRole,
   allowedRoles?: readonly UserRole[]
 ): boolean {
-  if (!allowedRoles || allowedRoles.length === 0) return true;
+  if (!allowedRoles || allowedRoles.length === 0) return false;
   const normalized = normalizeUserRole(role);
   return allowedRoles.some(
     (allowedRole) => normalizeUserRole(allowedRole) === normalized
