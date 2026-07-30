@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
   },
   modeButton: {
     flex: 1,
-    minHeight: 42,
+    minHeight: 44,
     overflow: "hidden",
     borderRadius: 14,
     borderWidth: 1,
