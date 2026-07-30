@@ -58,7 +58,9 @@ export default function ContactsScreen() {
                   style={[
                     styles.statusText,
                     {
-                      color: item.online ? colors.success : colors.textMuted
+                      color: item.online
+                        ? colors.success
+                        : colors.textSecondary
                     }
                   ]}
                 >
