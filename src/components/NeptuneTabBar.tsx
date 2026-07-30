@@ -1,7 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Tabs } from "expo-router";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps
+} from "react";
 import {
   Animated,
   Pressable,
@@ -14,6 +20,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { env } from "@/config/env";
 import { colors, gradients, radii } from "@/theme";
+
+type TabsProps = ComponentProps<typeof Tabs>;
+type NeptuneTabBarProps = Parameters<NonNullable<TabsProps["tabBar"]>>[0];
 
 const ICONS = {
   messages: {
@@ -38,7 +47,11 @@ const ICONS = {
   }
 };
 
-export function NeptuneTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export function NeptuneTabBar({
+  state,
+  descriptors,
+  navigation
+}: NeptuneTabBarProps) {
   const insets = useSafeAreaInsets();
   const [barWidth, setBarWidth] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
@@ -103,7 +116,6 @@ export function NeptuneTabBar({ state, descriptors, navigation }: BottomTabBarPr
         ) : null}
 
         {visibleRoutes.map((route) => {
-          const routeIndex = state.routes.findIndex((item) => item.key === route.key);
           const focused = route.key === currentKey;
           const descriptor = descriptors[route.key];
           const icon = ICONS[route.name as keyof typeof ICONS] ?? ICONS.messages;
