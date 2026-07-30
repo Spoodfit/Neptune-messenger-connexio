@@ -17,9 +17,10 @@ import { colors } from "../src/theme";
 configureNotificationPresentation();
 
 function AuthenticatedApp() {
-  const { sessionReady, isAuthenticated, getAccessToken } = useSession();
+  const { sessionReady, isAuthenticated, accessToken, getAccessToken } = useSession();
   const segments = useSegments();
   const pendingConversationId = useRef<string | null>(null);
+  const hasAccessToken = Boolean(accessToken);
 
   useEffect(() => {
     if (!sessionReady) return;
@@ -38,7 +39,14 @@ function AuthenticatedApp() {
   }, [isAuthenticated, segments, sessionReady]);
 
   useEffect(() => {
-    if (Platform.OS === "web" || !sessionReady || !isAuthenticated) return;
+    if (
+      Platform.OS === "web" ||
+      !sessionReady ||
+      !isAuthenticated ||
+      !hasAccessToken
+    ) {
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const token = await getAccessToken();
@@ -53,7 +61,7 @@ function AuthenticatedApp() {
     return () => {
       cancelled = true;
     };
-  }, [getAccessToken, isAuthenticated, sessionReady]);
+  }, [getAccessToken, hasAccessToken, isAuthenticated, sessionReady]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
