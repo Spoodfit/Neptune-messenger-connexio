@@ -117,9 +117,9 @@ export function NeptuneTabBar({
 
         {visibleRoutes.map((route) => {
           const focused = route.key === currentKey;
-          const descriptor = descriptors[route.key];
+          const options = descriptors[route.key]?.options;
           const icon = ICONS[route.name as keyof typeof ICONS] ?? ICONS.messages;
-          const badge = descriptor.options.tabBarBadge;
+          const badge = options?.tabBarBadge;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -142,9 +142,7 @@ export function NeptuneTabBar({
               key={route.key}
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
-              accessibilityLabel={
-                descriptor.options.tabBarAccessibilityLabel ?? icon.label
-              }
+              accessibilityLabel={options?.tabBarAccessibilityLabel ?? icon.label}
               onPress={onPress}
               onLongPress={onLongPress}
               style={({ pressed }) => [
