@@ -1,24 +1,35 @@
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { env } from "@/config/env";
 import { members } from "@/data/mockData";
 import { colors, radii, spacing, typography } from "@/theme";
 
 export default function ContactsScreen() {
+  const visibleMembers = env.mockMode ? members : [];
+
   return (
     <View style={styles.screen}>
       <BrandHeader
         title="Membres"
-        subtitle="Annuaire simplifié de l’écosystème Neptune."
+        subtitle="Annuaire de l’écosystème Neptune."
       />
 
       <FlatList
-        data={members}
+        accessibilityLabel="Annuaire des membres Neptune"
+        data={visibleMembers}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[
+          styles.list,
+          visibleMembers.length === 0 && styles.emptyList
+        ]}
         renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={styles.avatar}>
+          <View
+            accessible
+            accessibilityLabel={`${item.name}. ${item.company}. ${item.city}. ${item.online ? "En ligne" : "Absent"}`}
+            style={styles.row}
+          >
+            <View style={styles.avatar} accessibilityElementsHidden>
               <Text style={styles.initials}>{item.initials}</Text>
             </View>
             <View style={styles.content}>
@@ -50,6 +61,16 @@ export default function ContactsScreen() {
             </View>
           </View>
         )}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text accessibilityRole="header" style={styles.emptyTitle}>
+              Annuaire non connecté
+            </Text>
+            <Text style={styles.emptyText}>
+              Aucun membre fictif n’est affiché. L’annuaire sera activé après validation de l’endpoint Neptune et des règles de confidentialité.
+            </Text>
+          </View>
+        }
       />
     </View>
   );
@@ -65,7 +86,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: 96
   },
+  emptyList: { flexGrow: 1 },
   row: {
+    minHeight: 74,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
@@ -107,5 +130,14 @@ const styles = StyleSheet.create({
   statusText: {
     ...typography.caption,
     fontWeight: "800"
-  }
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    gap: spacing.sm
+  },
+  emptyTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
+  emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }
 });
