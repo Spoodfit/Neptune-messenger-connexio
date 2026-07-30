@@ -37,8 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     version: "0.2.0",
     orientation: "portrait",
     scheme: "neptuneconnexio",
-    userInterfaceStyle: "light",
-    backgroundColor: "#F5F7FC",
+    userInterfaceStyle: "dark",
+    backgroundColor: "#020713",
     web: {
       bundler: "metro",
       output: "single"
@@ -55,7 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       package: "com.neptunebusiness.connexio",
       adaptiveIcon: {
-        backgroundColor: "#07162F"
+        backgroundColor: "#020713"
       },
       permissions: ["POST_NOTIFICATIONS"]
     },
