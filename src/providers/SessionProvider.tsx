@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import {
   createContext,
   type PropsWithChildren,
@@ -14,11 +14,13 @@ import {
 } from "react";
 
 import { env } from "../config/env";
+import { shouldClearSessionAfterRefreshFailure } from "../domain/sessionErrors";
 import {
   calculateAccessTokenExpiry,
   shouldRefreshAccessToken
 } from "../domain/sessionTokens";
 import { currentUser as demoUser } from "../data/mockData";
+import { ApiError } from "../services/api/httpClient";
 import { NeptuneSessionApi } from "../services/api/sessionApi";
 import { configureSessionRuntime } from "../services/auth/sessionRuntime";
 import type { AppUser, SessionPayload } from "../types/messaging";
@@ -117,9 +119,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
         const session = await sessionApi.refreshSession(storedRefreshToken);
         await persistSession(session);
         return session.accessToken;
-      } catch {
-        await clearSession();
-        return null;
+      } catch (error) {
+        if (
+          error instanceof ApiError &&
+          shouldClearSessionAfterRefreshFailure(error.status)
+        ) {
+          await clearSession();
+          return null;
+        }
+        // Une panne réseau ou serveur ne doit jamais déconnecter l'utilisateur.
+        return accessTokenRef.current;
       }
     })().finally(() => {
       refreshInFlightRef.current = null;
@@ -168,8 +177,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
         setRefreshToken(storedRefreshToken);
         const session = await sessionApi.refreshSession(storedRefreshToken);
         if (!cancelled) await persistSession(session);
-      } catch {
-        if (!cancelled) await clearSession();
+      } catch (error) {
+        if (
+          !cancelled &&
+          error instanceof ApiError &&
+          shouldClearSessionAfterRefreshFailure(error.status)
+        ) {
+          await clearSession();
+        }
       } finally {
         if (!cancelled) setSessionReady(true);
       }
@@ -178,6 +193,14 @@ export function SessionProvider({ children }: PropsWithChildren) {
       cancelled = true;
     };
   }, [clearSession, persistSession]);
+
+  useEffect(() => {
+    if (env.mockMode || accessToken || !refreshToken) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshAccessToken();
+    });
+    return () => subscription.remove();
+  }, [accessToken, refreshAccessToken, refreshToken]);
 
   const exchangeOneTimeCode = useCallback(
     async (code: string) => {
@@ -209,7 +232,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     () => ({
       currentUser,
       accessToken,
-      isAuthenticated: env.mockMode || Boolean(accessToken),
+      isAuthenticated: env.mockMode || Boolean(accessToken || refreshToken),
       sessionReady,
       getAccessToken,
       refreshAccessToken,
@@ -222,6 +245,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       exchangeOneTimeCode,
       getAccessToken,
       refreshAccessToken,
+      refreshToken,
       sessionReady,
       signOut
     ]
