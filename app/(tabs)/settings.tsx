@@ -120,7 +120,7 @@ export default function SettingsScreen() {
                 accessible
                 accessibilityLabel={`${item.title}. Non disponible dans ce build.`}
                 key={item.title}
-                style={[styles.row, styles.pendingRow]}
+                style={styles.row}
               >
                 <Ionicons
                   name={item.icon}
@@ -252,7 +252,6 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   rowPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
-  pendingRow: { opacity: 0.78 },
   rowIcon: { marginTop: 1, flexShrink: 0 },
   trailingIcon: { marginTop: 1, flexShrink: 0 },
   rowContent: {
