@@ -29,6 +29,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
+      - name: Production dependency vulnerability audit
+        run: npm audit --omit=dev --audit-level=high
       - name: TypeScript and domain tests
         run: npm run verify --silent
       - name: Expo dependency compatibility
