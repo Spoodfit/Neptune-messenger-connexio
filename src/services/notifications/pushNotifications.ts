@@ -9,6 +9,20 @@ import type { PushTokenRegistration } from "../../types/messaging";
 
 const REGISTERED_PUSH_TOKEN_KEY = "connexio.push.registered-token";
 
+function getProjectId(): string | undefined {
+  return env.easProjectId || Constants.easConfig?.projectId || undefined;
+}
+
+function createRegistration(token: string): PushTokenRegistration {
+  return {
+    token,
+    provider: "expo",
+    platform: Platform.OS === "ios" ? "ios" : "android",
+    appVersion: Constants.expoConfig?.version ?? "0.0.0",
+    deviceName: Device.deviceName ?? undefined
+  };
+}
+
 export function configureNotificationPresentation(): void {
   if (Platform.OS === "web") return;
   Notifications.setNotificationHandler({
@@ -47,6 +61,19 @@ export async function unregisterDeviceFromPushNotifications(): Promise<void> {
   }
 }
 
+export async function registrationFromDevicePushToken(
+  devicePushToken: Notifications.DevicePushToken
+): Promise<PushTokenRegistration | null> {
+  if (Platform.OS === "web" || !Device.isDevice) return null;
+  const projectId = getProjectId();
+  if (!projectId) return null;
+  const expoToken = await Notifications.getExpoPushTokenAsync({
+    projectId,
+    devicePushToken
+  });
+  return createRegistration(expoToken.data);
+}
+
 export async function registerForPushNotifications(): Promise<PushTokenRegistration | null> {
   if (Platform.OS === "web" || !Device.isDevice) return null;
 
@@ -68,16 +95,9 @@ export async function registerForPushNotifications(): Promise<PushTokenRegistrat
   }
   if (status !== "granted") return null;
 
-  const projectId = env.easProjectId || Constants.easConfig?.projectId || undefined;
+  const projectId = getProjectId();
   if (!projectId) return null;
 
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  const platform: "ios" | "android" = Platform.OS === "ios" ? "ios" : "android";
-  return {
-    token: token.data,
-    provider: "expo",
-    platform,
-    appVersion: Constants.expoConfig?.version ?? "0.0.0",
-    deviceName: Device.deviceName ?? undefined
-  };
+  return createRegistration(token.data);
 }
