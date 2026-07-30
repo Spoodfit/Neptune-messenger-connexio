@@ -7,7 +7,9 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly payload?: unknown,
-    public readonly requestId?: string
+    public readonly requestId?: string,
+    public readonly code?: string,
+    public readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = "ApiError";
@@ -19,6 +21,12 @@ export class ApiError extends Error {
 interface RequestOptions extends RequestInit {
   token?: string | null;
   timeoutMs?: number;
+}
+
+interface ErrorPayload {
+  message?: unknown;
+  code?: unknown;
+  error?: unknown;
 }
 
 function joinUrl(base: string, path: string): string {
@@ -40,6 +48,45 @@ async function parsePayload(response: Response): Promise<unknown> {
   return text;
 }
 
+function getErrorDetails(
+  payload: unknown,
+  status: number
+): { message: string; code?: string } {
+  if (typeof payload === "string" && payload.trim()) {
+    return { message: payload.trim() };
+  }
+  if (payload && typeof payload === "object") {
+    const candidate = payload as ErrorPayload;
+    const code = typeof candidate.code === "string" ? candidate.code : undefined;
+    if (typeof candidate.message === "string" && candidate.message.trim()) {
+      return { message: candidate.message.trim(), code };
+    }
+    if (typeof candidate.error === "string" && candidate.error.trim()) {
+      return { message: candidate.error.trim(), code };
+    }
+    if (candidate.error && typeof candidate.error === "object") {
+      const nested = candidate.error as ErrorPayload;
+      if (typeof nested.message === "string" && nested.message.trim()) {
+        return {
+          message: nested.message.trim(),
+          code: typeof nested.code === "string" ? nested.code : code
+        };
+      }
+    }
+    return { message: `Erreur API ${status}`, code };
+  }
+  return { message: `Erreur API ${status}` };
+}
+
+function parseRetryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.round(seconds * 1_000);
+  const date = Date.parse(value);
+  if (!Number.isFinite(date)) return undefined;
+  return Math.max(0, date - Date.now());
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestOptions = {}
@@ -52,10 +99,12 @@ export async function apiRequest<T>(
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15_000);
   const externalSignal = options.signal;
   const abortFromExternal = () => controller.abort();
-  externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
 
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
+  headers.set("Accept-Language", "fr-FR");
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -73,11 +122,14 @@ export async function apiRequest<T>(
     const requestId = response.headers.get("x-request-id") ?? undefined;
 
     if (!response.ok) {
+      const details = getErrorDetails(payload, response.status);
       throw new ApiError(
-        `Erreur API ${response.status}`,
+        details.message,
         response.status,
         payload,
-        requestId
+        requestId,
+        details.code,
+        parseRetryAfter(response.headers.get("retry-after"))
       );
     }
 
