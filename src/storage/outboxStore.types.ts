@@ -13,4 +13,5 @@ export interface OutboxStore {
   ): Promise<void>;
   requeue(clientMessageId: string): Promise<void>;
   remove(clientMessageId: string): Promise<void>;
+  clear(): Promise<void>;
 }
