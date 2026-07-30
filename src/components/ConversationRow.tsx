@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, typography } from "../theme";
 import type { Conversation } from "../types/messaging";
@@ -24,19 +24,27 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.avatar} accessibilityElementsHidden>
-        <Ionicons
-          name={
-            conversation.type === "announcement"
-              ? "megaphone"
-              : conversation.type === "support"
-                ? "construct"
-                : conversation.type === "direct"
-                  ? "person"
-                  : "people"
-          }
-          size={22}
-          color={colors.primary}
-        />
+        {conversation.avatarUrl ? (
+          <Image
+            source={{ uri: conversation.avatarUrl }}
+            resizeMode="cover"
+            style={styles.avatarImage}
+          />
+        ) : (
+          <Ionicons
+            name={
+              conversation.type === "announcement"
+                ? "megaphone"
+                : conversation.type === "support"
+                  ? "construct"
+                  : conversation.type === "direct"
+                    ? "person"
+                    : "people"
+            }
+            size={22}
+            color={colors.primary}
+          />
+        )}
       </View>
       <View style={styles.content}>
         <View style={styles.topLine}>
@@ -89,10 +97,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
+    overflow: "hidden",
     backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center"
   },
+  avatarImage: { width: "100%", height: "100%" },
   content: { flex: 1, gap: 6 },
   topLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   name: { ...typography.heading3, color: colors.text, flex: 1 },
