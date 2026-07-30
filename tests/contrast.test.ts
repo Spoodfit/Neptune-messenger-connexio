@@ -26,7 +26,7 @@ function contrast(foreground: string, background: string): number {
 
 const normalTextPairs: Array<[string, string, string]> = [
   ["primary sur blanc", colors.primary, colors.white],
-  ["primary sur fond doux", colors.primary, colors.primarySoft],
+  ["texte clair sur fond primaire doux", colors.text, colors.primarySoft],
   ["texte atténué sur surface", colors.textMuted, colors.surface],
   ["texte atténué sur fond", colors.textMuted, colors.background],
   ["texte atténué sur surface douce", colors.textMuted, colors.surfaceMuted],
