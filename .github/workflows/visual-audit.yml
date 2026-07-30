@@ -68,6 +68,12 @@ jobs:
               { name: 'readonly-320x568', width: 320, height: 568, route: '/chat/annonces' },
               { name: 'settings-zoom140-320x568', width: 320, height: 568, route: '/settings', zoom: 1.4 }
             ];
+            const thumbnailNames = new Set([
+              'messages-320x568',
+              'messages-tablet-768x1024',
+              'chat-320x568',
+              'settings-zoom140-320x568'
+            ]);
             const browser = await chromium.launch({ headless: true });
             const findings = [];
             try {
@@ -141,8 +147,12 @@ jobs:
                     clipped
                   };
                 });
+                const screenshotPath = path.join(
+                  'visual-audit-output',
+                  `${c.name}.jpg`
+                );
                 await page.screenshot({
-                  path: path.join('visual-audit-output', `${c.name}.jpg`),
+                  path: screenshotPath,
                   type: 'jpeg',
                   quality: 62,
                   fullPage: true
@@ -155,6 +165,26 @@ jobs:
                   pageErrors
                 });
                 await context.close();
+
+                if (thumbnailNames.has(c.name)) {
+                  const thumbnailContext = await browser.newContext({
+                    viewport: { width: 160, height: 284 }
+                  });
+                  const thumbnailPage = await thumbnailContext.newPage();
+                  const source = fs.readFileSync(screenshotPath).toString('base64');
+                  await thumbnailPage.setContent(
+                    `<style>html,body{margin:0;background:#fff;overflow:hidden}img{display:block;width:160px;height:284px;object-fit:contain;object-position:top}</style><img src="data:image/jpeg;base64,${source}">`
+                  );
+                  await thumbnailPage.screenshot({
+                    path: path.join(
+                      'visual-audit-output',
+                      `${c.name}-thumb.jpg`
+                    ),
+                    type: 'jpeg',
+                    quality: 40
+                  });
+                  await thumbnailContext.close();
+                }
               }
             } finally {
               await browser.close();
