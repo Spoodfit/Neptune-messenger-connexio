@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing, typography } from "../theme";
@@ -11,9 +12,14 @@ interface ConversationRowProps {
 }
 
 export function ConversationRow({ conversation }: ConversationRowProps) {
+  const [avatarFailed, setAvatarFailed] = useState(false);
   const unreadLabel = conversation.unreadCount
     ? `${conversation.unreadCount} message${conversation.unreadCount > 1 ? "s" : ""} non lu${conversation.unreadCount > 1 ? "s" : ""}`
     : "Aucun message non lu";
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [conversation.avatarUrl]);
 
   return (
     <Pressable
@@ -24,9 +30,10 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
       <View style={styles.avatar} accessibilityElementsHidden>
-        {conversation.avatarUrl ? (
+        {conversation.avatarUrl && !avatarFailed ? (
           <Image
             source={{ uri: conversation.avatarUrl }}
+            onError={() => setAvatarFailed(true)}
             resizeMode="cover"
             style={styles.avatarImage}
           />
@@ -51,7 +58,7 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
           <Text style={styles.name} numberOfLines={1}>
             {conversation.name}
           </Text>
-          <Text style={styles.time}>
+          <Text style={styles.time} numberOfLines={1}>
             {formatConversationTime(conversation.lastMessageAt)}
           </Text>
         </View>
@@ -61,7 +68,7 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
           </Text>
           {conversation.unreadCount > 0 ? (
             <View style={styles.unread} accessibilityElementsHidden>
-              <Text style={styles.unreadText}>
+              <Text style={styles.unreadText} numberOfLines={1}>
                 {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
               </Text>
             </View>
@@ -81,6 +88,7 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
 
 const styles = StyleSheet.create({
   row: {
+    width: "100%",
     minHeight: 80,
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -100,15 +108,40 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: colors.primarySoft,
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    flexShrink: 0
   },
   avatarImage: { width: "100%", height: "100%" },
-  content: { flex: 1, gap: 6 },
-  topLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  name: { ...typography.heading3, color: colors.text, flex: 1 },
-  time: { ...typography.caption, color: colors.textMuted },
-  bottomLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  preview: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
+  content: { flex: 1, minWidth: 0, gap: 6 },
+  topLine: {
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+  name: {
+    ...typography.heading3,
+    color: colors.text,
+    flex: 1,
+    minWidth: 0
+  },
+  time: {
+    ...typography.caption,
+    color: colors.textMuted,
+    flexShrink: 0
+  },
+  bottomLine: {
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
+  preview: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    flex: 1,
+    minWidth: 0
+  },
   unread: {
     minWidth: 24,
     height: 24,
@@ -116,7 +149,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primary
+    backgroundColor: colors.primary,
+    flexShrink: 0
   },
   unreadText: { color: colors.white, fontSize: 11, fontWeight: "900" }
 });
