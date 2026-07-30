@@ -12,6 +12,7 @@ export function BrandHeader({ title, subtitle }: BrandHeaderProps) {
   return (
     <View style={styles.wrapper}>
       <LinearGradient
+        accessibilityElementsHidden
         colors={gradients.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -20,46 +21,44 @@ export function BrandHeader({ title, subtitle }: BrandHeaderProps) {
         <Text style={styles.logoText}>N</Text>
       </LinearGradient>
 
-      <View style={styles.content}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
-      </View>
+      <Text
+        accessibilityRole="header"
+        accessibilityHint={subtitle}
+        numberOfLines={1}
+        style={styles.title}
+      >
+        {title}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    paddingTop: Platform.OS === "ios" ? 58 : 28,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
+    paddingTop: Platform.OS === "ios" ? 50 : 18,
+    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: Platform.OS === "ios" ? 96 : 64,
     backgroundColor: colors.navy,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md
+    gap: spacing.sm
   },
   logo: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.lg,
+    width: 36,
+    height: 36,
+    borderRadius: radii.md,
     alignItems: "center",
     justifyContent: "center"
   },
   logoText: {
     color: colors.white,
-    fontSize: 27,
+    fontSize: 21,
     fontWeight: "900"
   },
-  content: {
-    flex: 1
-  },
   title: {
-    ...typography.display,
-    color: colors.white
-  },
-  subtitle: {
-    ...typography.bodySmall,
-    color: colors.whiteMuted,
-    marginTop: 3
+    ...typography.heading2,
+    color: colors.white,
+    flex: 1
   }
 });
