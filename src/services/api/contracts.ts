@@ -1,8 +1,10 @@
 import type {
   ChatMessage,
   Conversation,
-  PushTokenRegistration
-} from "@/types/messaging";
+  PushTokenRegistration,
+  RealtimeTicket,
+  SessionPayload
+} from "../../types/messaging";
 
 export interface CursorPage<T> {
   items: T[];
@@ -13,6 +15,12 @@ export interface SendMessageInput {
   clientMessageId: string;
   body: string;
   replyToMessageId?: string;
+}
+
+export interface SessionApi {
+  exchangeOneTimeCode(code: string, deviceId: string): Promise<SessionPayload>;
+  refreshSession(refreshToken: string): Promise<SessionPayload>;
+  revokeSession(refreshToken: string): Promise<void>;
 }
 
 export interface MessagingApi {
@@ -30,4 +38,6 @@ export interface MessagingApi {
     lastReadMessageId: string
   ): Promise<void>;
   registerPushToken(registration: PushTokenRegistration): Promise<void>;
+  unregisterPushToken(token: string): Promise<void>;
+  requestRealtimeTicket(): Promise<RealtimeTicket>;
 }

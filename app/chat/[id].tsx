@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -12,71 +13,101 @@ import {
   View
 } from "react-native";
 
-import { MessageBubble } from "@/components/MessageBubble";
-import { useMessaging } from "@/providers/MessagingProvider";
-import { colors, radii, spacing, typography } from "@/theme";
+import { MessageBubble } from "../../src/components/MessageBubble";
+import { useMessaging } from "../../src/providers/MessagingProvider";
+import { colors, radii, spacing, typography } from "../../src/theme";
 
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
-  const { getConversation, getMessages, sendMessage } = useMessaging();
+  const conversationId = Array.isArray(params.id)
+    ? (params.id[0] ?? "")
+    : (params.id ?? "");
+  const {
+    getConversation,
+    getMessages,
+    loadMessages,
+    sendMessage,
+    retryMessage,
+    markConversationRead,
+    loadingConversationIds,
+    connectionState,
+    lastError
+  } = useMessaging();
   const [draft, setDraft] = useState("");
 
   const conversation = useMemo(
-    () => getConversation(params.id),
-    [getConversation, params.id]
+    () => getConversation(conversationId),
+    [conversationId, getConversation]
   );
   const messages = useMemo(
-    () => getMessages(params.id),
-    [getMessages, params.id]
+    () => getMessages(conversationId),
+    [conversationId, getMessages]
   );
+  const loading = loadingConversationIds.has(conversationId);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    void loadMessages(conversationId);
+    void markConversationRead(conversationId);
+  }, [conversationId, loadMessages, markConversationRead]);
 
   if (!conversation) {
     return (
       <View style={styles.missing}>
-        <Text style={styles.missingTitle}>Conversation introuvable</Text>
-        <Pressable onPress={() => router.back()}>
+        <Text accessibilityRole="header" style={styles.missingTitle}>
+          Conversation introuvable
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Revenir aux discussions"
+          onPress={() => router.back()}
+          style={styles.missingButton}
+        >
           <Text style={styles.backLink}>Retour</Text>
         </Pressable>
       </View>
     );
   }
 
-  const submit = () => {
+  const submit = async () => {
     const body = draft.trim();
     if (!body) return;
-
-    sendMessage(conversation.id, body);
     setDraft("");
+    await sendMessage(conversation.id, body);
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={0}
     >
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.headerButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Retour aux discussions"
+          hitSlop={4}
+          onPress={() => router.back()}
+          style={styles.headerButton}
+        >
           <Ionicons name="chevron-back" size={25} color={colors.white} />
         </Pressable>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
+          <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>
             {conversation.name}
           </Text>
           <Text style={styles.headerSubtitle}>
-            {conversation.memberCount} membres
+            {connectionState === "online"
+              ? `${conversation.memberCount} membres`
+              : connectionState === "connecting"
+                ? "Connexion…"
+                : "Hors ligne — envois mis en attente"}
           </Text>
         </View>
-        <Pressable style={styles.headerButton}>
-          <Ionicons
-            name="information-circle-outline"
-            size={23}
-            color={colors.white}
-          />
-        </Pressable>
       </View>
 
       {conversation.pinnedMessage ? (
-        <View style={styles.pinned}>
+        <View style={styles.pinned} accessibilityLabel={`Message épinglé. ${conversation.pinnedMessage}`}>
           <Ionicons name="pin" size={16} color={colors.primary} />
           <Text style={styles.pinnedText} numberOfLines={2}>
             {conversation.pinnedMessage}
@@ -84,29 +115,58 @@ export default function ChatScreen() {
         </View>
       ) : null}
 
-      <FlatList
-        data={messages}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <MessageBubble message={item} />}
-        contentContainerStyle={styles.messages}
-        inverted
-      />
+      {lastError ? (
+        <Text accessibilityRole="alert" style={styles.errorBanner}>
+          {lastError}
+        </Text>
+      ) : null}
+
+      {loading && messages.length === 0 ? (
+        <View style={styles.loader} accessibilityLabel="Chargement des messages">
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          accessibilityLabel={`Messages de ${conversation.name}`}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <MessageBubble
+              message={item}
+              onRetry={(clientMessageId) => void retryMessage(clientMessageId)}
+            />
+          )}
+          contentContainerStyle={styles.messages}
+          inverted
+          keyboardShouldPersistTaps="handled"
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          ListEmptyComponent={
+            <Text style={styles.empty}>Aucun message. Lancez la discussion.</Text>
+          }
+        />
+      )}
 
       <View style={styles.composer}>
-        <Pressable style={styles.attachButton}>
-          <Ionicons name="add" size={26} color={colors.primary} />
-        </Pressable>
         <TextInput
           value={draft}
           onChangeText={setDraft}
+          accessibilityLabel="Écrire un message"
           placeholder="Écrire un message…"
           placeholderTextColor={colors.textMuted}
           multiline
           style={styles.input}
+          maxLength={4_000}
+          returnKeyType="default"
         />
         <Pressable
-          onPress={submit}
-          style={[styles.sendButton, !draft.trim() && styles.sendDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel="Envoyer le message"
+          onPress={() => void submit()}
+          style={({ pressed }) => [
+            styles.sendButton,
+            pressed && styles.sendPressed,
+            !draft.trim() && styles.sendDisabled
+          ]}
           disabled={!draft.trim()}
         >
           <Ionicons name="send" size={19} color={colors.white} />
@@ -117,37 +177,26 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background
-  },
+  screen: { flex: 1, backgroundColor: colors.background },
   header: {
     paddingTop: Platform.OS === "ios" ? 54 : 22,
     paddingBottom: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     backgroundColor: colors.navy,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm
   },
   headerButton: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center"
   },
-  headerContent: {
-    flex: 1
-  },
-  headerTitle: {
-    ...typography.heading2,
-    color: colors.white
-  },
-  headerSubtitle: {
-    ...typography.caption,
-    color: colors.whiteMuted,
-    marginTop: 2
-  },
+  headerContent: { flex: 1 },
+  headerTitle: { ...typography.heading2, color: colors.white },
+  headerSubtitle: { ...typography.caption, color: colors.whiteMuted, marginTop: 2 },
   pinned: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -158,54 +207,48 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border
   },
-  pinnedText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    flex: 1
+  pinnedText: { ...typography.caption, color: colors.textSecondary, flex: 1 },
+  errorBanner: {
+    ...typography.bodySmall,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
   },
-  messages: {
-    padding: spacing.md,
-    gap: spacing.sm
-  },
+  loader: { flex: 1, alignItems: "center", justifyContent: "center" },
+  messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
+  empty: { ...typography.body, color: colors.textMuted, textAlign: "center", marginTop: 64 },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: spacing.sm,
     padding: spacing.sm,
+    paddingBottom: Platform.OS === "ios" ? 24 : spacing.sm,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border
   },
-  attachButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primarySoft
-  },
   input: {
     flex: 1,
-    minHeight: 42,
-    maxHeight: 120,
+    minHeight: 48,
+    maxHeight: 132,
     borderRadius: radii.xl,
     paddingHorizontal: spacing.md,
-    paddingVertical: 11,
+    paddingVertical: 12,
     color: colors.text,
     backgroundColor: colors.surfaceMuted,
     ...typography.body
   },
   sendButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primary
   },
-  sendDisabled: {
-    opacity: 0.45
-  },
+  sendPressed: { transform: [{ scale: 0.96 }] },
+  sendDisabled: { opacity: 0.45 },
   missing: {
     flex: 1,
     alignItems: "center",
@@ -213,12 +256,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     backgroundColor: colors.background
   },
-  missingTitle: {
-    ...typography.heading2,
-    color: colors.text
-  },
-  backLink: {
-    color: colors.primary,
-    fontWeight: "800"
-  }
+  missingTitle: { ...typography.heading2, color: colors.text },
+  missingButton: { minWidth: 88, minHeight: 48, alignItems: "center", justifyContent: "center" },
+  backLink: { color: colors.primary, fontWeight: "800" }
 });

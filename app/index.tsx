@@ -1,5 +1,8 @@
 import { Redirect } from "expo-router";
 
+import { useSession } from "../src/providers/SessionProvider";
+
 export default function IndexRoute() {
-  return <Redirect href="/(tabs)/messages" />;
+  const { isAuthenticated } = useSession();
+  return <Redirect href={isAuthenticated ? "/(tabs)/messages" : "/sign-in"} />;
 }

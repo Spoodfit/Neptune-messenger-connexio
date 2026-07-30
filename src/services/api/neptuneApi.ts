@@ -1,14 +1,15 @@
-import { apiRequest } from "@/services/api/httpClient";
+import { apiRequest } from "./httpClient";
 import type {
   CursorPage,
   MessagingApi,
   SendMessageInput
-} from "@/services/api/contracts";
+} from "./contracts";
 import type {
   ChatMessage,
   Conversation,
-  PushTokenRegistration
-} from "@/types/messaging";
+  PushTokenRegistration,
+  RealtimeTicket
+} from "../../types/messaging";
 
 export class NeptuneMessagingApi implements MessagingApi {
   constructor(private readonly accessToken: string) {}
@@ -24,12 +25,9 @@ export class NeptuneMessagingApi implements MessagingApi {
     cursor?: string
   ): Promise<CursorPage<ChatMessage>> {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-
     return apiRequest<CursorPage<ChatMessage>>(
-      `/v1/conversations/${conversationId}/messages${query}`,
-      {
-        token: this.accessToken
-      }
+      `/v1/conversations/${encodeURIComponent(conversationId)}/messages${query}`,
+      { token: this.accessToken }
     );
   }
 
@@ -38,14 +36,14 @@ export class NeptuneMessagingApi implements MessagingApi {
     input: SendMessageInput
   ): Promise<ChatMessage> {
     return apiRequest<ChatMessage>(
-      `/v1/conversations/${conversationId}/messages`,
+      `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
       {
         method: "POST",
         token: this.accessToken,
         body: JSON.stringify({
           client_message_id: input.clientMessageId,
           body: input.body,
-          reply_to_message_id: input.replyToMessageId
+          reply_to_message_id: input.replyToMessageId ?? null
         })
       }
     );
@@ -55,13 +53,14 @@ export class NeptuneMessagingApi implements MessagingApi {
     conversationId: string,
     lastReadMessageId: string
   ): Promise<void> {
-    await apiRequest(`/v1/conversations/${conversationId}/read`, {
-      method: "POST",
-      token: this.accessToken,
-      body: JSON.stringify({
-        last_read_message_id: lastReadMessageId
-      })
-    });
+    await apiRequest(
+      `/v1/conversations/${encodeURIComponent(conversationId)}/read`,
+      {
+        method: "POST",
+        token: this.accessToken,
+        body: JSON.stringify({ last_read_message_id: lastReadMessageId })
+      }
+    );
   }
 
   async registerPushToken(
@@ -71,6 +70,21 @@ export class NeptuneMessagingApi implements MessagingApi {
       method: "POST",
       token: this.accessToken,
       body: JSON.stringify(registration)
+    });
+  }
+
+  async unregisterPushToken(token: string): Promise<void> {
+    await apiRequest("/v1/devices/push-tokens/revoke", {
+      method: "POST",
+      token: this.accessToken,
+      body: JSON.stringify({ token })
+    });
+  }
+
+  requestRealtimeTicket(): Promise<RealtimeTicket> {
+    return apiRequest<RealtimeTicket>("/v1/realtime/ticket", {
+      method: "POST",
+      token: this.accessToken
     });
   }
 }

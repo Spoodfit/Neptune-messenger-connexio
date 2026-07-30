@@ -8,7 +8,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: "Connexio by Neptune",
     slug: "neptune-messenger-connexio",
-    version: "0.1.0",
+    version: "0.2.0",
     orientation: "portrait",
     scheme: "neptuneconnexio",
     userInterfaceStyle: "automatic",
@@ -26,22 +26,30 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       bundleIdentifier: "com.neptunebusiness.connexio",
       infoPlist: {
         NSCameraUsageDescription:
-          "Connexio utilise l’appareil photo pour envoyer des photos dans les conversations.",
+          "Connexio utilise l’appareil photo uniquement lorsque vous choisissez d’envoyer une photo.",
         NSMicrophoneUsageDescription:
-          "Connexio utilise le micro pour les futurs messages vocaux.",
+          "Connexio utilise le micro uniquement lorsque vous enregistrez un message vocal ou lancez un appel.",
         NSPhotoLibraryUsageDescription:
-          "Connexio utilise votre photothèque pour joindre des images."
+          "Connexio utilise votre photothèque uniquement pour joindre les médias que vous sélectionnez."
       }
     },
     android: {
       package: "com.neptunebusiness.connexio",
       adaptiveIcon: {
         backgroundColor: "#07162F"
-      }
+      },
+      permissions: ["POST_NOTIFICATIONS"]
     },
     plugins: [
       "expo-router",
       "expo-secure-store",
+      [
+        "expo-sqlite",
+        {
+          useSQLCipher: true,
+          enableFTS: true
+        }
+      ],
       [
         "expo-notifications",
         {

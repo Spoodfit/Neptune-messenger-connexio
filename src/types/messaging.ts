@@ -1,9 +1,19 @@
-export type UserRole =
+export type CanonicalUserRole =
+  | "visionnaire"
+  | "amiral"
+  | "capitaine"
+  | "legende"
+  | "moussaillon"
+  | "triton"
+  | "admin";
+
+export type LegacyUserRole =
   | "member"
   | "captain"
   | "admiral"
-  | "visionary"
-  | "admin";
+  | "visionary";
+
+export type UserRole = CanonicalUserRole | LegacyUserRole;
 
 export type ConversationType =
   | "announcement"
@@ -11,9 +21,16 @@ export type ConversationType =
   | "role"
   | "topic"
   | "support"
-  | "direct";
+  | "direct"
+  | "small_group";
 
-export type MessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
+export type MessageStatus =
+  | "queued"
+  | "sending"
+  | "sent"
+  | "delivered"
+  | "read"
+  | "failed";
 
 export interface AppUser {
   id: string;
@@ -24,6 +41,8 @@ export interface AppUser {
   role: UserRole;
   roleLabel: string;
   online: boolean;
+  avatarUrl?: string;
+  phone?: string;
 }
 
 export interface Conversation {
@@ -39,18 +58,26 @@ export interface Conversation {
   pinnedMessage?: string;
   restricted: boolean;
   allowedRoles?: UserRole[];
+  canPost?: boolean;
+  avatarUrl?: string;
 }
 
 export interface ChatMessage {
   id: string;
+  clientMessageId?: string;
   conversationId: string;
   senderId: string;
   senderName: string;
   senderInitials: string;
+  senderAvatarUrl?: string;
   body: string;
   createdAt: string;
+  updatedAt?: string;
   status: MessageStatus;
   isMine: boolean;
+  replyToMessageId?: string;
+  retryCount?: number;
+  errorCode?: string;
 }
 
 export interface PushTokenRegistration {
@@ -59,4 +86,16 @@ export interface PushTokenRegistration {
   platform: "ios" | "android";
   appVersion: string;
   deviceName?: string;
+}
+
+export interface SessionPayload {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  user: AppUser;
+}
+
+export interface RealtimeTicket {
+  ticket: string;
+  expiresAt: string;
 }

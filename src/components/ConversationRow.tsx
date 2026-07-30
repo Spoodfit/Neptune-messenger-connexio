@@ -2,34 +2,42 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, radii, spacing, typography } from "@/theme";
-import type { Conversation } from "@/types/messaging";
-import { formatConversationTime } from "@/utils/date";
+import { colors, radii, spacing, typography } from "../theme";
+import type { Conversation } from "../types/messaging";
+import { formatConversationTime } from "../utils/date";
 
 interface ConversationRowProps {
   conversation: Conversation;
 }
 
 export function ConversationRow({ conversation }: ConversationRowProps) {
+  const unreadLabel = conversation.unreadCount
+    ? `${conversation.unreadCount} message${conversation.unreadCount > 1 ? "s" : ""} non lu${conversation.unreadCount > 1 ? "s" : ""}`
+    : "Aucun message non lu";
+
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${conversation.name}. ${conversation.lastMessage ?? "Aucun message"}. ${unreadLabel}`}
+      accessibilityHint="Ouvre la conversation"
       onPress={() => router.push(`/chat/${conversation.id}`)}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <View style={styles.avatar}>
+      <View style={styles.avatar} accessibilityElementsHidden>
         <Ionicons
           name={
             conversation.type === "announcement"
               ? "megaphone"
               : conversation.type === "support"
                 ? "construct"
-                : "people"
+                : conversation.type === "direct"
+                  ? "person"
+                  : "people"
           }
           size={22}
           color={colors.primary}
         />
       </View>
-
       <View style={styles.content}>
         <View style={styles.topLine}>
           <Text style={styles.name} numberOfLines={1}>
@@ -44,13 +52,14 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
             {conversation.lastMessage ?? "Aucun message"}
           </Text>
           {conversation.unreadCount > 0 ? (
-            <View style={styles.unread}>
+            <View style={styles.unread} accessibilityElementsHidden>
               <Text style={styles.unreadText}>
                 {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
               </Text>
             </View>
           ) : conversation.restricted ? (
             <Ionicons
+              accessibilityElementsHidden
               name="lock-closed"
               size={14}
               color={colors.textMuted}
@@ -64,7 +73,7 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
 
 const styles = StyleSheet.create({
   row: {
-    minHeight: 78,
+    minHeight: 80,
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     borderWidth: 1,
@@ -75,57 +84,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md
   },
-  pressed: {
-    opacity: 0.72
-  },
+  pressed: { opacity: 0.76, transform: [{ scale: 0.992 }] },
   avatar: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 16,
     backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center"
   },
-  content: {
-    flex: 1,
-    gap: 6
-  },
-  topLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm
-  },
-  name: {
-    ...typography.heading3,
-    color: colors.text,
-    flex: 1
-  },
-  time: {
-    ...typography.caption,
-    color: colors.textMuted
-  },
-  bottomLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm
-  },
-  preview: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    flex: 1
-  },
+  content: { flex: 1, gap: 6 },
+  topLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  name: { ...typography.heading3, color: colors.text, flex: 1 },
+  time: { ...typography.caption, color: colors.textMuted },
+  bottomLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  preview: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
   unread: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
     paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.primary
   },
-  unreadText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: "900"
-  }
+  unreadText: { color: colors.white, fontSize: 11, fontWeight: "900" }
 });
