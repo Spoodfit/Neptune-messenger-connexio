@@ -87,7 +87,8 @@ export default function ChatScreen() {
     const body = draft.trim();
     if (!conversation.canPost || !body) return;
     setDraft("");
-    await sendMessage(conversation.id, body);
+    const accepted = await sendMessage(conversation.id, body);
+    if (!accepted) setDraft(body);
   };
 
   const connectionLabel =
