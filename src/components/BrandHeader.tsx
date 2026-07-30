@@ -60,21 +60,21 @@ const styles = StyleSheet.create({
   },
   blueGlow: {
     position: "absolute",
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-    left: -52,
-    top: -74,
-    backgroundColor: "rgba(0,72,186,0.18)"
+    width: 78,
+    height: 96,
+    borderRadius: 48,
+    left: 0,
+    top: -56,
+    backgroundColor: "rgba(0,72,186,0.17)"
   },
   violetGlow: {
     position: "absolute",
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    right: -48,
-    top: -76,
-    backgroundColor: "rgba(107,79,234,0.15)"
+    width: 74,
+    height: 94,
+    borderRadius: 47,
+    right: 0,
+    top: -58,
+    backgroundColor: "rgba(107,79,234,0.14)"
   },
   logoShell: {
     width: 42,
