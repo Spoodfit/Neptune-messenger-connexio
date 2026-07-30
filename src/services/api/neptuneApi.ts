@@ -5,6 +5,11 @@ import type {
   SendMessageInput
 } from "./contracts";
 import {
+  normalizeChatMessage,
+  normalizeConversationList,
+  normalizeMessagePage
+} from "./wire";
+import {
   refreshSessionAccessToken,
   resolveSessionAccessToken
 } from "../auth/sessionRuntime";
@@ -39,25 +44,27 @@ export class NeptuneMessagingApi implements MessagingApi {
     }
   }
 
-  listConversations(): Promise<Conversation[]> {
-    return this.request<Conversation[]>("/v1/conversations");
+  async listConversations(): Promise<Conversation[]> {
+    const payload = await this.request<unknown>("/v1/conversations");
+    return normalizeConversationList(payload);
   }
 
-  listMessages(
+  async listMessages(
     conversationId: string,
     cursor?: string
   ): Promise<CursorPage<ChatMessage>> {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-    return this.request<CursorPage<ChatMessage>>(
+    const payload = await this.request<unknown>(
       `/v1/conversations/${encodeURIComponent(conversationId)}/messages${query}`
     );
+    return normalizeMessagePage(payload);
   }
 
-  sendMessage(
+  async sendMessage(
     conversationId: string,
     input: SendMessageInput
   ): Promise<ChatMessage> {
-    return this.request<ChatMessage>(
+    const payload = await this.request<unknown>(
       `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
       {
         method: "POST",
@@ -69,6 +76,7 @@ export class NeptuneMessagingApi implements MessagingApi {
         })
       }
     );
+    return normalizeChatMessage(payload);
   }
 
   async markConversationRead(
