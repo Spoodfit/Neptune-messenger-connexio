@@ -56,12 +56,8 @@ export function NeptuneTabBar({
   const translateX = useRef(new Animated.Value(0)).current;
 
   const visibleRoutes = useMemo(
-    () =>
-      state.routes.filter((route) => {
-        const options = descriptors[route.key]?.options;
-        return options?.href !== null && route.name in ICONS;
-      }),
-    [descriptors, state.routes]
+    () => state.routes.filter((route) => route.name in ICONS),
+    [state.routes]
   );
 
   const currentKey = state.routes[state.index]?.key;
