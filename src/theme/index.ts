@@ -5,7 +5,7 @@ export const colors = {
   primaryDark: "#00378E",
   primarySoft: "#102A54",
   violet: "#6B4FEA",
-  magenta: "#A950D8",
+  magenta: "#A044C8",
   orange: "#F4B183",
   background: "#020713",
   backgroundRaised: "#050B1C",
