@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: connexio-ci-${{ github.ref }}
@@ -18,31 +18,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout source commit
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           show-progress: false
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
-      - name: Update locked dependencies
-        run: npm install --no-audit --no-fund
-      - name: Commit updated dependency lock
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          if git diff --quiet -- package-lock.json; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore(deps): align Expo web renderer lock"
-          git push origin HEAD:${{ github.head_ref }}
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
       - name: TypeScript and domain tests
         run: npm run verify --silent
-      - name: Expo configuration audit
+      - name: Expo dependency compatibility
+        run: npx expo install --check
+      - name: Expo public configuration audit
+        run: npx expo config --type public >/dev/null
+      - name: Production configuration gate
+        env:
+          EAS_BUILD_PROFILE: production
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_MOCK_MODE: "false"
         run: npx expo config --type public >/dev/null
