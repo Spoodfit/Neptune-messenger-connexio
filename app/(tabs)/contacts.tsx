@@ -5,6 +5,8 @@ import { env } from "@/config/env";
 import { members } from "@/data/mockData";
 import { colors, radii, spacing, typography } from "@/theme";
 
+const MAX_CONTENT_WIDTH = 720;
+
 export default function ContactsScreen() {
   const visibleMembers = env.mockMode ? members : [];
 
@@ -19,6 +21,7 @@ export default function ContactsScreen() {
         accessibilityLabel="Annuaire des membres Neptune"
         data={visibleMembers}
         keyExtractor={(item) => item.id}
+        style={styles.listViewport}
         contentContainerStyle={[
           styles.list,
           visibleMembers.length === 0 && styles.emptyList
@@ -30,34 +33,38 @@ export default function ContactsScreen() {
             style={styles.row}
           >
             <View style={styles.avatar} accessibilityElementsHidden>
-              <Text style={styles.initials}>{item.initials}</Text>
-            </View>
-            <View style={styles.content}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.company}>
-                {item.company} · {item.city}
+              <Text style={styles.initials} numberOfLines={1}>
+                {item.initials}
               </Text>
             </View>
-            <View
-              style={[
-                styles.status,
-                {
-                  backgroundColor: item.online
-                    ? colors.successSoft
-                    : colors.surfaceMuted
-                }
-              ]}
-            >
-              <Text
+            <View style={styles.content}>
+              <Text style={styles.name} numberOfLines={2}>
+                {item.name}
+              </Text>
+              <Text style={styles.company} numberOfLines={2}>
+                {item.company} · {item.city}
+              </Text>
+              <View
                 style={[
-                  styles.statusText,
+                  styles.status,
                   {
-                    color: item.online ? colors.success : colors.textMuted
+                    backgroundColor: item.online
+                      ? colors.successSoft
+                      : colors.surfaceMuted
                   }
                 ]}
               >
-                {item.online ? "En ligne" : "Absent"}
-              </Text>
+                <Text
+                  style={[
+                    styles.statusText,
+                    {
+                      color: item.online ? colors.success : colors.textMuted
+                    }
+                  ]}
+                >
+                  {item.online ? "En ligne" : "Absent"}
+                </Text>
+              </View>
             </View>
           </View>
         )}
@@ -67,7 +74,8 @@ export default function ContactsScreen() {
               Annuaire non connecté
             </Text>
             <Text style={styles.emptyText}>
-              Aucun membre fictif n’est affiché. L’annuaire sera activé après validation de l’endpoint Neptune et des règles de confidentialité.
+              Aucun membre fictif n’est affiché. L’annuaire sera activé après
+              validation de l’endpoint Neptune et des règles de confidentialité.
             </Text>
           </View>
         }
@@ -81,6 +89,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background
   },
+  listViewport: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center"
+  },
   list: {
     padding: spacing.md,
     gap: spacing.sm,
@@ -88,9 +101,10 @@ const styles = StyleSheet.create({
   },
   emptyList: { flexGrow: 1 },
   row: {
+    width: "100%",
     minHeight: 74,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md,
     padding: spacing.md,
     backgroundColor: colors.surface,
@@ -104,26 +118,33 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.primary
+    backgroundColor: colors.primary,
+    flexShrink: 0
   },
   initials: {
     color: colors.white,
     fontWeight: "900"
   },
   content: {
-    flex: 1
+    flex: 1,
+    minWidth: 0,
+    alignItems: "flex-start"
   },
   name: {
     ...typography.heading3,
-    color: colors.text
+    color: colors.text,
+    maxWidth: "100%"
   },
   company: {
     ...typography.caption,
     color: colors.textMuted,
-    marginTop: 3
+    marginTop: 3,
+    maxWidth: "100%"
   },
   status: {
+    alignSelf: "flex-start",
     borderRadius: radii.pill,
+    marginTop: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6
   },
@@ -138,6 +159,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.sm
   },
-  emptyTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
-  emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }
+  emptyTitle: {
+    ...typography.heading3,
+    color: colors.text,
+    textAlign: "center"
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: "center"
+  }
 });
