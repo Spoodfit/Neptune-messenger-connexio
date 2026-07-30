@@ -1,31 +1,41 @@
 export const colors = {
-  navy: "#07162F",
-  navyLight: "#102A54",
-  primary: "#4658EB",
-  primaryDark: "#3040C7",
-  primarySoft: "#ECEEFF",
-  violet: "#7B3FF2",
-  magenta: "#A83BCE",
-  orange: "#FF7A45",
-  background: "#F5F7FC",
-  surface: "#FFFFFF",
-  surfaceMuted: "#EEF1F7",
-  border: "#E0E5EF",
-  text: "#10213D",
-  textSecondary: "#40516D",
-  textMuted: "#606C82",
+  navy: "#020713",
+  navyLight: "#071127",
+  primary: "#0048BA",
+  primaryDark: "#00378E",
+  primarySoft: "#102A54",
+  violet: "#6B4FEA",
+  magenta: "#A950D8",
+  orange: "#F4B183",
+  background: "#020713",
+  backgroundRaised: "#050B1C",
+  surface: "#081226",
+  surfaceStrong: "#101A31",
+  surfaceMuted: "#111C34",
+  glass: "rgba(255,255,255,0.065)",
+  glassStrong: "rgba(255,255,255,0.095)",
+  border: "rgba(255,255,255,0.14)",
+  borderSoft: "rgba(255,255,255,0.085)",
+  text: "#F4F7FF",
+  textSecondary: "#D2DBEF",
+  textMuted: "#AEB8D2",
   white: "#FFFFFF",
-  whiteMuted: "rgba(255,255,255,0.72)",
-  success: "#11754C",
-  successSoft: "#E1F7EE",
-  warning: "#955308",
-  warningSoft: "#FFF1D6",
-  danger: "#B52F3E",
-  dangerSoft: "#FFE6E9"
+  whiteMuted: "rgba(255,255,255,0.78)",
+  success: "#38F8B4",
+  successSoft: "#0A3029",
+  warning: "#F4B183",
+  warningSoft: "#392719",
+  danger: "#FF7B86",
+  dangerSoft: "#35151E",
+  shadow: "rgba(0,0,0,0.42)"
 } as const;
 
 export const gradients = {
-  primary: [colors.primary, colors.violet, colors.magenta] as const
+  primary: [colors.primary, colors.violet, colors.magenta] as const,
+  primaryWarm: [colors.primary, colors.violet, colors.orange] as const,
+  screen: [colors.backgroundRaised, colors.background] as const,
+  glass: ["rgba(255,255,255,0.075)", "rgba(255,255,255,0.035)"] as const,
+  activeTab: ["rgba(0,72,186,0.42)", "rgba(107,79,234,0.38)"] as const
 };
 
 export const spacing = {
@@ -42,6 +52,7 @@ export const radii = {
   md: 12,
   lg: 18,
   xl: 24,
+  xxl: 30,
   pill: 999
 } as const;
 
