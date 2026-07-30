@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import type { ReactNode } from "react";
 import type { ColorValue } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { env } from "@/config/env";
 import { useMessaging } from "@/providers/MessagingProvider";
@@ -36,6 +37,8 @@ function icon(
 
 export default function TabsLayout() {
   const { visibleConversations } = useMessaging();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 8);
   const unreadCount = visibleConversations.reduce(
     (total, conversation) => total + conversation.unreadCount,
     0
@@ -50,9 +53,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 68,
+          height: 60 + bottomPadding,
           paddingTop: 6,
-          paddingBottom: 8
+          paddingBottom: bottomPadding
         },
         tabBarLabelStyle: {
           fontSize: 11,
