@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View
@@ -60,90 +61,95 @@ export default function SettingsScreen() {
     <View style={styles.screen}>
       <BrandHeader title="Réglages" subtitle="Compte et préférences Connexio." />
 
-      <View
-        accessible
-        accessibilityLabel={`${currentUser.name}. ${currentUser.company}. ${currentUser.roleLabel}`}
-        style={styles.profile}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.avatar} accessibilityElementsHidden>
-          <Text style={styles.initials}>{currentUser.initials}</Text>
-        </View>
-        <View style={styles.profileContent}>
-          <Text style={styles.name}>{currentUser.name}</Text>
-          <Text style={styles.role}>
-            {currentUser.company || "Neptune Business"} · {currentUser.roleLabel}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.list}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Ouvrir les réglages de notifications du téléphone"
-          accessibilityHint="Ouvre les réglages système de Connexio"
-          onPress={() => void Linking.openSettings()}
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        <View
+          accessible
+          accessibilityLabel={`${currentUser.name}. ${currentUser.company}. ${currentUser.roleLabel}`}
+          style={styles.profile}
         >
-          <Ionicons name="notifications-outline" size={22} color={colors.primary} />
-          <View style={styles.rowContent}>
-            <Text style={styles.rowTitle}>Notifications</Text>
-            <Text style={styles.rowSubtitle}>Autorisations système et alertes</Text>
+          <View style={styles.avatar} accessibilityElementsHidden>
+            <Text style={styles.initials}>{currentUser.initials}</Text>
           </View>
-          <Ionicons name="open-outline" size={19} color={colors.textMuted} />
-        </Pressable>
+          <View style={styles.profileContent}>
+            <Text style={styles.name}>{currentUser.name}</Text>
+            <Text style={styles.role}>
+              {currentUser.company || "Neptune Business"} · {currentUser.roleLabel}
+            </Text>
+          </View>
+        </View>
 
-        {pendingSettings.map((item) => (
-          <View
-            accessible
-            accessibilityLabel={`${item.title}. Non disponible dans ce build.`}
-            key={item.title}
-            style={[styles.row, styles.pendingRow]}
+        <View style={styles.list}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Ouvrir les réglages de notifications du téléphone"
+            accessibilityHint="Ouvre les réglages système de Connexio"
+            onPress={() => void Linking.openSettings()}
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           >
-            <Ionicons name={item.icon} size={22} color={colors.textMuted} />
+            <Ionicons name="notifications-outline" size={22} color={colors.primary} />
             <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>{item.title}</Text>
-              <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
+              <Text style={styles.rowTitle}>Notifications</Text>
+              <Text style={styles.rowSubtitle}>Autorisations système et alertes</Text>
             </View>
-            <Text style={styles.pendingLabel}>À finaliser</Text>
-          </View>
-        ))}
+            <Ionicons name="open-outline" size={19} color={colors.textMuted} />
+          </Pressable>
 
-        {signOutError ? (
-          <Text
-            accessibilityRole="alert"
-            accessibilityLiveRegion="assertive"
-            style={styles.signOutError}
+          {pendingSettings.map((item) => (
+            <View
+              accessible
+              accessibilityLabel={`${item.title}. Non disponible dans ce build.`}
+              key={item.title}
+              style={[styles.row, styles.pendingRow]}
+            >
+              <Ionicons name={item.icon} size={22} color={colors.textMuted} />
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>{item.title}</Text>
+                <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
+              </View>
+              <Text style={styles.pendingLabel}>À finaliser</Text>
+            </View>
+          ))}
+
+          {signOutError ? (
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+              style={styles.signOutError}
+            >
+              {signOutError}
+            </Text>
+          ) : null}
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Se déconnecter de Connexio"
+            accessibilityState={{ disabled: signingOut, busy: signingOut }}
+            disabled={signingOut}
+            onPress={() => void handleSignOut()}
+            style={({ pressed }) => [
+              styles.signOutButton,
+              pressed && styles.rowPressed,
+              signingOut && styles.disabled
+            ]}
           >
-            {signOutError}
-          </Text>
-        ) : null}
+            {signingOut ? (
+              <ActivityIndicator color={colors.danger} />
+            ) : (
+              <>
+                <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+                <Text style={styles.signOutText}>Se déconnecter</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Se déconnecter de Connexio"
-          accessibilityState={{ disabled: signingOut, busy: signingOut }}
-          disabled={signingOut}
-          onPress={() => void handleSignOut()}
-          style={({ pressed }) => [
-            styles.signOutButton,
-            pressed && styles.rowPressed,
-            signingOut && styles.disabled
-          ]}
-        >
-          {signingOut ? (
-            <ActivityIndicator color={colors.danger} />
-          ) : (
-            <>
-              <Ionicons name="log-out-outline" size={22} color={colors.danger} />
-              <Text style={styles.signOutText}>Se déconnecter</Text>
-            </>
-          )}
-        </Pressable>
-      </View>
-
-      <Text style={styles.version}>
-        Connexio {Constants.expoConfig?.version ?? "0.2.0"} · {getEnvironmentLabel()}
-      </Text>
+        <Text style={styles.version}>
+          Connexio {Constants.expoConfig?.version ?? "0.2.0"} · {getEnvironmentLabel()}
+        </Text>
+      </ScrollView>
     </View>
   );
 }
@@ -152,6 +158,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl
   },
   profile: {
     margin: spacing.md,
