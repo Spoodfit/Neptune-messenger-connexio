@@ -45,3 +45,40 @@ jobs:
           EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
           EXPO_PUBLIC_MOCK_MODE: "false"
         run: npx expo config --type public >/dev/null
+
+  responsive-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install pinned browser audit tools
+        run: |
+          npm install --no-save --no-package-lock playwright@1.55.0 serve@14.2.4
+          npx playwright install --with-deps chromium
+      - name: Build mock web application
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_GITHUB_PAGES: "false"
+        run: npm run web:build
+      - name: Audit responsive layout and interactions
+        run: |
+          npx serve -s dist -l 4173 > /tmp/connexio-serve.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          node scripts/visual-audit.cjs
