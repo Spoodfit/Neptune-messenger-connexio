@@ -39,6 +39,7 @@ export default function TabsLayout() {
   const { visibleConversations } = useMessaging();
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 8);
+  const tabBarHeight = 60 + bottomPadding;
   const unreadCount = visibleConversations.reduce(
     (total, conversation) => total + conversation.unreadCount,
     0
@@ -48,12 +49,16 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        sceneStyle: {
+          backgroundColor: colors.background,
+          paddingBottom: tabBarHeight
+        },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 60 + bottomPadding,
+          height: tabBarHeight,
           paddingTop: 6,
           paddingBottom: bottomPadding
         },
