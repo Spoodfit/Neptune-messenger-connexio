@@ -71,6 +71,8 @@ async function inspectPage(page) {
       label: label(element),
       rect: element.getBoundingClientRect()
     }));
+    const pointInside = (x, y, rect) =>
+      x > rect.left + 1 && x < rect.right - 1 && y > rect.top + 1 && y < rect.bottom - 1;
     const controlOverlaps = [];
     for (let index = 0; index < controlRects.length; index += 1) {
       for (let nextIndex = index + 1; nextIndex < controlRects.length; nextIndex += 1) {
@@ -84,13 +86,24 @@ async function inspectPage(page) {
         }
         const a = first.rect;
         const b = second.rect;
-        if (
-          a.left < b.right - 1 &&
-          a.right > b.left + 1 &&
-          a.top < b.bottom - 1 &&
-          a.bottom > b.top + 1
-        ) {
-          controlOverlaps.push({ first: first.label, second: second.label });
+        const overlapWidth = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+        const overlapHeight = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        if (overlapWidth <= 1 || overlapHeight <= 1) continue;
+
+        const overlapArea = overlapWidth * overlapHeight;
+        const smallerArea = Math.max(1, Math.min(a.width * a.height, b.width * b.height));
+        const overlapRatio = overlapArea / smallerArea;
+        const aCenter = { x: a.left + a.width / 2, y: a.top + a.height / 2 };
+        const bCenter = { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+        const centerCollision =
+          pointInside(aCenter.x, aCenter.y, b) || pointInside(bCenter.x, bCenter.y, a);
+
+        if (overlapRatio >= 0.35 || centerCollision) {
+          controlOverlaps.push({
+            first: first.label,
+            second: second.label,
+            overlapRatio: Number(overlapRatio.toFixed(3))
+          });
         }
       }
     }
