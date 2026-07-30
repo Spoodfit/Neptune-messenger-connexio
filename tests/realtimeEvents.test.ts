@@ -15,8 +15,9 @@ test("normalise un message WebSocket minimal conforme au contrat", () => {
     }
   });
 
-  assert.equal(event?.type, "message.created");
-  if (event?.type !== "message.created") assert.fail("Événement message attendu");
+  if (!event || event.type !== "message.created") {
+    throw new Error("Événement message attendu");
+  }
   assert.equal(event.payload.status, "sent");
   assert.equal(event.payload.senderName, "Membre Neptune");
 });
@@ -40,7 +41,10 @@ test("ignore un type inconnu ou un payload incomplet", () => {
     null
   );
   assert.equal(
-    normalizeRealtimeEvent({ type: "presence.changed", payload: { userId: "u" } }),
+    normalizeRealtimeEvent({
+      type: "presence.changed",
+      payload: { userId: "u" }
+    }),
     null
   );
   assert.equal(normalizeRealtimeEvent("not-an-event"), null);
