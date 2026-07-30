@@ -149,10 +149,8 @@ function AuthenticatedApp() {
     );
   }
 
-  return (
-    <MessagingProvider
-      key={isAuthenticated ? `user:${currentUser.id}` : "signed-out"}
-    >
+  const applicationStack = (
+    <>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -161,6 +159,16 @@ function AuthenticatedApp() {
           animation: "fade_from_bottom"
         }}
       />
+    </>
+  );
+
+  if (!isAuthenticated) {
+    return applicationStack;
+  }
+
+  return (
+    <MessagingProvider key={`user:${currentUser.id}`}>
+      {applicationStack}
     </MessagingProvider>
   );
 }
