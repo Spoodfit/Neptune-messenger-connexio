@@ -151,7 +151,11 @@ function AuthenticatedApp() {
       }
     };
 
-    void Notifications.getLastNotificationResponseAsync().then(openConversation);
+    void Notifications.getLastNotificationResponseAsync()
+      .then(openConversation)
+      .catch(() => {
+        // Une réponse native illisible ne doit pas bloquer le démarrage.
+      });
     const subscription = Notifications.addNotificationResponseReceivedListener(
       openConversation
     );
@@ -173,7 +177,7 @@ function AuthenticatedApp() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
-          animation: "fade_from_bottom"
+          animation: Platform.OS === "web" ? "fade" : "default"
         }}
       />
     </>
