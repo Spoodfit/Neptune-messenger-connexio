@@ -21,6 +21,7 @@ interface OutboxRow {
 }
 
 let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let purgePromise: Promise<void> | null = null;
 
 function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -37,6 +38,7 @@ async function getDatabaseKey(): Promise<string> {
 }
 
 async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (purgePromise) await purgePromise;
   if (!databasePromise) {
     databasePromise = (async () => {
       const database = await SQLite.openDatabaseAsync(DATABASE_NAME);
@@ -75,6 +77,24 @@ function rowToItem(row: OutboxRow): OutboxItem {
     state: row.state,
     lastError: row.last_error ?? undefined
   };
+}
+
+export async function purgeOutboxData(): Promise<void> {
+  if (purgePromise) return purgePromise;
+  const operation = (async () => {
+    const currentDatabase = databasePromise;
+    databasePromise = null;
+    if (currentDatabase) {
+      const database = await currentDatabase;
+      await database.closeAsync();
+    }
+    await SQLite.deleteDatabaseAsync(DATABASE_NAME);
+    await SecureStore.deleteItemAsync(DATABASE_KEY);
+  })().finally(() => {
+    purgePromise = null;
+  });
+  purgePromise = operation;
+  return operation;
 }
 
 export function createOutboxStore(): OutboxStore {
@@ -150,6 +170,9 @@ export function createOutboxStore(): OutboxStore {
         "DELETE FROM message_outbox WHERE client_message_id = ?",
         clientMessageId
       );
+    },
+    async clear() {
+      await purgeOutboxData();
     }
   };
 }
