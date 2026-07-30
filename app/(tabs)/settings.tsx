@@ -31,13 +31,19 @@ const pendingSettings = [
 export default function SettingsScreen() {
   const { currentUser, signOut } = useSession();
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
+    setSignOutError(null);
     try {
       await signOut();
       router.replace("/sign-in");
+    } catch {
+      setSignOutError(
+        "La déconnexion a été bloquée car les messages locaux n’ont pas pu être supprimés en sécurité. Fermez puis relancez l’application avant de réessayer."
+      );
     } finally {
       setSigningOut(false);
     }
@@ -94,6 +100,16 @@ export default function SettingsScreen() {
             <Text style={styles.pendingLabel}>À finaliser</Text>
           </View>
         ))}
+
+        {signOutError ? (
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+            style={styles.signOutError}
+          >
+            {signOutError}
+          </Text>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -199,6 +215,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 10,
     fontWeight: "800"
+  },
+  signOutError: {
+    ...typography.bodySmall,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radii.md,
+    padding: spacing.sm
   },
   signOutButton: {
     minHeight: 52,
