@@ -107,10 +107,7 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
             {message.isMine ? (
               <Text
                 accessibilityLiveRegion="polite"
-                style={[
-                  styles.status,
-                  message.status === "failed" && styles.failedStatus
-                ]}
+                style={styles.status}
               >
                 {statusLabel}
               </Text>
@@ -193,16 +190,15 @@ const styles = StyleSheet.create({
     rowGap: 2
   },
   time: { ...typography.caption, flexShrink: 0 },
-  mineTime: { color: colors.whiteMuted },
+  mineTime: { color: colors.white },
   otherTime: { color: colors.textMuted },
   status: {
-    color: colors.whiteMuted,
+    color: colors.white,
     fontSize: 10,
     fontWeight: "700",
     flexShrink: 1,
     textAlign: "right"
   },
-  failedStatus: { color: "#FFE1E4" },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
 });
