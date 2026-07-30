@@ -1,0 +1,171 @@
+name: Apply targeted message hardening
+
+on:
+  push:
+    branches:
+      - feat/production-hardening
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: connexio-targeted-hardening-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout hardening branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/production-hardening
+          fetch-depth: 0
+      - name: Apply verified source transformations
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(text: str, old: str, new: str, expected: int = 1) -> str:
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"Expected {expected} occurrence(s), found {count}: {old[:100]!r}")
+              return text.replace(old, new)
+
+          provider_path = Path("src/providers/MessagingProvider.tsx")
+          provider = provider_path.read_text()
+
+          provider = replace_exact(
+              provider,
+              '''import {
+            latestPersistedMessageId,
+            mergeMessagesNewestFirst
+          } from "../domain/messageCollections";''',
+              '''import {
+            latestPersistedMessageId,
+            mergeMessagesNewestFirst
+          } from "../domain/messageCollections";
+          import {
+            hasKnownMessage,
+            rememberMessage,
+            rememberMessages
+          } from "../domain/messageIdentity";'''
+          )
+
+          provider = replace_exact(
+              provider,
+              '''  const realtimeClientRef = useRef<RealtimeClient | null>(null);
+            const api = useMemo(''',
+              '''  const realtimeClientRef = useRef<RealtimeClient | null>(null);
+            const knownMessageKeys = useRef(new Set<string>()).current;
+            const seededMockMessagesRef = useRef(false);
+            if (env.mockMode && !seededMockMessagesRef.current) {
+              rememberMessages(knownMessageKeys, Object.values(initialMessages).flat());
+              seededMockMessagesRef.current = true;
+            }
+            const api = useMemo('''
+          )
+
+          provider = replace_exact(
+              provider,
+              '''      const normalized: ChatMessage = {
+                ...incoming,
+                isMine: incoming.isMine || incoming.senderId === currentUser.id
+              };
+              setMessagesByConversation((previous) => {''',
+              '''      const normalized: ChatMessage = {
+                ...incoming,
+                isMine: incoming.isMine || incoming.senderId === currentUser.id
+              };
+              rememberMessage(knownMessageKeys, normalized);
+              setMessagesByConversation((previous) => {'''
+          )
+
+          provider = replace_exact(
+              provider,
+              '''        const normalized = normalizeMessagesForCurrentUser(page.items);
+                setMessagesByConversation((previous) => ({''',
+              '''        const normalized = normalizeMessagesForCurrentUser(page.items);
+                rememberMessages(knownMessageKeys, normalized);
+                setMessagesByConversation((previous) => ({''',
+              expected=2
+          )
+
+          provider = replace_exact(
+              provider,
+              '''      try {
+                await outbox.enqueue(outboxItem);
+              } catch {
+                setLastError("Impossible d’enregistrer le message sur cet appareil.");
+                return false;
+              }
+
+              setMessagesByConversation((previous) => ({''',
+              '''      try {
+                await outbox.enqueue(outboxItem);
+              } catch {
+                setLastError("Impossible d’enregistrer le message sur cet appareil.");
+                return false;
+              }
+
+              rememberMessage(knownMessageKeys, optimistic);
+              setMessagesByConversation((previous) => ({'''
+          )
+
+          provider = replace_exact(
+              provider,
+              '''      if (event.type === "message.created" || event.type === "message.updated") {
+                upsertMessage(event.payload);
+                if (event.type === "message.created") {''',
+              '''      if (event.type === "message.created" || event.type === "message.updated") {
+                const isNewMessage = !hasKnownMessage(knownMessageKeys, event.payload);
+                upsertMessage(event.payload);
+                if (event.type === "message.created" && isNewMessage) {'''
+          )
+
+          provider = replace_exact(
+              provider,
+              '''        } catch {
+                  // Le serveur recalculera le non-lu lors de la prochaine synchronisation.
+                }
+              }
+            },
+            [api, messagesByConversation]
+          );''',
+              '''        } catch {
+                  // Restaure la source de vérité si l’optimisme local n’a pas été confirmé.
+                  void refreshConversations();
+                }
+              }
+            },
+            [api, messagesByConversation, refreshConversations]
+          );'''
+          )
+
+          provider_path.write_text(provider)
+
+          chat_path = Path("app/chat/[id].tsx")
+          chat = chat_path.read_text()
+          chat = replace_exact(
+              chat,
+              '''    setDraft("");
+              await sendMessage(conversation.id, body);''',
+              '''    setDraft("");
+              const accepted = await sendMessage(conversation.id, body);
+              if (!accepted) setDraft(body);'''
+          )
+          chat_path.write_text(chat)
+          PY
+      - name: Commit targeted changes when needed
+        run: |
+          if git diff --quiet; then
+            echo "Targeted hardening already applied"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/providers/MessagingProvider.tsx app/chat/'[id].tsx'
+          git commit -m "fix: deduplicate realtime unread events"
+          git push origin HEAD:feat/production-hardening
