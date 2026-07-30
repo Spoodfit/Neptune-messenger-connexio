@@ -1,0 +1,177 @@
+name: Visual Audit
+
+on:
+  push:
+    branches:
+      - feat/production-hardening
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connexio-visual-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install visual audit tooling
+        run: |
+          npm install --no-save --no-package-lock playwright@1.55.0 serve@14.2.4
+          npx playwright install --with-deps chromium
+      - name: Build web application
+        env:
+          EXPO_PUBLIC_MOCK_MODE: 'true'
+          EXPO_PUBLIC_GITHUB_PAGES: 'false'
+        run: npm run web:build
+      - name: Run responsive and navigation audit
+        run: |
+          mkdir -p visual-audit
+          npx serve -s dist -l 4173 > visual-audit/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const fs = require('fs');
+          const path = require('path');
+
+          const cases = [
+            { name: 'messages-320x568', width: 320, height: 568, route: '/' },
+            { name: 'messages-390x844', width: 390, height: 844, route: '/' },
+            { name: 'messages-430x932', width: 430, height: 932, route: '/' },
+            { name: 'messages-tablet-768x1024', width: 768, height: 1024, route: '/' },
+            { name: 'communities-320x568', width: 320, height: 568, route: '/communities' },
+            { name: 'contacts-320x568', width: 320, height: 568, route: '/contacts' },
+            { name: 'settings-320x568', width: 320, height: 568, route: '/settings' },
+            { name: 'chat-320x568', width: 320, height: 568, route: '/chat/carcassonne' },
+            { name: 'chat-keyboard-height-390x430', width: 390, height: 430, route: '/chat/carcassonne', focusComposer: true },
+            { name: 'readonly-320x568', width: 320, height: 568, route: '/chat/annonces' },
+            { name: 'settings-zoom140-320x568', width: 320, height: 568, route: '/settings', zoom: 1.4 }
+          ];
+
+          const browser = await chromium.launch({ headless: true });
+          const findings = [];
+          try {
+            for (const testCase of cases) {
+              const context = await browser.newContext({
+                viewport: { width: testCase.width, height: testCase.height },
+                deviceScaleFactor: 1,
+                locale: 'fr-FR',
+                reducedMotion: 'no-preference'
+              });
+              const page = await context.newPage();
+              const consoleErrors = [];
+              const pageErrors = [];
+              page.on('console', message => {
+                if (message.type() === 'error') consoleErrors.push(message.text());
+              });
+              page.on('pageerror', error => pageErrors.push(String(error)));
+              await page.goto(`http://127.0.0.1:4173${testCase.route}`, {
+                waitUntil: 'networkidle',
+                timeout: 30000
+              });
+              await page.waitForTimeout(500);
+              if (testCase.zoom) {
+                await page.evaluate(value => { document.body.style.zoom = String(value); }, testCase.zoom);
+                await page.waitForTimeout(250);
+              }
+              if (testCase.focusComposer) {
+                const input = page.getByLabel('Écrire un message');
+                if (await input.count()) await input.focus();
+              }
+
+              const metrics = await page.evaluate(() => {
+                const viewportWidth = window.innerWidth;
+                const interactive = Array.from(document.querySelectorAll('button, input, textarea, [role="button"], a'));
+                const clipped = interactive
+                  .filter(element => {
+                    const style = getComputedStyle(element);
+                    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                    const rect = element.getBoundingClientRect();
+                    return rect.width > 0 && (rect.left < -1 || rect.right > viewportWidth + 1);
+                  })
+                  .slice(0, 20)
+                  .map(element => {
+                    const rect = element.getBoundingClientRect();
+                    return {
+                      text: (element.getAttribute('aria-label') || element.textContent || '').trim().slice(0, 120),
+                      left: rect.left,
+                      right: rect.right,
+                      width: rect.width
+                    };
+                  });
+                const fixedBottom = Array.from(document.querySelectorAll('*'))
+                  .filter(element => {
+                    const style = getComputedStyle(element);
+                    return style.position === 'fixed' || style.position === 'sticky';
+                  })
+                  .map(element => {
+                    const rect = element.getBoundingClientRect();
+                    return { top: rect.top, bottom: rect.bottom, height: rect.height };
+                  });
+                return {
+                  viewportWidth,
+                  viewportHeight: window.innerHeight,
+                  scrollWidth: document.documentElement.scrollWidth,
+                  scrollHeight: document.documentElement.scrollHeight,
+                  horizontalOverflow: document.documentElement.scrollWidth > viewportWidth + 1,
+                  clipped,
+                  fixedBottom
+                };
+              });
+
+              await page.screenshot({
+                path: path.join('visual-audit', `${testCase.name}.png`),
+                fullPage: true
+              });
+              findings.push({
+                ...testCase,
+                url: page.url(),
+                title: await page.title(),
+                metrics,
+                consoleErrors,
+                pageErrors
+              });
+              await context.close();
+            }
+          } finally {
+            await browser.close();
+          }
+
+          fs.writeFileSync('visual-audit/report.json', JSON.stringify(findings, null, 2));
+          const failures = findings.filter(item =>
+            item.metrics.horizontalOverflow ||
+            item.metrics.clipped.length > 0 ||
+            item.consoleErrors.length > 0 ||
+            item.pageErrors.length > 0
+          );
+          if (failures.length > 0) {
+            console.error(JSON.stringify(failures, null, 2));
+            process.exit(1);
+          }
+          console.log(JSON.stringify(findings, null, 2));
+          NODE
+      - name: Upload screenshots and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connexio-visual-audit
+          path: visual-audit
+          retention-days: 7
