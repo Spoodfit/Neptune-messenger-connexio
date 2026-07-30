@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: connexio-ci-${{ github.ref }}
@@ -18,36 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout source commit
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           show-progress: false
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
-      - name: Detect tracked dependency lock
-        id: dependency-lock
-        run: |
-          if git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
-            echo "tracked=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "tracked=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Install dependencies
-        run: npm install --silent --no-audit --no-fund
-      - name: Commit generated dependency lock
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository &&
-          steps.dependency-lock.outputs.tracked == 'false'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore(deps): lock npm dependencies"
-          git push origin HEAD:${{ github.head_ref }}
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --silent --no-audit --no-fund
       - name: TypeScript and domain tests
         run: npm run verify --silent
       - name: Expo configuration audit
