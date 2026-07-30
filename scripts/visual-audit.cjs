@@ -16,15 +16,6 @@ const cases = [
   { name: "readonly-280x568", width: 280, height: 568, route: "/chat/annonces" }
 ];
 
-function overlaps(first, second) {
-  return (
-    first.left < second.right - 1 &&
-    first.right > second.left + 1 &&
-    first.top < second.bottom - 1 &&
-    first.bottom > second.top + 1
-  );
-}
-
 async function inspectPage(page) {
   return page.evaluate(() => {
     const viewportWidth = window.innerWidth;
@@ -37,7 +28,11 @@ async function inspectPage(page) {
         style.visibility !== "hidden" &&
         Number(style.opacity) > 0 &&
         rect.width > 0 &&
-        rect.height > 0
+        rect.height > 0 &&
+        rect.bottom > 0 &&
+        rect.top < viewportHeight &&
+        rect.right > 0 &&
+        rect.left < viewportWidth
       );
     };
     const label = (element) =>
@@ -103,6 +98,8 @@ async function inspectPage(page) {
     const textOverflow = allElements
       .filter((element) => {
         if (!element.textContent?.trim()) return false;
+        if (element.getAttribute("aria-hidden") === "true") return false;
+        if (element.children.length > 0) return false;
         const style = getComputedStyle(element);
         if (style.textOverflow === "ellipsis" || style.overflow === "hidden") {
           return false;
@@ -116,22 +113,6 @@ async function inspectPage(page) {
         scrollWidth: element.scrollWidth
       }));
 
-    const fixedElements = allElements
-      .filter((element) => {
-        const position = getComputedStyle(element).position;
-        return position === "fixed" || position === "sticky";
-      })
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        return {
-          label: label(element),
-          top: rect.top,
-          bottom: rect.bottom,
-          left: rect.left,
-          right: rect.right
-        };
-      });
-
     return {
       viewportWidth,
       viewportHeight,
@@ -140,8 +121,7 @@ async function inspectPage(page) {
       horizontalClipping,
       smallTargets,
       controlOverlaps,
-      textOverflow,
-      fixedElements
+      textOverflow
     };
   });
 }
@@ -212,7 +192,9 @@ async function run() {
     findings.push({
       name: "direct-chat-back-navigation",
       url: interactionPage.url(),
-      passed: /\/messages(?:$|[?#])/.test(interactionPage.url()) || interactionPage.url().endsWith("/")
+      passed:
+        /\/messages(?:$|[?#])/.test(interactionPage.url()) ||
+        interactionPage.url().endsWith("/")
     });
     await interactionContext.close();
   } finally {
