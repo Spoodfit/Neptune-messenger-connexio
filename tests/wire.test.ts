@@ -41,7 +41,7 @@ test("refuse une session sans jetons ou durée valide", () => {
   );
 });
 
-test("normalise conversations et compteurs snake_case", () => {
+test("normalise conversations et compteurs snake_case en lecture seule par défaut", () => {
   const conversations = normalizeConversationList([
     {
       id: "carcassonne",
@@ -57,6 +57,24 @@ test("normalise conversations et compteurs snake_case", () => {
   assert.equal(conversations[0]?.memberCount, 68);
   assert.equal(conversations[0]?.unreadCount, 5);
   assert.equal(conversations[0]?.lastMessage, "Bonjour");
+  assert.equal(conversations[0]?.canPost, false);
+});
+
+test("refuse un type de conversation absent ou inconnu", () => {
+  assert.throws(
+    () =>
+      normalizeConversationList([
+        { id: "club", name: "Club sans type", can_post: true }
+      ]),
+    WireValidationError
+  );
+  assert.throws(
+    () =>
+      normalizeConversationList([
+        { id: "club", name: "Club inconnu", type: "forbidden", can_post: true }
+      ]),
+    WireValidationError
+  );
 });
 
 test("normalise un message temps réel minimal", () => {
