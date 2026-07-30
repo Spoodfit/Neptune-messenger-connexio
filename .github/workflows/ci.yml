@@ -28,7 +28,7 @@ jobs:
           node-version: "22.13"
           cache: npm
       - name: Install locked dependencies
-        run: npm ci --silent --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: TypeScript and domain tests
         run: npm run verify --silent
       - name: Expo configuration audit
