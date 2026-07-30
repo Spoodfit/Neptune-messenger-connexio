@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
@@ -12,6 +13,19 @@ export default function MessagesScreen() {
     loadingConversations,
     lastError
   } = useMessaging();
+  const sortedConversations = useMemo(
+    () =>
+      [...visibleConversations].sort((first, second) => {
+        const firstTime = first.lastMessageAt
+          ? Date.parse(first.lastMessageAt)
+          : 0;
+        const secondTime = second.lastMessageAt
+          ? Date.parse(second.lastMessageAt)
+          : 0;
+        return secondTime - firstTime;
+      }),
+    [visibleConversations]
+  );
 
   return (
     <View style={styles.screen}>
@@ -25,14 +39,14 @@ export default function MessagesScreen() {
           Discussions récentes
         </Text>
         <Text
-          accessibilityLabel={`${visibleConversations.length} discussions visibles`}
+          accessibilityLabel={`${sortedConversations.length} discussions visibles`}
           style={styles.sectionCount}
         >
-          {visibleConversations.length}
+          {sortedConversations.length}
         </Text>
       </View>
 
-      {lastError && visibleConversations.length === 0 ? (
+      {lastError && sortedConversations.length === 0 ? (
         <View style={styles.feedback}>
           <Text accessibilityRole="alert" style={styles.feedbackTitle}>
             Discussions indisponibles
@@ -50,19 +64,19 @@ export default function MessagesScreen() {
             <Text style={styles.retryText}>Réessayer</Text>
           </Pressable>
         </View>
-      ) : loadingConversations && visibleConversations.length === 0 ? (
+      ) : loadingConversations && sortedConversations.length === 0 ? (
         <View style={styles.feedback} accessibilityLabel="Chargement des discussions">
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
           accessibilityLabel="Liste des discussions Neptune"
-          data={visibleConversations}
+          data={sortedConversations}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ConversationRow conversation={item} />}
           contentContainerStyle={[
             styles.list,
-            visibleConversations.length === 0 && styles.emptyList
+            sortedConversations.length === 0 && styles.emptyList
           ]}
           refreshing={loadingConversations}
           onRefresh={() => void refreshConversations()}
