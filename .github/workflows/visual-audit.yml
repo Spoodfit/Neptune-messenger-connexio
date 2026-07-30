@@ -1,6 +1,7 @@
 name: Visual Audit
 
 on:
+  pull_request:
   push:
     branches:
       - feat/production-hardening
@@ -117,23 +118,13 @@ jobs:
                       width: rect.width
                     };
                   });
-                const fixedBottom = Array.from(document.querySelectorAll('*'))
-                  .filter(element => {
-                    const style = getComputedStyle(element);
-                    return style.position === 'fixed' || style.position === 'sticky';
-                  })
-                  .map(element => {
-                    const rect = element.getBoundingClientRect();
-                    return { top: rect.top, bottom: rect.bottom, height: rect.height };
-                  });
                 return {
                   viewportWidth,
                   viewportHeight: window.innerHeight,
                   scrollWidth: document.documentElement.scrollWidth,
                   scrollHeight: document.documentElement.scrollHeight,
                   horizontalOverflow: document.documentElement.scrollWidth > viewportWidth + 1,
-                  clipped,
-                  fixedBottom
+                  clipped
                 };
               });
 
