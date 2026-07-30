@@ -20,6 +20,13 @@ async function inspectPage(page) {
   return page.evaluate(() => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const withinViewport = (rect) =>
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.bottom > 0 &&
+      rect.top < viewportHeight &&
+      rect.right > 0 &&
+      rect.left < viewportWidth;
     const visible = (element) => {
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
@@ -27,12 +34,7 @@ async function inspectPage(page) {
         style.display !== "none" &&
         style.visibility !== "hidden" &&
         Number(style.opacity) > 0 &&
-        rect.width > 0 &&
-        rect.height > 0 &&
-        rect.bottom > 0 &&
-        rect.top < viewportHeight &&
-        rect.right > 0 &&
-        rect.left < viewportWidth
+        withinViewport(rect)
       );
     };
     const label = (element) =>
@@ -40,6 +42,27 @@ async function inspectPage(page) {
         .trim()
         .replace(/\s+/g, " ")
         .slice(0, 100);
+    const elementOwnsPoint = (element, x, y) => {
+      const top = document.elementFromPoint(x, y);
+      return Boolean(top && (top === element || element.contains(top)));
+    };
+    const reachable = (element) => {
+      if (!visible(element)) return false;
+      const rect = element.getBoundingClientRect();
+      const left = Math.max(1, rect.left + 2);
+      const right = Math.min(viewportWidth - 1, rect.right - 2);
+      const top = Math.max(1, rect.top + 2);
+      const bottom = Math.min(viewportHeight - 1, rect.bottom - 2);
+      if (right <= left || bottom <= top) return false;
+      const points = [
+        [(left + right) / 2, (top + bottom) / 2],
+        [left, top],
+        [right, top],
+        [left, bottom],
+        [right, bottom]
+      ];
+      return points.some(([x, y]) => elementOwnsPoint(element, x, y));
+    };
 
     const allElements = Array.from(document.querySelectorAll("body *")).filter(visible);
     const horizontalClipping = allElements
@@ -55,7 +78,7 @@ async function inspectPage(page) {
 
     const controls = Array.from(
       document.querySelectorAll('button, [role="button"], a, input, textarea')
-    ).filter(visible);
+    ).filter(reachable);
     const smallTargets = controls
       .filter((element) => {
         const rect = element.getBoundingClientRect();
