@@ -82,6 +82,31 @@ function optionalString(
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function requireDateString(
+  record: Record<string, unknown>,
+  label: string,
+  ...keys: string[]
+): string {
+  const value = requireString(record, label, ...keys);
+  if (!Number.isFinite(Date.parse(value))) {
+    throw new WireValidationError(`${label} manquante ou invalide.`);
+  }
+  return value;
+}
+
+function optionalDateString(
+  record: Record<string, unknown>,
+  label: string,
+  ...keys: string[]
+): string | undefined {
+  const value = optionalString(record, ...keys);
+  if (!value) return undefined;
+  if (!Number.isFinite(Date.parse(value))) {
+    throw new WireValidationError(`${label} invalide.`);
+  }
+  return value;
+}
+
 function numberOrDefault(
   record: Record<string, unknown>,
   fallback: number,
@@ -201,7 +226,12 @@ export function normalizeConversation(value: unknown): Conversation {
       numberOrDefault(value, 0, "unreadCount", "unread_count")
     ),
     lastMessage: optionalString(value, "lastMessage", "last_message"),
-    lastMessageAt: optionalString(value, "lastMessageAt", "last_message_at"),
+    lastMessageAt: optionalDateString(
+      value,
+      "Date du dernier message",
+      "lastMessageAt",
+      "last_message_at"
+    ),
     pinnedMessage: optionalString(value, "pinnedMessage", "pinned_message"),
     restricted: booleanOrDefault(value, false, "restricted"),
     allowedRoles,
@@ -245,8 +275,18 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
       "sender_avatar_url"
     ),
     body: requireString(value, "Contenu message", "body"),
-    createdAt: requireString(value, "Date message", "createdAt", "created_at"),
-    updatedAt: optionalString(value, "updatedAt", "updated_at"),
+    createdAt: requireDateString(
+      value,
+      "Date message",
+      "createdAt",
+      "created_at"
+    ),
+    updatedAt: optionalDateString(
+      value,
+      "Date de modification du message",
+      "updatedAt",
+      "updated_at"
+    ),
     status: normalizeMessageStatus(readUnknown(value, "status")),
     isMine: booleanOrDefault(value, false, "isMine", "is_mine"),
     replyToMessageId: optionalString(
