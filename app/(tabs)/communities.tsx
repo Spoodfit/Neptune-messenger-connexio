@@ -43,7 +43,7 @@ export default function CommunitiesScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Ouvrir ${item.name}. ${item.memberCount} membres. ${item.categoryLabel}. ${item.canPost ? "Publication autorisée" : "Lecture seule"}`}
-            onPress={() => router.push(`/chat/${item.id}`)}
+            onPress={() => router.push(`/chat/${encodeURIComponent(item.id)}`)}
             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
           >
             <View style={styles.icon} accessibilityElementsHidden>
