@@ -22,6 +22,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         `Configuration Connexio production incomplète : ${missing.join(", ")}`
       );
     }
+    if (!apiBaseUrl.startsWith("https://")) {
+      throw new Error("EXPO_PUBLIC_API_BASE_URL doit utiliser HTTPS en production.");
+    }
+    if (!realtimeUrl.startsWith("wss://")) {
+      throw new Error("EXPO_PUBLIC_REALTIME_URL doit utiliser WSS en production.");
+    }
   }
 
   return {
