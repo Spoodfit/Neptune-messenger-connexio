@@ -1,0 +1,26 @@
+name: Apply Wire Location
+
+on:
+  push:
+    branches:
+      - feat/production-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: contains(github.event.head_commit.message, '[wire-location]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/production-hardening
+          fetch-depth: 0
+      - run: python scripts/apply_wire_location.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/api/wire.ts
+          git commit -m "fix: normaliser les localisations reçues"
+          git push origin HEAD:feat/production-hardening
