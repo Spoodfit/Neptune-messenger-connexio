@@ -1,4 +1,4 @@
-import type { ChatMessage } from "../types/messaging";
+import type { ChatMessage, MessageAttachment } from "../types/messaging";
 
 interface OptimisticMessageInput {
   clientMessageId: string;
@@ -10,6 +10,8 @@ interface OptimisticMessageInput {
   body: string;
   createdAt: string;
   replyToMessageId?: string;
+  attachments?: MessageAttachment[];
+  mentionedUserIds?: string[];
 }
 
 export function createOptimisticMessage(
@@ -28,6 +30,8 @@ export function createOptimisticMessage(
     status: "queued",
     isMine: true,
     replyToMessageId: input.replyToMessageId,
+    attachments: input.attachments,
+    mentionedUserIds: input.mentionedUserIds,
     retryCount: 0
   };
 }
@@ -41,9 +45,10 @@ export function reconcileServerMessage(
     ...server,
     clientMessageId: server.clientMessageId ?? local.clientMessageId,
     isMine: local.isMine,
-    status: server.status === "queued" || server.status === "sending"
-      ? "sent"
-      : server.status,
+    status:
+      server.status === "queued" || server.status === "sending"
+        ? "sent"
+        : server.status,
     errorCode: undefined
   };
 }
