@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# [highlight-share] déclenchement contrôlé.
 path = Path("app/highlight/[id].tsx")
 text = path.read_text()
 
