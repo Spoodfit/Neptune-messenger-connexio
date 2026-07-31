@@ -14,12 +14,12 @@ import {
 } from "react";
 
 import { env } from "../config/env";
+import { currentUser as demoUser } from "../data/mockData";
 import { shouldClearSessionAfterRefreshFailure } from "../domain/sessionErrors";
 import {
   calculateAccessTokenExpiry,
   shouldRefreshAccessToken
 } from "../domain/sessionTokens";
-import { currentUser as demoUser } from "../data/mockData";
 import { ApiError } from "../services/api/httpClient";
 import { NeptuneMessagingApi } from "../services/api/neptuneApi";
 import { NeptuneSessionApi } from "../services/api/sessionApi";
@@ -41,8 +41,8 @@ const signedOutUser: AppUser = {
   initials: "MN",
   company: "",
   city: "",
-  role: "triton",
-  roleLabel: "Triton",
+  role: "free",
+  roleLabel: "Free",
   online: false
 };
 
@@ -100,6 +100,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(env.mockMode);
+  const [mockAuthenticated, setMockAuthenticated] = useState(env.mockMode);
 
   const accessTokenRef = useRef<string | null>(null);
   const refreshTokenRef = useRef<string | null>(null);
@@ -127,7 +128,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const clearSession = useCallback(async () => {
-    // Le refresh token est la donnée critique : la vue ne se déconnecte qu’après sa suppression.
     await secureDelete(REFRESH_TOKEN_KEY);
     await secureDelete(USER_KEY).catch(() => undefined);
 
@@ -136,7 +136,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
     accessTokenExpiresAtRef.current = null;
     setAccessToken(null);
     setRefreshToken(null);
-    setCurrentUser(env.mockMode ? demoUser : signedOutUser);
+    setCurrentUser(signedOutUser);
+    setMockAuthenticated(false);
   }, []);
 
   const invalidateSession = useCallback(async () => {
@@ -145,7 +146,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [clearSession]);
 
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
-    if (env.mockMode) return accessTokenRef.current;
+    if (env.mockMode) return mockAuthenticated ? "mock-access-token" : null;
     if (refreshInFlightRef.current) return refreshInFlightRef.current;
 
     const operation = (async () => {
@@ -173,10 +174,10 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     refreshInFlightRef.current = operation;
     return operation;
-  }, [invalidateSession, persistSession]);
+  }, [invalidateSession, mockAuthenticated, persistSession]);
 
   const getAccessToken = useCallback(async (): Promise<string | null> => {
-    if (env.mockMode) return accessTokenRef.current;
+    if (env.mockMode) return mockAuthenticated ? "mock-access-token" : null;
     if (
       !shouldRefreshAccessToken(
         accessTokenRef.current,
@@ -186,7 +187,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       return accessTokenRef.current;
     }
     return refreshAccessToken();
-  }, [refreshAccessToken]);
+  }, [mockAuthenticated, refreshAccessToken]);
 
   useLayoutEffect(
     () => configureSessionRuntime({ getAccessToken, refreshAccessToken }),
@@ -248,6 +249,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
     async (code: string) => {
       const cleanCode = code.trim();
       if (!cleanCode) throw new Error("Code de connexion manquant.");
+      if (env.mockMode) {
+        setCurrentUser(demoUser);
+        setMockAuthenticated(true);
+        setSessionReady(true);
+        return;
+      }
       const session = await sessionApi.exchangeOneTimeCode(
         cleanCode,
         await getDeviceId()
@@ -259,9 +266,26 @@ export function SessionProvider({ children }: PropsWithChildren) {
   );
 
   const signOut = useCallback(async () => {
+    if (env.mockMode) {
+      await purgeOutboxData().catch(() => undefined);
+      accessTokenRef.current = null;
+      refreshTokenRef.current = null;
+      accessTokenExpiresAtRef.current = null;
+      setAccessToken(null);
+      setRefreshToken(null);
+      setCurrentUser(signedOutUser);
+      setMockAuthenticated(false);
+      return;
+    }
+
     const accessTokenToRevoke = accessTokenRef.current;
     const refreshTokenToRevoke = refreshTokenRef.current ?? refreshToken;
-    const registeredPushToken = await getRegisteredPushToken();
+    let registeredPushToken: string | null = null;
+    try {
+      registeredPushToken = await getRegisteredPushToken();
+    } catch {
+      registeredPushToken = null;
+    }
 
     await invalidateSession();
 
@@ -285,7 +309,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     () => ({
       currentUser,
       accessToken,
-      isAuthenticated: env.mockMode || Boolean(accessToken),
+      isAuthenticated: env.mockMode ? mockAuthenticated : Boolean(accessToken),
       sessionReady,
       getAccessToken,
       refreshAccessToken,
@@ -297,6 +321,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       currentUser,
       exchangeOneTimeCode,
       getAccessToken,
+      mockAuthenticated,
       refreshAccessToken,
       sessionReady,
       signOut
