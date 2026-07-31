@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -15,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { env } from "../config/env";
 import {
   GROUP_VISIBILITY_ROLES,
   isGovernanceRole,
@@ -26,15 +28,37 @@ import {
   useExperience
 } from "../providers/ExperienceProvider";
 import { useGroupAdmin } from "../providers/GroupAdminProvider";
+import { useMessaging } from "../providers/MessagingProvider";
 import { useSession } from "../providers/SessionProvider";
-import { colors, gradients, radii, spacing, typography } from "../theme";
+import { NeptuneExperienceApi } from "../services/api/experienceApi";
+import { uploadGroupAvatar } from "../services/api/uploadApi";
+import { pickGroupAvatar } from "../services/media/mediaPicker";
+import { colors, gradients, spacing, typography } from "../theme";
 import type { CanonicalUserRole } from "../types/messaging";
+
+const GROUP_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
+  "people",
+  "business",
+  "bulb",
+  "rocket",
+  "location",
+  "calendar",
+  "megaphone",
+  "school",
+  "trophy",
+  "construct"
+];
 
 export default function NewConversationScreen() {
   const insets = useSafeAreaInsets();
-  const { currentUser } = useSession();
+  const { currentUser, accessToken } = useSession();
   const { members, createPrivateConversation } = useExperience();
   const { createGroup } = useGroupAdmin();
+  const { refreshConversations } = useMessaging();
+  const api = useMemo(
+    () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
+    [accessToken]
+  );
   const canCreateOfficialGroup = isGovernanceRole(currentUser.role);
 
   const [mode, setMode] = useState<"private" | "group">("private");
@@ -47,6 +71,11 @@ export default function NewConversationScreen() {
   const [allowedRoles, setAllowedRoles] = useState<CanonicalUserRole[]>([
     ...GROUP_VISIBILITY_ROLES
   ]);
+  const [avatarUri, setAvatarUri] = useState<string | undefined>();
+  const [iconName, setIconName] = useState<keyof typeof Ionicons.glyphMap>(
+    "people"
+  );
+  const [creating, setCreating] = useState(false);
 
   const filteredMembers = useMemo(() => {
     const cleanQuery = query.trim().toLocaleLowerCase("fr");
@@ -86,51 +115,84 @@ export default function NewConversationScreen() {
     );
   };
 
-  const submit = () => {
-    if (mode === "private") {
-      if (!selectedIds.length) {
-        Alert.alert("Contact requis", "Sélectionnez au moins un membre.");
+  const selectAvatar = async () => {
+    try {
+      const selected = await pickGroupAvatar();
+      if (selected) setAvatarUri(selected);
+    } catch (error) {
+      Alert.alert(
+        "Image indisponible",
+        error instanceof Error
+          ? error.message
+          : "L’image du groupe n’a pas pu être sélectionnée."
+      );
+    }
+  };
+
+  const submit = async () => {
+    if (creating) return;
+    if (mode === "private" && selectedIds.length === 0) {
+      Alert.alert("Contact requis", "Sélectionnez au moins un membre.");
+      return;
+    }
+    if (mode === "group") {
+      if (!canCreateOfficialGroup) {
+        Alert.alert(
+          "Autorisation insuffisante",
+          "Votre statut Neptune ne permet pas de créer un groupe officiel."
+        );
         return;
       }
-      try {
-        const conversation = createPrivateConversation({
-          memberIds: selectedIds,
-          name: privateName.trim() || undefined
-        });
-        router.replace(`/chat/${encodeURIComponent(conversation.id)}`);
-      } catch (error) {
-        Alert.alert(
-          "Création impossible",
-          error instanceof Error ? error.message : "Vérifiez votre sélection."
-        );
+      if (!groupName.trim()) {
+        Alert.alert("Nom requis", "Indiquez le nom du groupe.");
+        return;
       }
-      return;
+      if (allowedRoles.length === 0) {
+        Alert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
+        return;
+      }
     }
 
-    if (!canCreateOfficialGroup) {
+    setCreating(true);
+    try {
+      if (mode === "private") {
+        const conversation = api
+          ? await api.createPrivateConversation(
+              selectedIds,
+              privateName.trim() || undefined
+            )
+          : createPrivateConversation({
+              memberIds: selectedIds,
+              name: privateName.trim() || undefined
+            });
+        if (api) await refreshConversations();
+        router.replace(`/chat/${encodeURIComponent(conversation.id)}`);
+        return;
+      }
+
+      let readyAvatar = avatarUri;
+      if (api && avatarUri?.startsWith("file:")) {
+        readyAvatar = await uploadGroupAvatar(avatarUri, accessToken);
+      }
+      const draft = {
+        name: groupName,
+        description,
+        allowedRoles,
+        canMembersPost: membersCanPost,
+        iconName,
+        avatarUrl: readyAvatar
+      };
+      const group = api ? await api.createGroup(draft) : createGroup(draft);
+      if (api) await refreshConversations();
+      router.replace(`/group/${encodeURIComponent(group.id)}`);
+    } catch (error) {
       Alert.alert(
-        "Autorisation requise",
-        "Le backend Neptune doit confirmer votre droit de créer un groupe officiel."
+        "Création impossible",
+        error instanceof Error ? error.message : "La création a échoué."
       );
-      return;
+    } finally {
+      setCreating(false);
     }
-    if (!groupName.trim()) {
-      Alert.alert("Nom requis", "Indiquez le nom du groupe.");
-      return;
-    }
-    if (!allowedRoles.length) {
-      Alert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
-      return;
-    }
-
-    const group = createGroup({
-      name: groupName,
-      description,
-      allowedRoles,
-      canMembersPost: membersCanPost,
-      iconName: "people"
-    });
-    router.replace(`/group/${encodeURIComponent(group.id)}`);
   };
 
   return (
@@ -159,10 +221,16 @@ export default function NewConversationScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Créer"
-          onPress={submit}
+          accessibilityState={{ busy: creating, disabled: creating }}
+          disabled={creating}
+          onPress={() => void submit()}
           style={styles.createAction}
         >
-          <Text style={styles.createActionText}>Créer</Text>
+          {creating ? (
+            <ActivityIndicator size="small" color={colors.orange} />
+          ) : (
+            <Text style={styles.createActionText}>Créer</Text>
+          )}
         </Pressable>
       </View>
 
@@ -196,172 +264,200 @@ export default function NewConversationScreen() {
         })}
       </View>
 
-      {mode === "private" ? (
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: Math.max(insets.bottom, spacing.xl) }
-          ]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.infoCard}>
-            <Ionicons name="shield-checkmark" size={19} color={colors.success} />
-            <Text style={styles.infoText}>
-              Discussion individuelle ou mini-groupe de {MAX_PRIVATE_PARTICIPANTS} participants au total, vous compris.
-            </Text>
-          </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, spacing.xl) }
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {mode === "private" ? (
+          <>
+            <View style={styles.infoCard}>
+              <Ionicons name="shield-checkmark" size={19} color={colors.success} />
+              <Text style={styles.infoText}>
+                Discussion individuelle ou mini-groupe de {MAX_PRIVATE_PARTICIPANTS} participants au total, vous compris.
+              </Text>
+            </View>
 
-          {selectedIds.length > 1 ? (
+            {selectedIds.length > 1 ? (
+              <TextInput
+                value={privateName}
+                onChangeText={setPrivateName}
+                placeholder="Nom du mini-groupe (facultatif)"
+                placeholderTextColor={colors.textMuted}
+                maxLength={70}
+                style={styles.input}
+              />
+            ) : null}
+
             <TextInput
-              value={privateName}
-              onChangeText={setPrivateName}
-              placeholder="Nom du mini-groupe (facultatif)"
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Rechercher par nom, entreprise ou ville"
               placeholderTextColor={colors.textMuted}
-              maxLength={70}
               style={styles.input}
             />
-          ) : null}
 
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Rechercher par nom, entreprise ou ville"
-            placeholderTextColor={colors.textMuted}
-            style={styles.input}
-          />
-
-          <View style={styles.selectionRow}>
-            <Text style={styles.selectionText}>
-              {selectedIds.length}/{MAX_PRIVATE_CONTACTS} contact{selectedIds.length > 1 ? "s" : ""}
-            </Text>
-            <Text style={styles.participantText}>
-              {selectedIds.length + 1}/{MAX_PRIVATE_PARTICIPANTS} participants
-            </Text>
-          </View>
-
-          <View style={styles.memberList}>
-            {filteredMembers.map((member) => {
-              const selected = selectedIds.includes(member.id);
-              return (
-                <Pressable
-                  key={member.id}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityLabel={`${member.name}, ${member.company}`}
-                  onPress={() => toggleMember(member.id)}
-                  style={({ pressed }) => [
-                    styles.memberRow,
-                    selected && styles.memberRowSelected,
-                    pressed && styles.pressed
-                  ]}
-                >
-                  <View style={styles.avatar}>
-                    {member.avatarUrl ? (
-                      <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} />
-                    ) : (
-                      <Text style={styles.initials}>{member.initials}</Text>
-                    )}
-                  </View>
-                  <View style={styles.memberContent}>
-                    <Text style={styles.memberName}>{member.name}</Text>
-                    <Text style={styles.memberMeta} numberOfLines={1}>
-                      {member.company} · {member.city}
-                    </Text>
-                  </View>
-                  <View style={[styles.check, selected && styles.checkSelected]}>
-                    {selected ? (
-                      <Ionicons name="checkmark" size={18} color={colors.white} />
-                    ) : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </ScrollView>
-      ) : (
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: Math.max(insets.bottom, spacing.xl) }
-          ]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {!canCreateOfficialGroup ? (
-            <View style={[styles.infoCard, styles.warningCard]}>
-              <Ionicons name="lock-closed" size={19} color={colors.warning} />
-              <Text style={styles.infoText}>
-                L’écran est prêt, mais le serveur devra confirmer la permission administrateur avant toute création.
+            <View style={styles.selectionRow}>
+              <Text style={styles.selectionText}>
+                {selectedIds.length}/{MAX_PRIVATE_CONTACTS} contact{selectedIds.length > 1 ? "s" : ""}
+              </Text>
+              <Text style={styles.participantText}>
+                {selectedIds.length + 1}/{MAX_PRIVATE_PARTICIPANTS} participants
               </Text>
             </View>
-          ) : null}
 
-          <Text style={styles.label}>Identité du groupe</Text>
-          <TextInput
-            value={groupName}
-            onChangeText={setGroupName}
-            placeholder="Nom du groupe"
-            placeholderTextColor={colors.textMuted}
-            maxLength={70}
-            style={styles.input}
-          />
-          <TextInput
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Description du groupe"
-            placeholderTextColor={colors.textMuted}
-            multiline
-            maxLength={240}
-            textAlignVertical="top"
-            style={[styles.input, styles.multiline]}
-          />
-
-          <Text style={styles.label}>Visibilité par statut</Text>
-          <View style={styles.roleGrid}>
-            {GROUP_VISIBILITY_ROLES.map((role) => {
-              const selected = allowedRoles.includes(role);
-              return (
-                <Pressable
-                  key={role}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected }}
-                  onPress={() => toggleRole(role)}
-                  style={[styles.roleChip, selected && styles.roleChipSelected]}
-                >
-                  <Text style={[styles.roleText, selected && styles.roleTextSelected]}>
-                    {ROLE_LABELS[role]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchContent}>
-              <Text style={styles.switchTitle}>Les membres peuvent publier</Text>
-              <Text style={styles.switchSubtitle}>
-                Sinon, seuls les administrateurs autorisés pourront envoyer des messages.
-              </Text>
+            <View style={styles.memberList}>
+              {filteredMembers.map((member) => {
+                const selected = selectedIds.includes(member.id);
+                return (
+                  <Pressable
+                    key={member.id}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    accessibilityLabel={`${member.name}, ${member.company}`}
+                    onPress={() => toggleMember(member.id)}
+                    style={({ pressed }) => [
+                      styles.memberRow,
+                      selected && styles.memberRowSelected,
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <View style={styles.avatar}>
+                      {member.avatarUrl ? (
+                        <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} />
+                      ) : (
+                        <Text style={styles.initials}>{member.initials}</Text>
+                      )}
+                    </View>
+                    <View style={styles.memberContent}>
+                      <Text style={styles.memberName}>{member.name}</Text>
+                      <Text style={styles.memberMeta} numberOfLines={1}>
+                        {member.company} · {member.city}
+                      </Text>
+                    </View>
+                    <View style={[styles.check, selected && styles.checkSelected]}>
+                      {selected ? (
+                        <Ionicons name="checkmark" size={18} color={colors.white} />
+                      ) : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Switch
-              accessibilityLabel="Autoriser les membres à publier"
-              style={styles.switchControl}
-              value={membersCanPost}
-              onValueChange={setMembersCanPost}
-              trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
-              thumbColor={colors.white}
+          </>
+        ) : (
+          <>
+            {!canCreateOfficialGroup ? (
+              <View style={[styles.infoCard, styles.warningCard]}>
+                <Ionicons name="lock-closed" size={19} color={colors.warning} />
+                <Text style={styles.infoText}>
+                  Seuls les statuts de gouvernance autorisés peuvent créer un groupe officiel.
+                </Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.label}>Identité du groupe</Text>
+            <View style={styles.identityRow}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choisir l’image du groupe"
+                onPress={() => void selectAvatar()}
+                style={styles.groupAvatar}
+              >
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                ) : (
+                  <Ionicons name={iconName} size={28} color={colors.text} />
+                )}
+              </Pressable>
+              <View style={styles.identityFields}>
+                <TextInput
+                  value={groupName}
+                  onChangeText={setGroupName}
+                  placeholder="Nom du groupe"
+                  placeholderTextColor={colors.textMuted}
+                  maxLength={70}
+                  style={styles.input}
+                />
+                <Text style={styles.helperText}>Touchez l’avatar pour choisir une image.</Text>
+              </View>
+            </View>
+
+            <TextInput
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Description du groupe"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              maxLength={240}
+              textAlignVertical="top"
+              style={[styles.input, styles.multiline]}
             />
-          </View>
 
-          <View style={styles.backendCard}>
-            <Ionicons name="server-outline" size={19} color={colors.orange} />
-            <Text style={styles.backendText}>
-              Les règles doivent être appliquées par le backend sur la liste, l’accès direct, les messages, les notifications et le temps réel.
-            </Text>
-          </View>
-        </ScrollView>
-      )}
+            <Text style={styles.label}>Icône de remplacement</Text>
+            <View style={styles.iconGrid}>
+              {GROUP_ICONS.map((icon) => {
+                const selected = iconName === icon;
+                return (
+                  <Pressable
+                    key={icon}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    onPress={() => setIconName(icon)}
+                    style={[styles.iconChoice, selected && styles.iconChoiceSelected]}
+                  >
+                    <Ionicons
+                      name={icon}
+                      size={22}
+                      color={selected ? colors.orange : colors.textMuted}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.label}>Visibilité par statut</Text>
+            <View style={styles.roleGrid}>
+              {GROUP_VISIBILITY_ROLES.map((role) => {
+                const selected = allowedRoles.includes(role);
+                return (
+                  <Pressable
+                    key={role}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => toggleRole(role)}
+                    style={[styles.roleChip, selected && styles.roleChipSelected]}
+                  >
+                    <Text style={[styles.roleText, selected && styles.roleTextSelected]}>
+                      {ROLE_LABELS[role]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.switchRow}>
+              <View style={styles.switchContent}>
+                <Text style={styles.switchTitle}>Les membres peuvent publier</Text>
+                <Text style={styles.switchSubtitle}>
+                  Sinon, seuls les administrateurs autorisés pourront envoyer des messages.
+                </Text>
+              </View>
+              <Switch
+                accessibilityLabel="Autoriser les membres à publier"
+                style={styles.switchControl}
+                value={membersCanPost}
+                onValueChange={setMembersCanPost}
+                trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
+          </>
+        )}
+      </ScrollView>
     </LinearGradient>
   );
 }
@@ -496,24 +592,53 @@ const styles = StyleSheet.create({
   check: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center"
   },
-  checkSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkSelected: { borderColor: colors.violet, backgroundColor: colors.violet },
   label: {
     ...typography.heading3,
     color: colors.text,
     marginTop: spacing.sm,
     marginBottom: 8
   },
-  roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  identityRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  groupAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  identityFields: { flex: 1, minWidth: 0 },
+  helperText: { color: colors.textMuted, fontSize: 9, marginTop: -5, marginBottom: 10 },
+  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  iconChoice: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  iconChoiceSelected: {
+    borderColor: colors.violet,
+    backgroundColor: "rgba(107,79,234,0.2)"
+  },
+  roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   roleChip: {
     minHeight: 44,
-    paddingHorizontal: 12,
-    borderRadius: 20,
+    paddingHorizontal: 11,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -522,15 +647,14 @@ const styles = StyleSheet.create({
   },
   roleChipSelected: {
     borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.22)"
+    backgroundColor: "rgba(107,79,234,0.2)"
   },
-  roleText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  roleText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
   roleTextSelected: { color: colors.text },
   switchRow: {
-    minHeight: 76,
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
     padding: spacing.md,
-    borderRadius: radii.lg,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -539,17 +663,7 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   switchContent: { flex: 1, minWidth: 0 },
-  switchControl: { width: 48, height: 44 },
   switchTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
   switchSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
-  backendCard: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surfaceMuted,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10
-  },
-  backendText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 }
+  switchControl: { width: 48, height: 44 }
 });
