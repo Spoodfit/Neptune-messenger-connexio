@@ -23,11 +23,15 @@ import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
 import { useMessaging } from "../../src/providers/MessagingProvider";
 import { useSession } from "../../src/providers/SessionProvider";
+import { env } from "../../src/config/env";
+import { uploadMessageAttachment } from "../../src/services/api/uploadApi";
+import { pickMessageAttachment } from "../../src/services/media/mediaPicker";
 import { colors, gradients, radii, spacing, typography } from "../../src/theme";
 import type {
   AttachmentKind,
   ChatMessage,
-  Conversation
+  Conversation,
+  MessageAttachment
 } from "../../src/types/messaging";
 
 const SUBMIT_LOCK_MS = 320;
@@ -41,8 +45,7 @@ const ATTACHMENTS: Array<{
   { kind: "video", label: "Vidéo", icon: "videocam-outline" },
   { kind: "document", label: "Document", icon: "document-text-outline" },
   { kind: "file", label: "Fichier", icon: "folder-open-outline" },
-  { kind: "location", label: "Localisation", icon: "location-outline" },
-  { kind: "contact", label: "Contact", icon: "person-add-outline" }
+  { kind: "location", label: "Localisation", icon: "location-outline" }
 ];
 
 function isPrivateConversation(conversation: Conversation): boolean {
@@ -90,7 +93,7 @@ export default function ChatScreen() {
   const [reactionMessage, setReactionMessage] = useState<ChatMessage | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<
-    Array<{ kind: AttachmentKind; label: string }>
+    MessageAttachment[]
   >([]);
   const lastMarkedReadMessageId = useRef<string | null>(null);
   const submitLockRef = useRef(false);
@@ -240,53 +243,148 @@ export default function ChatScreen() {
     setDraft((current) => current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `));
   };
 
+  const addAttachment = async (kind: AttachmentKind) => {
+    setAttachmentMenuOpen(false);
+    try {
+      const picked = await pickMessageAttachment(kind);
+      if (!picked) return;
+      setPendingAttachments((previous) => {
+        const maxAttachments = 10;
+        if (previous.length >= maxAttachments) {
+          Alert.alert(
+            "Limite atteinte",
+            `Un message accepte au maximum ${maxAttachments} pièces jointes.`
+          );
+          return previous;
+        }
+        return [...previous, picked];
+      });
+    } catch (error) {
+      Alert.alert(
+        "Pièce jointe indisponible",
+        error instanceof Error
+          ? error.message
+          : "Le contenu sélectionné n’a pas pu être ajouté."
+      );
+    }
+  };
+
+  const resolveMentionedUserIds = (value: string): string[] => {
+    const normalized = value.toLocaleLowerCase("fr");
+    return members
+      .filter((member) => {
+        const firstName = member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
+        return (
+          (firstName && normalized.includes(`@${firstName}`)) ||
+          normalized.includes(`@${member.name.toLocaleLowerCase("fr")}`) ||
+          (member.company &&
+            normalized.includes(`@${member.company.toLocaleLowerCase("fr")}`))
+        );
+      })
+      .map((member) => member.id);
+  };
+
   const submit = () => {
-    if (submitLockRef.current) return;
-    const attachmentFallback = pendingAttachments
-      .map((attachment) => `${attachment.label} jointe`)
-      .join(", ");
-    const body =
-      draft.trim() || (attachmentFallback ? `📎 ${attachmentFallback}` : "");
-    if (!conversation.canPost || !body) return;
+    if (submitLockRef.current || submitting) return;
+    const body = draft.trim();
+    if (!conversation.canPost || (!body && pendingAttachments.length === 0)) return;
 
     submitLockRef.current = true;
     setSubmitting(true);
-    setDraft("");
-    setPendingAttachments([]);
+    const originalDraft = draft;
+    const originalAttachments = pendingAttachments;
+    const originalReply = replyingTo;
+    const mentionedUserIds = resolveMentionedUserIds(body);
 
-    const operation =
-      source === "admin"
-        ? sendCreatedGroupMessage(
-            conversation.id,
-            body,
-            replyingTo ?? undefined
-          )
-        : source === "private"
-          ? sendLocalMessage(
-              conversation.id,
-              body,
-              replyingTo ?? undefined
+    void (async () => {
+      try {
+        const readyAttachments: MessageAttachment[] = [];
+        for (let index = 0; index < originalAttachments.length; index += 1) {
+          const attachment = originalAttachments[index]!;
+          if (env.mockMode || localOnly || attachment.status === "ready") {
+            readyAttachments.push({
+              ...attachment,
+              status: "ready",
+              uploadProgress: 1
+            });
+            continue;
+          }
+          setPendingAttachments((previous) =>
+            previous.map((item) =>
+              item.id === attachment.id
+                ? { ...item, status: "uploading", uploadProgress: 0 }
+                : item
             )
-          : sendMessage(conversation.id, body, replyingTo?.id);
-    setReplyingTo(null);
-
-    submitUnlockTimerRef.current = setTimeout(() => {
-      submitLockRef.current = false;
-      submitUnlockTimerRef.current = null;
-      if (mountedRef.current) setSubmitting(false);
-    }, SUBMIT_LOCK_MS);
-
-    void operation
-      .then((accepted) => {
-        if (!accepted && mountedRef.current) {
-          setDraft((currentDraft) => currentDraft || body);
+          );
+          const uploaded = await uploadMessageAttachment(
+            attachment,
+            undefined,
+            (progress) =>
+              setPendingAttachments((previous) =>
+                previous.map((item) =>
+                  item.id === attachment.id
+                    ? { ...item, status: "uploading", uploadProgress: progress }
+                    : item
+                )
+              )
+          );
+          readyAttachments.push(uploaded);
         }
-      })
-      .catch(() => {
+
+        const fallbackBody =
+          body ||
+          (readyAttachments.length === 1
+            ? `📎 ${readyAttachments[0]?.name ?? "Pièce jointe"}`
+            : `📎 ${readyAttachments.length} pièces jointes`);
+        const accepted =
+          source === "admin"
+            ? await sendCreatedGroupMessage(
+                conversation.id,
+                fallbackBody,
+                originalReply ?? undefined,
+                readyAttachments,
+                mentionedUserIds
+              )
+            : source === "private"
+              ? await sendLocalMessage(
+                  conversation.id,
+                  fallbackBody,
+                  originalReply ?? undefined,
+                  readyAttachments,
+                  mentionedUserIds
+                )
+              : await sendMessage(
+                  conversation.id,
+                  fallbackBody,
+                  originalReply?.id,
+                  readyAttachments,
+                  mentionedUserIds
+                );
+        if (!accepted) throw new Error("Le message a été refusé.");
         if (mountedRef.current) {
-          setDraft((currentDraft) => currentDraft || body);
+          setDraft("");
+          setPendingAttachments([]);
+          setReplyingTo(null);
         }
-      });
+      } catch (error) {
+        if (mountedRef.current) {
+          setDraft((current) => current || originalDraft);
+          setPendingAttachments((current) =>
+            current.length > 0 ? current : originalAttachments
+          );
+          setReplyingTo(originalReply);
+          Alert.alert(
+            "Envoi impossible",
+            error instanceof Error
+              ? error.message
+              : "Le message n’a pas pu être envoyé."
+          );
+        }
+      } finally {
+        submitLockRef.current = false;
+        if (mountedRef.current) setSubmitting(false);
+      }
+    })();
   };
 
   const connectionLabel = localOnly
@@ -352,10 +450,10 @@ export default function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel="Appeler en audio"
               onPress={() =>
-                Alert.alert(
-                  "Appel audio",
-                  "Écran prêt. Le développeur doit brancher WebRTC ou le fournisseur d’appel."
-                )
+                router.push({
+                  pathname: "/call/[id]",
+                  params: { id: conversation.id, mode: "audio" }
+                })
               }
               style={styles.callButton}
             >
@@ -365,10 +463,10 @@ export default function ChatScreen() {
               accessibilityRole="button"
               accessibilityLabel="Appeler en vidéo"
               onPress={() =>
-                Alert.alert(
-                  "Appel vidéo",
-                  "Écran prêt. Le développeur doit brancher WebRTC ou le fournisseur d’appel."
-                )
+                router.push({
+                  pathname: "/call/[id]",
+                  params: { id: conversation.id, mode: "video" }
+                })
               }
               style={styles.callButton}
             >
@@ -532,7 +630,12 @@ export default function ChatScreen() {
                     size={16}
                     color={colors.orange}
                   />
-                  <Text style={styles.pendingText}>{attachment.label}</Text>
+                  <Text style={styles.pendingText} numberOfLines={1}>
+                    {attachment.name}
+                    {attachment.status === "uploading"
+                      ? ` · ${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
+                      : ""}
+                  </Text>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Retirer ${attachment.label}`}
@@ -634,13 +737,7 @@ export default function ChatScreen() {
                 <Pressable
                   key={attachment.kind}
                   accessibilityRole="button"
-                  onPress={() => {
-                    setPendingAttachments((previous) => [
-                      ...previous,
-                      { kind: attachment.kind, label: attachment.label }
-                    ]);
-                    setAttachmentMenuOpen(false);
-                  }}
+                  onPress={() => void addAttachment(attachment.kind)}
                   style={styles.attachmentChoice}
                 >
                   <LinearGradient
@@ -658,7 +755,7 @@ export default function ChatScreen() {
               ))}
             </View>
             <Text style={styles.backendHint}>
-              Les pickers natifs, la compression, la progression et l’upload privé sont prêts à être branchés sur ces actions.
+              Les contenus sont sélectionnés depuis l’appareil puis envoyés vers le stockage privé Neptune avec progression et reprise en cas d’échec.
             </Text>
           </Pressable>
         </Pressable>
