@@ -69,47 +69,63 @@ async function checkGeometry(page, label) {
       "[role='radio']",
       "[role='switch']"
     ].join(",");
-    const visible = [...document.querySelectorAll(interactiveSelector)]
-      .filter((element) => {
-        const style = getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-        return (
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          Number(style.opacity || "1") > 0.02 &&
-          rect.width > 0 &&
-          rect.height > 0 &&
-          rect.bottom > 0 &&
-          rect.top < viewport.height &&
-          rect.right > 0 &&
-          rect.left < viewport.width
-        );
-      })
+    const labelFor = (element) =>
+      element.getAttribute("aria-label") ||
+      element.textContent?.trim().slice(0, 80) ||
+      element.tagName;
+    const ownsPoint = (element, x, y) => {
+      const top = document.elementFromPoint(x, y);
+      return Boolean(top && (top === element || element.contains(top)));
+    };
+    const reachable = (element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (
+        style.display === "none" ||
+        style.visibility === "hidden" ||
+        style.pointerEvents === "none" ||
+        Number(style.opacity || "1") <= 0.02 ||
+        element.closest('[aria-hidden="true"], [inert]') ||
+        rect.width <= 0 ||
+        rect.height <= 0 ||
+        rect.bottom <= 0 ||
+        rect.top >= viewport.height ||
+        rect.right <= 0 ||
+        rect.left >= viewport.width
+      ) {
+        return false;
+      }
+      const left = Math.max(1, rect.left + 2);
+      const right = Math.min(viewport.width - 1, rect.right - 2);
+      const top = Math.max(1, rect.top + 2);
+      const bottom = Math.min(viewport.height - 1, rect.bottom - 2);
+      if (right <= left || bottom <= top) return false;
+      return [
+        [(left + right) / 2, (top + bottom) / 2],
+        [left, top],
+        [right, top],
+        [left, bottom],
+        [right, bottom]
+      ].some(([x, y]) => ownsPoint(element, x, y));
+    };
+    const controls = [...document.querySelectorAll(interactiveSelector)]
+      .filter(reachable)
       .map((element) => {
         const rect = element.getBoundingClientRect();
         return {
-          label:
-            element.getAttribute("aria-label") ||
-            element.textContent?.trim().slice(0, 80) ||
-            element.tagName,
+          label: labelFor(element),
           left: rect.left,
           right: rect.right,
-          top: rect.top,
-          bottom: rect.bottom,
           width: rect.width,
           height: rect.height
         };
       });
     return {
       horizontalOverflow: Math.max(rootWidth, bodyWidth) > viewport.width + 1,
-      cut: visible.filter(
-        (item) =>
-          item.left < -1 ||
-          item.right > viewport.width + 1 ||
-          item.top < -1 ||
-          item.bottom > viewport.height + 1
+      cut: controls.filter(
+        (item) => item.left < -1 || item.right > viewport.width + 1
       ),
-      undersized: visible.filter(
+      undersized: controls.filter(
         (item) => item.width < 43 || item.height < 43
       )
     };
@@ -117,7 +133,7 @@ async function checkGeometry(page, label) {
   if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal`);
   if (result.cut.length) {
     failures.push(
-      `${label}: contrôles coupés: ${result.cut
+      `${label}: contrôles coupés horizontalement: ${result.cut
         .slice(0, 4)
         .map((item) => item.label)
         .join(", ")}`
