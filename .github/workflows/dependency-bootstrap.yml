@@ -1,0 +1,54 @@
+name: Dependency Bootstrap
+
+on:
+  push:
+    branches:
+      - feat/production-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    if: contains(github.event.head_commit.message, '[deps-run]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/production-hardening
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Install Expo-compatible runtime dependencies
+        run: npx expo install expo-image-picker expo-document-picker expo-location expo-video react-native-webview @react-native-async-storage/async-storage
+      - name: Restore read-only CI and remove bootstrap
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/branch-ci.yml')
+          text = path.read_text()
+          start = text.find('  dependency-bootstrap:')
+          end = text.find('\n  verify:', start)
+          if start >= 0 and end >= 0:
+              text = text[:start] + text[end+1:]
+          text = text.replace('permissions:\n  contents: write', 'permissions:\n  contents: read')
+          path.write_text(text)
+          Path('.github/workflows/dependency-bootstrap.yml').unlink()
+          marker = Path('docs/DEPENDENCIES_BOOTSTRAP.md')
+          if marker.exists(): marker.unlink()
+          PY
+      - name: Verify dependencies
+        run: |
+          npm run typecheck
+          npx expo install --check
+      - name: Commit synchronized runtime
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json .github/workflows/branch-ci.yml .github/workflows/dependency-bootstrap.yml docs/DEPENDENCIES_BOOTSTRAP.md
+          git commit -m "chore: verrouiller les intégrations natives réelles"
+          git push origin HEAD:feat/production-hardening
