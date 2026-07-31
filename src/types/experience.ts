@@ -39,6 +39,11 @@ export interface HighlightMedia {
   id: string;
   kind: "photo" | "video";
   uri?: string;
+  name?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  width?: number;
+  height?: number;
   durationSeconds?: number;
   uploadProgress?: number;
   status?: "local" | "uploading" | "ready" | "failed";
@@ -78,6 +83,7 @@ export interface HighlightPost {
     accuracyRadiusMeters: number;
   };
   syncedWithBusinessApp?: boolean;
+  syncState?: "local" | "queued" | "synced" | "failed";
 }
 
 export interface MapMemberMoment {
