@@ -1,10 +1,14 @@
 import { normalizeUserRole, ROLE_LABELS } from "../../domain/roles";
 import type {
   AppUser,
+  AttachmentKind,
   ChatMessage,
   Conversation,
   ConversationType,
+  MessageAttachment,
+  MessageReactionSummary,
   MessageStatus,
+  ReplyPreview,
   SessionPayload,
   UserRole
 } from "../../types/messaging";
@@ -24,6 +28,7 @@ const USER_ROLES = new Set<UserRole>([
   "legende",
   "moussaillon",
   "triton",
+  "free",
   "admin",
   "member",
   "captain",
@@ -46,6 +51,15 @@ const MESSAGE_STATUSES = new Set<MessageStatus>([
   "delivered",
   "read",
   "failed"
+]);
+const ATTACHMENT_KINDS = new Set<AttachmentKind>([
+  "photo",
+  "video",
+  "document",
+  "file",
+  "audio",
+  "location",
+  "contact"
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -160,6 +174,17 @@ function nonNegativeInteger(
   return Math.max(0, Math.trunc(numberOrDefault(record, fallback, ...keys)));
 }
 
+function optionalPositiveInteger(
+  record: Record<string, unknown>,
+  ...keys: string[]
+): number | undefined {
+  const value = readUnknown(record, ...keys);
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return undefined;
+  }
+  return Math.trunc(value);
+}
+
 function booleanOrDefault(
   record: Record<string, unknown>,
   fallback: boolean,
@@ -167,6 +192,22 @@ function booleanOrDefault(
 ): boolean {
   const value = readUnknown(record, ...keys);
   return typeof value === "boolean" ? value : fallback;
+}
+
+function optionalStringArray(
+  record: Record<string, unknown>,
+  maxItems: number,
+  maxLength: number,
+  ...keys: string[]
+): string[] | undefined {
+  const value = readUnknown(record, ...keys);
+  if (!Array.isArray(value)) return undefined;
+  const normalized = value
+    .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    .slice(0, maxItems)
+    .map((item) => item.trim())
+    .filter((item) => item.length <= maxLength);
+  return normalized.length ? [...new Set(normalized)] : undefined;
 }
 
 function initialsFromName(name: string): string {
@@ -201,6 +242,87 @@ function normalizeMessageStatus(value: unknown): MessageStatus {
     : "sent";
 }
 
+function normalizeAttachment(value: unknown): MessageAttachment {
+  if (!isRecord(value)) throw new WireValidationError("Pièce jointe invalide.");
+  const rawKind = readUnknown(value, "kind", "type");
+  if (
+    typeof rawKind !== "string" ||
+    !ATTACHMENT_KINDS.has(rawKind as AttachmentKind)
+  ) {
+    throw new WireValidationError("Type de pièce jointe invalide.");
+  }
+  const statusRaw = optionalString(value, "status");
+  const status =
+    statusRaw === "local" ||
+    statusRaw === "uploading" ||
+    statusRaw === "ready" ||
+    statusRaw === "failed"
+      ? statusRaw
+      : undefined;
+  const progress = numberOrDefault(value, -1, "uploadProgress", "upload_progress");
+  return {
+    id: requireBoundedString(value, "Identifiant pièce jointe", 256, "id"),
+    kind: rawKind as AttachmentKind,
+    name:
+      optionalBoundedString(value, 255, "name", "file_name") ??
+      "Pièce jointe",
+    uri: optionalHttpsUrl(value, "uri", "url", "download_url"),
+    mimeType: optionalBoundedString(value, 160, "mimeType", "mime_type"),
+    sizeBytes: optionalPositiveInteger(value, "sizeBytes", "size_bytes"),
+    durationSeconds: optionalPositiveInteger(
+      value,
+      "durationSeconds",
+      "duration_seconds"
+    ),
+    width: optionalPositiveInteger(value, "width"),
+    height: optionalPositiveInteger(value, "height"),
+    uploadProgress:
+      progress >= 0 && progress <= 1 ? progress : undefined,
+    status
+  };
+}
+
+function normalizeReaction(value: unknown): MessageReactionSummary {
+  if (!isRecord(value)) throw new WireValidationError("Réaction invalide.");
+  return {
+    emoji: requireBoundedString(value, "Emoji de réaction", 16, "emoji"),
+    count: nonNegativeInteger(value, 0, "count"),
+    reactedByCurrentUser: booleanOrDefault(
+      value,
+      false,
+      "reactedByCurrentUser",
+      "reacted_by_current_user"
+    ),
+    userIds: optionalStringArray(value, 500, 256, "userIds", "user_ids")
+  };
+}
+
+function normalizeReplyPreview(value: unknown): ReplyPreview | undefined {
+  if (!isRecord(value)) return undefined;
+  return {
+    messageId: requireBoundedString(
+      value,
+      "Identifiant du message cité",
+      256,
+      "messageId",
+      "message_id"
+    ),
+    senderName: requireBoundedString(
+      value,
+      "Auteur du message cité",
+      160,
+      "senderName",
+      "sender_name"
+    ),
+    body: requireBoundedString(
+      value,
+      "Aperçu du message cité",
+      500,
+      "body"
+    )
+  };
+}
+
 export function normalizeAppUser(value: unknown): AppUser {
   if (!isRecord(value)) throw new WireValidationError("Utilisateur invalide.");
   const name = requireBoundedString(
@@ -229,7 +351,19 @@ export function normalizeAppUser(value: unknown): AppUser {
     roleLabel: ROLE_LABELS[normalizeUserRole(role)],
     online: booleanOrDefault(value, false, "online", "is_online"),
     avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url"),
-    phone: optionalBoundedString(value, 32, "phone", "phone_number")
+    phone: optionalBoundedString(value, 32, "phone", "phone_number"),
+    videoCallEnabled: booleanOrDefault(
+      value,
+      false,
+      "videoCallEnabled",
+      "video_call_enabled"
+    ),
+    lastSeenAt: optionalDateString(
+      value,
+      "Dernière activité",
+      "lastSeenAt",
+      "last_seen_at"
+    )
   };
 }
 
@@ -280,6 +414,7 @@ export function normalizeConversation(value: unknown): Conversation {
     type: requireConversationType(readUnknown(value, "type")),
     memberCount: nonNegativeInteger(value, 0, "memberCount", "member_count"),
     unreadCount: nonNegativeInteger(value, 0, "unreadCount", "unread_count"),
+    mentionCount: nonNegativeInteger(value, 0, "mentionCount", "mention_count"),
     lastMessage: optionalBoundedString(value, 4_000, "lastMessage", "last_message"),
     lastMessageAt: optionalDateString(
       value,
@@ -296,7 +431,15 @@ export function normalizeConversation(value: unknown): Conversation {
     restricted: booleanOrDefault(value, false, "restricted"),
     allowedRoles,
     canPost: booleanOrDefault(value, false, "canPost", "can_post"),
-    avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url")
+    canManage: booleanOrDefault(value, false, "canManage", "can_manage"),
+    avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url"),
+    iconName: optionalBoundedString(value, 80, "iconName", "icon_name"),
+    memberIds: optionalStringArray(value, 10_000, 256, "memberIds", "member_ids"),
+    ownerId: optionalBoundedString(value, 256, "ownerId", "owner_id"),
+    adminIds: optionalStringArray(value, 500, 256, "adminIds", "admin_ids"),
+    muted: booleanOrDefault(value, false, "muted", "is_muted"),
+    archived: booleanOrDefault(value, false, "archived", "is_archived"),
+    left: booleanOrDefault(value, false, "left", "has_left")
   };
 }
 
@@ -312,6 +455,18 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
   const senderName =
     optionalBoundedString(value, 160, "senderName", "sender_name") ??
     "Membre Neptune";
+  const attachmentsRaw = readUnknown(value, "attachments");
+  const attachments = Array.isArray(attachmentsRaw)
+    ? attachmentsRaw.slice(0, 20).map(normalizeAttachment)
+    : undefined;
+  const reactionsRaw = readUnknown(value, "reactions");
+  const reactions = Array.isArray(reactionsRaw)
+    ? reactionsRaw.slice(0, 64).map(normalizeReaction)
+    : undefined;
+  const body = optionalBoundedString(value, 4_000, "body") ?? "";
+  if (!body && !attachments?.length) {
+    throw new WireValidationError("Message sans contenu ni pièce jointe.");
+  }
   return {
     id: requireBoundedString(value, "Identifiant message", 256, "id", "message_id"),
     clientMessageId: optionalBoundedString(
@@ -343,7 +498,7 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
       "senderAvatarUrl",
       "sender_avatar_url"
     ),
-    body: requireBoundedString(value, "Contenu message", 4_000, "body"),
+    body,
     createdAt: requireDateString(
       value,
       "Date message",
@@ -364,8 +519,26 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
       "replyToMessageId",
       "reply_to_message_id"
     ),
+    replyPreview: normalizeReplyPreview(
+      readUnknown(value, "replyPreview", "reply_preview")
+    ),
+    attachments,
+    reactions,
+    mentionedUserIds: optionalStringArray(
+      value,
+      500,
+      256,
+      "mentionedUserIds",
+      "mentioned_user_ids"
+    ),
     retryCount: nonNegativeInteger(value, 0, "retryCount", "retry_count"),
-    errorCode: optionalBoundedString(value, 160, "errorCode", "error_code")
+    errorCode: optionalBoundedString(value, 160, "errorCode", "error_code"),
+    deletedAt: optionalDateString(
+      value,
+      "Date de suppression du message",
+      "deletedAt",
+      "deleted_at"
+    )
   };
 }
 
