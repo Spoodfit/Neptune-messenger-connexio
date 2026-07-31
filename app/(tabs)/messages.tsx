@@ -307,6 +307,25 @@ export default function MessagesScreen() {
         <Pressable style={styles.modalBackdrop} onPress={closeMenu}>
           <Pressable style={styles.sheet} onPress={() => undefined}>
             <View style={styles.sheetHandle} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Fermer les options de conversation"
+              onPress={closeMenu}
+              style={({ pressed }) => ({
+                position: "absolute",
+                top: 8,
+                right: 10,
+                width: 44,
+                height: 44,
+                zIndex: 2,
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.62 : 1
+              })}
+            >
+              <Ionicons name="close" size={21} color={colors.textMuted} />
+            </Pressable>
             <Text style={styles.sheetTitle} numberOfLines={2}>
               {selectedConversation?.name}
             </Text>

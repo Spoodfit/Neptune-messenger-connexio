@@ -76,7 +76,7 @@ export default function HighlightsScreen() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={
-                  item === "feed" ? "Afficher le Feed" : "Afficher la Map"
+                  item === "feed" ? "Afficher le Feed" : "Afficher la carte"
                 }
                 onPress={() => setMode(item)}
                 style={styles.modeButton}

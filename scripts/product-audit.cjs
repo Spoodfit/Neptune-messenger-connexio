@@ -216,7 +216,12 @@ async function run() {
         await page.waitForTimeout(650);
         await page.mouse.up();
         await expectVisible(page.getByText(/Mettre en sourdine|Réactiver les notifications/).first(), "menu maintien long");
-        await page.keyboard.press("Escape");
+        const closeOptions = page.getByLabel("Fermer les options de conversation");
+        await expectVisible(closeOptions, "fermeture du menu de conversation");
+        if (await closeOptions.isVisible().catch(() => false)) {
+          await closeOptions.click();
+          await page.waitForTimeout(180);
+        }
       }
     } else {
       failures.push("maintien long: aucune conversation de groupe visible");
