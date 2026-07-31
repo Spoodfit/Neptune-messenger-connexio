@@ -1,7 +1,6 @@
-
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
-import { router, Stack, useSegments } from "expo-router";
+import { Redirect, router, Stack, useSegments } from "expo-router";
 import { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import {
@@ -26,6 +25,8 @@ import { colors } from "../src/theme";
 
 configureNotificationPresentation();
 
+const PUBLIC_ROUTES = new Set(["sign-in", "access-help", "privacy"]);
+
 function chatPath(conversationId: string): `/chat/${string}` {
   return `/chat/${encodeURIComponent(conversationId)}`;
 }
@@ -42,15 +43,13 @@ function AuthenticatedApp() {
   const pendingConversationId = useRef<string | null>(null);
   const processedNotificationResponseId = useRef<string | null>(null);
   const hasAccessToken = Boolean(accessToken);
+  const currentRootSegment = segments[0];
+  const onSignInRoute = currentRootSegment === "sign-in";
+  const onPublicRoute =
+    typeof currentRootSegment === "string" && PUBLIC_ROUTES.has(currentRootSegment);
 
   useEffect(() => {
-    if (!sessionReady) return;
-    const onSignInRoute = segments[0] === "sign-in";
-
-    if (!isAuthenticated) {
-      if (!onSignInRoute) router.replace("/sign-in");
-      return;
-    }
+    if (!sessionReady || !isAuthenticated) return;
 
     const conversationId = pendingConversationId.current;
     if (conversationId) {
@@ -60,7 +59,7 @@ function AuthenticatedApp() {
     }
 
     if (onSignInRoute) router.replace("/(tabs)/messages");
-  }, [isAuthenticated, segments, sessionReady]);
+  }, [isAuthenticated, onSignInRoute, sessionReady]);
 
   useEffect(() => {
     if (
@@ -186,7 +185,10 @@ function AuthenticatedApp() {
     </>
   );
 
-  if (!isAuthenticated) return applicationStack;
+  if (!isAuthenticated) {
+    if (!onPublicRoute) return <Redirect href="/sign-in" />;
+    return applicationStack;
+  }
 
   return (
     <MessagingProvider key={`user:${currentUser.id}`}>
