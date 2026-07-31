@@ -8,46 +8,65 @@ import {
   useState
 } from "react";
 
+import { useSession } from "./SessionProvider";
 import type { GroupDraft } from "../types/experience";
-import type { Conversation } from "../types/messaging";
+import type { ChatMessage, Conversation } from "../types/messaging";
 
 interface GroupAdminContextValue {
   createdGroups: Conversation[];
+  createdMessagesByGroup: Record<string, ChatMessage[]>;
   createGroup: (draft: GroupDraft) => Conversation;
   updateCreatedGroup: (conversationId: string, draft: GroupDraft) => void;
   getCreatedGroup: (conversationId: string) => Conversation | undefined;
+  getCreatedGroupMessages: (conversationId: string) => ChatMessage[];
+  sendCreatedGroupMessage: (
+    conversationId: string,
+    body: string,
+    replyTo?: ChatMessage
+  ) => Promise<boolean>;
   removeCreatedGroup: (conversationId: string) => void;
 }
 
 const GroupAdminContext = createContext<GroupAdminContextValue | null>(null);
 
 export function GroupAdminProvider({ children }: PropsWithChildren) {
+  const { currentUser } = useSession();
   const [createdGroups, setCreatedGroups] = useState<Conversation[]>([]);
+  const [createdMessagesByGroup, setCreatedMessagesByGroup] = useState<
+    Record<string, ChatMessage[]>
+  >({});
 
-  const createGroup = useCallback((draft: GroupDraft): Conversation => {
-    const group: Conversation = {
-      id: `local-group-${Crypto.randomUUID()}`,
-      name: draft.name.trim(),
-      description: draft.description.trim(),
-      categoryLabel: "Groupe administré",
-      type: "topic",
-      memberCount: 1,
-      unreadCount: 0,
-      restricted: true,
-      allowedRoles: draft.allowedRoles,
-      canPost: draft.canMembersPost,
-      canManage: true,
-      avatarUrl: draft.avatarUrl,
-      iconName: draft.iconName,
-      ownerId: "user-johan",
-      adminIds: ["user-johan"],
-      memberIds: ["user-johan"],
-      lastMessage: "Groupe créé. Le backend ajoutera les membres éligibles.",
-      lastMessageAt: new Date().toISOString()
-    };
-    setCreatedGroups((previous) => [group, ...previous]);
-    return group;
-  }, []);
+  const createGroup = useCallback(
+    (draft: GroupDraft): Conversation => {
+      const group: Conversation = {
+        id: `local-group-${Crypto.randomUUID()}`,
+        name: draft.name.trim(),
+        description: draft.description.trim(),
+        categoryLabel: "Groupe administré",
+        type: "topic",
+        memberCount: 1,
+        unreadCount: 0,
+        restricted: true,
+        allowedRoles: draft.allowedRoles,
+        canPost: draft.canMembersPost,
+        canManage: true,
+        avatarUrl: draft.avatarUrl,
+        iconName: draft.iconName,
+        ownerId: currentUser.id,
+        adminIds: [currentUser.id],
+        memberIds: [currentUser.id],
+        lastMessage: "Groupe créé. Le backend ajoutera les membres éligibles.",
+        lastMessageAt: new Date().toISOString()
+      };
+      setCreatedGroups((previous) => [group, ...previous]);
+      setCreatedMessagesByGroup((previous) => ({
+        ...previous,
+        [group.id]: []
+      }));
+      return group;
+    },
+    [currentUser.id]
+  );
 
   const updateCreatedGroup = useCallback(
     (conversationId: string, draft: GroupDraft) => {
@@ -76,25 +95,88 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
     [createdGroups]
   );
 
+  const getCreatedGroupMessages = useCallback(
+    (conversationId: string) => createdMessagesByGroup[conversationId] ?? [],
+    [createdMessagesByGroup]
+  );
+
+  const sendCreatedGroupMessage = useCallback(
+    async (
+      conversationId: string,
+      body: string,
+      replyTo?: ChatMessage
+    ): Promise<boolean> => {
+      const cleanBody = body.trim();
+      const group = createdGroups.find((item) => item.id === conversationId);
+      if (!group?.canPost || !cleanBody || cleanBody.length > 4_000) return false;
+      const createdAt = new Date().toISOString();
+      const message: ChatMessage = {
+        id: `local-group-message-${Crypto.randomUUID()}`,
+        clientMessageId: Crypto.randomUUID(),
+        conversationId,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        senderInitials: currentUser.initials,
+        senderAvatarUrl: currentUser.avatarUrl,
+        body: cleanBody,
+        createdAt,
+        status: "sent",
+        isMine: true,
+        replyToMessageId: replyTo?.id,
+        replyPreview: replyTo
+          ? {
+              messageId: replyTo.id,
+              senderName: replyTo.senderName,
+              body: replyTo.body
+            }
+          : undefined
+      };
+      setCreatedMessagesByGroup((previous) => ({
+        ...previous,
+        [conversationId]: [message, ...(previous[conversationId] ?? [])]
+      }));
+      setCreatedGroups((previous) =>
+        previous.map((item) =>
+          item.id === conversationId
+            ? { ...item, lastMessage: cleanBody, lastMessageAt: createdAt }
+            : item
+        )
+      );
+      return true;
+    },
+    [createdGroups, currentUser]
+  );
+
   const removeCreatedGroup = useCallback((conversationId: string) => {
     setCreatedGroups((previous) =>
       previous.filter((group) => group.id !== conversationId)
     );
+    setCreatedMessagesByGroup((previous) => {
+      const next = { ...previous };
+      delete next[conversationId];
+      return next;
+    });
   }, []);
 
   const value = useMemo<GroupAdminContextValue>(
     () => ({
       createdGroups,
+      createdMessagesByGroup,
       createGroup,
       updateCreatedGroup,
       getCreatedGroup,
+      getCreatedGroupMessages,
+      sendCreatedGroupMessage,
       removeCreatedGroup
     }),
     [
       createGroup,
       createdGroups,
+      createdMessagesByGroup,
       getCreatedGroup,
+      getCreatedGroupMessages,
       removeCreatedGroup,
+      sendCreatedGroupMessage,
       updateCreatedGroup
     ]
   );
