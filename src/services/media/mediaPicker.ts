@@ -3,7 +3,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 
-import type { HighlightMedia } from "../../types/experience";
+import type { HighlightMedia, HighlightPost } from "../../types/experience";
 import type { AttachmentKind, MessageAttachment } from "../../types/messaging";
 
 const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
@@ -18,7 +18,11 @@ export class MediaSelectionError extends Error {
   }
 }
 
-function assertFileSize(sizeBytes: number | undefined, maximum: number, label: string) {
+function assertFileSize(
+  sizeBytes: number | undefined,
+  maximum: number,
+  label: string
+) {
   if (typeof sizeBytes === "number" && sizeBytes > maximum) {
     throw new MediaSelectionError(
       `${label} dépasse la taille maximale de ${Math.round(maximum / 1024 / 1024)} Mo.`
@@ -43,7 +47,8 @@ async function pickLibraryAsset(kind: "photo" | "video") {
     mediaTypes: kind === "photo" ? ["images"] : ["videos"],
     allowsEditing: kind === "photo",
     quality: kind === "photo" ? 0.88 : 1,
-    videoMaxDuration: kind === "video" ? MAX_HIGHLIGHT_VIDEO_SECONDS : undefined,
+    videoMaxDuration:
+      kind === "video" ? MAX_HIGHLIGHT_VIDEO_SECONDS : undefined,
     selectionLimit: 1
   });
   if (result.canceled || !result.assets[0]) return null;
@@ -71,7 +76,8 @@ export async function pickMessageAttachment(
         }`,
       uri: asset.uri,
       mimeType:
-        asset.mimeType ?? (kind === "photo" ? "image/jpeg" : "video/mp4"),
+        asset.mimeType ??
+        (kind === "photo" ? "image/jpeg" : "video/mp4"),
       sizeBytes: asset.fileSize,
       durationSeconds:
         typeof asset.duration === "number" ? asset.duration / 1000 : undefined,
@@ -86,7 +92,12 @@ export async function pickMessageAttachment(
     const result = await DocumentPicker.getDocumentAsync({
       type:
         kind === "document"
-          ? ["application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.*"]
+          ? [
+              "application/pdf",
+              "text/*",
+              "application/msword",
+              "application/vnd.openxmlformats-officedocument.*"
+            ]
           : "*/*",
       copyToCacheDirectory: true,
       multiple: false
@@ -107,33 +118,23 @@ export async function pickMessageAttachment(
   }
 
   if (kind === "location") {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) {
-      throw new MediaSelectionError(
-        "La localisation doit être autorisée pour partager votre position."
-      );
-    }
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced
-    });
-    const { latitude, longitude, accuracy } = location.coords;
+    const coordinates = await pickApproximateLocation();
     return {
       id: `local-attachment-${Crypto.randomUUID()}`,
       kind: "location",
       name: "Position approximative",
-      uri: `geo:${latitude},${longitude}`,
+      uri: `geo:${coordinates.latitude},${coordinates.longitude}`,
       mimeType: "application/vnd.neptune.location+json",
-      latitude,
-      longitude,
-      accuracyRadiusMeters:
-        typeof accuracy === "number" && accuracy > 0 ? accuracy : 250,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      accuracyRadiusMeters: coordinates.accuracyRadiusMeters,
       status: "ready",
       uploadProgress: 1
     };
   }
 
   throw new MediaSelectionError(
-    "Ce type de pièce jointe n’est pas encore autorisé sur cet appareil."
+    "Ce type de pièce jointe n’est pas autorisé sur cet appareil."
   );
 }
 
@@ -162,7 +163,8 @@ export async function pickHighlightMedia(
     uri: asset.uri,
     name: asset.fileName ?? `${kind}-${Date.now()}`,
     mimeType:
-      asset.mimeType ?? (kind === "photo" ? "image/jpeg" : "video/mp4"),
+      asset.mimeType ??
+      (kind === "photo" ? "image/jpeg" : "video/mp4"),
     sizeBytes: asset.fileSize,
     width: asset.width || undefined,
     height: asset.height || undefined,
@@ -177,4 +179,25 @@ export async function pickGroupAvatar(): Promise<string | null> {
   if (!asset) return null;
   assertFileSize(asset.fileSize, MAX_PHOTO_BYTES, "L’image du groupe");
   return asset.uri;
+}
+
+export async function pickApproximateLocation(): Promise<
+  NonNullable<HighlightPost["coordinates"]>
+> {
+  const permission = await Location.requestForegroundPermissionsAsync();
+  if (!permission.granted) {
+    throw new MediaSelectionError(
+      "La localisation doit être autorisée pour partager une position approximative."
+    );
+  }
+  const location = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.Balanced
+  });
+  const accuracy = location.coords.accuracy ?? 250;
+  const privacyRadius = Math.min(3_000, Math.max(1_000, accuracy * 3));
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    accuracyRadiusMeters: Math.round(privacyRadius)
+  };
 }
