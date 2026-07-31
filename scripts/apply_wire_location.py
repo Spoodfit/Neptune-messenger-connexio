@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# [wire-location] déclenchement contrôlé.
 path = Path("src/services/api/wire.ts")
 text = path.read_text()
 old = '''    width: optionalPositiveInteger(value, "width"),
@@ -24,7 +25,6 @@ new = '''    width: optionalPositiveInteger(value, "width"),
 if text.count(old) != 1:
     raise SystemExit(f"Expected one attachment return block, found {text.count(old)}")
 text = text.replace(old, new, 1)
-# Remove non-finite coordinates rather than leaking NaN into the UI.
 old_return = '''  return {
     id: requireBoundedString(value, "Identifiant pièce jointe", 256, "id"),'''
 new_return = '''  const latitude = numberOrDefault(value, Number.NaN, "latitude");
