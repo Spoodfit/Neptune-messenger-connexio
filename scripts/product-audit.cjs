@@ -147,6 +147,19 @@ async function clickText(page, text, label = text) {
   if (await locator.isVisible().catch(() => false)) await locator.click();
 }
 
+async function pageDiagnostic(page) {
+  return page.evaluate(() => ({
+    url: window.location.href,
+    text: document.body.innerText.replace(/\s+/g, " ").trim().slice(0, 500),
+    controls: [...document.querySelectorAll("button, [role='button'], a, input")]
+      .map((element) =>
+        element.getAttribute("aria-label") || element.textContent?.replace(/\s+/g, " ").trim()
+      )
+      .filter(Boolean)
+      .slice(0, 30)
+  }));
+}
+
 async function run() {
   if (!fs.existsSync(path.join(root, "index.html"))) {
     throw new Error("Le build web-product-audit-dist est absent.");
@@ -264,9 +277,13 @@ async function run() {
       await signOut.click();
       const demoEntry = page.getByLabel("Entrer dans la démonstration Connexio");
       await expectVisible(demoEntry, "retour à la connexion");
-      await checkGeometry(page, "Connexion après déconnexion");
-      await demoEntry.click();
-      await expectVisible(page.getByText("Messages", { exact: true }).first(), "reconnexion démonstration");
+      if (await demoEntry.isVisible().catch(() => false)) {
+        await checkGeometry(page, "Connexion après déconnexion");
+        await demoEntry.click();
+        await expectVisible(page.getByText("Messages", { exact: true }).first(), "reconnexion démonstration");
+      } else {
+        failures.push(`diagnostic après déconnexion: ${JSON.stringify(await pageDiagnostic(page))}`);
+      }
     }
 
     if (runtimeErrors.length) {
@@ -288,5 +305,5 @@ async function run() {
 
 run().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });
