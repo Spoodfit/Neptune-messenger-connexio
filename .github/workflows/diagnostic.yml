@@ -27,10 +27,16 @@ jobs:
           node-version: 22.13.1
           cache: npm
 
-      - name: Replace removed React Native style alias
+      - name: Remove compatibility polyfill and migrate styles
         shell: bash
         run: |
           set -euo pipefail
+
+          if [ -f app/_layout.tsx ]; then
+            sed -i '/^import "\.\.\/src\/polyfills\/styleSheet";$/d' app/_layout.tsx
+          fi
+          rm -f src/polyfills/styleSheet.ts
+
           mapfile -t files < <(grep -RIl \
             --include='*.ts' \
             --include='*.tsx' \
@@ -47,33 +53,28 @@ jobs:
           if grep -RIn \
             --include='*.ts' \
             --include='*.tsx' \
-            'StyleSheet\.absoluteFillObject' app src; then
-            echo 'Des alias obsolètes subsistent après migration.'
+            'StyleSheet\.absoluteFillObject\|polyfills/styleSheet' app src; then
+            echo 'Une référence obsolète subsiste après migration.'
             exit 1
           fi
 
       - name: Install locked dependencies
-        id: install
         shell: bash
         run: npm ci
 
       - name: TypeScript application
-        id: typecheck
         shell: bash
         run: npm run typecheck
 
       - name: Domain tests
-        id: tests
         shell: bash
         run: npm run test:domain
 
       - name: Expo dependency compatibility
-        id: expo
         shell: bash
         run: npx expo install --check
 
       - name: Build mock web application
-        id: webbuild
         shell: bash
         env:
           EXPO_PUBLIC_MOCK_MODE: "true"
@@ -93,6 +94,7 @@ jobs:
 
           | Contrôle | Résultat |
           |---|---|
+          | Suppression du polyfill React Native temporaire | Réussie |
           | Migration \`absoluteFillObject\` vers \`absoluteFill\` | Réussie |
           | Installation verrouillée | Réussie |
           | TypeScript strict | Réussi |
@@ -100,7 +102,7 @@ jobs:
           | Compatibilité Expo | Réussie |
           | Build web mock | Réussi |
 
-          Le correcteur refuse de committer si un alias React Native obsolète subsiste ou si une validation échoue.
+          Le correcteur refuse de committer si une référence obsolète subsiste ou si une validation échoue.
           EOF
 
       - name: Commit repaired frontend
@@ -109,12 +111,12 @@ jobs:
           set -euo pipefail
           git config user.name "Connexio CI"
           git config user.email "actions@users.noreply.github.com"
-          git add app src docs/CI_DIAGNOSTIC_TEMP.md
+          git add -A app src docs/CI_DIAGNOSTIC_TEMP.md
 
           if git diff --cached --quiet; then
             echo 'Aucune correction de code à committer.'
             exit 0
           fi
 
-          git commit -m "ci(autofix): migrer les styles React Native et valider le front [skip ci]"
+          git commit -m "ci(autofix): finaliser la compatibilité React Native [skip ci]"
           git push origin HEAD:feat/production-hardening
