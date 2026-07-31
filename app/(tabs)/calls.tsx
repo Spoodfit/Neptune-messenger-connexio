@@ -1,18 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
-import { colors, gradients, radii, spacing, typography } from "@/theme";
-
-function explainUnavailable(kind: "audio" | "video", name: string) {
-  Alert.alert(
-    kind === "audio" ? `Appeler ${name}` : `Visio avec ${name}`,
-    "Le front, l’historique et les états sont prêts. Le développeur doit brancher WebRTC, la signalisation, TURN/STUN, les appels entrants et les notifications CallKit/ConnectionService."
-  );
-}
+import { useMessaging } from "@/providers/MessagingProvider";
+import { useSession } from "@/providers/SessionProvider";
+import { NeptuneExperienceApi } from "@/services/api/experienceApi";
+import { colors, gradients, spacing, typography } from "@/theme";
 
 function directionLabel(direction: "incoming" | "outgoing" | "missed") {
   if (direction === "missed") return "Appel manqué";
@@ -21,7 +27,45 @@ function directionLabel(direction: "incoming" | "outgoing" | "missed") {
 }
 
 export default function CallsScreen() {
-  const { callHistory } = useExperience();
+  const { accessToken } = useSession();
+  const {
+    callHistory,
+    localConversations,
+    createPrivateConversation
+  } = useExperience();
+  const { visibleConversations, refreshConversations } = useMessaging();
+  const api = useMemo(
+    () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
+    [accessToken]
+  );
+  const [openingMemberId, setOpeningMemberId] = useState<string | null>(null);
+
+  const startCall = async (
+    memberId: string,
+    mode: "audio" | "video"
+  ) => {
+    if (openingMemberId) return;
+    setOpeningMemberId(memberId);
+    try {
+      const existing = [...visibleConversations, ...localConversations].find(
+        (conversation) =>
+          conversation.type === "direct" &&
+          conversation.memberIds?.includes(memberId)
+      );
+      const conversation =
+        existing ??
+        (api
+          ? await api.createPrivateConversation([memberId])
+          : createPrivateConversation({ memberIds: [memberId] }));
+      if (api && !existing) await refreshConversations();
+      router.push({
+        pathname: "/call/[id]",
+        params: { id: conversation.id, mode }
+      });
+    } finally {
+      setOpeningMemberId(null);
+    }
+  };
 
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
@@ -108,10 +152,16 @@ export default function CallsScreen() {
               </Pressable>
 
               <View style={styles.actions}>
+                {openingMemberId === call.member.id ? (
+                  <View style={styles.actionLoader}>
+                    <ActivityIndicator size="small" color={colors.violet} />
+                  </View>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Appeler ${call.member.name}`}
-                  onPress={() => explainUnavailable("audio", call.member.name)}
+                  disabled={Boolean(openingMemberId)}
+                  onPress={() => void startCall(call.member.id, "audio")}
                   style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
                 >
                   <Ionicons name="call-outline" size={19} color={colors.text} />
@@ -119,7 +169,8 @@ export default function CallsScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Démarrer une visio avec ${call.member.name}`}
-                  onPress={() => explainUnavailable("video", call.member.name)}
+                  disabled={Boolean(openingMemberId)}
+                  onPress={() => void startCall(call.member.id, "video")}
                   style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
                 >
                   <Ionicons name="videocam-outline" size={20} color={colors.text} />
@@ -127,13 +178,6 @@ export default function CallsScreen() {
               </View>
             </LinearGradient>
           ))}
-        </View>
-
-        <View style={styles.backendNote}>
-          <Ionicons name="shield-checkmark-outline" size={20} color={colors.success} />
-          <Text style={styles.backendText}>
-            Les appels sont privés uniquement. Le backend devra vérifier l’identité, le blocage, les permissions et fournir un ticket de signalisation à durée courte.
-          </Text>
         </View>
       </ScrollView>
     </LinearGradient>
@@ -184,9 +228,8 @@ const styles = StyleSheet.create({
   callType: { color: colors.textSecondary, fontSize: 10.5, lineHeight: 14, flexShrink: 1 },
   callTypeMissed: { color: colors.danger },
   time: { color: colors.textMuted, fontSize: 9, lineHeight: 12, marginTop: 2 },
-  actions: { flexDirection: "row", gap: 5, flexShrink: 0 },
+  actions: { flexDirection: "row", gap: 5, flexShrink: 0, position: "relative" },
   actionButton: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.glass, alignItems: "center", justifyContent: "center" },
-  pressed: { transform: [{ scale: 0.94 }], opacity: 0.8 },
-  backendNote: { marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  backendText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 }
+  actionLoader: { position: "absolute", zIndex: 3, inset: 0, borderRadius: 14, backgroundColor: "rgba(5,11,28,0.82)", alignItems: "center", justifyContent: "center" },
+  pressed: { transform: [{ scale: 0.94 }], opacity: 0.8 }
 });
