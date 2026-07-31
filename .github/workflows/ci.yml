@@ -29,8 +29,8 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
-      - name: Generate package lock
-        run: npm install --package-lock-only --no-audit --no-fund
+      - name: Install and generate package lock
+        run: npm install --no-audit --no-fund
       - name: Validate Expo compatibility
         run: npx expo install --check
       - name: Restore immutable workflows
