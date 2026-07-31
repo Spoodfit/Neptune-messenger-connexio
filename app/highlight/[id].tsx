@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HighlightCard } from "@/components/HighlightCard";
+import { HighlightShareButton } from "@/components/HighlightShareButton";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 import type { HighlightComment, QuickReaction } from "@/types/experience";
@@ -189,17 +190,7 @@ export default function HighlightDetailScreen() {
         <Text accessibilityRole="header" style={styles.headerTitle}>
           Publication
         </Text>
-        <Pressable
-          onPress={() =>
-            Alert.alert(
-              "Partager",
-              "Le lien sécurisé et la feuille de partage native seront branchés ici."
-            )
-          }
-          style={styles.headerButton}
-        >
-          <Ionicons name="share-outline" size={22} color={colors.text} />
-        </Pressable>
+        <HighlightShareButton post={post} />
       </View>
 
       <FlatList
