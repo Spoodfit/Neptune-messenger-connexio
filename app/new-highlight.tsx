@@ -295,6 +295,8 @@ export default function NewHighlightScreen() {
             </Text>
           </View>
           <Switch
+            accessibilityLabel="Activer la position approximative"
+            style={styles.switchControl}
             value={locationEnabled}
             onValueChange={setLocationEnabled}
             trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
@@ -344,9 +346,10 @@ const styles = StyleSheet.create({
   mediaPreview: { height: 210, marginTop: 10, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   mediaPreviewTop: { position: "absolute", top: 9, left: 9, right: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   mediaPreviewLabel: { color: colors.white, fontSize: 10, fontWeight: "900", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.72)" },
-  removeMedia: { width: 40, height: 40, borderRadius: 14, backgroundColor: "rgba(2,7,19,0.72)", alignItems: "center", justifyContent: "center" },
+  removeMedia: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(2,7,19,0.72)", alignItems: "center", justifyContent: "center" },
   locationRow: { marginTop: spacing.md, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: spacing.md },
   locationContent: { flex: 1, minWidth: 0 },
+  switchControl: { width: 48, height: 44 },
   locationTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
   locationSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
   backendNote: { marginTop: spacing.md, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surfaceMuted, flexDirection: "row", alignItems: "flex-start", gap: 10 },
