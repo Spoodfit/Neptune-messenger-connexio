@@ -1,16 +1,7 @@
-import { useEffect, useMemo } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { createElement, useEffect, useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 
 import type { NeptuneMapProps } from "./NeptuneMap.types";
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
 
 export default function NeptuneMap({
   moments,
@@ -18,15 +9,14 @@ export default function NeptuneMap({
   onSelectMember
 }: NeptuneMapProps) {
   useEffect(() => {
-    if (Platform.OS !== "web") return;
     const listener = (event: MessageEvent) => {
       if (event.data?.source !== "connexio-map") return;
       if (event.data?.type !== "member-selected") return;
       if (typeof event.data.memberId !== "string") return;
       onSelectMember(event.data.memberId);
     };
-    globalThis.addEventListener?.("message", listener as EventListener);
-    return () => globalThis.removeEventListener?.("message", listener as EventListener);
+    window.addEventListener("message", listener);
+    return () => window.removeEventListener("message", listener);
   }, [onSelectMember]);
 
   const html = useMemo(() => {
@@ -71,15 +61,16 @@ html,body,#map{height:100%;margin:0;background:#020713;font-family:Arial,sans-se
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const members=${serialized};
+const escapeText=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
 const map=L.map('map',{zoomControl:true,minZoom:5,maxZoom:16,zoomSnap:.25});
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
 const cluster=L.markerClusterGroup({maxClusterRadius:56,spiderfyOnMaxZoom:true,showCoverageOnHover:false,iconCreateFunction:c=>L.divIcon({className:'custom-cluster',html:'<div class="cluster-core">'+c.getChildCount()+'</div>',iconSize:[48,48]})});
 const bounds=[];
 members.forEach(member=>{
- const html='<div class="member-marker '+(member.pulse?'pulse ':'')+(member.selected?'selected':'')+'"><div class="member-core"><div class="member-inner">'+${escapeHtml.toString()}(member.initials)+'</div></div></div>';
+ const html='<div class="member-marker '+(member.pulse?'pulse ':'')+(member.selected?'selected':'')+'"><div class="member-core"><div class="member-inner">'+escapeText(member.initials)+'</div></div></div>';
  const marker=L.marker([member.latitude,member.longitude],{icon:L.divIcon({className:'',html,iconSize:[56,56],iconAnchor:[28,28]}),title:member.name});
  marker.on('click',()=>window.parent.postMessage({source:'connexio-map',type:'member-selected',memberId:member.id},'*'));
- marker.bindTooltip(member.name,{direction:'bottom',offset:[0,22],opacity:.92});
+ marker.bindTooltip(escapeText(member.name),{direction:'bottom',offset:[0,22],opacity:.92});
  cluster.addLayer(marker);bounds.push([member.latitude,member.longitude]);
 });
 map.addLayer(cluster);
@@ -98,8 +89,7 @@ document.querySelector('.geo-btn').addEventListener('click',()=>{
 
   return (
     <View style={styles.wrap}>
-      {/** React Native Web transmet ces attributs au DOM. */}
-      {globalThis.React?.createElement?.("iframe", {
+      {createElement("iframe", {
         title: "Carte Neptune",
         srcDoc: html,
         style: {
@@ -110,7 +100,7 @@ document.querySelector('.geo-btn').addEventListener('click',()=>{
           background: "#020713"
         },
         allow: "geolocation"
-      }) ?? null}
+      })}
     </View>
   );
 }
