@@ -64,7 +64,10 @@ async function uploadAsset(
   const blob = await localResponse.blob();
   const headers = new Headers(prepared.upload_headers ?? {});
   if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", asset.mimeType ?? blob.type || "application/octet-stream");
+    headers.set(
+      "Content-Type",
+      asset.mimeType ?? (blob.type || "application/octet-stream")
+    );
   }
   onProgress?.(0.32);
   const uploaded = await fetch(prepared.upload_url, {
@@ -73,7 +76,10 @@ async function uploadAsset(
     body: blob
   });
   if (!uploaded.ok) {
-    throw new ApiError("Échec de l’envoi du fichier vers le stockage privé.", uploaded.status);
+    throw new ApiError(
+      "Échec de l’envoi du fichier vers le stockage privé.",
+      uploaded.status
+    );
   }
   onProgress?.(0.86);
   const completed = await authenticatedRequest<CompleteUploadResponse>(
@@ -153,7 +159,10 @@ export async function uploadGroupAvatar(
     fallbackAccessToken
   );
   if (!completed.download_url) {
-    throw new ApiError("Le backend n’a pas renvoyé l’URL de l’image du groupe.", 502);
+    throw new ApiError(
+      "Le backend n’a pas renvoyé l’URL de l’image du groupe.",
+      502
+    );
   }
   return completed.download_url;
 }
