@@ -4,13 +4,13 @@ from pathlib import Path
 def replace_once(path: str, old: str, new: str) -> bool:
     file = Path(path)
     content = file.read_text(encoding="utf-8")
-    if new in content:
-        return False
     count = content.count(old)
-    if count != 1:
-        raise SystemExit(f"{path}: motif source introuvable ou ambigu ({count})")
-    file.write_text(content.replace(old, new, 1), encoding="utf-8")
-    return True
+    if count == 1:
+        file.write_text(content.replace(old, new, 1), encoding="utf-8")
+        return True
+    if count == 0 and new in content:
+        return False
+    raise SystemExit(f"{path}: motif source introuvable ou ambigu ({count})")
 
 
 changed = False
