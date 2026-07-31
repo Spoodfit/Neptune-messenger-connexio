@@ -8,34 +8,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  final-front-fix:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout branch
-        uses: actions/checkout@v4
-        with:
-          ref: feat/production-hardening
-          fetch-depth: 0
-          persist-credentials: true
-      - name: Apply exact frontend corrections
-        run: python3 .github/scripts/final_front_fix.py
-      - name: Commit corrections when needed
-        shell: bash
-        run: |
-          if git diff --quiet -- 'app/(tabs)/highlights.tsx' 'app/(tabs)/messages.tsx' scripts/product-audit.cjs; then
-            exit 0
-          fi
-          git config user.name "Connexio CI"
-          git config user.email "actions@users.noreply.github.com"
-          git add 'app/(tabs)/highlights.tsx' 'app/(tabs)/messages.tsx' scripts/product-audit.cjs
-          git commit -m "fix(front-final): fermer les options et harmoniser la carte"
-          git push origin HEAD:feat/production-hardening
-
   product-audit:
     runs-on: ubuntu-latest
     steps:
