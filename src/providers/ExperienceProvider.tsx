@@ -31,6 +31,9 @@ import type {
   MessageReactionSummary
 } from "../types/messaging";
 
+export const MAX_PRIVATE_PARTICIPANTS = 4;
+export const MAX_PRIVATE_CONTACTS = MAX_PRIVATE_PARTICIPANTS - 1;
+
 interface CreatePostInput {
   kind: HighlightKind;
   body: string;
@@ -108,6 +111,19 @@ function toggleReaction(
   return next;
 }
 
+function sameParticipants(
+  conversation: Conversation,
+  participantIds: string[]
+): boolean {
+  if (!conversation.memberIds) return false;
+  const existingIds = [...conversation.memberIds].sort();
+  const requestedIds = [...participantIds].sort();
+  return (
+    existingIds.length === requestedIds.length &&
+    existingIds.every((id, index) => id === requestedIds[index])
+  );
+}
+
 export function ExperienceProvider({ children }: PropsWithChildren) {
   const [localConversations, setLocalConversations] = useState<Conversation[]>(
     privateConversations
@@ -161,12 +177,27 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
 
   const createPrivateConversation = useCallback(
     (draft: PrivateConversationDraft): Conversation => {
-      const uniqueIds = [...new Set(draft.memberIds)].filter(
-        (id) => id !== currentUser.id
-      );
-      if (uniqueIds.length < 1 || uniqueIds.length > 4) {
-        throw new Error("Une conversation privée accepte entre 1 et 4 contacts.");
+      const uniqueIds = [
+        ...new Set(
+          draft.memberIds.map((id) => id.trim()).filter(Boolean)
+        )
+      ].filter((id) => id !== currentUser.id);
+
+      if (uniqueIds.length < 1 || uniqueIds.length > MAX_PRIVATE_CONTACTS) {
+        throw new Error(
+          `Une conversation privée accepte ${MAX_PRIVATE_PARTICIPANTS} participants au total, vous compris.`
+        );
       }
+
+      const participantIds = [currentUser.id, ...uniqueIds];
+      const existingConversation = localConversations.find(
+        (conversation) =>
+          (conversation.type === "direct" ||
+            conversation.type === "small_group") &&
+          sameParticipants(conversation, participantIds)
+      );
+      if (existingConversation) return existingConversation;
+
       const selectedMembers = uniqueIds
         .map((id) => members.find((member) => member.id === id))
         .filter((member): member is AppUser => Boolean(member));
@@ -182,17 +213,17 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
         description:
           type === "direct"
             ? "Conversation privée"
-            : `Mini-groupe privé · ${selectedMembers.length + 1} membres`,
+            : `Mini-groupe privé · ${participantIds.length}/${MAX_PRIVATE_PARTICIPANTS} participants`,
         categoryLabel: type === "direct" ? "Privé" : "Mini-groupe",
         type,
-        memberCount: selectedMembers.length + 1,
+        memberCount: participantIds.length,
         unreadCount: 0,
         restricted: false,
         canPost: true,
         canManage: true,
         ownerId: currentUser.id,
         adminIds: [currentUser.id],
-        memberIds: [currentUser.id, ...selectedMembers.map((member) => member.id)]
+        memberIds: participantIds
       };
       setLocalConversations((previous) => [conversation, ...previous]);
       setLocalMessagesByConversation((previous) => ({
@@ -201,7 +232,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       }));
       return conversation;
     },
-    []
+    [localConversations]
   );
 
   const sendLocalMessage = useCallback(
