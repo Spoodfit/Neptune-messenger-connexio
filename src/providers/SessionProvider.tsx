@@ -59,6 +59,7 @@ interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 const sessionApi = new NeptuneSessionApi();
+let mockSessionAuthenticated = env.mockMode;
 
 async function secureGet(key: string): Promise<string | null> {
   if (Platform.OS === "web") return null;
@@ -94,13 +95,16 @@ async function getDeviceId(): Promise<string> {
 }
 
 export function SessionProvider({ children }: PropsWithChildren) {
+  const initialMockAuthentication = env.mockMode && mockSessionAuthenticated;
   const [currentUser, setCurrentUser] = useState<AppUser>(
-    env.mockMode ? demoUser : signedOutUser
+    initialMockAuthentication ? demoUser : signedOutUser
   );
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(env.mockMode);
-  const [mockAuthenticated, setMockAuthenticated] = useState(env.mockMode);
+  const [mockAuthenticated, setMockAuthenticated] = useState(
+    initialMockAuthentication
+  );
 
   const accessTokenRef = useRef<string | null>(null);
   const refreshTokenRef = useRef<string | null>(null);
@@ -134,6 +138,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     accessTokenRef.current = null;
     refreshTokenRef.current = null;
     accessTokenExpiresAtRef.current = null;
+    mockSessionAuthenticated = false;
     setAccessToken(null);
     setRefreshToken(null);
     setCurrentUser(signedOutUser);
@@ -250,6 +255,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       const cleanCode = code.trim();
       if (!cleanCode) throw new Error("Code de connexion manquant.");
       if (env.mockMode) {
+        mockSessionAuthenticated = true;
         setCurrentUser(demoUser);
         setMockAuthenticated(true);
         setSessionReady(true);
@@ -271,6 +277,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       accessTokenRef.current = null;
       refreshTokenRef.current = null;
       accessTokenExpiresAtRef.current = null;
+      mockSessionAuthenticated = false;
       setAccessToken(null);
       setRefreshToken(null);
       setCurrentUser(signedOutUser);
