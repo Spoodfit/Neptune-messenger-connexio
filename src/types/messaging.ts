@@ -93,6 +93,9 @@ export interface MessageAttachment {
   durationSeconds?: number;
   width?: number;
   height?: number;
+  latitude?: number;
+  longitude?: number;
+  accuracyRadiusMeters?: number;
   uploadProgress?: number;
   status?: "local" | "uploading" | "ready" | "failed";
 }
