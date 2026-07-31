@@ -1,0 +1,83 @@
+name: Front Diagnostic
+
+on:
+  push:
+    branches:
+      - feat/production-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: ${{ !contains(github.event.head_commit.message, 'ci(report)') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feat/production-hardening
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Run diagnostics
+        shell: bash
+        run: |
+          set +e
+          npm ci > /tmp/install.log 2>&1
+          install_code=$?
+          if [ "$install_code" -eq 0 ]; then
+            npm run typecheck > /tmp/typecheck.log 2>&1
+            typecheck_code=$?
+            npm run test:domain > /tmp/tests.log 2>&1
+            tests_code=$?
+            npx expo install --check > /tmp/expo.log 2>&1
+            expo_code=$?
+          else
+            typecheck_code=99
+            tests_code=99
+            expo_code=99
+            echo "Non exécuté : installation en échec." > /tmp/typecheck.log
+            cp /tmp/typecheck.log /tmp/tests.log
+            cp /tmp/typecheck.log /tmp/expo.log
+          fi
+          mkdir -p docs
+          {
+            echo "# Diagnostic temporaire Connexio"
+            echo
+            echo "Commit testé : \`${GITHUB_SHA}\`"
+            echo
+            echo "| Étape | Code |"
+            echo "|---|---:|"
+            echo "| npm ci | ${install_code} |"
+            echo "| TypeScript | ${typecheck_code} |"
+            echo "| Tests | ${tests_code} |"
+            echo "| Expo check | ${expo_code} |"
+            echo
+            echo "## TypeScript"
+            echo '```text'
+            tail -n 180 /tmp/typecheck.log
+            echo '```'
+            echo
+            echo "## Tests"
+            echo '```text'
+            tail -n 120 /tmp/tests.log
+            echo '```'
+            echo
+            echo "## Expo"
+            echo '```text'
+            tail -n 80 /tmp/expo.log
+            echo '```'
+          } > docs/CI_DIAGNOSTIC_TEMP.md
+      - name: Commit diagnostic
+        shell: bash
+        run: |
+          git config user.name "Connexio CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/CI_DIAGNOSTIC_TEMP.md
+          git commit -m "ci(report): actualiser le diagnostic temporaire [skip ci]" || exit 0
+          git push origin HEAD:feat/production-hardening
