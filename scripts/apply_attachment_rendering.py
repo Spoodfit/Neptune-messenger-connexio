@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# [attachment-rendering] déclenchement contrôlé.
 path = Path("src/components/MessageBubble.tsx")
 text = path.read_text()
 
