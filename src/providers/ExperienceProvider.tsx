@@ -4,23 +4,27 @@ import {
   type PropsWithChildren,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState
 } from "react";
 
-import { currentUser, members } from "../data/mockData";
+import { env } from "../config/env";
+import { members as initialMembers } from "../data/mockData";
 import {
   callHistory as initialCallHistory,
   highlightPosts as initialPosts,
-  mapMoments,
+  mapMoments as initialMapMoments,
   privateConversations,
   privateMessages
 } from "../data/experienceMock";
+import { NeptuneExperienceApi } from "../services/api/experienceApi";
 import type {
   GroupDraft,
   HighlightKind,
   HighlightMedia,
   HighlightPost,
+  MapMemberMoment,
   PrivateConversationDraft,
   QuickReaction
 } from "../types/experience";
@@ -28,8 +32,10 @@ import type {
   AppUser,
   ChatMessage,
   Conversation,
+  MessageAttachment,
   MessageReactionSummary
 } from "../types/messaging";
+import { useSession } from "./SessionProvider";
 
 export const MAX_PRIVATE_PARTICIPANTS = 4;
 export const MAX_PRIVATE_CONTACTS = MAX_PRIVATE_PARTICIPANTS - 1;
@@ -47,7 +53,7 @@ interface ExperienceContextValue {
   localConversations: Conversation[];
   localMessagesByConversation: Record<string, ChatMessage[]>;
   posts: HighlightPost[];
-  mapMoments: typeof mapMoments;
+  mapMoments: MapMemberMoment[];
   callHistory: typeof initialCallHistory;
   getConversation: (conversationId: string) => Conversation | undefined;
   getConversationMessages: (conversationId: string) => ChatMessage[];
@@ -57,7 +63,9 @@ interface ExperienceContextValue {
   sendLocalMessage: (
     conversationId: string,
     body: string,
-    replyToMessage?: ChatMessage
+    replyToMessage?: ChatMessage,
+    attachments?: MessageAttachment[],
+    mentionedUserIds?: string[]
   ) => Promise<boolean>;
   toggleConversationMuted: (conversationId: string) => void;
   leaveConversation: (conversationId: string) => void;
@@ -77,6 +85,7 @@ interface ExperienceContextValue {
     commentId: string,
     emoji: QuickReaction
   ) => void;
+  refreshExperience: () => Promise<void>;
   getMember: (memberId: string) => AppUser | undefined;
 }
 
@@ -84,31 +93,39 @@ const ExperienceContext = createContext<ExperienceContextValue | null>(null);
 
 function toggleReaction(
   reactions: readonly MessageReactionSummary[],
-  emoji: string
+  emoji: string,
+  currentUserId: string
 ): MessageReactionSummary[] {
   const existing = reactions.find((reaction) => reaction.emoji === emoji);
   if (!existing) {
     return [
       ...reactions,
-      { emoji, count: 1, reactedByCurrentUser: true, userIds: [currentUser.id] }
+      {
+        emoji,
+        count: 1,
+        reactedByCurrentUser: true,
+        userIds: [currentUserId]
+      }
     ];
   }
   const nextCount = Math.max(
     0,
     existing.count + (existing.reactedByCurrentUser ? -1 : 1)
   );
-  const next = reactions
+  return reactions
     .map((reaction) =>
       reaction.emoji === emoji
         ? {
             ...reaction,
             count: nextCount,
-            reactedByCurrentUser: !reaction.reactedByCurrentUser
+            reactedByCurrentUser: !reaction.reactedByCurrentUser,
+            userIds: reaction.reactedByCurrentUser
+              ? reaction.userIds?.filter((id) => id !== currentUserId)
+              : [...new Set([...(reaction.userIds ?? []), currentUserId])]
           }
         : reaction
     )
     .filter((reaction) => reaction.count > 0);
-  return next;
 }
 
 function sameParticipants(
@@ -124,13 +141,23 @@ function sameParticipants(
   );
 }
 
+function isLocalId(id: string): boolean {
+  return id.startsWith("local-") || id.startsWith("mock-");
+}
+
 export function ExperienceProvider({ children }: PropsWithChildren) {
+  const { currentUser, accessToken } = useSession();
+  const api = useMemo(
+    () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
+    [accessToken]
+  );
+  const [members, setMembers] = useState<AppUser[]>(initialMembers);
   const [localConversations, setLocalConversations] = useState<Conversation[]>(
-    privateConversations
+    env.mockMode ? privateConversations : []
   );
   const [localMessagesByConversation, setLocalMessagesByConversation] = useState<
     Record<string, ChatMessage[]>
-  >(privateMessages);
+  >(env.mockMode ? privateMessages : {});
   const [mutedConversationIds, setMutedConversationIds] = useState<Set<string>>(
     new Set()
   );
@@ -143,7 +170,34 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
   const [messageReactionOverrides, setMessageReactionOverrides] = useState<
     Record<string, MessageReactionSummary[]>
   >({});
-  const [posts, setPosts] = useState<HighlightPost[]>(initialPosts);
+  const [posts, setPosts] = useState<HighlightPost[]>(
+    env.mockMode ? initialPosts : []
+  );
+  const [mapMoments, setMapMoments] = useState<MapMemberMoment[]>(
+    env.mockMode ? initialMapMoments : []
+  );
+
+  const refreshExperience = useCallback(async () => {
+    if (!api) return;
+    const [memberResult, highlightResult, mapResult] = await Promise.allSettled([
+      api.listMembers(),
+      api.listHighlights(),
+      api.listMapMoments()
+    ]);
+    if (memberResult.status === "fulfilled") {
+      setMembers(memberResult.value);
+    }
+    if (highlightResult.status === "fulfilled") {
+      setPosts(highlightResult.value.items);
+    }
+    if (mapResult.status === "fulfilled") {
+      setMapMoments(mapResult.value);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    void refreshExperience();
+  }, [refreshExperience]);
 
   const decorateConversation = useCallback(
     (conversation: Conversation): Conversation => ({
@@ -178,17 +232,13 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
   const createPrivateConversation = useCallback(
     (draft: PrivateConversationDraft): Conversation => {
       const uniqueIds = [
-        ...new Set(
-          draft.memberIds.map((id) => id.trim()).filter(Boolean)
-        )
+        ...new Set(draft.memberIds.map((id) => id.trim()).filter(Boolean))
       ].filter((id) => id !== currentUser.id);
-
       if (uniqueIds.length < 1 || uniqueIds.length > MAX_PRIVATE_CONTACTS) {
         throw new Error(
           `Une conversation privée accepte ${MAX_PRIVATE_PARTICIPANTS} participants au total, vous compris.`
         );
       }
-
       const participantIds = [currentUser.id, ...uniqueIds];
       const existingConversation = localConversations.find(
         (conversation) =>
@@ -197,7 +247,6 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
           sameParticipants(conversation, participantIds)
       );
       if (existingConversation) return existingConversation;
-
       const selectedMembers = uniqueIds
         .map((id) => members.find((member) => member.id === id))
         .filter((member): member is AppUser => Boolean(member));
@@ -232,20 +281,28 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       }));
       return conversation;
     },
-    [localConversations]
+    [currentUser.id, localConversations, members]
   );
 
   const sendLocalMessage = useCallback(
     async (
       conversationId: string,
       body: string,
-      replyToMessage?: ChatMessage
+      replyToMessage?: ChatMessage,
+      attachments: MessageAttachment[] = [],
+      mentionedUserIds: string[] = []
     ): Promise<boolean> => {
       const cleanBody = body.trim();
       const conversation = localConversations.find(
         (item) => item.id === conversationId
       );
-      if (!conversation || !cleanBody || cleanBody.length > 4_000) return false;
+      if (
+        !conversation ||
+        (!cleanBody && attachments.length === 0) ||
+        cleanBody.length > 4_000
+      ) {
+        return false;
+      }
       const createdAt = new Date().toISOString();
       const message: ChatMessage = {
         id: `local-message-${Crypto.randomUUID()}`,
@@ -260,6 +317,8 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
         status: "sent",
         isMine: true,
         replyToMessageId: replyToMessage?.id,
+        attachments,
+        mentionedUserIds,
         replyPreview: replyToMessage
           ? {
               messageId: replyToMessage.id,
@@ -275,60 +334,87 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       setLocalConversations((previous) =>
         previous.map((item) =>
           item.id === conversationId
-            ? { ...item, lastMessage: cleanBody, lastMessageAt: createdAt }
+            ? {
+                ...item,
+                lastMessage:
+                  cleanBody ||
+                  (attachments.length === 1
+                    ? `📎 ${attachments[0]?.name ?? "Pièce jointe"}`
+                    : `📎 ${attachments.length} pièces jointes`),
+                lastMessageAt: createdAt
+              }
             : item
         )
       );
       return true;
     },
-    [localConversations]
+    [currentUser, localConversations]
   );
 
-  const toggleConversationMuted = useCallback((conversationId: string) => {
-    setMutedConversationIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(conversationId)) next.delete(conversationId);
-      else next.add(conversationId);
-      return next;
-    });
-  }, []);
+  const toggleConversationMuted = useCallback(
+    (conversationId: string) => {
+      let nextMuted = false;
+      setMutedConversationIds((previous) => {
+        const next = new Set(previous);
+        if (next.has(conversationId)) next.delete(conversationId);
+        else {
+          next.add(conversationId);
+          nextMuted = true;
+        }
+        return next;
+      });
+      if (api && !isLocalId(conversationId)) {
+        void api
+          .setConversationMuted(conversationId, nextMuted)
+          .catch(() => undefined);
+      }
+    },
+    [api]
+  );
 
-  const leaveConversation = useCallback((conversationId: string) => {
-    setLeftConversationIds((previous) => new Set(previous).add(conversationId));
-  }, []);
+  const leaveConversation = useCallback(
+    (conversationId: string) => {
+      setLeftConversationIds((previous) => new Set(previous).add(conversationId));
+      if (api && !isLocalId(conversationId)) {
+        void api.leaveGroup(conversationId).catch(() =>
+          setLeftConversationIds((previous) => {
+            const next = new Set(previous);
+            next.delete(conversationId);
+            return next;
+          })
+        );
+      }
+    },
+    [api]
+  );
 
   const updateGroup = useCallback(
     (conversationId: string, draft: GroupDraft) => {
+      const override: Partial<Conversation> = {
+        name: draft.name.trim(),
+        description: draft.description.trim(),
+        avatarUrl: draft.avatarUrl,
+        iconName: draft.iconName,
+        allowedRoles: draft.allowedRoles,
+        restricted: true,
+        canPost: draft.canMembersPost
+      };
       setConversationOverrides((previous) => ({
         ...previous,
-        [conversationId]: {
-          name: draft.name.trim(),
-          description: draft.description.trim(),
-          avatarUrl: draft.avatarUrl,
-          iconName: draft.iconName,
-          allowedRoles: draft.allowedRoles,
-          restricted: true,
-          canPost: draft.canMembersPost
-        }
+        [conversationId]: override
       }));
       setLocalConversations((previous) =>
         previous.map((conversation) =>
           conversation.id === conversationId
-            ? {
-                ...conversation,
-                name: draft.name.trim(),
-                description: draft.description.trim(),
-                avatarUrl: draft.avatarUrl,
-                iconName: draft.iconName,
-                allowedRoles: draft.allowedRoles,
-                restricted: true,
-                canPost: draft.canMembersPost
-              }
+            ? { ...conversation, ...override }
             : conversation
         )
       );
+      if (api && !isLocalId(conversationId)) {
+        void api.updateGroup(conversationId, draft).catch(() => undefined);
+      }
     },
-    []
+    [api]
   );
 
   const getMessageReactions = useCallback(
@@ -339,56 +425,76 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
 
   const toggleMessageReaction = useCallback(
     (message: ChatMessage, emoji: string) => {
+      const current = messageReactionOverrides[message.id] ?? message.reactions ?? [];
+      const active =
+        current.find((reaction) => reaction.emoji === emoji)
+          ?.reactedByCurrentUser ?? false;
       setMessageReactionOverrides((previous) => ({
         ...previous,
         [message.id]: toggleReaction(
           previous[message.id] ?? message.reactions ?? [],
-          emoji
+          emoji,
+          currentUser.id
         )
       }));
+      if (api && !isLocalId(message.id)) {
+        void api.reactToMessage(message.id, emoji, !active).catch(() => undefined);
+      }
     },
-    []
+    [api, currentUser.id, messageReactionOverrides]
   );
 
-  const createPost = useCallback((input: CreatePostInput): HighlightPost => {
-    const post: HighlightPost = {
-      id: `post-${Crypto.randomUUID()}`,
-      author: currentUser,
-      kind: input.kind,
-      body: input.body.trim(),
-      createdAt: new Date().toISOString(),
-      media: input.media,
-      mentionedUserIds: input.mentionedUserIds,
-      reactions: [],
-      comments: [],
-      shareCount: 0,
-      coordinates: input.coordinates,
-      syncedWithBusinessApp: input.kind === "besoin"
-    };
-    setPosts((previous) => [post, ...previous]);
-    return post;
-  }, []);
+  const createPost = useCallback(
+    (input: CreatePostInput): HighlightPost => {
+      const post: HighlightPost = {
+        id: `post-${Crypto.randomUUID()}`,
+        author: currentUser,
+        kind: input.kind,
+        body: input.body.trim(),
+        createdAt: new Date().toISOString(),
+        media: input.media,
+        mentionedUserIds: input.mentionedUserIds,
+        reactions: [],
+        comments: [],
+        shareCount: 0,
+        coordinates: input.coordinates,
+        syncedWithBusinessApp: input.kind === "besoin"
+      };
+      setPosts((previous) => [post, ...previous]);
+      return post;
+    },
+    [currentUser]
+  );
 
   const togglePostReaction = useCallback(
     (postId: string, emoji: QuickReaction) => {
+      const post = posts.find((item) => item.id === postId);
+      const active =
+        post?.reactions.find((reaction) => reaction.emoji === emoji)
+          ?.reactedByCurrentUser ?? false;
       setPosts((previous) =>
-        previous.map((post) =>
-          post.id === postId
+        previous.map((item) =>
+          item.id === postId
             ? {
-                ...post,
-                reactions: toggleReaction(post.reactions, emoji).map(
-                  (reaction) => ({
-                    emoji: reaction.emoji as QuickReaction,
-                    count: reaction.count,
-                    reactedByCurrentUser: reaction.reactedByCurrentUser
-                  })
-                )
+                ...item,
+                reactions: toggleReaction(
+                  item.reactions,
+                  emoji,
+                  currentUser.id
+                ).map((reaction) => ({
+                  emoji: reaction.emoji as QuickReaction,
+                  count: reaction.count,
+                  reactedByCurrentUser: reaction.reactedByCurrentUser
+                }))
               }
-            : post
+            : item
         )
       );
+      if (api && !isLocalId(postId) && !postId.startsWith("post-")) {
+        void api.reactToHighlight(postId, emoji, !active).catch(() => undefined);
+      }
     },
-    []
+    [api, currentUser.id, posts]
   );
 
   const addComment = useCallback(
@@ -400,6 +506,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
     ) => {
       const cleanBody = body.trim();
       if (!cleanBody) return;
+      const localCommentId = `comment-${Crypto.randomUUID()}`;
       setPosts((previous) =>
         previous.map((post) =>
           post.id === postId
@@ -408,7 +515,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
                 comments: [
                   ...post.comments,
                   {
-                    id: `comment-${Crypto.randomUUID()}`,
+                    id: localCommentId,
                     postId,
                     author: currentUser,
                     body: cleanBody,
@@ -422,37 +529,78 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
             : post
         )
       );
+      if (api && !isLocalId(postId) && !postId.startsWith("post-")) {
+        void api
+          .addComment(
+            postId,
+            cleanBody,
+            parentCommentId,
+            mentionedUserIds ?? []
+          )
+          .then((updatedPost) =>
+            setPosts((previous) =>
+              previous.map((post) =>
+                post.id === postId ? updatedPost : post
+              )
+            )
+          )
+          .catch(() =>
+            setPosts((previous) =>
+              previous.map((post) =>
+                post.id === postId
+                  ? {
+                      ...post,
+                      comments: post.comments.filter(
+                        (comment) => comment.id !== localCommentId
+                      )
+                    }
+                  : post
+              )
+            )
+          );
+      }
     },
-    []
+    [api, currentUser]
   );
 
   const toggleCommentReaction = useCallback(
     (postId: string, commentId: string, emoji: QuickReaction) => {
+      const comment = posts
+        .find((post) => post.id === postId)
+        ?.comments.find((item) => item.id === commentId);
+      const active =
+        comment?.reactions.find((reaction) => reaction.emoji === emoji)
+          ?.reactedByCurrentUser ?? false;
       setPosts((previous) =>
         previous.map((post) =>
           post.id === postId
             ? {
                 ...post,
-                comments: post.comments.map((comment) =>
-                  comment.id === commentId
+                comments: post.comments.map((item) =>
+                  item.id === commentId
                     ? {
-                        ...comment,
-                        reactions: toggleReaction(comment.reactions, emoji).map(
-                          (reaction) => ({
-                            emoji: reaction.emoji as QuickReaction,
-                            count: reaction.count,
-                            reactedByCurrentUser: reaction.reactedByCurrentUser
-                          })
-                        )
+                        ...item,
+                        reactions: toggleReaction(
+                          item.reactions,
+                          emoji,
+                          currentUser.id
+                        ).map((reaction) => ({
+                          emoji: reaction.emoji as QuickReaction,
+                          count: reaction.count,
+                          reactedByCurrentUser: reaction.reactedByCurrentUser
+                        }))
                       }
-                    : comment
+                    : item
                 )
               }
             : post
         )
       );
+      if (api && !isLocalId(commentId) && !commentId.startsWith("comment-")) {
+        void api.reactToComment(commentId, emoji, !active).catch(() => undefined);
+      }
     },
-    []
+    [api, currentUser.id, posts]
   );
 
   const value = useMemo<ExperienceContextValue>(
@@ -478,6 +626,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       togglePostReaction,
       addComment,
       toggleCommentReaction,
+      refreshExperience,
       getMember: (memberId: string) =>
         members.find((member) => member.id === memberId)
     }),
@@ -492,7 +641,10 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       isConversationVisible,
       localConversations,
       localMessagesByConversation,
+      mapMoments,
+      members,
       posts,
+      refreshExperience,
       sendLocalMessage,
       toggleCommentReaction,
       toggleConversationMuted,
