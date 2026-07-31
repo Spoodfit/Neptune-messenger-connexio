@@ -1,3 +1,5 @@
+import type { MessageAttachment } from "../types/messaging";
+
 export type OutboxState = "pending" | "sending" | "failed";
 
 export interface OutboxItem {
@@ -5,6 +7,8 @@ export interface OutboxItem {
   conversationId: string;
   body: string;
   replyToMessageId?: string;
+  attachments?: MessageAttachment[];
+  mentionedUserIds?: string[];
   createdAt: string;
   attempts: number;
   nextAttemptAt: number;
@@ -18,7 +22,9 @@ export function calculateBackoffMs(
 ): number {
   const safeAttempt = Math.max(0, Math.floor(attempt));
   const exponential = Math.min(30_000, 1_000 * 2 ** safeAttempt);
-  const jitter = Math.floor(exponential * 0.2 * Math.max(0, Math.min(1, randomValue)));
+  const jitter = Math.floor(
+    exponential * 0.2 * Math.max(0, Math.min(1, randomValue))
+  );
   return exponential + jitter;
 }
 
@@ -31,7 +37,8 @@ export function dedupeOutbox(items: readonly OutboxItem[]): OutboxItem[] {
     }
   }
   return [...byId.values()].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    (a, b) =>
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 }
 
