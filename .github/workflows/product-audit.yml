@@ -8,9 +8,34 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  final-touch-and-auth-fix:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/production-hardening
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Apply exact corrections
+        run: python3 .github/scripts/final_touch_and_auth_fix.py
+      - name: Commit corrections when needed
+        shell: bash
+        run: |
+          if git diff --quiet -- 'app/(tabs)/messages.tsx' 'app/(tabs)/highlights.tsx' 'app/(tabs)/settings.tsx' 'app/chat/[id].tsx' src/components/HighlightCard.tsx src/components/MessageBubble.tsx scripts/product-audit.cjs; then
+            exit 0
+          fi
+          git config user.name "Connexio CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add 'app/(tabs)/messages.tsx' 'app/(tabs)/highlights.tsx' 'app/(tabs)/settings.tsx' 'app/chat/[id].tsx' src/components/HighlightCard.tsx src/components/MessageBubble.tsx scripts/product-audit.cjs
+          git commit -m "fix(front-final): garantir les cibles tactiles et la reconnexion"
+          git push origin HEAD:feat/production-hardening
+
   product-audit:
     runs-on: ubuntu-latest
     steps:
