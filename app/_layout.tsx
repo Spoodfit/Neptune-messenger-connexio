@@ -9,6 +9,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
+import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
 import { MessagingProvider } from "../src/providers/MessagingProvider";
 import { SessionProvider, useSession } from "../src/providers/SessionProvider";
 import { NeptuneMessagingApi } from "../src/services/api/neptuneApi";
@@ -188,7 +189,9 @@ function AuthenticatedApp() {
 
   return (
     <MessagingProvider key={`user:${currentUser.id}`}>
-      <ExperienceProvider>{applicationStack}</ExperienceProvider>
+      <GroupAdminProvider>
+        <ExperienceProvider>{applicationStack}</ExperienceProvider>
+      </GroupAdminProvider>
     </MessagingProvider>
   );
 }
