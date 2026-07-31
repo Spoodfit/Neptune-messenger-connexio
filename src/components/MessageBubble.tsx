@@ -38,7 +38,7 @@ const STATUS_LABELS: Record<MessageStatus, string> = {
   failed: "Échec de l’envoi"
 };
 
-const AVATAR_SIZE = 34;
+const AVATAR_SIZE = 44;
 const MAX_BUBBLE_WIDTH = 520;
 const REPLY_THRESHOLD = 54;
 
@@ -261,6 +261,7 @@ export function MessageBubble({
               accessibilityLabel={`Ouvrir le profil de ${message.senderName}`}
               onPress={() => onOpenProfile?.(message.senderId)}
               hitSlop={6}
+              style={styles.senderPressable}
             >
               <Text numberOfLines={1} style={styles.sender}>
                 {message.senderName}
@@ -380,6 +381,7 @@ const styles = StyleSheet.create({
   wrapper: { minWidth: 0, flexShrink: 1 },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
+  senderPressable: { minWidth: 44, minHeight: 44, justifyContent: "flex-end" },
   sender: {
     ...typography.caption,
     maxWidth: "100%",

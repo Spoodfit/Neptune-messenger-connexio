@@ -378,8 +378,8 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   toolbar: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", paddingHorizontal: 10, paddingTop: 10, flexDirection: "row", alignItems: "center", gap: 8 },
-  segmented: { flex: 1, height: 44, padding: 3, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", overflow: "hidden" },
-  segmentButton: { flex: 1, minHeight: 36, borderRadius: 13, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  segmented: { flex: 1, height: 52, padding: 3, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", overflow: "hidden" },
+  segmentButton: { flex: 1, minHeight: 44, borderRadius: 13, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   segmentText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
   segmentTextActive: { color: colors.text },
   createButton: { width: 44, height: 44, borderRadius: 15 },

@@ -262,9 +262,10 @@ async function run() {
     await expectVisible(signOut, "bouton de déconnexion");
     if (await signOut.isVisible().catch(() => false)) {
       await signOut.click();
-      await expectVisible(page.getByText("Entrer en démonstration", { exact: true }), "retour à la connexion");
+      const demoEntry = page.getByLabel("Entrer dans la démonstration Connexio");
+      await expectVisible(demoEntry, "retour à la connexion");
       await checkGeometry(page, "Connexion après déconnexion");
-      await page.getByText("Entrer en démonstration", { exact: true }).click();
+      await demoEntry.click();
       await expectVisible(page.getByText("Messages", { exact: true }).first(), "reconnexion démonstration");
     }
 

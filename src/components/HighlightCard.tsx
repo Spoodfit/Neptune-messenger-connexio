@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   metrics: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 10 },
   metricText: { color: colors.textMuted, fontSize: 9.5, fontWeight: "700" },
   reactionPicker: { marginTop: 10, minHeight: 52, paddingHorizontal: 5, borderRadius: 26, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "space-around" },
-  reactionChoice: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
+  reactionChoice: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   reactionEmoji: { fontSize: 23 },
   reactionSummary: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 5 },
   reactionPill: { minHeight: 27, paddingHorizontal: 7, borderRadius: 14, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 4 },
@@ -281,6 +281,6 @@ const styles = StyleSheet.create({
   reactionPillEmoji: { fontSize: 12 },
   reactionPillCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   actions: { marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.borderSoft, flexDirection: "row" },
-  action: { flex: 1, minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  action: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   actionText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" }
 });

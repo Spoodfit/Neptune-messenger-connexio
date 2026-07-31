@@ -307,11 +307,12 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 8,
     flexDirection: "row",
+    alignItems: "center",
     gap: 7
   },
   modeBar: {
     flex: 1,
-    height: 44,
+    height: 52,
     padding: 3,
     borderRadius: 16,
     borderWidth: 1,
@@ -322,6 +323,7 @@ const styles = StyleSheet.create({
   },
   modeButton: {
     flex: 1,
+    minHeight: 44,
     overflow: "hidden",
     borderRadius: 13,
     flexDirection: "row",
