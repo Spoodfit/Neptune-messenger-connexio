@@ -29,6 +29,23 @@ const sections = [
   }
 ];
 
+const accountRights: Array<{ title: string; subtitle: string }> = [
+  {
+    title: "Télécharger mes données",
+    subtitle: "Le backend doit générer une archive sécurisée et temporaire."
+  },
+  {
+    title: "Supprimer mon compte",
+    subtitle:
+      "La suppression doit révoquer les sessions, traiter les contenus et respecter les obligations légales."
+  },
+  {
+    title: "Historique des appareils",
+    subtitle:
+      "Les sessions actives doivent être visibles et révocables individuellement."
+  }
+];
+
 export default function PrivacyScreen() {
   const insets = useSafeAreaInsets();
   return (
@@ -67,24 +84,20 @@ export default function PrivacyScreen() {
         ))}
 
         <Text style={styles.sectionTitle}>Droits du compte</Text>
-        {[
-          ["Télécharger mes données", "Le backend doit générer une archive sécurisée et temporaire."],
-          ["Supprimer mon compte", "La suppression doit révoquer les sessions, traiter les contenus et respecter les obligations légales."],
-          ["Historique des appareils", "Les sessions actives doivent être visibles et révocables individuellement."]
-        ].map(([title, subtitle]) => (
+        {accountRights.map((right) => (
           <Pressable
-            key={title}
+            key={right.title}
             onPress={() =>
               Alert.alert(
-                title,
-                `${subtitle}\n\nLe front est prêt ; l’action serveur doit être connectée avant le pilote.`
+                right.title,
+                `${right.subtitle}\n\nLe front est prêt ; l’action serveur doit être connectée avant le pilote.`
               )
             }
             style={styles.actionRow}
           >
             <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>{title}</Text>
-              <Text style={styles.actionSubtitle}>{subtitle}</Text>
+              <Text style={styles.actionTitle}>{right.title}</Text>
+              <Text style={styles.actionSubtitle}>{right.subtitle}</Text>
             </View>
             <Ionicons name="chevron-forward" size={19} color={colors.textMuted} />
           </Pressable>
@@ -96,21 +109,90 @@ export default function PrivacyScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
-  headerButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, textAlign: "center" },
-  content: { width: "100%", maxWidth: 660, alignSelf: "center", paddingHorizontal: spacing.md },
+  header: {
+    minHeight: 58,
+    paddingBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  headerButton: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  headerTitle: {
+    ...typography.heading3,
+    color: colors.text,
+    flex: 1,
+    textAlign: "center"
+  },
+  content: {
+    width: "100%",
+    maxWidth: 660,
+    alignSelf: "center",
+    paddingHorizontal: spacing.md
+  },
   hero: { alignItems: "center", paddingVertical: spacing.lg },
-  title: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 10 },
-  intro: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: 7 },
-  card: { minHeight: 96, marginBottom: 9, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  iconWrap: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  title: {
+    ...typography.heading2,
+    color: colors.text,
+    textAlign: "center",
+    marginTop: 10
+  },
+  intro: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: 7
+  },
+  card: {
+    minHeight: 96,
+    marginBottom: 9,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12
+  },
+  iconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   cardContent: { flex: 1, minWidth: 0 },
   cardTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
   cardBody: { ...typography.bodySmall, color: colors.textMuted, marginTop: 4 },
-  sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.lg, marginBottom: 8 },
-  actionRow: { minHeight: 76, marginBottom: 8, padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 10 },
+  sectionTitle: {
+    ...typography.heading3,
+    color: colors.text,
+    marginTop: spacing.lg,
+    marginBottom: 8
+  },
+  actionRow: {
+    minHeight: 76,
+    marginBottom: 8,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
   actionContent: { flex: 1, minWidth: 0 },
   actionTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  actionSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 }
+  actionSubtitle: {
+    color: colors.textMuted,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 3
+  }
 });
