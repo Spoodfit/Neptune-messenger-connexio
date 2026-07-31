@@ -1,3 +1,3 @@
 # Dépendances natives Connexio
 
-Déclenchement final du verrouillage Expo pour les médias, documents, géolocalisation, vidéo et carte native.
+Déclenchement du job Branch CI reconnu pour verrouiller les dépendances Expo finales.
