@@ -1,8 +1,11 @@
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useMemo } from "react";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -11,10 +14,24 @@ import {
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { ConversationRow } from "@/components/ConversationRow";
+import { useExperience } from "@/providers/ExperienceProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
+import { useSession } from "@/providers/SessionProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
+import type { ConversationFilter } from "@/types/experience";
+import type { Conversation } from "@/types/messaging";
 
 const MAX_CONTENT_WIDTH = 720;
+
+function isPrivateConversation(conversation: Conversation): boolean {
+  return conversation.type === "direct" || conversation.type === "small_group";
+}
+
+function matchesMention(conversation: Conversation, aliases: string[]): boolean {
+  if ((conversation.mentionCount ?? 0) > 0) return true;
+  const text = conversation.lastMessage?.toLocaleLowerCase("fr") ?? "";
+  return aliases.some((alias) => alias && text.includes(`@${alias}`));
+}
 
 export default function MessagesScreen() {
   const {
@@ -24,10 +41,37 @@ export default function MessagesScreen() {
     loadingConversations,
     lastError
   } = useMessaging();
+  const {
+    localConversations,
+    decorateConversation,
+    isConversationVisible,
+    toggleConversationMuted,
+    leaveConversation
+  } = useExperience();
+  const { currentUser } = useSession();
+  const [filter, setFilter] = useState<ConversationFilter>("groups");
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null);
+
+  const mentionAliases = useMemo(() => {
+    const [firstName = "", ...lastNameParts] = currentUser.name
+      .toLocaleLowerCase("fr")
+      .split(/\s+/);
+    const lastName = lastNameParts.join(" ");
+    return [
+      firstName,
+      lastName,
+      currentUser.name.toLocaleLowerCase("fr"),
+      currentUser.company.toLocaleLowerCase("fr")
+    ].filter(Boolean);
+  }, [currentUser.company, currentUser.name]);
+
   const sortedConversations = useMemo(
     () =>
-      visibleConversations
-        .map((conversation) => {
+      [...visibleConversations, ...localConversations]
+        .filter(isConversationVisible)
+        .map((rawConversation) => {
+          const conversation = decorateConversation(rawConversation);
           const localLatestMessage = getMessages(conversation.id)[0];
           if (!localLatestMessage) return conversation;
 
@@ -45,6 +89,11 @@ export default function MessagesScreen() {
             lastMessageAt: localLatestMessage.createdAt
           };
         })
+        .filter((conversation) =>
+          filter === "private"
+            ? isPrivateConversation(conversation)
+            : !isPrivateConversation(conversation)
+        )
         .sort((first, second) => {
           const firstTime = first.lastMessageAt
             ? Date.parse(first.lastMessageAt)
@@ -54,16 +103,104 @@ export default function MessagesScreen() {
             : 0;
           return secondTime - firstTime;
         }),
-    [getMessages, visibleConversations]
+    [
+      decorateConversation,
+      filter,
+      getMessages,
+      isConversationVisible,
+      localConversations,
+      visibleConversations
+    ]
   );
+
+  const openConversationSettings = (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+  };
+
+  const closeMenu = () => setSelectedConversation(null);
+
+  const openDetails = () => {
+    if (!selectedConversation) return;
+    const route = isPrivateConversation(selectedConversation)
+      ? `/conversation/${encodeURIComponent(selectedConversation.id)}`
+      : `/group/${encodeURIComponent(selectedConversation.id)}`;
+    closeMenu();
+    router.push(route);
+  };
+
+  const toggleMute = () => {
+    if (!selectedConversation) return;
+    toggleConversationMuted(selectedConversation.id);
+    setSelectedConversation({
+      ...selectedConversation,
+      muted: !selectedConversation.muted
+    });
+  };
+
+  const leaveSelectedGroup = () => {
+    if (!selectedConversation) return;
+    leaveConversation(selectedConversation.id);
+    closeMenu();
+  };
 
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
-      <BrandHeader title="Messages" subtitle="Les échanges Neptune, au même endroit." />
+      <BrandHeader title="Messages" subtitle="Groupes et échanges privés Neptune." />
+
+      <View style={styles.toolbar}>
+        <View
+          accessibilityRole="tablist"
+          accessibilityLabel="Type de discussions"
+          style={styles.segmented}
+        >
+          {(["groups", "private"] as const).map((value) => {
+            const active = filter === value;
+            return (
+              <Pressable
+                key={value}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={
+                  value === "groups" ? "Discussions de groupe" : "Discussions privées"
+                }
+                onPress={() => setFilter(value)}
+                style={styles.segmentButton}
+              >
+                {active ? (
+                  <LinearGradient
+                    colors={gradients.activeTab}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                ) : null}
+                <Ionicons
+                  name={value === "groups" ? "people" : "chatbubble-ellipses"}
+                  size={17}
+                  color={active ? colors.text : colors.textMuted}
+                />
+                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                  {value === "groups" ? "Groupes" : "Privées"}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Créer une nouvelle conversation"
+          accessibilityHint="Permet de créer une discussion privée ou, si autorisé, un groupe"
+          onPress={() => router.push("/new-conversation")}
+          style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}
+        >
+          <LinearGradient colors={gradients.primary} style={styles.createGradient}>
+            <Ionicons name="add" size={23} color={colors.white} />
+          </LinearGradient>
+        </Pressable>
+      </View>
 
       <View style={styles.sectionHeader}>
         <Text accessibilityRole="header" style={styles.sectionTitle}>
-          Discussions
+          {filter === "groups" ? "Discussions de groupe" : "Discussions privées"}
         </Text>
         <View style={styles.sectionCountShell}>
           <Text
@@ -104,10 +241,21 @@ export default function MessagesScreen() {
         </View>
       ) : (
         <FlatList
-          accessibilityLabel="Liste des discussions Neptune"
+          accessibilityLabel={
+            filter === "groups"
+              ? "Liste des groupes Neptune"
+              : "Liste des conversations privées"
+          }
           data={sortedConversations}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ConversationRow conversation={item} />}
+          renderItem={({ item }) => (
+            <ConversationRow
+              conversation={item}
+              mentioned={matchesMention(item, mentionAliases)}
+              muted={item.muted}
+              onLongPress={() => openConversationSettings(item)}
+            />
+          )}
           style={styles.listViewport}
           contentContainerStyle={[
             styles.list,
@@ -118,21 +266,129 @@ export default function MessagesScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.feedbackTitle}>Aucune discussion</Text>
+              <Ionicons
+                name={filter === "groups" ? "people-outline" : "chatbubbles-outline"}
+                size={34}
+                color={colors.textMuted}
+              />
+              <Text style={styles.feedbackTitle}>
+                {filter === "groups" ? "Aucun groupe visible" : "Aucune discussion privée"}
+              </Text>
               <Text style={styles.feedbackText}>
-                Les groupes autorisés apparaîtront ici après la synchronisation
-                Neptune.
+                {filter === "groups"
+                  ? "Les groupes apparaissent selon votre statut et les règles définies par les administrateurs."
+                  : "Créez une conversation individuelle ou un mini-groupe de quatre contacts maximum."}
               </Text>
             </View>
           }
         />
       )}
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(selectedConversation)}
+        onRequestClose={closeMenu}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={closeMenu}>
+          <Pressable style={styles.sheet} onPress={() => undefined}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle} numberOfLines={2}>
+              {selectedConversation?.name}
+            </Text>
+            <Text style={styles.sheetSubtitle}>
+              {selectedConversation?.type === "direct"
+                ? "Conversation privée"
+                : `${selectedConversation?.memberCount ?? 0} membres`}
+            </Text>
+
+            <Pressable style={styles.sheetAction} onPress={toggleMute}>
+              <Ionicons
+                name={selectedConversation?.muted ? "notifications" : "notifications-off"}
+                size={21}
+                color={colors.text}
+              />
+              <Text style={styles.sheetActionText}>
+                {selectedConversation?.muted ? "Réactiver les notifications" : "Mettre en sourdine"}
+              </Text>
+            </Pressable>
+
+            <Pressable style={styles.sheetAction} onPress={openDetails}>
+              <Ionicons name="settings-outline" size={21} color={colors.text} />
+              <Text style={styles.sheetActionText}>
+                {selectedConversation && isPrivateConversation(selectedConversation)
+                  ? "Informations de la conversation"
+                  : "Paramètres et membres du groupe"}
+              </Text>
+            </Pressable>
+
+            {selectedConversation &&
+            selectedConversation.type !== "direct" &&
+            selectedConversation.type !== "announcement" ? (
+              <Pressable
+                style={[styles.sheetAction, styles.dangerAction]}
+                onPress={leaveSelectedGroup}
+              >
+                <Ionicons name="exit-outline" size={21} color={colors.danger} />
+                <Text style={[styles.sheetActionText, styles.dangerText]}>
+                  Quitter le groupe
+                </Text>
+              </Pressable>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  toolbar: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center",
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  segmented: {
+    flex: 1,
+    height: 44,
+    padding: 3,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    overflow: "hidden"
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 13,
+    overflow: "hidden",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6
+  },
+  segmentText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  segmentTextActive: { color: colors.text },
+  createButton: { width: 44, height: 44, borderRadius: 15 },
+  createGradient: {
+    flex: 1,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  pressed: { transform: [{ scale: 0.96 }], opacity: 0.86 },
   sectionHeader: {
     width: "100%",
     maxWidth: MAX_CONTENT_WIDTH,
@@ -162,20 +418,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  sectionCount: {
-    color: colors.text,
-    fontSize: 11,
-    fontWeight: "900"
-  },
+  sectionCount: { color: colors.text, fontSize: 11, fontWeight: "900" },
   listViewport: {
     width: "100%",
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: "center"
   },
-  list: {
-    paddingHorizontal: 10,
-    paddingBottom: 22
-  },
+  list: { paddingHorizontal: 10, paddingBottom: 22 },
   emptyList: { flexGrow: 1 },
   feedbackWrap: {
     width: "100%",
@@ -224,5 +473,55 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary
   },
   retryPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
-  retryText: { color: colors.white, fontWeight: "900" }
+  retryText: { color: colors.white, fontWeight: "900" },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    justifyContent: "flex-end"
+  },
+  sheet: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+    paddingHorizontal: spacing.md,
+    paddingTop: 10,
+    paddingBottom: 28,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong
+  },
+  sheetHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: spacing.md,
+    backgroundColor: colors.border
+  },
+  sheetTitle: { ...typography.heading2, color: colors.text, textAlign: "center" },
+  sheetSubtitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: 3,
+    marginBottom: spacing.md
+  },
+  sheetAction: {
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  sheetActionText: {
+    ...typography.body,
+    color: colors.text,
+    flex: 1,
+    fontWeight: "700"
+  },
+  dangerAction: { marginTop: 4, backgroundColor: colors.dangerSoft },
+  dangerText: { color: colors.danger }
 });
