@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -14,9 +15,22 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { HighlightMediaView } from "@/components/HighlightMediaView";
+import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
+import { useSession } from "@/providers/SessionProvider";
+import { NeptuneExperienceApi } from "@/services/api/experienceApi";
+import { uploadHighlightMedia } from "@/services/api/uploadApi";
+import {
+  pickApproximateLocation,
+  pickHighlightMedia
+} from "@/services/media/mediaPicker";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
-import type { HighlightKind, HighlightMedia } from "@/types/experience";
+import type {
+  HighlightKind,
+  HighlightMedia,
+  HighlightPost
+} from "@/types/experience";
 
 const KINDS: Array<{
   value: HighlightKind;
@@ -31,11 +45,17 @@ const KINDS: Array<{
 
 export default function NewHighlightScreen() {
   const insets = useSafeAreaInsets();
+  const { accessToken } = useSession();
   const { members, createPost } = useExperience();
+  const api = useMemo(
+    () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
+    [accessToken]
+  );
   const [kind, setKind] = useState<HighlightKind>("standard");
   const [body, setBody] = useState("");
   const [media, setMedia] = useState<HighlightMedia | undefined>();
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const mentionQuery = useMemo(() => {
     const match = body.match(/(?:^|\s)@([^\s@]*)$/u);
@@ -57,7 +77,8 @@ export default function NewHighlightScreen() {
       members
         .filter((member) => {
           const text = body.toLocaleLowerCase("fr");
-          const firstName = member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
+          const firstName =
+            member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
           return (
             (firstName && text.includes(`@${firstName}`)) ||
             text.includes(`@${member.name.toLocaleLowerCase("fr")}`) ||
@@ -70,27 +91,27 @@ export default function NewHighlightScreen() {
   );
 
   const insertMention = (name: string) => {
-    setBody((current) => current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `));
+    setBody((current) =>
+      current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `)
+    );
   };
 
-  const attachPhoto = () => {
-    setMedia({
-      id: `local-photo-${Date.now()}`,
-      kind: "photo",
-      status: "local"
-    });
+  const selectMedia = async (mediaKind: "photo" | "video") => {
+    try {
+      const selected = await pickHighlightMedia(mediaKind);
+      if (selected) setMedia(selected);
+    } catch (error) {
+      Alert.alert(
+        "Média indisponible",
+        error instanceof Error
+          ? error.message
+          : "Le média n’a pas pu être sélectionné."
+      );
+    }
   };
 
-  const attachVideo = () => {
-    setMedia({
-      id: `local-video-${Date.now()}`,
-      kind: "video",
-      durationSeconds: 42,
-      status: "local"
-    });
-  };
-
-  const publish = () => {
+  const publish = async () => {
+    if (publishing) return;
     const cleanBody = body.trim();
     if (!cleanBody && !media) {
       Alert.alert("Publication vide", "Ajoutez un texte, une photo ou une vidéo.");
@@ -100,33 +121,71 @@ export default function NewHighlightScreen() {
       Alert.alert("Vidéo trop longue", "La durée maximale est de 60 secondes.");
       return;
     }
-    const post = createPost({
-      kind,
-      body: cleanBody,
-      media,
-      mentionedUserIds,
-      coordinates: locationEnabled
-        ? {
-            latitude: 43.213,
-            longitude: 2.351,
-            accuracyRadiusMeters: 1800
-          }
-        : undefined
-    });
-    if (kind === "besoin") {
-      Alert.alert(
-        "Besoin publié",
-        "Le front marque cette publication pour une synchronisation bidirectionnelle avec Neptune Business. Le backend devra garantir l’idempotence et la source de vérité.",
-        [
-          {
-            text: "Voir",
-            onPress: () => router.replace(`/highlight/${encodeURIComponent(post.id)}`)
-          }
-        ]
+
+    setPublishing(true);
+    try {
+      let readyMedia = media;
+      if (readyMedia && api && readyMedia.status !== "ready") {
+        setMedia((current) =>
+          current ? { ...current, status: "uploading", uploadProgress: 0 } : current
+        );
+        readyMedia = await uploadHighlightMedia(
+          readyMedia,
+          accessToken,
+          (progress) =>
+            setMedia((current) =>
+              current
+                ? { ...current, status: "uploading", uploadProgress: progress }
+                : current
+            )
+        );
+        setMedia(readyMedia);
+      }
+
+      let coordinates: HighlightPost["coordinates"];
+      if (locationEnabled) {
+        coordinates = await pickApproximateLocation();
+        if (api) {
+          await api.updateLocation(
+            coordinates.latitude,
+            coordinates.longitude,
+            coordinates.accuracyRadiusMeters
+          );
+        }
+      }
+
+      const post = api
+        ? await api.createHighlight({
+            kind,
+            body: cleanBody,
+            media: readyMedia,
+            mentionedUserIds,
+            coordinates
+          })
+        : createPost({
+            kind,
+            body: cleanBody,
+            media: readyMedia
+              ? { ...readyMedia, status: "ready", uploadProgress: 1 }
+              : undefined,
+            mentionedUserIds,
+            coordinates
+          });
+
+      router.replace(`/highlight/${encodeURIComponent(post.id)}`);
+    } catch (error) {
+      setMedia((current) =>
+        current ? { ...current, status: "failed" } : current
       );
-      return;
+      Alert.alert(
+        "Publication impossible",
+        error instanceof Error
+          ? error.message
+          : "Le Temps fort n’a pas pu être publié."
+      );
+    } finally {
+      setPublishing(false);
     }
-    router.replace(`/highlight/${encodeURIComponent(post.id)}`);
   };
 
   return (
@@ -155,10 +214,16 @@ export default function NewHighlightScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Publier"
-          onPress={publish}
+          accessibilityState={{ busy: publishing, disabled: publishing }}
+          disabled={publishing}
+          onPress={() => void publish()}
           style={styles.publishButton}
         >
-          <Text style={styles.publishText}>Publier</Text>
+          {publishing ? (
+            <ActivityIndicator size="small" color={colors.orange} />
+          ) : (
+            <Text style={styles.publishText}>Publier</Text>
+          )}
         </Pressable>
       </View>
 
@@ -191,7 +256,12 @@ export default function NewHighlightScreen() {
                   size={18}
                   color={selected ? colors.orange : colors.textMuted}
                 />
-                <Text style={[styles.kindLabel, selected && styles.kindLabelSelected]}>
+                <Text
+                  style={[
+                    styles.kindLabel,
+                    selected && styles.kindLabelSelected
+                  ]}
+                >
                   {item.label}
                 </Text>
               </Pressable>
@@ -203,7 +273,9 @@ export default function NewHighlightScreen() {
           <View style={styles.syncNote}>
             <Ionicons name="sync" size={19} color={colors.success} />
             <Text style={styles.syncNoteText}>
-              Les publications BESOIN seront synchronisées avec l’application Neptune Business dans les deux sens.
+              Cette publication sera créée avec les cibles Connexio et Neptune
+              Business. Le serveur applique l’idempotence et la synchronisation
+              bidirectionnelle.
             </Text>
           </View>
         ) : null}
@@ -244,11 +316,17 @@ export default function NewHighlightScreen() {
         ) : null}
 
         <View style={styles.mediaActions}>
-          <Pressable onPress={attachPhoto} style={styles.mediaButton}>
+          <Pressable
+            onPress={() => void selectMedia("photo")}
+            style={styles.mediaButton}
+          >
             <Ionicons name="image-outline" size={21} color={colors.text} />
             <Text style={styles.mediaLabel}>Photo</Text>
           </Pressable>
-          <Pressable onPress={attachVideo} style={styles.mediaButton}>
+          <Pressable
+            onPress={() => void selectMedia("video")}
+            style={styles.mediaButton}
+          >
             <Ionicons name="videocam-outline" size={22} color={colors.text} />
             <Text style={styles.mediaLabel}>Vidéo − 1 min</Text>
           </Pressable>
@@ -256,28 +334,19 @@ export default function NewHighlightScreen() {
 
         {media ? (
           <View style={styles.mediaPreview}>
-            <LinearGradient
-              colors={
-                media.kind === "video"
-                  ? ["#063C72", "#1859D9", "#9145ED"]
-                  : ["#24345C", "#734EE3", "#FF7E75"]
-              }
-              style={StyleSheet.absoluteFill}
-            />
-            <Ionicons
-              name={media.kind === "video" ? "play-circle" : "image"}
-              size={52}
-              color={colors.white}
-            />
+            <HighlightMediaView media={media} />
             <View style={styles.mediaPreviewTop}>
               <Text style={styles.mediaPreviewLabel}>
-                {media.kind === "video"
-                  ? `Vidéo · ${media.durationSeconds ?? 0} secondes`
-                  : "Photo"}
+                {media.status === "uploading"
+                  ? `Envoi · ${Math.round((media.uploadProgress ?? 0) * 100)} %`
+                  : media.kind === "video"
+                    ? `Vidéo · ${Math.round(media.durationSeconds ?? 0)} secondes`
+                    : "Photo"}
               </Text>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Retirer le média"
+                disabled={publishing}
                 onPress={() => setMedia(undefined)}
                 style={styles.removeMedia}
               >
@@ -291,7 +360,8 @@ export default function NewHighlightScreen() {
           <View style={styles.locationContent}>
             <Text style={styles.locationTitle}>Position approximative sur la Map</Text>
             <Text style={styles.locationSubtitle}>
-              Le serveur ne doit jamais exposer les coordonnées exactes. Rayon prévu : 1 à 3 km.
+              La position est obtenue au moment de publier et protégée par un rayon
+              de confidentialité compris entre 1 et 3 km.
             </Text>
           </View>
           <Switch
@@ -303,13 +373,6 @@ export default function NewHighlightScreen() {
             thumbColor={colors.white}
           />
         </View>
-
-        <View style={styles.backendNote}>
-          <Ionicons name="cloud-upload-outline" size={20} color={colors.orange} />
-          <Text style={styles.backendText}>
-            Les boutons média sont fonctionnels côté front. Le développeur doit brancher le picker, la validation MIME, la compression, l’upload privé, la progression, la reprise et la modération.
-          </Text>
-        </View>
       </ScrollView>
     </LinearGradient>
   );
@@ -317,41 +380,174 @@ export default function NewHighlightScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
-  headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, textAlign: "center" },
-  publishButton: { minWidth: 68, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  header: {
+    minHeight: 58,
+    paddingBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  headerButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  headerTitle: {
+    ...typography.heading3,
+    color: colors.text,
+    flex: 1,
+    textAlign: "center"
+  },
+  publishButton: {
+    minWidth: 68,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   publishText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
   content: { width: "100%", maxWidth: 680, alignSelf: "center" },
-  sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.md, marginBottom: 8 },
+  sectionTitle: {
+    ...typography.heading3,
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: 8
+  },
   kindGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  kindButton: { minHeight: 44, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 6 },
-  kindButtonSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
+  kindButton: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  kindButtonSelected: {
+    borderColor: colors.violet,
+    backgroundColor: "rgba(107,79,234,0.22)"
+  },
   kindLabel: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   kindLabelSelected: { color: colors.text },
-  syncNote: { marginTop: 10, padding: 12, borderRadius: 16, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 9 },
+  syncNote: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: colors.successSoft,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9
+  },
   syncNoteText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
-  editor: { minHeight: 168, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, color: colors.text, ...typography.body },
-  counter: { color: colors.textMuted, fontSize: 9, textAlign: "right", marginTop: 4 },
-  suggestions: { marginTop: 7, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, overflow: "hidden" },
-  suggestionRow: { minHeight: 52, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
-  suggestionAvatar: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  editor: {
+    minHeight: 168,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    color: colors.text,
+    ...typography.body
+  },
+  counter: {
+    color: colors.textMuted,
+    fontSize: 9,
+    textAlign: "right",
+    marginTop: 4
+  },
+  suggestions: {
+    marginTop: 7,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+    overflow: "hidden"
+  },
+  suggestionRow: {
+    minHeight: 52,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  suggestionAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   suggestionInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
   suggestionContent: { flex: 1, minWidth: 0 },
   suggestionName: { color: colors.text, fontSize: 12, fontWeight: "900" },
   suggestionCompany: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
   mediaActions: { flexDirection: "row", gap: 8, marginTop: spacing.md },
-  mediaButton: { flex: 1, minHeight: 52, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  mediaButton: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
   mediaLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
-  mediaPreview: { height: 210, marginTop: 10, borderRadius: 20, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  mediaPreviewTop: { position: "absolute", top: 9, left: 9, right: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  mediaPreviewLabel: { color: colors.white, fontSize: 10, fontWeight: "900", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.72)" },
-  removeMedia: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(2,7,19,0.72)", alignItems: "center", justifyContent: "center" },
-  locationRow: { marginTop: spacing.md, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  mediaPreview: {
+    marginTop: 10,
+    borderRadius: 20,
+    overflow: "hidden",
+    position: "relative"
+  },
+  mediaPreviewTop: {
+    position: "absolute",
+    top: 9,
+    left: 9,
+    right: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  mediaPreviewLabel: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: "rgba(2,7,19,0.72)"
+  },
+  removeMedia: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(2,7,19,0.72)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  locationRow: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md
+  },
   locationContent: { flex: 1, minWidth: 0 },
   switchControl: { width: 48, height: 44 },
   locationTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  locationSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
-  backendNote: { marginTop: spacing.md, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surfaceMuted, flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  backendText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 }
+  locationSubtitle: {
+    color: colors.textMuted,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 3
+  }
 });
