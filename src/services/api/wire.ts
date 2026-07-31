@@ -260,6 +260,8 @@ function normalizeAttachment(value: unknown): MessageAttachment {
       ? statusRaw
       : undefined;
   const progress = numberOrDefault(value, -1, "uploadProgress", "upload_progress");
+  const latitude = numberOrDefault(value, Number.NaN, "latitude");
+  const longitude = numberOrDefault(value, Number.NaN, "longitude");
   return {
     id: requireBoundedString(value, "Identifiant pièce jointe", 256, "id"),
     kind: rawKind as AttachmentKind,
@@ -276,6 +278,13 @@ function normalizeAttachment(value: unknown): MessageAttachment {
     ),
     width: optionalPositiveInteger(value, "width"),
     height: optionalPositiveInteger(value, "height"),
+    latitude: Number.isFinite(latitude) ? latitude : undefined,
+    longitude: Number.isFinite(longitude) ? longitude : undefined,
+    accuracyRadiusMeters: optionalPositiveInteger(
+      value,
+      "accuracyRadiusMeters",
+      "accuracy_radius_meters"
+    ),
     uploadProgress:
       progress >= 0 && progress <= 1 ? progress : undefined,
     status
