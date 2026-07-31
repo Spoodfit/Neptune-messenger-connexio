@@ -73,7 +73,19 @@ export class NeptuneMessagingApi implements MessagingApi {
         body: JSON.stringify({
           client_message_id: input.clientMessageId,
           body: input.body,
-          reply_to_message_id: input.replyToMessageId ?? null
+          reply_to_message_id: input.replyToMessageId ?? null,
+          mentioned_user_ids: input.mentionedUserIds ?? [],
+          attachments: (input.attachments ?? []).map((attachment) => ({
+            id: attachment.id,
+            kind: attachment.kind,
+            name: attachment.name,
+            uri: attachment.uri ?? null,
+            mime_type: attachment.mimeType ?? null,
+            size_bytes: attachment.sizeBytes ?? null,
+            duration_seconds: attachment.durationSeconds ?? null,
+            width: attachment.width ?? null,
+            height: attachment.height ?? null
+          }))
         })
       }
     );
