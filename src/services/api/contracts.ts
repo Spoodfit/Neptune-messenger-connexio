@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   Conversation,
+  MessageAttachment,
   PushTokenRegistration,
   RealtimeTicket,
   SessionPayload
@@ -15,6 +16,8 @@ export interface SendMessageInput {
   clientMessageId: string;
   body: string;
   replyToMessageId?: string;
+  attachments?: MessageAttachment[];
+  mentionedUserIds?: string[];
 }
 
 export interface SessionApi {
