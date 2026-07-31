@@ -1,6 +1,6 @@
 # Diagnostic temporaire Connexio
 
-Commit testé : `957ddca4a816f7e5a432b3e1195779286141c4a8`
+Commit testé : `c21213340cdaa616da4e26830ef0ade3f49db3a4`
 
 | Étape | Code |
 |---|---:|
@@ -26,14 +26,13 @@ app/account.tsx(71,42): error TS2345: Argument of type 'string | undefined' is n
 app/account.tsx(78,26): error TS18048: 'title' is possibly 'undefined'.
 app/account.tsx(82,48): error TS18048: 'title' is possibly 'undefined'.
 app/highlight/[id].tsx(175,67): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
-app/new-conversation.tsx(180,33): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
-app/new-conversation.tsx(196,33): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 app/new-highlight.tsx(265,33): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 app/privacy.tsx(79,17): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
   Type 'undefined' is not assignable to type 'string'.
 app/sign-in.tsx(18,29): error TS2307: Cannot find module '../src/components/NeptuneMark' or its corresponding type declarations.
 app/sign-in.tsx(87,67): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 src/components/HighlightCard.tsx(137,31): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/screens/NewConversationScreen.tsx(183,37): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 ```
 
 ## Tests
@@ -46,7 +45,7 @@ npm error   npm run test:compile # run the "test:compile" package script
 npm error
 npm error To see a list of scripts, run:
 npm error   npm run
-npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-31T10_50_36_616Z-debug-0.log
+npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-31T10_52_08_403Z-debug-0.log
 ```
 
 ## Expo
