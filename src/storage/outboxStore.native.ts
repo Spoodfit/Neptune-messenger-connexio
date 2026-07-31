@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import * as SQLite from "expo-sqlite";
 
 import type { OutboxItem, OutboxState } from "../domain/outbox";
+import type { MessageAttachment } from "../types/messaging";
 import type { OutboxStore } from "./outboxStore.types";
 
 const DATABASE_NAME = "connexio-outbox.db";
@@ -13,6 +14,8 @@ interface OutboxRow {
   conversation_id: string;
   body: string;
   reply_to_message_id: string | null;
+  attachments_json: string | null;
+  mentioned_user_ids_json: string | null;
   created_at: string;
   attempts: number;
   next_attempt_at: number;
@@ -24,7 +27,9 @@ let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 let purgePromise: Promise<void> | null = null;
 
 function bytesToHex(bytes: Uint8Array): string {
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return [...bytes]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function getDatabaseKey(): Promise<string> {
@@ -35,6 +40,20 @@ async function getDatabaseKey(): Promise<string> {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY
   });
   return generated;
+}
+
+async function addColumnIfMissing(
+  database: SQLite.SQLiteDatabase,
+  name: string,
+  definition: string
+): Promise<void> {
+  const columns = await database.getAllAsync<{ name: string }>(
+    "PRAGMA table_info(message_outbox)"
+  );
+  if (columns.some((column) => column.name === name)) return;
+  await database.execAsync(
+    `ALTER TABLE message_outbox ADD COLUMN ${name} ${definition}`
+  );
 }
 
 async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
@@ -52,6 +71,8 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
             conversation_id TEXT NOT NULL,
             body TEXT NOT NULL,
             reply_to_message_id TEXT,
+            attachments_json TEXT,
+            mentioned_user_ids_json TEXT,
             created_at TEXT NOT NULL,
             attempts INTEGER NOT NULL DEFAULT 0,
             next_attempt_at INTEGER NOT NULL,
@@ -60,6 +81,12 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
           );
           UPDATE message_outbox SET state = 'pending' WHERE state = 'sending';
         `);
+        await addColumnIfMissing(database, "attachments_json", "TEXT");
+        await addColumnIfMissing(
+          database,
+          "mentioned_user_ids_json",
+          "TEXT"
+        );
         return database;
       } catch (error) {
         await database.closeAsync().catch(() => undefined);
@@ -76,12 +103,36 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
   }
 }
 
+function parseAttachments(value: string | null): MessageAttachment[] | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as MessageAttachment[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseStringArray(value: string | null): string[] | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function rowToItem(row: OutboxRow): OutboxItem {
   return {
     clientMessageId: row.client_message_id,
     conversationId: row.conversation_id,
     body: row.body,
     replyToMessageId: row.reply_to_message_id ?? undefined,
+    attachments: parseAttachments(row.attachments_json),
+    mentionedUserIds: parseStringArray(row.mentioned_user_ids_json),
     createdAt: row.created_at,
     attempts: row.attempts,
     nextAttemptAt: row.next_attempt_at,
@@ -115,12 +166,15 @@ export function createOutboxStore(): OutboxStore {
       await database.runAsync(
         `INSERT OR REPLACE INTO message_outbox (
           client_message_id, conversation_id, body, reply_to_message_id,
-          created_at, attempts, next_attempt_at, state, last_error
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          attachments_json, mentioned_user_ids_json, created_at, attempts,
+          next_attempt_at, state, last_error
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         item.clientMessageId,
         item.conversationId,
         item.body,
         item.replyToMessageId ?? null,
+        item.attachments ? JSON.stringify(item.attachments) : null,
+        item.mentionedUserIds ? JSON.stringify(item.mentionedUserIds) : null,
         item.createdAt,
         item.attempts,
         item.nextAttemptAt,
