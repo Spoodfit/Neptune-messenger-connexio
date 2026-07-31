@@ -14,6 +14,7 @@ const ROLE_ALIASES: Record<UserRole, CanonicalUserRole> = {
   moussaillon: "moussaillon",
   triton: "triton",
   member: "triton",
+  free: "free",
   admin: "admin"
 };
 
@@ -24,8 +25,19 @@ export const ROLE_LABELS: Record<CanonicalUserRole, string> = {
   legende: "Légende",
   moussaillon: "Moussaillon",
   triton: "Triton",
+  free: "Free",
   admin: "Administration"
 };
+
+export const GROUP_VISIBILITY_ROLES: CanonicalUserRole[] = [
+  "visionnaire",
+  "amiral",
+  "capitaine",
+  "legende",
+  "moussaillon",
+  "triton",
+  "free"
+];
 
 export function normalizeUserRole(role: UserRole): CanonicalUserRole {
   return ROLE_ALIASES[role];
