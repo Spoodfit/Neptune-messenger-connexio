@@ -1,3 +1,5 @@
+import "../src/polyfills/styleSheet";
+
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 import { router, Stack, useSegments } from "expo-router";
