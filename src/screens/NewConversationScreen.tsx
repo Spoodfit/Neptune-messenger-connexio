@@ -345,6 +345,8 @@ export default function NewConversationScreen() {
               </Text>
             </View>
             <Switch
+              accessibilityLabel="Autoriser les membres à publier"
+              style={styles.switchControl}
               value={membersCanPost}
               onValueChange={setMembersCanPost}
               trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
@@ -394,7 +396,7 @@ const styles = StyleSheet.create({
   },
   createActionText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
   tabs: {
-    height: 44,
+    height: 52,
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
     padding: 3,
@@ -407,6 +409,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    minHeight: 44,
     borderRadius: 13,
     overflow: "hidden",
     flexDirection: "row",
@@ -508,7 +511,7 @@ const styles = StyleSheet.create({
   },
   roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   roleChip: {
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
@@ -536,6 +539,7 @@ const styles = StyleSheet.create({
     gap: spacing.md
   },
   switchContent: { flex: 1, minWidth: 0 },
+  switchControl: { width: 48, height: 44 },
   switchTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
   switchSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
   backendCard: {
