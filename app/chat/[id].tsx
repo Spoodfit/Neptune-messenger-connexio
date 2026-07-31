@@ -19,11 +19,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MessageBubble } from "../../src/components/MessageBubble";
+import { env } from "../../src/config/env";
+import { isPrivateConversation } from "../../src/domain/conversationFilter";
 import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
 import { useMessaging } from "../../src/providers/MessagingProvider";
 import { useSession } from "../../src/providers/SessionProvider";
-import { env } from "../../src/config/env";
 import { uploadMessageAttachment } from "../../src/services/api/uploadApi";
 import { pickMessageAttachment } from "../../src/services/media/mediaPicker";
 import { colors, gradients, radii, spacing, typography } from "../../src/theme";
@@ -34,8 +35,9 @@ import type {
   MessageAttachment
 } from "../../src/types/messaging";
 
-const SUBMIT_LOCK_MS = 320;
 const QUICK_REACTIONS = ["❤️", "🔥", "👏", "💡", "🤝", "😂"];
+const SUBMIT_LOCK_MS = 800;
+
 const ATTACHMENTS: Array<{
   kind: AttachmentKind;
   label: string;
@@ -48,28 +50,24 @@ const ATTACHMENTS: Array<{
   { kind: "location", label: "Localisation", icon: "location-outline" }
 ];
 
-function isPrivateConversation(conversation: Conversation): boolean {
-  return conversation.type === "direct" || conversation.type === "small_group";
-}
-
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const { currentUser } = useSession();
   const conversationId = Array.isArray(params.id)
     ? (params.id[0] ?? "")
     : (params.id ?? "");
+  const { currentUser } = useSession();
   const {
     getConversation: getServerConversation,
-    getMessages,
+    getMessages: getServerMessages,
     loadMessages,
     loadMoreMessages,
     hasMoreMessages,
+    loadingConversationIds,
+    loadingMoreConversationIds,
     sendMessage,
     retryMessage,
     markConversationRead,
-    loadingConversationIds,
-    loadingMoreConversationIds,
     connectionState,
     lastError
   } = useMessaging();
@@ -77,7 +75,6 @@ export default function ChatScreen() {
     members,
     getConversation: getLocalConversation,
     getConversationMessages,
-    decorateConversation,
     sendLocalMessage,
     getMessageReactions,
     toggleMessageReaction
@@ -87,61 +84,44 @@ export default function ChatScreen() {
     getCreatedGroupMessages,
     sendCreatedGroupMessage
   } = useGroupAdmin();
+
+  const serverConversation = getServerConversation(conversationId);
+  const privateConversation = getLocalConversation(conversationId);
+  const adminConversation = getCreatedGroup(conversationId);
+  const conversation =
+    serverConversation ?? privateConversation ?? adminConversation;
+  const source = adminConversation
+    ? "admin"
+    : privateConversation
+      ? "private"
+      : "server";
+  const localOnly = source !== "server";
+  const messages =
+    source === "admin"
+      ? getCreatedGroupMessages(conversationId)
+      : source === "private"
+        ? getConversationMessages(conversationId)
+        : getServerMessages(conversationId);
+  const loading = loadingConversationIds.has(conversationId);
+  const loadingMore = loadingMoreConversationIds.has(conversationId);
+  const hasMore = hasMoreMessages(conversationId);
+  const latestMessageId = messages[0]?.id;
+  const directMemberId = conversation?.memberIds?.find(
+    (memberId) => memberId !== currentUser.id
+  );
+
   const [draft, setDraft] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [reactionMessage, setReactionMessage] = useState<ChatMessage | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<
     MessageAttachment[]
   >([]);
-  const lastMarkedReadMessageId = useRef<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const submitLockRef = useRef(false);
-  const submitUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
-
-  const serverConversation = useMemo(
-    () => getServerConversation(conversationId),
-    [conversationId, getServerConversation]
-  );
-  const localConversation = useMemo(
-    () => getLocalConversation(conversationId),
-    [conversationId, getLocalConversation]
-  );
-  const createdGroup = useMemo(
-    () => getCreatedGroup(conversationId),
-    [conversationId, getCreatedGroup]
-  );
-  const rawConversation = serverConversation ?? localConversation ?? createdGroup;
-  const conversation = rawConversation
-    ? decorateConversation(rawConversation)
-    : undefined;
-  const source: "server" | "private" | "admin" = createdGroup
-    ? "admin"
-    : localConversation
-      ? "private"
-      : "server";
-  const localOnly = source !== "server";
-  const messages = useMemo(() => {
-    if (source === "admin") return getCreatedGroupMessages(conversationId);
-    if (source === "private") return getConversationMessages(conversationId);
-    return getMessages(conversationId);
-  }, [
-    conversationId,
-    getConversationMessages,
-    getCreatedGroupMessages,
-    getMessages,
-    source
-  ]);
-  const loading = !localOnly && loadingConversationIds.has(conversationId);
-  const loadingMore = !localOnly && loadingMoreConversationIds.has(conversationId);
-  const hasMore = !localOnly && hasMoreMessages(conversationId);
-  const latestMessageId = messages[0]?.id;
-  const canSubmit = Boolean(
-    conversation?.canPost &&
-      (draft.trim() || pendingAttachments.length > 0) &&
-      !submitting
-  );
+  const submitUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastMarkedReadMessageId = useRef<string | null>(null);
 
   const mentionQuery = useMemo(() => {
     const match = draft.match(/(?:^|\s)@([^\s@]*)$/u);
@@ -149,27 +129,21 @@ export default function ChatScreen() {
   }, [draft]);
   const mentionSuggestions = useMemo(() => {
     if (mentionQuery === null) return [];
-    const allowedMemberIds = conversation?.memberIds;
     return members
       .filter((member) => member.id !== currentUser.id)
-      .filter((member) =>
-        allowedMemberIds?.length ? allowedMemberIds.includes(member.id) : true
-      )
       .filter((member) =>
         [member.name, member.company]
           .join(" ")
           .toLocaleLowerCase("fr")
           .includes(mentionQuery)
       )
-      .slice(0, 4);
-  }, [conversation?.memberIds, currentUser.id, members, mentionQuery]);
-
-  const directMemberId = useMemo(() => {
-    if (!conversation || conversation.type !== "direct") return undefined;
-    return conversation.memberIds?.find(
-      (memberId) => memberId !== currentUser.id
-    );
-  }, [conversation, currentUser.id]);
+      .slice(0, 5);
+  }, [currentUser.id, members, mentionQuery]);
+  const canSubmit = Boolean(
+    conversation?.canPost &&
+      !submitting &&
+      (draft.trim() || pendingAttachments.length > 0)
+  );
 
   const goBackToDiscussions = () => {
     if (router.canGoBack()) {
@@ -209,7 +183,8 @@ export default function ChatScreen() {
           Conversation introuvable
         </Text>
         <Text style={styles.missingText}>
-          Elle a peut-être été supprimée, masquée par votre statut ou vous avez quitté le groupe.
+          Elle a peut-être été supprimée, masquée par votre statut ou vous avez
+          quitté le groupe.
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -240,7 +215,9 @@ export default function ChatScreen() {
   };
 
   const insertMention = (name: string) => {
-    setDraft((current) => current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `));
+    setDraft((current) =>
+      current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `)
+    );
   };
 
   const addAttachment = async (kind: AttachmentKind) => {
@@ -273,7 +250,8 @@ export default function ChatScreen() {
     const normalized = value.toLocaleLowerCase("fr");
     return members
       .filter((member) => {
-        const firstName = member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
+        const firstName =
+          member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
         return (
           (firstName && normalized.includes(`@${firstName}`)) ||
           normalized.includes(`@${member.name.toLocaleLowerCase("fr")}`) ||
@@ -638,7 +616,7 @@ export default function ChatScreen() {
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`Retirer ${attachment.label}`}
+                    accessibilityLabel={`Retirer ${attachment.name}`}
                     onPress={() =>
                       setPendingAttachments((previous) =>
                         previous.filter((_, itemIndex) => itemIndex !== index)
@@ -755,7 +733,8 @@ export default function ChatScreen() {
               ))}
             </View>
             <Text style={styles.backendHint}>
-              Les contenus sont sélectionnés depuis l’appareil puis envoyés vers le stockage privé Neptune avec progression et reprise en cas d’échec.
+              Les contenus sont sélectionnés depuis l’appareil puis envoyés vers le
+              stockage privé Neptune avec progression et reprise en cas d’échec.
             </Text>
           </Pressable>
         </Pressable>
@@ -789,16 +768,6 @@ export default function ChatScreen() {
               </Pressable>
             ))}
           </Pressable>
-          <Pressable
-            style={styles.replyAction}
-            onPress={() => {
-              setReplyingTo(reactionMessage);
-              setReactionMessage(null);
-            }}
-          >
-            <Ionicons name="return-up-forward" size={20} color={colors.text} />
-            <Text style={styles.replyActionText}>Répondre à ce message</Text>
-          </Pressable>
         </Pressable>
       </Modal>
     </KeyboardAvoidingView>
@@ -807,64 +776,268 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  header: { paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center", gap: 4, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  headerContent: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: "center" },
-  headerTitle: { ...typography.heading3, color: colors.white },
-  headerSubtitle: { ...typography.caption, color: colors.whiteMuted, marginTop: 1 },
-  callActions: { flexDirection: "row", flexShrink: 0 },
-  callButton: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  pinned: { flexDirection: "row", gap: spacing.sm, alignItems: "center", backgroundColor: colors.surfaceStrong, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  pinnedText: { ...typography.caption, color: colors.textSecondary, flex: 1, minWidth: 0 },
-  errorBanner: { ...typography.bodySmall, color: colors.danger, backgroundColor: colors.dangerSoft, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  header: {
+    minHeight: 72,
+    paddingBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft
+  },
+  headerButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  headerContent: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 52,
+    justifyContent: "center",
+    paddingHorizontal: 5
+  },
+  headerTitle: { ...typography.heading3, color: colors.text },
+  headerSubtitle: { color: colors.textMuted, fontSize: 9.5, marginTop: 2 },
+  callActions: { flexDirection: "row", gap: 3 },
+  callButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSoft
+  },
+  pinned: {
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9
+  },
+  pinnedText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
+  errorBanner: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    fontSize: 10,
+    fontWeight: "800",
+    textAlign: "center"
+  },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
-  historyLoader: { minHeight: 48, alignItems: "center", justifyContent: "center" },
-  messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
-  empty: { ...typography.body, color: colors.textMuted, textAlign: "center", marginTop: 64 },
-  composerArea: { paddingTop: 6, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderSoft },
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 7 },
-  attachButton: { width: 46, height: 46, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft },
-  input: { flex: 1, minWidth: 0, minHeight: 46, maxHeight: 126, borderRadius: 20, paddingHorizontal: spacing.md, paddingVertical: 11, color: colors.text, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft, ...typography.body },
-  sendButton: { width: 46, height: 46, borderRadius: 17, overflow: "hidden", flexShrink: 0 },
-  sendGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
-  sendPressed: { transform: [{ scale: 0.95 }] },
-  sendDisabled: { opacity: 0.4 },
-  readOnly: { minHeight: 64, paddingTop: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
-  readOnlyText: { ...typography.bodySmall, color: colors.textMuted, textAlign: "center", flexShrink: 1 },
-  mentionSuggestions: { marginBottom: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, overflow: "hidden" },
-  mentionRow: { minHeight: 50, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
-  mentionAvatar: { width: 32, height: 32, borderRadius: 11, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  messages: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md
+  },
+  historyLoader: { minHeight: 52, alignItems: "center", justifyContent: "center" },
+  empty: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginVertical: spacing.xl
+  },
+  composerArea: {
+    paddingTop: 6,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft
+  },
+  mentionSuggestions: {
+    marginBottom: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+    overflow: "hidden"
+  },
+  mentionRow: {
+    minHeight: 50,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  mentionAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   mentionInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
   mentionContent: { flex: 1, minWidth: 0 },
   mentionName: { color: colors.text, fontSize: 12, fontWeight: "900" },
   mentionCompany: { color: colors.textMuted, fontSize: 10, marginTop: 1 },
-  replyComposer: { marginBottom: 6, padding: 8, borderRadius: 13, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 8 },
-  replyComposerAccent: { width: 3, alignSelf: "stretch", borderRadius: 2, backgroundColor: colors.orange },
+  replyComposer: {
+    marginBottom: 6,
+    padding: 8,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  replyComposerAccent: {
+    width: 3,
+    alignSelf: "stretch",
+    borderRadius: 2,
+    backgroundColor: colors.orange
+  },
   replyComposerContent: { flex: 1, minWidth: 0 },
   replyComposerTitle: { color: colors.orange, fontSize: 10, fontWeight: "900" },
   replyComposerText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   smallButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  pendingAttachments: { gap: 6, paddingBottom: 6 },
-  pendingChip: { minHeight: 34, paddingHorizontal: 9, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 6 },
-  pendingText: { color: colors.textSecondary, fontSize: 11, fontWeight: "700" },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.72)", justifyContent: "flex-end" },
-  attachmentSheet: { width: "100%", maxWidth: 640, alignSelf: "center", padding: spacing.md, paddingBottom: 28, borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong },
-  sheetHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", backgroundColor: colors.border, marginBottom: spacing.md },
-  sheetTitle: { ...typography.heading2, color: colors.text, textAlign: "center", marginBottom: spacing.md },
-  attachmentGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 18 },
-  attachmentChoice: { width: "31%", minHeight: 86, alignItems: "center", justifyContent: "center", gap: 7 },
-  attachmentChoiceIcon: { width: 48, height: 48, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-  attachmentChoiceText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800", textAlign: "center" },
-  backendHint: { ...typography.caption, color: colors.textMuted, textAlign: "center", marginTop: spacing.lg },
-  reactionBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.64)", alignItems: "center", justifyContent: "center", padding: spacing.md },
-  reactionBar: { paddingHorizontal: 8, minHeight: 58, borderRadius: 29, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center" },
-  reactionButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
-  reactionEmoji: { fontSize: 25 },
-  replyAction: { marginTop: 12, minHeight: 50, paddingHorizontal: spacing.md, borderRadius: 17, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 10 },
-  replyActionText: { color: colors.text, fontWeight: "800" },
-  missing: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
+  pendingAttachments: { gap: 7, paddingBottom: 6 },
+  pendingChip: {
+    maxWidth: 250,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7
+  },
+  pendingText: { color: colors.textSecondary, fontSize: 10, flexShrink: 1 },
+  composer: { flexDirection: "row", alignItems: "flex-end", gap: 7 },
+  attachButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 17,
+    backgroundColor: colors.surfaceStrong,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 46,
+    maxHeight: 122,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong,
+    color: colors.text,
+    ...typography.bodySmall
+  },
+  sendButton: { width: 46, height: 46, borderRadius: 17, overflow: "hidden" },
+  sendGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
+  sendDisabled: { opacity: 0.4 },
+  sendPressed: { transform: [{ scale: 0.95 }] },
+  readOnly: {
+    minHeight: 56,
+    paddingTop: spacing.sm,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  readOnlyText: { ...typography.bodySmall, color: colors.textMuted, flexShrink: 1 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "flex-end"
+  },
+  attachmentSheet: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderColor: colors.border
+  },
+  sheetHandle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.textMuted,
+    alignSelf: "center",
+    marginBottom: 14
+  },
+  sheetTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
+  attachmentGrid: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  attachmentChoice: {
+    width: "30%",
+    minWidth: 86,
+    minHeight: 86,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
+  attachmentChoiceIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  attachmentChoiceText: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  backendHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: spacing.md
+  },
+  reactionBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.md
+  },
+  reactionBar: {
+    minHeight: 58,
+    paddingHorizontal: 7,
+    borderRadius: 29,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionButton: { width: 46, height: 46, alignItems: "center", justifyContent: "center" },
+  reactionEmoji: { fontSize: 23 },
+  missing: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.xl,
+    gap: spacing.md
+  },
   missingTitle: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  missingText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 420 },
-  missingButton: { minWidth: 150, minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 16, backgroundColor: colors.primarySoft },
-  backLink: { color: colors.text, fontWeight: "800" }
+  missingText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
+  missingButton: {
+    minHeight: 48,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  backLink: { color: colors.white, fontWeight: "900" }
 });
