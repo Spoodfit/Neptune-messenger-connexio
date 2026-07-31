@@ -1,4 +1,4 @@
-name: Front Diagnostic
+name: Front Compatibility Repair
 
 on:
   push:
@@ -9,9 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  diagnose:
-    if: ${{ !contains(github.event.head_commit.message, 'ci(report)') }}
+  repair-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, 'ci(autofix)') && !contains(github.event.head_commit.message, 'ci(report)') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,65 +20,101 @@ jobs:
           ref: feat/production-hardening
           fetch-depth: 0
           persist-credentials: true
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22.13.1
           cache: npm
-      - name: Run diagnostics
+
+      - name: Replace removed React Native style alias
         shell: bash
         run: |
-          set +e
-          npm ci > /tmp/install.log 2>&1
-          install_code=$?
-          if [ "$install_code" -eq 0 ]; then
-            npm run typecheck > /tmp/typecheck.log 2>&1
-            typecheck_code=$?
-            npm run test:domain > /tmp/tests.log 2>&1
-            tests_code=$?
-            npx expo install --check > /tmp/expo.log 2>&1
-            expo_code=$?
+          set -euo pipefail
+          mapfile -t files < <(grep -RIl \
+            --include='*.ts' \
+            --include='*.tsx' \
+            'StyleSheet\.absoluteFillObject' app src 2>/dev/null || true)
+
+          if [ "${#files[@]}" -gt 0 ]; then
+            printf 'Migration de %s fichier(s):\n' "${#files[@]}"
+            printf ' - %s\n' "${files[@]}"
+            sed -i 's/StyleSheet\.absoluteFillObject/StyleSheet.absoluteFill/g' "${files[@]}"
           else
-            typecheck_code=99
-            tests_code=99
-            expo_code=99
-            echo "Non exécuté : installation en échec." > /tmp/typecheck.log
-            cp /tmp/typecheck.log /tmp/tests.log
-            cp /tmp/typecheck.log /tmp/expo.log
+            echo 'Aucun ancien alias React Native détecté.'
           fi
-          mkdir -p docs
-          {
-            echo "# Diagnostic temporaire Connexio"
-            echo
-            echo "Commit testé : \`${GITHUB_SHA}\`"
-            echo
-            echo "| Étape | Code |"
-            echo "|---|---:|"
-            echo "| npm ci | ${install_code} |"
-            echo "| TypeScript | ${typecheck_code} |"
-            echo "| Tests | ${tests_code} |"
-            echo "| Expo check | ${expo_code} |"
-            echo
-            echo "## TypeScript"
-            echo '```text'
-            tail -n 180 /tmp/typecheck.log
-            echo '```'
-            echo
-            echo "## Tests"
-            echo '```text'
-            tail -n 120 /tmp/tests.log
-            echo '```'
-            echo
-            echo "## Expo"
-            echo '```text'
-            tail -n 80 /tmp/expo.log
-            echo '```'
-          } > docs/CI_DIAGNOSTIC_TEMP.md
-      - name: Commit diagnostic
+
+          if grep -RIn \
+            --include='*.ts' \
+            --include='*.tsx' \
+            'StyleSheet\.absoluteFillObject' app src; then
+            echo 'Des alias obsolètes subsistent après migration.'
+            exit 1
+          fi
+
+      - name: Install locked dependencies
+        id: install
+        shell: bash
+        run: npm ci
+
+      - name: TypeScript application
+        id: typecheck
+        shell: bash
+        run: npm run typecheck
+
+      - name: Domain tests
+        id: tests
+        shell: bash
+        run: npm run test:domain
+
+      - name: Expo dependency compatibility
+        id: expo
+        shell: bash
+        run: npx expo install --check
+
+      - name: Build mock web application
+        id: webbuild
+        shell: bash
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.com
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.com/v1/realtime
+          EXPO_PUBLIC_EAS_PROJECT_ID: ""
+          EXPO_PUBLIC_GITHUB_PAGES: "false"
+        run: npm run web:build
+
+      - name: Write verification record
         shell: bash
         run: |
+          cat > docs/CI_DIAGNOSTIC_TEMP.md <<EOF
+          # Vérification frontend Connexio
+
+          Commit source : \`${GITHUB_SHA}\`
+
+          | Contrôle | Résultat |
+          |---|---|
+          | Migration \`absoluteFillObject\` vers \`absoluteFill\` | Réussie |
+          | Installation verrouillée | Réussie |
+          | TypeScript strict | Réussi |
+          | Tests métier | Réussis |
+          | Compatibilité Expo | Réussie |
+          | Build web mock | Réussi |
+
+          Le correcteur refuse de committer si un alias React Native obsolète subsiste ou si une validation échoue.
+          EOF
+
+      - name: Commit repaired frontend
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "Connexio CI"
           git config user.email "actions@users.noreply.github.com"
-          git add docs/CI_DIAGNOSTIC_TEMP.md
-          git commit -m "ci(report): actualiser le diagnostic temporaire [skip ci]" || exit 0
+          git add app src docs/CI_DIAGNOSTIC_TEMP.md
+
+          if git diff --cached --quiet; then
+            echo 'Aucune correction de code à committer.'
+            exit 0
+          fi
+
+          git commit -m "ci(autofix): migrer les styles React Native et valider le front [skip ci]"
           git push origin HEAD:feat/production-hardening
