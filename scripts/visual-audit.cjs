@@ -90,10 +90,43 @@ async function inspectPage(page) {
         return { label: label(element), width: rect.width, height: rect.height };
       });
 
+    const clippedVisibleRect = (element) => {
+      const raw = element.getBoundingClientRect();
+      let left = Math.max(0, raw.left);
+      let right = Math.min(viewportWidth, raw.right);
+      let top = Math.max(0, raw.top);
+      let bottom = Math.min(viewportHeight, raw.bottom);
+      let ancestor = element.parentElement;
+      const clips = (value) => ["hidden", "clip", "auto", "scroll"].includes(value);
+
+      while (ancestor && ancestor !== document.body) {
+        const style = getComputedStyle(ancestor);
+        const ancestorRect = ancestor.getBoundingClientRect();
+        if (clips(style.overflowX)) {
+          left = Math.max(left, ancestorRect.left);
+          right = Math.min(right, ancestorRect.right);
+        }
+        if (clips(style.overflowY)) {
+          top = Math.max(top, ancestorRect.top);
+          bottom = Math.min(bottom, ancestorRect.bottom);
+        }
+        ancestor = ancestor.parentElement;
+      }
+
+      return {
+        left,
+        right,
+        top,
+        bottom,
+        width: Math.max(0, right - left),
+        height: Math.max(0, bottom - top)
+      };
+    };
+
     const controlRects = controls.map((element) => ({
       element,
       label: label(element),
-      rect: element.getBoundingClientRect()
+      rect: clippedVisibleRect(element)
     }));
     const pointInside = (x, y, rect) =>
       x > rect.left + 1 && x < rect.right - 1 && y > rect.top + 1 && y < rect.bottom - 1;
