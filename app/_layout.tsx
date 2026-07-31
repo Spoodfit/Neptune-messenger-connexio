@@ -8,6 +8,7 @@ import {
   SafeAreaProvider
 } from "react-native-safe-area-context";
 
+import { ExperienceProvider } from "../src/providers/ExperienceProvider";
 import { MessagingProvider } from "../src/providers/MessagingProvider";
 import { SessionProvider, useSession } from "../src/providers/SessionProvider";
 import { NeptuneMessagingApi } from "../src/services/api/neptuneApi";
@@ -187,7 +188,7 @@ function AuthenticatedApp() {
 
   return (
     <MessagingProvider key={`user:${currentUser.id}`}>
-      {applicationStack}
+      <ExperienceProvider>{applicationStack}</ExperienceProvider>
     </MessagingProvider>
   );
 }
