@@ -183,7 +183,7 @@ export default function MessagesScreen() {
                 {active ? (
                   <LinearGradient
                     colors={gradients.activeTab}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                   />
                 ) : null}
                 <Ionicons

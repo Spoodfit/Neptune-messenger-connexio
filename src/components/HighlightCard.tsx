@@ -134,7 +134,7 @@ export function HighlightCard({
                 ? ["#063C72", "#1859D9", "#9145ED"]
                 : ["#24345C", "#734EE3", "#FF7E75"]
             }
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
           <Ionicons
             name={post.media.kind === "video" ? "play-circle" : "image"}

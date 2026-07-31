@@ -172,7 +172,7 @@ export default function HighlightDetailScreen() {
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient colors={gradients.screen} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={gradients.screen} style={StyleSheet.absoluteFill} />
       <View
         style={[
           styles.header,

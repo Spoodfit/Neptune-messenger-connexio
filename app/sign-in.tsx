@@ -84,7 +84,7 @@ export default function SignInScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={gradients.screen} style={StyleSheet.absoluteFillObject} />
+      <LinearGradient colors={gradients.screen} style={StyleSheet.absoluteFill} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboard}

@@ -262,7 +262,7 @@ export default function NewHighlightScreen() {
                   ? ["#063C72", "#1859D9", "#9145ED"]
                   : ["#24345C", "#734EE3", "#FF7E75"]
               }
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
             <Ionicons
               name={media.kind === "video" ? "play-circle" : "image"}

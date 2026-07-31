@@ -4,7 +4,7 @@ const compatibleStyleSheet = StyleSheet as typeof StyleSheet & {
   absoluteFillObject?: typeof StyleSheet.absoluteFill;
 };
 
-if (!compatibleStyleSheet.absoluteFillObject) {
+if (!compatibleStyleSheet.absoluteFill) {
   Object.defineProperty(compatibleStyleSheet, "absoluteFillObject", {
     value: StyleSheet.absoluteFill,
     enumerable: false,
