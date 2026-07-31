@@ -28,18 +28,34 @@ changed |= replace_once(
 
 changed |= replace_once(
     "app/(tabs)/highlights.tsx",
-    'paddingHorizontal: 10, paddingTop: 10, flexDirection: "row", gap: 8 },',
-    'paddingHorizontal: 10, paddingTop: 10, flexDirection: "row", alignItems: "center", gap: 8 },',
+    '''    flexDirection: "row",
+    gap: 7
+  },
+  modeBar: {''',
+    '''    flexDirection: "row",
+    alignItems: "center",
+    gap: 7
+  },
+  modeBar: {''',
 )
 changed |= replace_once(
     "app/(tabs)/highlights.tsx",
-    'modeBar: { flex: 1, height: 44, padding: 3,',
-    'modeBar: { flex: 1, height: 52, padding: 3,',
+    '''  modeBar: {
+    flex: 1,
+    height: 44,''',
+    '''  modeBar: {
+    flex: 1,
+    height: 52,''',
 )
 changed |= replace_once(
     "app/(tabs)/highlights.tsx",
-    'modeButton: { flex: 1, minHeight: 36,',
-    'modeButton: { flex: 1, minHeight: 44,',
+    '''  modeButton: {
+    flex: 1,
+    overflow: "hidden",''',
+    '''  modeButton: {
+    flex: 1,
+    minHeight: 44,
+    overflow: "hidden",''',
 )
 
 changed |= replace_once(
