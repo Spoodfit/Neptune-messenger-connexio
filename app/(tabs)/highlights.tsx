@@ -3,8 +3,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   Animated,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,18 +16,30 @@ import {
 import { BrandHeader } from "@/components/BrandHeader";
 import { HighlightCard } from "@/components/HighlightCard";
 import NeptuneMap from "@/components/NeptuneMap";
+import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
-import { colors, gradients, spacing, typography } from "@/theme";
+import { useMessaging } from "@/providers/MessagingProvider";
+import { useSession } from "@/providers/SessionProvider";
+import { NeptuneExperienceApi } from "@/services/api/experienceApi";
+import { colors, gradients, typography } from "@/theme";
 
 export default function HighlightsScreen() {
+  const { accessToken } = useSession();
   const {
     posts,
     mapMoments,
+    localConversations,
     togglePostReaction,
     createPrivateConversation
   } = useExperience();
+  const { visibleConversations, refreshConversations } = useMessaging();
+  const api = useMemo(
+    () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
+    [accessToken]
+  );
   const [mode, setMode] = useState<"feed" | "map">("feed");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [openingAction, setOpeningAction] = useState(false);
   const overlayProgress = useRef(new Animated.Value(0)).current;
 
   const selectedMoment = useMemo(
@@ -51,12 +64,40 @@ export default function HighlightsScreen() {
     }).start();
   }, [overlayProgress, selectedMemberId]);
 
-  const contactSelectedMember = () => {
-    if (!selectedMoment) return;
-    const existing = createPrivateConversation({
-      memberIds: [selectedMoment.member.id]
-    });
-    router.push(`/chat/${encodeURIComponent(existing.id)}`);
+  const ensureSelectedConversation = async () => {
+    if (!selectedMoment) throw new Error("Membre introuvable.");
+    const existing = [...visibleConversations, ...localConversations].find(
+      (conversation) =>
+        conversation.type === "direct" &&
+        conversation.memberIds?.includes(selectedMoment.member.id)
+    );
+    if (existing) return existing;
+    if (api) {
+      const conversation = await api.createPrivateConversation([
+        selectedMoment.member.id
+      ]);
+      await refreshConversations();
+      return conversation;
+    }
+    return createPrivateConversation({ memberIds: [selectedMoment.member.id] });
+  };
+
+  const openSelectedAction = async (action: "message" | "audio" | "video") => {
+    if (openingAction) return;
+    setOpeningAction(true);
+    try {
+      const conversation = await ensureSelectedConversation();
+      if (action === "message") {
+        router.push(`/chat/${encodeURIComponent(conversation.id)}`);
+      } else {
+        router.push({
+          pathname: "/call/[id]",
+          params: { id: conversation.id, mode: action }
+        });
+      }
+    } finally {
+      setOpeningAction(false);
+    }
   };
 
   return (
@@ -129,6 +170,12 @@ export default function HighlightsScreen() {
                 </View>
               );
             })}
+            {posts.length === 0 ? (
+              <View style={styles.emptyFeed}>
+                <Ionicons name="sparkles-outline" size={28} color={colors.textMuted} />
+                <Text style={styles.emptyText}>Aucun Temps fort visible.</Text>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
       ) : (
@@ -176,9 +223,16 @@ export default function HighlightsScreen() {
                     style={styles.memberAvatar}
                   >
                     <View style={styles.memberAvatarInner}>
-                      <Text style={styles.memberInitials}>
-                        {selectedMoment.member.initials}
-                      </Text>
+                      {selectedMoment.member.avatarUrl ? (
+                        <Image
+                          source={{ uri: selectedMoment.member.avatarUrl }}
+                          style={styles.avatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.memberInitials}>
+                          {selectedMoment.member.initials}
+                        </Text>
+                      )}
                     </View>
                   </LinearGradient>
                   <View style={styles.memberText}>
@@ -200,15 +254,14 @@ export default function HighlightsScreen() {
                 </Pressable>
               </View>
 
-              <View style={styles.floatingMoments}>
+              <ScrollView
+                style={styles.momentScroll}
+                contentContainerStyle={styles.floatingMoments}
+                showsVerticalScrollIndicator={false}
+              >
                 {selectedPosts.slice(0, 3).map((post, index) => (
-                  <Pressable
+                  <View
                     key={post.id}
-                    accessibilityRole="button"
-                    accessibilityLabel="Ouvrir la publication"
-                    onPress={() =>
-                      router.push(`/highlight/${encodeURIComponent(post.id)}`)
-                    }
                     style={[
                       styles.momentBubble,
                       {
@@ -217,39 +270,70 @@ export default function HighlightsScreen() {
                       }
                     ]}
                   >
-                    <View style={styles.momentTop}>
-                      <Text style={styles.momentKind}>
-                        {post.kind.toLocaleUpperCase("fr")}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Ouvrir la publication"
+                      onPress={() =>
+                        router.push(`/highlight/${encodeURIComponent(post.id)}`)
+                      }
+                    >
+                      <View style={styles.momentTop}>
+                        <Text style={styles.momentKind}>
+                          {post.kind.toLocaleUpperCase("fr")}
+                        </Text>
+                        <Text style={styles.momentDate}>
+                          {new Date(post.createdAt).toLocaleTimeString("fr-FR", {
+                            hour: "2-digit",
+                            minute: "2-digit"
+                          })}
+                        </Text>
+                      </View>
+                      <Text style={styles.momentBody} numberOfLines={3}>
+                        {post.body}
                       </Text>
-                      <Text style={styles.momentDate}>
-                        {new Date(post.createdAt).toLocaleTimeString("fr-FR", {
-                          hour: "2-digit",
-                          minute: "2-digit"
-                        })}
-                      </Text>
+                    </Pressable>
+                    <View style={styles.bubbleActions}>
+                      {(["❤️", "🔥", "👏"] as const).map((emoji) => (
+                        <Pressable
+                          key={emoji}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Réagir avec ${emoji}`}
+                          onPress={() => togglePostReaction(post.id, emoji)}
+                          style={styles.bubbleReaction}
+                        >
+                          <Text style={styles.bubbleEmoji}>{emoji}</Text>
+                        </Pressable>
+                      ))}
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Commenter"
+                        onPress={() =>
+                          router.push(`/highlight/${encodeURIComponent(post.id)}`)
+                        }
+                        style={styles.bubbleComment}
+                      >
+                        <Ionicons
+                          name="chatbubble-outline"
+                          size={17}
+                          color={colors.textMuted}
+                        />
+                        <Text style={styles.momentStat}>{post.comments.length}</Text>
+                      </Pressable>
                     </View>
-                    <Text style={styles.momentBody} numberOfLines={3}>
-                      {post.body}
-                    </Text>
-                    <View style={styles.momentStats}>
-                      <Text style={styles.momentStat}>
-                        {post.reactions.reduce(
-                          (sum, reaction) => sum + reaction.count,
-                          0
-                        )} réactions
-                      </Text>
-                      <Text style={styles.momentStat}>
-                        {post.comments.length} commentaires
-                      </Text>
-                    </View>
-                  </Pressable>
+                  </View>
                 ))}
-              </View>
+              </ScrollView>
 
               <View style={styles.quickActions}>
+                {openingAction ? (
+                  <View style={styles.actionLoader}>
+                    <ActivityIndicator size="small" color={colors.violet} />
+                  </View>
+                ) : null}
                 <Pressable
                   accessibilityRole="button"
-                  onPress={contactSelectedMember}
+                  disabled={openingAction}
+                  onPress={() => void openSelectedAction("message")}
                   style={styles.quickAction}
                 >
                   <Ionicons name="chatbubble" size={19} color={colors.text} />
@@ -257,12 +341,8 @@ export default function HighlightsScreen() {
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() =>
-                    Alert.alert(
-                      "Appel audio",
-                      "Le fournisseur d’appel sera branché sur cette action."
-                    )
-                  }
+                  disabled={openingAction}
+                  onPress={() => void openSelectedAction("audio")}
                   style={styles.quickAction}
                 >
                   <Ionicons name="call" size={19} color={colors.text} />
@@ -270,12 +350,8 @@ export default function HighlightsScreen() {
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() =>
-                    Alert.alert(
-                      "Visio",
-                      "La signalisation WebRTC sera branchée sur cette action."
-                    )
-                  }
+                  disabled={openingAction}
+                  onPress={() => void openSelectedAction("video")}
                   style={styles.quickAction}
                 >
                   <Ionicons name="videocam" size={20} color={colors.text} />
@@ -299,123 +375,47 @@ export default function HighlightsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  toolbar: {
-    width: "100%",
-    maxWidth: 720,
-    alignSelf: "center",
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7
-  },
-  modeBar: {
-    flex: 1,
-    height: 52,
-    padding: 3,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    overflow: "hidden"
-  },
-  modeButton: {
-    flex: 1,
-    minHeight: 44,
-    overflow: "hidden",
-    borderRadius: 13,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6
-  },
+  toolbar: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 7 },
+  modeBar: { flex: 1, height: 52, padding: 3, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", overflow: "hidden" },
+  modeButton: { flex: 1, minHeight: 44, overflow: "hidden", borderRadius: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   modeLabel: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
   modeLabelActive: { color: colors.text },
   createButton: { width: 44, height: 44, borderRadius: 15, overflow: "hidden" },
   createGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
-  feed: {
-    width: "100%",
-    maxWidth: 720,
-    alignSelf: "center",
-    paddingHorizontal: 10,
-    paddingBottom: 24
-  },
-  feedGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 9
-  },
+  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24 },
+  feedGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 9 },
   postWide: { width: "100%" },
   postHalf: { width: "48.5%" },
-  mapStage: {
-    flex: 1,
-    width: "100%",
-    maxWidth: 720,
-    alignSelf: "center",
-    paddingHorizontal: 10,
-    paddingBottom: 12,
-    position: "relative"
-  },
-  mapHint: {
-    position: "absolute",
-    left: 22,
-    right: 22,
-    bottom: 24,
-    minHeight: 42,
-    paddingHorizontal: 12,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "rgba(8,18,38,0.94)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8
-  },
+  emptyFeed: { width: "100%", minHeight: 180, alignItems: "center", justifyContent: "center", gap: 8 },
+  emptyText: { ...typography.bodySmall, color: colors.textMuted },
+  mapStage: { flex: 1, width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 12, position: "relative" },
+  mapHint: { position: "absolute", left: 22, right: 22, bottom: 24, minHeight: 44, paddingHorizontal: 12, borderRadius: 15, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,18,38,0.94)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   mapHintText: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
-  momentOverlay: {
-    position: "absolute",
-    left: 18,
-    right: 18,
-    bottom: 20,
-    maxHeight: "72%",
-    padding: 10,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "rgba(5,11,28,0.96)",
-    shadowColor: "#000000",
-    shadowOpacity: 0.4,
-    shadowRadius: 26,
-    shadowOffset: { width: 0, height: 16 }
-  },
+  momentOverlay: { position: "absolute", left: 18, right: 18, bottom: 20, maxHeight: "78%", padding: 10, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(5,11,28,0.96)", shadowColor: "#000000", shadowOpacity: 0.4, shadowRadius: 26, shadowOffset: { width: 0, height: 16 } },
   memberSummary: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 7 },
   memberIdentity: { flex: 1, minWidth: 0, minHeight: 50, flexDirection: "row", alignItems: "center", gap: 9 },
   memberAvatar: { width: 43, height: 43, padding: 2, borderRadius: 15 },
-  memberAvatarInner: { flex: 1, borderRadius: 13, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  memberAvatarInner: { flex: 1, borderRadius: 13, overflow: "hidden", backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  avatarImage: { width: "100%", height: "100%" },
   memberInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
   memberText: { flex: 1, minWidth: 0 },
   memberName: { color: colors.text, fontSize: 13, fontWeight: "900" },
   memberMeta: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
   closeButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  momentScroll: { maxHeight: 320 },
   floatingMoments: { gap: 7, paddingVertical: 6 },
-  momentBubble: {
-    padding: 11,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface
-  },
+  momentBubble: { padding: 11, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
   momentTop: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   momentKind: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
   momentDate: { color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
   momentBody: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 6 },
-  momentStats: { flexDirection: "row", gap: 10, marginTop: 7 },
-  momentStat: { color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
-  quickActions: { marginTop: 5, flexDirection: "row", gap: 7 },
+  bubbleActions: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7 },
+  bubbleReaction: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  bubbleEmoji: { fontSize: 17 },
+  bubbleComment: { minWidth: 54, height: 44, paddingHorizontal: 8, borderRadius: 15, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  momentStat: { color: colors.textMuted, fontSize: 9, fontWeight: "700" },
+  quickActions: { marginTop: 5, flexDirection: "row", gap: 7, position: "relative" },
   quickAction: { flex: 1, minHeight: 48, borderRadius: 16, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  quickText: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" }
+  quickText: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  actionLoader: { position: "absolute", zIndex: 3, inset: 0, borderRadius: 16, backgroundColor: "rgba(5,11,28,0.72)", alignItems: "center", justifyContent: "center" }
 });
