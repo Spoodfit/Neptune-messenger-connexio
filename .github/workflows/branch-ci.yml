@@ -1,0 +1,100 @@
+name: Branch CI
+
+on:
+  push:
+    branches:
+      - feat/production-hardening
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Production dependency vulnerability audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: TypeScript application
+        run: npm run typecheck
+      - name: Domain tests
+        run: npm run test:domain
+      - name: Expo dependency compatibility
+        run: npx expo install --check
+      - name: Expo public configuration audit
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.com
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.com/v1/realtime
+        run: npm run config:check
+      - name: Production configuration gate
+        run: |
+          set -euo pipefail
+          run_should_fail() {
+            local description="$1"
+            shift
+            set +e
+            "$@" >/tmp/connexio-config-gate.log 2>&1
+            local exit_code=$?
+            set -e
+            if [ "$exit_code" -eq 0 ]; then
+              echo "Gate invalide: $description aurait dû échouer."
+              cat /tmp/connexio-config-gate.log
+              exit 1
+            fi
+          }
+          run_should_pass() {
+            local description="$1"
+            shift
+            if ! "$@" >/tmp/connexio-config-gate.log 2>&1; then
+              echo "Gate invalide: $description aurait dû réussir."
+              cat /tmp/connexio-config-gate.log
+              exit 1
+            fi
+          }
+          run_should_fail "configuration absente" env EAS_BUILD_PROFILE=production EXPO_PUBLIC_MOCK_MODE=false EXPO_PUBLIC_API_BASE_URL= EXPO_PUBLIC_REALTIME_URL= EXPO_PUBLIC_EAS_PROJECT_ID= npx expo config --type public
+          run_should_fail "mode mock en production" env EAS_BUILD_PROFILE=production EXPO_PUBLIC_MOCK_MODE=true EXPO_PUBLIC_API_BASE_URL=https://api.example.com EXPO_PUBLIC_REALTIME_URL=wss://api.example.com/v1/realtime EXPO_PUBLIC_EAS_PROJECT_ID=11111111-1111-4111-8111-111111111111 npx expo config --type public
+          run_should_fail "API non chiffrée" env EAS_BUILD_PROFILE=production EXPO_PUBLIC_MOCK_MODE=false EXPO_PUBLIC_API_BASE_URL=http://api.example.com EXPO_PUBLIC_REALTIME_URL=wss://api.example.com/v1/realtime EXPO_PUBLIC_EAS_PROJECT_ID=11111111-1111-4111-8111-111111111111 npx expo config --type public
+          run_should_fail "WebSocket non chiffré" env EAS_BUILD_PROFILE=production EXPO_PUBLIC_MOCK_MODE=false EXPO_PUBLIC_API_BASE_URL=https://api.example.com EXPO_PUBLIC_REALTIME_URL=ws://api.example.com/v1/realtime EXPO_PUBLIC_EAS_PROJECT_ID=11111111-1111-4111-8111-111111111111 npx expo config --type public
+          run_should_pass "configuration valide" env EAS_BUILD_PROFILE=production EXPO_PUBLIC_MOCK_MODE=false EXPO_PUBLIC_API_BASE_URL=https://api.example.com EXPO_PUBLIC_REALTIME_URL=wss://api.example.com/v1/realtime EXPO_PUBLIC_EAS_PROJECT_ID=11111111-1111-4111-8111-111111111111 npx expo config --type public
+
+  responsive-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install pinned browser audit tools
+        run: |
+          npm install --no-save --package-lock=false playwright-core@1.58.2
+          sudo apt-get update -qq
+          sudo apt-get install -y chromium-browser >/dev/null 2>&1 || sudo apt-get install -y chromium >/dev/null 2>&1
+      - name: Build mock web application
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.com
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.com/v1/realtime
+          EXPO_PUBLIC_EAS_PROJECT_ID: ""
+          EXPO_PUBLIC_GITHUB_PAGES: "false"
+        run: npx expo export --platform web --output-dir web-audit-dist
+      - name: Audit responsive layout and interactions
+        run: node scripts/visual-audit.cjs
