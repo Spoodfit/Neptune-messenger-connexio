@@ -1,0 +1,118 @@
+name: Final Front Fix
+
+on:
+  push:
+    branches:
+      - feat/production-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, 'fix(front-final)') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/production-hardening
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+
+      - name: Patch frontend and product audit
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              content = file.read_text(encoding="utf-8")
+              count = content.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: attendu 1 motif, trouvé {count}")
+              file.write_text(content.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "app/(tabs)/highlights.tsx",
+              'item === "feed" ? "Afficher le Feed" : "Afficher la Map"',
+              'item === "feed" ? "Afficher le Feed" : "Afficher la carte"',
+          )
+
+          replace_once(
+              "app/(tabs)/messages.tsx",
+              '            <View style={styles.sheetHandle} />\n',
+              '''            <View style={styles.sheetHandle} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Fermer les options de conversation"
+              onPress={closeMenu}
+              style={({ pressed }) => ({
+                position: "absolute",
+                top: 8,
+                right: 10,
+                width: 44,
+                height: 44,
+                zIndex: 2,
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.62 : 1
+              })}
+            >
+              <Ionicons name="close" size={21} color={colors.textMuted} />
+            </Pressable>
+''',
+          )
+
+          replace_once(
+              "scripts/product-audit.cjs",
+              '        await page.keyboard.press("Escape");\n',
+              '''        const closeOptions = page.getByLabel("Fermer les options de conversation");
+        await expectVisible(closeOptions, "fermeture du menu de conversation");
+        if (await closeOptions.isVisible().catch(() => false)) {
+          await closeOptions.click();
+          await page.waitForTimeout(180);
+        }
+''',
+          )
+          PY
+
+          grep -RIn 'Afficher la Map\|page.keyboard.press("Escape")' 'app/(tabs)/highlights.tsx' scripts/product-audit.cjs && exit 1 || true
+          grep -n 'Fermer les options de conversation' 'app/(tabs)/messages.tsx' scripts/product-audit.cjs
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify application
+        run: npm run verify
+
+      - name: Check Expo dependencies
+        run: npx expo install --check
+
+      - name: Build web application
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.com
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.com/v1/realtime
+          EXPO_PUBLIC_EAS_PROJECT_ID: ""
+          EXPO_PUBLIC_GITHUB_PAGES: "false"
+        run: npm run web:build
+
+      - name: Commit frontend fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Connexio CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add 'app/(tabs)/highlights.tsx' 'app/(tabs)/messages.tsx' scripts/product-audit.cjs
+          git commit -m "fix(front-final): fermer les options et harmoniser la carte"
+          git push origin HEAD:feat/production-hardening
