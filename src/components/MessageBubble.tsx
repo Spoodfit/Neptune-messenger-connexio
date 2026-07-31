@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { colors, gradients, radii, spacing, typography } from "../theme";
+import { MessageAttachmentView } from "./MessageAttachmentView";
 import type {
   ChatMessage,
   MessageReactionSummary,
@@ -41,23 +42,6 @@ const STATUS_LABELS: Record<MessageStatus, string> = {
 const AVATAR_SIZE = 44;
 const MAX_BUBBLE_WIDTH = 520;
 const REPLY_THRESHOLD = 54;
-
-const attachmentIcon = (kind: string) => {
-  switch (kind) {
-    case "photo":
-      return "image-outline" as const;
-    case "video":
-      return "videocam-outline" as const;
-    case "audio":
-      return "mic-outline" as const;
-    case "location":
-      return "location-outline" as const;
-    case "contact":
-      return "person-outline" as const;
-    default:
-      return "document-attach-outline" as const;
-  }
-};
 
 export function MessageBubble({
   message,
@@ -138,36 +122,11 @@ export function MessageBubble({
       ) : null}
 
       {message.attachments?.map((attachment) => (
-        <View key={attachment.id} style={styles.attachment}>
-          <View style={styles.attachmentIcon}>
-            <Ionicons
-              name={attachmentIcon(attachment.kind)}
-              size={21}
-              color={message.isMine ? colors.white : colors.orange}
-            />
-          </View>
-          <View style={styles.attachmentContent}>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.attachmentName,
-                message.isMine ? styles.mineBody : styles.otherBody
-              ]}
-            >
-              {attachment.name}
-            </Text>
-            <Text
-              style={[
-                styles.attachmentMeta,
-                message.isMine ? styles.mineTime : styles.otherTime
-              ]}
-            >
-              {attachment.status === "uploading"
-                ? `${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
-                : attachment.kind.toLocaleUpperCase("fr")}
-            </Text>
-          </View>
-        </View>
+        <MessageAttachmentView
+          key={attachment.id}
+          attachment={attachment}
+          isMine={message.isMine}
+        />
       ))}
 
       {message.body ? (
