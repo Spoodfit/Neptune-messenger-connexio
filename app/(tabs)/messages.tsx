@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.heading3, color: colors.text, flex: 1, flexShrink: 1, fontWeight: "900" },
   sectionCountShell: { minWidth: 28, height: 28, paddingHorizontal: 7, borderRadius: 14, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: "rgba(107,79,234,0.18)", alignItems: "center", justifyContent: "center" },
   sectionCount: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  listViewport: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" },
+  listViewport: { flex: 1, minHeight: 0, width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" },
   list: { paddingHorizontal: 10, paddingBottom: 22 },
   emptyList: { flexGrow: 1 },
   feedbackWrap: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", flex: 1, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center" },
