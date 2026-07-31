@@ -1,6 +1,6 @@
 # Diagnostic temporaire Connexio
 
-Commit testé : `10c135face2e7b3801601333c5b627ad19a20f06`
+Commit testé : `bbaf8f51a7c72f6124653911c545d4e3b8f833e7`
 
 | Étape | Code |
 |---|---:|
@@ -46,7 +46,7 @@ npm error   npm run test:compile # run the "test:compile" package script
 npm error
 npm error To see a list of scripts, run:
 npm error   npm run
-npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-31T10_34_02_250Z-debug-0.log
+npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-31T10_40_47_380Z-debug-0.log
 ```
 
 ## Expo
