@@ -22,6 +22,7 @@ import { MessageBubble } from "../../src/components/MessageBubble";
 import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
 import { useMessaging } from "../../src/providers/MessagingProvider";
+import { useSession } from "../../src/providers/SessionProvider";
 import { colors, gradients, radii, spacing, typography } from "../../src/theme";
 import type {
   AttachmentKind,
@@ -51,6 +52,7 @@ function isPrivateConversation(conversation: Conversation): boolean {
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const { currentUser } = useSession();
   const conversationId = Array.isArray(params.id)
     ? (params.id[0] ?? "")
     : (params.id ?? "");
@@ -72,11 +74,16 @@ export default function ChatScreen() {
     members,
     getConversation: getLocalConversation,
     getConversationMessages,
+    decorateConversation,
     sendLocalMessage,
     getMessageReactions,
     toggleMessageReaction
   } = useExperience();
-  const { getCreatedGroup } = useGroupAdmin();
+  const {
+    getCreatedGroup,
+    getCreatedGroupMessages,
+    sendCreatedGroupMessage
+  } = useGroupAdmin();
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
@@ -102,20 +109,27 @@ export default function ChatScreen() {
     () => getCreatedGroup(conversationId),
     [conversationId, getCreatedGroup]
   );
-  const conversation = serverConversation ?? localConversation ?? createdGroup;
-  const localOnly = Boolean(localConversation || createdGroup);
-  const messages = useMemo(
-    () =>
-      localOnly
-        ? getConversationMessages(conversationId)
-        : getMessages(conversationId),
-    [
-      conversationId,
-      getConversationMessages,
-      getMessages,
-      localOnly
-    ]
-  );
+  const rawConversation = serverConversation ?? localConversation ?? createdGroup;
+  const conversation = rawConversation
+    ? decorateConversation(rawConversation)
+    : undefined;
+  const source: "server" | "private" | "admin" = createdGroup
+    ? "admin"
+    : localConversation
+      ? "private"
+      : "server";
+  const localOnly = source !== "server";
+  const messages = useMemo(() => {
+    if (source === "admin") return getCreatedGroupMessages(conversationId);
+    if (source === "private") return getConversationMessages(conversationId);
+    return getMessages(conversationId);
+  }, [
+    conversationId,
+    getConversationMessages,
+    getCreatedGroupMessages,
+    getMessages,
+    source
+  ]);
   const loading = !localOnly && loadingConversationIds.has(conversationId);
   const loadingMore = !localOnly && loadingMoreConversationIds.has(conversationId);
   const hasMore = !localOnly && hasMoreMessages(conversationId);
@@ -132,8 +146,12 @@ export default function ChatScreen() {
   }, [draft]);
   const mentionSuggestions = useMemo(() => {
     if (mentionQuery === null) return [];
+    const allowedMemberIds = conversation?.memberIds;
     return members
-      .filter((member) => member.id !== "user-johan")
+      .filter((member) => member.id !== currentUser.id)
+      .filter((member) =>
+        allowedMemberIds?.length ? allowedMemberIds.includes(member.id) : true
+      )
       .filter((member) =>
         [member.name, member.company]
           .join(" ")
@@ -141,12 +159,14 @@ export default function ChatScreen() {
           .includes(mentionQuery)
       )
       .slice(0, 4);
-  }, [members, mentionQuery]);
+  }, [conversation?.memberIds, currentUser.id, members, mentionQuery]);
 
   const directMemberId = useMemo(() => {
     if (!conversation || conversation.type !== "direct") return undefined;
-    return conversation.memberIds?.find((memberId) => memberId !== "user-johan");
-  }, [conversation]);
+    return conversation.memberIds?.find(
+      (memberId) => memberId !== currentUser.id
+    );
+  }, [conversation, currentUser.id]);
 
   const goBackToDiscussions = () => {
     if (router.canGoBack()) {
@@ -212,6 +232,7 @@ export default function ChatScreen() {
   };
 
   const openMemberProfile = (memberId: string) => {
+    if (!memberId || memberId === currentUser.id) return;
     router.push(`/profile/${encodeURIComponent(memberId)}`);
   };
 
@@ -224,7 +245,8 @@ export default function ChatScreen() {
     const attachmentFallback = pendingAttachments
       .map((attachment) => `${attachment.label} jointe`)
       .join(", ");
-    const body = draft.trim() || (attachmentFallback ? `📎 ${attachmentFallback}` : "");
+    const body =
+      draft.trim() || (attachmentFallback ? `📎 ${attachmentFallback}` : "");
     if (!conversation.canPost || !body) return;
 
     submitLockRef.current = true;
@@ -232,9 +254,20 @@ export default function ChatScreen() {
     setDraft("");
     setPendingAttachments([]);
 
-    const operation = localOnly
-      ? sendLocalMessage(conversation.id, body, replyingTo ?? undefined)
-      : sendMessage(conversation.id, body, replyingTo?.id);
+    const operation =
+      source === "admin"
+        ? sendCreatedGroupMessage(
+            conversation.id,
+            body,
+            replyingTo ?? undefined
+          )
+        : source === "private"
+          ? sendLocalMessage(
+              conversation.id,
+              body,
+              replyingTo ?? undefined
+            )
+          : sendMessage(conversation.id, body, replyingTo?.id);
     setReplyingTo(null);
 
     submitUnlockTimerRef.current = setTimeout(() => {
@@ -318,7 +351,12 @@ export default function ChatScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Appeler en audio"
-              onPress={() => Alert.alert("Appel audio", "Écran prêt. Le développeur doit brancher WebRTC ou le fournisseur d’appel.")}
+              onPress={() =>
+                Alert.alert(
+                  "Appel audio",
+                  "Écran prêt. Le développeur doit brancher WebRTC ou le fournisseur d’appel."
+                )
+              }
               style={styles.callButton}
             >
               <Ionicons name="call-outline" size={20} color={colors.text} />
@@ -326,7 +364,12 @@ export default function ChatScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Appeler en vidéo"
-              onPress={() => Alert.alert("Appel vidéo", "Écran prêt. Le développeur doit brancher WebRTC ou le fournisseur d’appel.")}
+              onPress={() =>
+                Alert.alert(
+                  "Appel vidéo",
+                  "Écran prêt. Le développeur doit brancher WebRTC ou le fournisseur d’appel."
+                )
+              }
               style={styles.callButton}
             >
               <Ionicons name="videocam-outline" size={21} color={colors.text} />
@@ -339,7 +382,11 @@ export default function ChatScreen() {
             onPress={openConversationDetails}
             style={styles.headerButton}
           >
-            <Ionicons name="information-circle-outline" size={23} color={colors.text} />
+            <Ionicons
+              name="information-circle-outline"
+              size={23}
+              color={colors.text}
+            />
           </Pressable>
         )}
       </LinearGradient>
@@ -477,7 +524,11 @@ export default function ChatScreen() {
               {pendingAttachments.map((attachment, index) => (
                 <View key={`${attachment.kind}-${index}`} style={styles.pendingChip}>
                   <Ionicons
-                    name={ATTACHMENTS.find((item) => item.kind === attachment.kind)?.icon ?? "attach"}
+                    name={
+                      ATTACHMENTS.find(
+                        (item) => item.kind === attachment.kind
+                      )?.icon ?? "attach"
+                    }
                     size={16}
                     color={colors.orange}
                   />
@@ -491,7 +542,11 @@ export default function ChatScreen() {
                       )
                     }
                   >
-                    <Ionicons name="close-circle" size={17} color={colors.textMuted} />
+                    <Ionicons
+                      name="close-circle"
+                      size={17}
+                      color={colors.textMuted}
+                    />
                   </Pressable>
                 </View>
               ))}
@@ -592,7 +647,11 @@ export default function ChatScreen() {
                     colors={gradients.activeTab}
                     style={styles.attachmentChoiceIcon}
                   >
-                    <Ionicons name={attachment.icon} size={23} color={colors.text} />
+                    <Ionicons
+                      name={attachment.icon}
+                      size={23}
+                      color={colors.text}
+                    />
                   </LinearGradient>
                   <Text style={styles.attachmentChoiceText}>{attachment.label}</Text>
                 </Pressable>
@@ -622,7 +681,9 @@ export default function ChatScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Réagir avec ${emoji}`}
                 onPress={() => {
-                  if (reactionMessage) toggleMessageReaction(reactionMessage, emoji);
+                  if (reactionMessage) {
+                    toggleMessageReaction(reactionMessage, emoji);
+                  }
                   setReactionMessage(null);
                 }}
                 style={styles.reactionButton}
@@ -649,110 +710,31 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  header: {
-    paddingBottom: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft
-  },
-  headerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0
-  },
+  header: { paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center", gap: 4, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   headerContent: { flex: 1, minWidth: 0, justifyContent: "center" },
   headerTitle: { ...typography.heading3, color: colors.white },
   headerSubtitle: { ...typography.caption, color: colors.whiteMuted, marginTop: 1 },
   callActions: { flexDirection: "row", flexShrink: 0 },
-  callButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  pinned: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    alignItems: "center",
-    backgroundColor: colors.surfaceStrong,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft
-  },
+  callButton: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  pinned: { flexDirection: "row", gap: spacing.sm, alignItems: "center", backgroundColor: colors.surfaceStrong, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
   pinnedText: { ...typography.caption, color: colors.textSecondary, flex: 1, minWidth: 0 },
-  errorBanner: {
-    ...typography.bodySmall,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm
-  },
+  errorBanner: { ...typography.bodySmall, color: colors.danger, backgroundColor: colors.dangerSoft, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
   historyLoader: { minHeight: 48, alignItems: "center", justifyContent: "center" },
   messages: { padding: spacing.md, gap: spacing.sm, flexGrow: 1 },
   empty: { ...typography.body, color: colors.textMuted, textAlign: "center", marginTop: 64 },
-  composerArea: {
-    paddingTop: 6,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft
-  },
+  composerArea: { paddingTop: 6, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderSoft },
   composer: { flexDirection: "row", alignItems: "flex-end", gap: 7 },
-  attachButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.borderSoft
-  },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 46,
-    maxHeight: 126,
-    borderRadius: 20,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-    color: colors.text,
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    ...typography.body
-  },
+  attachButton: { width: 46, height: 46, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft },
+  input: { flex: 1, minWidth: 0, minHeight: 46, maxHeight: 126, borderRadius: 20, paddingHorizontal: spacing.md, paddingVertical: 11, color: colors.text, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft, ...typography.body },
   sendButton: { width: 46, height: 46, borderRadius: 17, overflow: "hidden", flexShrink: 0 },
   sendGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
   sendPressed: { transform: [{ scale: 0.95 }] },
   sendDisabled: { opacity: 0.4 },
-  readOnly: {
-    minHeight: 64,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm
-  },
+  readOnly: { minHeight: 64, paddingTop: spacing.sm, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
   readOnlyText: { ...typography.bodySmall, color: colors.textMuted, textAlign: "center", flexShrink: 1 },
-  mentionSuggestions: {
-    marginBottom: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
-    overflow: "hidden"
-  },
+  mentionSuggestions: { marginBottom: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, overflow: "hidden" },
   mentionRow: { minHeight: 50, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
   mentionAvatar: { width: 32, height: 32, borderRadius: 11, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
   mentionInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
