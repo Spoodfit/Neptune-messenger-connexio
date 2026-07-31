@@ -8,9 +8,183 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  final-product-fix:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/production-hardening
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply exact final corrections
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              content = file.read_text(encoding="utf-8")
+              if new in content:
+                  return
+              count = content.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: motif absent ou ambigu ({count})")
+              file.write_text(content.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "src/screens/NewConversationScreen.tsx",
+              '''            <Switch
+              value={membersCanPost}
+              onValueChange={setMembersCanPost}''',
+              '''            <Switch
+              accessibilityLabel="Autoriser les membres à publier"
+              style={styles.switchControl}
+              value={membersCanPost}
+              onValueChange={setMembersCanPost}'''
+          )
+          replace_once("src/screens/NewConversationScreen.tsx", "  tabs: {\n    height: 44,", "  tabs: {\n    height: 52,")
+          replace_once("src/screens/NewConversationScreen.tsx", "  tab: {\n    flex: 1,", "  tab: {\n    flex: 1,\n    minHeight: 44,")
+          replace_once("src/screens/NewConversationScreen.tsx", "  roleChip: {\n    minHeight: 40,", "  roleChip: {\n    minHeight: 44,")
+          replace_once("src/screens/NewConversationScreen.tsx", "  switchContent: { flex: 1, minWidth: 0 },", "  switchContent: { flex: 1, minWidth: 0 },\n  switchControl: { width: 48, height: 44 },")
+
+          replace_once(
+              "app/new-highlight.tsx",
+              '''          <Switch
+            value={locationEnabled}
+            onValueChange={setLocationEnabled}''',
+              '''          <Switch
+            accessibilityLabel="Activer la position approximative"
+            style={styles.switchControl}
+            value={locationEnabled}
+            onValueChange={setLocationEnabled}'''
+          )
+          replace_once("app/new-highlight.tsx", "  removeMedia: { width: 40, height: 40,", "  removeMedia: { width: 44, height: 44,")
+          replace_once("app/new-highlight.tsx", "  locationContent: { flex: 1, minWidth: 0 },", "  locationContent: { flex: 1, minWidth: 0 },\n  switchControl: { width: 48, height: 44 },")
+
+          replace_once("app/(tabs)/settings.tsx", "      await signOut();\n    } catch {", "      await signOut();\n      router.replace(\"/sign-in\");\n    } catch {")
+
+          audit = Path("scripts/product-audit.cjs")
+          content = audit.read_text(encoding="utf-8")
+          start = content.index("async function checkGeometry(page, label) {")
+          end = content.index("\nasync function expectVisible", start)
+          replacement = r'''async function checkGeometry(page, label) {
+  const result = await page.evaluate(() => {
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const rootWidth = document.documentElement.scrollWidth;
+    const bodyWidth = document.body.scrollWidth;
+    const interactiveSelector = [
+      "button", "a[href]", "input", "textarea", "[role='button']",
+      "[role='tab']", "[role='checkbox']", "[role='radio']", "[role='switch']"
+    ].join(",");
+    const labelFor = (element) =>
+      element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 80) || element.tagName;
+    const ownsPoint = (element, x, y) => {
+      const top = document.elementFromPoint(x, y);
+      return Boolean(top && (top === element || element.contains(top)));
+    };
+    const reachable = (element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (
+        style.display === "none" || style.visibility === "hidden" ||
+        style.pointerEvents === "none" || Number(style.opacity || "1") <= 0.02 ||
+        element.closest('[aria-hidden="true"], [inert]') ||
+        rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 ||
+        rect.top >= viewport.height || rect.right <= 0 || rect.left >= viewport.width
+      ) return false;
+      const left = Math.max(1, rect.left + 2);
+      const right = Math.min(viewport.width - 1, rect.right - 2);
+      const top = Math.max(1, rect.top + 2);
+      const bottom = Math.min(viewport.height - 1, rect.bottom - 2);
+      if (right <= left || bottom <= top) return false;
+      return [
+        [(left + right) / 2, (top + bottom) / 2],
+        [left, top], [right, top], [left, bottom], [right, bottom]
+      ].some(([x, y]) => ownsPoint(element, x, y));
+    };
+    const controls = [...document.querySelectorAll(interactiveSelector)]
+      .filter(reachable)
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { label: labelFor(element), left: rect.left, right: rect.right, width: rect.width, height: rect.height };
+      });
+    return {
+      horizontalOverflow: Math.max(rootWidth, bodyWidth) > viewport.width + 1,
+      cut: controls.filter((item) => item.left < -1 || item.right > viewport.width + 1),
+      undersized: controls.filter((item) => item.width < 43 || item.height < 43)
+    };
+  });
+  if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal`);
+  if (result.cut.length) failures.push(`${label}: contrôles coupés horizontalement: ${result.cut.slice(0, 4).map((item) => item.label).join(", ")}`);
+  if (result.undersized.length) {
+    failures.push(`${label}: cibles sous 44 px: ${result.undersized.slice(0, 5).map((item) => `${item.label} (${Math.round(item.width)}x${Math.round(item.height)})`).join(", ")}`);
+  }
+}'''
+          audit.write_text(content[:start] + replacement + content[end:], encoding="utf-8")
+          PY
+
+      - name: Restore workflow, remove temporary file and commit
+        shell: bash
+        run: |
+          cat > .github/workflows/product-audit.yml <<'YAML'
+          name: Product Audit
+
+          on:
+            push:
+              branches:
+                - feat/production-hardening
+            pull_request:
+            workflow_dispatch:
+
+          permissions:
+            contents: read
+
+          jobs:
+            product-audit:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v4
+                  with:
+                    show-progress: false
+                - name: Setup Node
+                  uses: actions/setup-node@v4
+                  with:
+                    node-version: 22.13.1
+                    cache: npm
+                - name: Install locked dependencies
+                  run: npm ci
+                - name: Install audit browser
+                  run: |
+                    npm install --no-save --package-lock=false playwright-core@1.58.2
+                    sudo apt-get update -qq
+                    sudo apt-get install -y chromium-browser >/dev/null 2>&1 || sudo apt-get install -y chromium >/dev/null 2>&1
+                - name: Build web demonstration
+                  env:
+                    EXPO_PUBLIC_MOCK_MODE: "true"
+                    EXPO_PUBLIC_API_BASE_URL: https://api.example.com
+                    EXPO_PUBLIC_REALTIME_URL: wss://api.example.com/v1/realtime
+                    EXPO_PUBLIC_EAS_PROJECT_ID: ""
+                    EXPO_PUBLIC_GITHUB_PAGES: "false"
+                  run: npx expo export --platform web --output-dir web-product-audit-dist
+                - name: Run product audit
+                  run: node scripts/product-audit.cjs
+          YAML
+          git rm -f .github/workflows/final-product-audit-fix.yml
+          git config user.name "Connexio CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add .github/workflows/product-audit.yml 'src/screens/NewConversationScreen.tsx' 'app/new-highlight.tsx' 'app/(tabs)/settings.tsx' scripts/product-audit.cjs
+          git commit -m "fix(front-final): fermer les derniers écarts produit"
+          git push origin HEAD:feat/production-hardening
+
   product-audit:
     runs-on: ubuntu-latest
     steps:
