@@ -42,7 +42,11 @@ import {
   type RealtimeEvent
 } from "../services/realtime/RealtimeClient";
 import { createOutboxStore } from "../storage/outboxStore";
-import type { ChatMessage, Conversation } from "../types/messaging";
+import type {
+  ChatMessage,
+  Conversation,
+  MessageAttachment
+} from "../types/messaging";
 
 export type ConnectionState = "offline" | "connecting" | "online";
 
@@ -57,7 +61,9 @@ interface MessagingContextValue {
   sendMessage: (
     conversationId: string,
     body: string,
-    replyToMessageId?: string
+    replyToMessageId?: string,
+    attachments?: MessageAttachment[],
+    mentionedUserIds?: string[]
   ) => Promise<boolean>;
   retryMessage: (clientMessageId: string) => Promise<void>;
   markConversationRead: (conversationId: string) => Promise<void>;
@@ -353,13 +359,17 @@ export function MessagingProvider({ children }: PropsWithChildren) {
                 createdAt: item.createdAt,
                 status: "sent",
                 isMine: true,
-                replyToMessageId: item.replyToMessageId
+                replyToMessageId: item.replyToMessageId,
+                attachments: item.attachments,
+                mentionedUserIds: item.mentionedUserIds
               };
             } else {
               serverMessage = await api!.sendMessage(item.conversationId, {
                 clientMessageId: item.clientMessageId,
                 body: item.body,
-                replyToMessageId: item.replyToMessageId
+                replyToMessageId: item.replyToMessageId,
+                attachments: item.attachments,
+                mentionedUserIds: item.mentionedUserIds
               });
             }
             upsertMessage(serverMessage);
@@ -438,7 +448,9 @@ export function MessagingProvider({ children }: PropsWithChildren) {
             senderAvatarUrl: currentUser.avatarUrl,
             body: item.body,
             createdAt: item.createdAt,
-            replyToMessageId: item.replyToMessageId
+            replyToMessageId: item.replyToMessageId,
+            attachments: item.attachments,
+            mentionedUserIds: item.mentionedUserIds
           });
           if (item.state === "sending") message = markMessageSending(message);
           if (item.state === "failed") {
@@ -483,7 +495,9 @@ export function MessagingProvider({ children }: PropsWithChildren) {
     async (
       conversationId: string,
       body: string,
-      replyToMessageId?: string
+      replyToMessageId?: string,
+      attachments: MessageAttachment[] = [],
+      mentionedUserIds: string[] = []
     ): Promise<boolean> => {
       const conversation = getConversation(conversationId);
       const cleanBody = body.trim();
@@ -491,7 +505,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         setLastError("Vous n’êtes pas autorisé à publier dans cette conversation.");
         return false;
       }
-      if (!cleanBody) return false;
+      if (!cleanBody && attachments.length === 0) return false;
       if (cleanBody.length > 4_000) {
         setLastError("Le message dépasse la limite de 4 000 caractères.");
         return false;
@@ -508,13 +522,17 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         senderAvatarUrl: currentUser.avatarUrl,
         body: cleanBody,
         createdAt,
-        replyToMessageId
+        replyToMessageId,
+        attachments,
+        mentionedUserIds
       });
       const outboxItem: OutboxItem = {
         clientMessageId,
         conversationId,
         body: cleanBody,
         replyToMessageId,
+        attachments,
+        mentionedUserIds,
         createdAt,
         attempts: 0,
         nextAttemptAt: Date.now(),
@@ -536,7 +554,15 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       setConversations((previous) =>
         previous.map((item) =>
           item.id === conversationId
-            ? { ...item, lastMessage: cleanBody, lastMessageAt: createdAt }
+            ? {
+                ...item,
+                lastMessage:
+                  cleanBody ||
+                  (attachments.length === 1
+                    ? `📎 ${attachments[0]?.name ?? "Pièce jointe"}`
+                    : `📎 ${attachments.length} pièces jointes`),
+                lastMessageAt: createdAt
+              }
             : item
         )
       );
