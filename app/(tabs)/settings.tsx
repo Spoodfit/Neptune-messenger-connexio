@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -19,25 +20,45 @@ import { colors, gradients, radii, spacing, typography } from "@/theme";
 
 const MAX_CONTENT_WIDTH = 720;
 
-const pendingSettings = [
-  {
-    icon: "shield-checkmark-outline" as const,
-    title: "Confidentialité",
-    subtitle: "Blocage et signalement à connecter au backend Neptune"
-  },
-  {
-    icon: "help-circle-outline" as const,
-    title: "SAV application",
-    subtitle: "Canal de support à connecter avant le pilote"
-  }
-];
-
 function getEnvironmentLabel(): string {
   const buildProfile = Constants.expoConfig?.extra?.buildProfile;
   if (buildProfile === "production") return "Production";
   if (buildProfile === "preview") return "Préproduction";
   return "Développement";
 }
+
+const entries = [
+  {
+    icon: "person-circle-outline" as const,
+    title: "Compte et sécurité",
+    subtitle: "Appareils, sessions, export et suppression",
+    route: "/account" as const
+  },
+  {
+    icon: "notifications-outline" as const,
+    title: "Notifications",
+    subtitle: "Messages, mentions, groupes, appels et Temps forts",
+    route: "/notification-settings" as const
+  },
+  {
+    icon: "shield-checkmark-outline" as const,
+    title: "Confidentialité",
+    subtitle: "Localisation, visibilité, blocage et données",
+    route: "/privacy" as const
+  },
+  {
+    icon: "person-remove-outline" as const,
+    title: "Membres bloqués",
+    subtitle: "Gérer les blocages et leurs effets",
+    route: "/blocked-users" as const
+  },
+  {
+    icon: "help-circle-outline" as const,
+    title: "Aide et accès",
+    subtitle: "Code de connexion et sécurité du compte",
+    route: "/access-help" as const
+  }
+];
 
 export default function SettingsScreen() {
   const { currentUser, signOut } = useSession();
@@ -53,7 +74,7 @@ export default function SettingsScreen() {
       router.replace("/sign-in");
     } catch {
       setSignOutError(
-        "La déconnexion a été bloquée car les messages locaux n’ont pas pu être supprimés en sécurité. Fermez puis relancez l’application avant de réessayer."
+        "La déconnexion a été bloquée car les données locales n’ont pas pu être supprimées en sécurité. Fermez puis relancez l’application avant de réessayer."
       );
     } finally {
       setSigningOut(false);
@@ -69,88 +90,93 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.contentColumn}>
-          <LinearGradient
-            colors={gradients.glass}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.9, y: 1 }}
-            accessible
-            accessibilityLabel={`${currentUser.name}. ${currentUser.company}. ${currentUser.roleLabel}`}
-            style={styles.profile}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${currentUser.name}. ${currentUser.company}. ${currentUser.roleLabel}. Ouvrir mon compte.`}
+            onPress={() => router.push("/account")}
           >
             <LinearGradient
-              colors={gradients.primaryWarm}
+              colors={gradients.glass}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.avatarShell}
-              accessibilityElementsHidden
+              end={{ x: 0.9, y: 1 }}
+              style={styles.profile}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.initials} numberOfLines={1}>
-                  {currentUser.initials}
+              <LinearGradient
+                colors={gradients.primaryWarm}
+                style={styles.avatarShell}
+                accessibilityElementsHidden
+              >
+                <View style={styles.avatar}>
+                  {currentUser.avatarUrl ? (
+                    <Image source={{ uri: currentUser.avatarUrl }} style={styles.avatarImage} />
+                  ) : (
+                    <Text style={styles.initials}>{currentUser.initials}</Text>
+                  )}
+                </View>
+              </LinearGradient>
+              <View style={styles.profileContent}>
+                <Text style={styles.name}>{currentUser.name}</Text>
+                <Text style={styles.role} numberOfLines={2}>
+                  {currentUser.company || "Neptune Business"} · {currentUser.roleLabel}
                 </Text>
+                <View style={styles.profileMeta}>
+                  <View style={styles.roleChip}>
+                    <View style={styles.roleDot} />
+                    <Text style={styles.roleChipText}>{currentUser.roleLabel}</Text>
+                  </View>
+                  {currentUser.city ? (
+                    <View style={styles.cityChip}>
+                      <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+                      <Text style={styles.cityText}>{currentUser.city}</Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </LinearGradient>
-            <View style={styles.profileContent}>
-              <Text style={styles.name}>{currentUser.name}</Text>
-              <Text style={styles.role}>
-                {currentUser.company || "Neptune Business"} · {currentUser.roleLabel}
-              </Text>
-              <View style={styles.roleChip}>
-                <View style={styles.roleDot} />
-                <Text style={styles.roleChipText}>{currentUser.roleLabel}</Text>
-              </View>
-            </View>
-          </LinearGradient>
+          </Pressable>
 
           <View style={styles.list}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ouvrir les réglages de notifications du téléphone"
-              accessibilityHint="Ouvre les réglages système de Connexio"
-              onPress={() => void Linking.openSettings()}
-              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-            >
-              <View style={styles.iconShell}>
-                <Ionicons
-                  name="notifications-outline"
-                  size={21}
-                  color={colors.text}
-                />
-              </View>
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>Notifications</Text>
-                <Text style={styles.rowSubtitle}>
-                  Autorisations système et alertes
-                </Text>
-              </View>
-              <Ionicons
-                accessibilityElementsHidden
-                name="open-outline"
-                size={18}
-                color={colors.textMuted}
-                style={styles.trailingIcon}
-              />
-            </Pressable>
-
-            {pendingSettings.map((item) => (
-              <View
-                accessible
-                accessibilityLabel={`${item.title}. Non disponible dans ce build.`}
+            {entries.map((item) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
                 key={item.title}
-                style={styles.row}
+                onPress={() => router.push(item.route)}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
               >
-                <View style={[styles.iconShell, styles.iconShellMuted]}>
-                  <Ionicons name={item.icon} size={21} color={colors.textMuted} />
+                <View style={styles.iconShell}>
+                  <Ionicons name={item.icon} size={21} color={colors.text} />
                 </View>
                 <View style={styles.rowContent}>
                   <Text style={styles.rowTitle}>{item.title}</Text>
                   <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
-                  <View style={styles.pendingBadge}>
-                    <Text style={styles.pendingLabel}>À finaliser</Text>
-                  </View>
                 </View>
-              </View>
+                <Ionicons name="chevron-forward" size={19} color={colors.textMuted} />
+              </Pressable>
             ))}
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Contacter le support Connexio"
+              onPress={() =>
+                void Linking.openURL(
+                  "mailto:contact@neptunebusiness.com?subject=Support%20Connexio"
+                )
+              }
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            >
+              <View style={styles.iconShell}>
+                <Ionicons name="chatbubbles-outline" size={21} color={colors.text} />
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={styles.rowTitle}>SAV application</Text>
+                <Text style={styles.rowSubtitle}>
+                  Signaler un problème ou demander de l’aide
+                </Text>
+              </View>
+              <Ionicons name="mail-outline" size={19} color={colors.textMuted} />
+            </Pressable>
 
             {signOutError ? (
               <Text
@@ -185,6 +211,14 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
 
+          <Pressable
+            onPress={() => void Linking.openSettings()}
+            style={styles.systemSettings}
+          >
+            <Ionicons name="settings-outline" size={17} color={colors.textMuted} />
+            <Text style={styles.systemSettingsText}>Réglages système de l’application</Text>
+          </Pressable>
+
           <Text style={styles.version}>
             Connexio {Constants.expoConfig?.version ?? "0.2.0"} ·{" "}
             {getEnvironmentLabel()}
@@ -197,189 +231,34 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  scrollContent: {
-    width: "100%",
-    paddingBottom: 28
-  },
-  contentColumn: {
-    width: "100%",
-    maxWidth: MAX_CONTENT_WIDTH,
-    alignSelf: "center"
-  },
-  profile: {
-    margin: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    shadowColor: "#000000",
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 7
-  },
-  avatarShell: {
-    width: 64,
-    height: 64,
-    padding: 3,
-    borderRadius: 22,
-    flexShrink: 0,
-    shadowColor: colors.violet,
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 }
-  },
-  avatar: {
-    flex: 1,
-    borderRadius: 19,
-    borderWidth: 2,
-    borderColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceStrong
-  },
-  initials: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: "900"
-  },
+  scrollContent: { width: "100%", paddingBottom: 28 },
+  contentColumn: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" },
+  profile: { margin: spacing.md, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", gap: spacing.md, shadowColor: "#000000", shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 12 } },
+  avatarShell: { width: 62, height: 62, padding: 3, borderRadius: 22, flexShrink: 0 },
+  avatar: { flex: 1, borderRadius: 19, overflow: "hidden", borderWidth: 2, borderColor: colors.surface, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  avatarImage: { width: "100%", height: "100%" },
+  initials: { color: colors.white, fontSize: 18, fontWeight: "900" },
   profileContent: { flex: 1, minWidth: 0 },
-  name: {
-    ...typography.heading2,
-    color: colors.text,
-    flexShrink: 1
-  },
-  role: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    marginTop: 3,
-    flexShrink: 1
-  },
-  roleChip: {
-    alignSelf: "flex-start",
-    marginTop: 9,
-    minHeight: 26,
-    paddingHorizontal: 9,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: "rgba(107,79,234,0.34)",
-    backgroundColor: "rgba(107,79,234,0.12)",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6
-  },
-  roleDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: colors.orange
-  },
-  roleChipText: {
-    color: colors.text,
-    fontSize: 9,
-    fontWeight: "900",
-    textTransform: "uppercase",
-    letterSpacing: 0.6
-  },
-  list: {
-    marginHorizontal: spacing.md,
-    gap: spacing.sm
-  },
-  row: {
-    width: "100%",
-    minHeight: 72,
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    backgroundColor: colors.glass,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12
-  },
-  rowPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
-  iconShell: {
-    width: 40,
-    height: 40,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,72,186,0.20)",
-    borderWidth: 1,
-    borderColor: "rgba(0,72,186,0.30)",
-    flexShrink: 0
-  },
-  iconShellMuted: {
-    backgroundColor: colors.glass,
-    borderColor: colors.borderSoft
-  },
-  trailingIcon: { marginTop: 10, flexShrink: 0 },
+  name: { ...typography.heading2, color: colors.text, flexShrink: 1 },
+  role: { ...typography.bodySmall, color: colors.textMuted, marginTop: 3, flexShrink: 1 },
+  profileMeta: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  roleChip: { minHeight: 26, paddingHorizontal: 8, borderRadius: 13, backgroundColor: "rgba(107,79,234,0.20)", flexDirection: "row", alignItems: "center", gap: 5 },
+  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
+  roleChipText: { color: colors.textSecondary, fontSize: 9, fontWeight: "900" },
+  cityChip: { minHeight: 26, paddingHorizontal: 8, borderRadius: 13, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 4 },
+  cityText: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  list: { marginHorizontal: spacing.md, gap: spacing.sm },
+  row: { width: "100%", minHeight: 72, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  rowPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
+  iconShell: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   rowContent: { flex: 1, minWidth: 0 },
-  rowTitle: {
-    ...typography.heading3,
-    color: colors.text,
-    flexShrink: 1
-  },
-  rowSubtitle: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: 3,
-    flexShrink: 1
-  },
-  pendingBadge: {
-    alignSelf: "flex-start",
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.borderSoft
-  },
-  pendingLabel: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: "800"
-  },
-  signOutError: {
-    ...typography.bodySmall,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: "rgba(255,123,134,0.22)",
-    padding: spacing.sm
-  },
-  signOutButton: {
-    minHeight: 52,
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: "rgba(255,123,134,0.36)",
-    backgroundColor: colors.dangerSoft,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm
-  },
-  signOutText: {
-    color: colors.danger,
-    fontWeight: "900",
-    fontSize: 15,
-    textAlign: "center"
-  },
+  rowTitle: { ...typography.heading3, color: colors.text, flexShrink: 1 },
+  rowSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3, flexShrink: 1 },
+  signOutError: { ...typography.bodySmall, color: colors.danger, backgroundColor: colors.dangerSoft, borderRadius: radii.md, padding: spacing.sm },
+  signOutButton: { minHeight: 52, marginTop: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.dangerSoft, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  signOutText: { color: colors.danger, fontWeight: "900", fontSize: 15, textAlign: "center" },
   disabled: { opacity: 0.5 },
-  version: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: "center",
-    marginTop: spacing.xl,
-    paddingHorizontal: spacing.md
-  }
+  systemSettings: { minHeight: 48, marginHorizontal: spacing.md, marginTop: spacing.sm, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  systemSettingsText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
+  version: { ...typography.caption, color: colors.textMuted, textAlign: "center", marginTop: spacing.md, paddingHorizontal: spacing.md }
 });
