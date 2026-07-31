@@ -1,3 +1,3 @@
 # Dépendances natives Connexio
 
-Déclenchement du job Branch CI reconnu pour verrouiller les dépendances Expo finales.
+Verrouillage final du runtime Expo et suppression des mécanismes temporaires.
