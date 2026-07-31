@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   form: { width: "100%", maxWidth: 520, alignSelf: "center" },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: spacing.xl },
   brandText: { minWidth: 0 },
-  brandName: { color: colors.text, fontSize: 24, lineHeight: 27, fontWeight: "950", letterSpacing: 1.7 },
+  brandName: { color: colors.text, fontSize: 24, lineHeight: 27, fontWeight: "900", letterSpacing: 1.7 },
   brandSignature: { color: colors.orange, fontSize: 11, fontWeight: "800", marginTop: 1 },
   title: { ...typography.display, color: colors.white },
   description: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.lg },
