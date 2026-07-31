@@ -1,8 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 
 import { colors, gradients, radii, spacing, typography } from "../theme";
 import type { Conversation } from "../types/messaging";
@@ -10,10 +17,21 @@ import { formatConversationTime } from "../utils/date";
 
 interface ConversationRowProps {
   conversation: Conversation;
+  mentioned?: boolean;
+  muted?: boolean;
+  onPress?: () => void;
+  onLongPress?: () => void;
 }
 
-export function ConversationRow({ conversation }: ConversationRowProps) {
+export function ConversationRow({
+  conversation,
+  mentioned = false,
+  muted = false,
+  onPress,
+  onLongPress
+}: ConversationRowProps) {
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const pulse = useRef(new Animated.Value(0)).current;
   const unreadLabel = conversation.unreadCount
     ? `${conversation.unreadCount} message${conversation.unreadCount > 1 ? "s" : ""} non lu${conversation.unreadCount > 1 ? "s" : ""}`
     : "Aucun message non lu";
@@ -22,132 +40,198 @@ export function ConversationRow({ conversation }: ConversationRowProps) {
     setAvatarFailed(false);
   }, [conversation.avatarUrl]);
 
+  useEffect(() => {
+    if (!mentioned) {
+      pulse.stopAnimation();
+      pulse.setValue(0);
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 1150,
+          useNativeDriver: true
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 1150,
+          useNativeDriver: true
+        })
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [mentioned, pulse]);
+
+  const borderOpacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.62, 1]
+  });
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.006]
+  });
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${conversation.name}. ${conversation.lastMessage ?? "Aucun message"}. ${unreadLabel}`}
-      accessibilityHint="Ouvre la conversation"
-      onPress={() => router.push(`/chat/${encodeURIComponent(conversation.id)}`)}
-      style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
+    <Animated.View
+      style={[
+        styles.animatedWrap,
+        mentioned && { opacity: borderOpacity, transform: [{ scale }] }
+      ]}
     >
       <LinearGradient
-        colors={gradients.glass}
+        colors={
+          mentioned
+            ? [colors.primary, colors.violet, colors.orange]
+            : [colors.borderSoft, colors.borderSoft, colors.borderSoft]
+        }
         start={{ x: 0, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={styles.row}
+        end={{ x: 1, y: 1 }}
+        style={styles.border}
       >
-        <LinearGradient
-          colors={gradients.primaryWarm}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.avatarShell}
-          accessibilityElementsHidden
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${conversation.name}. ${conversation.lastMessage ?? "Aucun message"}. ${unreadLabel}${mentioned ? ". Vous avez été mentionné" : ""}${muted ? ". Conversation en sourdine" : ""}`}
+          accessibilityHint={
+            onLongPress
+              ? "Ouvre la conversation. Maintenir pour les paramètres rapides."
+              : "Ouvre la conversation"
+          }
+          onPress={
+            onPress ??
+            (() =>
+              router.push(`/chat/${encodeURIComponent(conversation.id)}`))
+          }
+          onLongPress={onLongPress}
+          delayLongPress={420}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
         >
-          <View style={styles.avatarInner}>
-            {conversation.avatarUrl && !avatarFailed ? (
-              <Image
-                source={{ uri: conversation.avatarUrl }}
-                onError={() => setAvatarFailed(true)}
-                resizeMode="cover"
-                style={styles.avatarImage}
-              />
-            ) : (
-              <Ionicons
-                name={
-                  conversation.type === "announcement"
-                    ? "megaphone"
-                    : conversation.type === "support"
-                      ? "construct"
-                      : conversation.type === "direct"
-                        ? "person"
-                        : "people"
-                }
-                size={21}
-                color={colors.text}
-              />
-            )}
-          </View>
-        </LinearGradient>
+          <LinearGradient
+            colors={gradients.primaryWarm}
+            style={styles.avatarBorder}
+            accessibilityElementsHidden
+          >
+            <View style={styles.avatar}>
+              {conversation.avatarUrl && !avatarFailed ? (
+                <Image
+                  source={{ uri: conversation.avatarUrl }}
+                  onError={() => setAvatarFailed(true)}
+                  resizeMode="cover"
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Ionicons
+                  name={
+                    conversation.type === "announcement"
+                      ? "megaphone"
+                      : conversation.type === "support"
+                        ? "construct"
+                        : conversation.type === "direct"
+                          ? "person"
+                          : conversation.type === "small_group"
+                            ? "people"
+                            : "chatbubbles"
+                  }
+                  size={21}
+                  color={colors.text}
+                />
+              )}
+            </View>
+          </LinearGradient>
 
-        <View style={styles.content}>
-          <View style={styles.topLine}>
-            <Text style={styles.name} numberOfLines={1}>
-              {conversation.name}
-            </Text>
-            <Text style={styles.time} numberOfLines={1}>
-              {formatConversationTime(conversation.lastMessageAt)}
-            </Text>
+          <View style={styles.content}>
+            <View style={styles.topLine}>
+              <Text style={styles.name} numberOfLines={1}>
+                {conversation.name}
+              </Text>
+              {mentioned ? (
+                <View style={styles.mentionPill} accessibilityElementsHidden>
+                  <Text style={styles.mentionText}>@</Text>
+                </View>
+              ) : null}
+              {muted ? (
+                <Ionicons
+                  accessibilityElementsHidden
+                  name="notifications-off-outline"
+                  size={14}
+                  color={colors.textMuted}
+                />
+              ) : null}
+              <Text style={styles.time} numberOfLines={1}>
+                {formatConversationTime(conversation.lastMessageAt)}
+              </Text>
+            </View>
+            <View style={styles.bottomLine}>
+              <Text style={styles.preview} numberOfLines={1}>
+                {conversation.lastMessage ?? "Aucun message"}
+              </Text>
+              {conversation.unreadCount > 0 ? (
+                <LinearGradient
+                  colors={[colors.primary, colors.violet]}
+                  style={styles.unread}
+                  accessibilityElementsHidden
+                >
+                  <Text style={styles.unreadText} numberOfLines={1}>
+                    {conversation.unreadCount > 99
+                      ? "99+"
+                      : conversation.unreadCount}
+                  </Text>
+                </LinearGradient>
+              ) : conversation.restricted ? (
+                <Ionicons
+                  accessibilityElementsHidden
+                  name="lock-closed"
+                  size={14}
+                  color={colors.textMuted}
+                />
+              ) : null}
+            </View>
           </View>
-          <View style={styles.bottomLine}>
-            <Text style={styles.preview} numberOfLines={1}>
-              {conversation.lastMessage ?? "Aucun message"}
-            </Text>
-            {conversation.unreadCount > 0 ? (
-              <LinearGradient
-                colors={[colors.primary, colors.violet]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.unread}
-                accessibilityElementsHidden
-              >
-                <Text style={styles.unreadText} numberOfLines={1}>
-                  {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
-                </Text>
-              </LinearGradient>
-            ) : conversation.restricted ? (
-              <Ionicons
-                accessibilityElementsHidden
-                name="lock-closed"
-                size={14}
-                color={colors.textMuted}
-              />
-            ) : null}
-          </View>
-        </View>
+        </Pressable>
       </LinearGradient>
-    </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  pressable: {
+  animatedWrap: {
     width: "100%",
     marginBottom: spacing.sm,
-    borderRadius: 21,
+    borderRadius: radii.xl,
     shadowColor: "#000000",
     shadowOpacity: 0.16,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 5
   },
-  pressed: { transform: [{ scale: 0.985 }], opacity: 0.92 },
+  border: {
+    width: "100%",
+    padding: 1,
+    borderRadius: radii.xl
+  },
   row: {
     width: "100%",
     minHeight: 78,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    paddingHorizontal: 11,
-    paddingVertical: 12,
+    padding: 12,
+    borderRadius: radii.xl - 1,
+    backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 12
   },
-  avatarShell: {
+  pressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
+  avatarBorder: {
     width: 50,
     height: 50,
     padding: 2,
     borderRadius: 17,
-    flexShrink: 0,
-    shadowColor: colors.violet,
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 }
+    flexShrink: 0
   },
-  avatarInner: {
+  avatar: {
     flex: 1,
-    overflow: "hidden",
     borderRadius: 15,
+    overflow: "hidden",
     borderWidth: 2,
     borderColor: colors.surface,
     backgroundColor: colors.surfaceStrong,
@@ -160,7 +244,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm
+    gap: 6
   },
   name: {
     ...typography.heading3,
@@ -188,6 +272,21 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: 12
+  },
+  mentionPill: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(244,177,131,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(244,177,131,0.52)"
+  },
+  mentionText: {
+    color: colors.orange,
+    fontSize: 12,
+    fontWeight: "900"
   },
   unread: {
     minWidth: 22,
