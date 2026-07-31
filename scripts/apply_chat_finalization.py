@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Déclenchement contrôlé de la finalisation du chat.
 path = Path("app/chat/[id].tsx")
 text = path.read_text()
 
