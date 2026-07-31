@@ -4,6 +4,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   const realtimeUrl = process.env.EXPO_PUBLIC_REALTIME_URL ?? "";
+  const callBaseUrl =
+    process.env.EXPO_PUBLIC_CALL_BASE_URL ?? "https://meet.jit.si";
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
   const isGithubPages = process.env.EXPO_PUBLIC_GITHUB_PAGES === "true";
@@ -28,13 +30,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     if (!realtimeUrl.startsWith("wss://")) {
       throw new Error("EXPO_PUBLIC_REALTIME_URL doit utiliser WSS en production.");
     }
+    if (!callBaseUrl.startsWith("https://")) {
+      throw new Error("EXPO_PUBLIC_CALL_BASE_URL doit utiliser HTTPS en production.");
+    }
   }
 
   return {
     ...config,
     name: "Connexio by Neptune",
     slug: "neptune-messenger-connexio",
-    version: "0.2.0",
+    version: "0.3.0",
     orientation: "portrait",
     scheme: "neptuneconnexio",
     userInterfaceStyle: "dark",
@@ -49,15 +54,31 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         }
       : undefined,
     ios: {
-      supportsTablet: false,
-      bundleIdentifier: "com.neptunebusiness.connexio"
+      supportsTablet: true,
+      bundleIdentifier: "com.neptunebusiness.connexio",
+      infoPlist: {
+        NSCameraUsageDescription:
+          "Connexio utilise la caméra pour envoyer des photos, publier des vidéos et participer aux appels vidéo.",
+        NSMicrophoneUsageDescription:
+          "Connexio utilise le microphone pour les messages audio et les appels.",
+        NSPhotoLibraryUsageDescription:
+          "Connexio accède à vos médias uniquement lorsque vous choisissez un contenu à partager.",
+        NSLocationWhenInUseUsageDescription:
+          "Connexio utilise votre position pour vous localiser sur la carte et partager un lieu à votre demande."
+      }
     },
     android: {
       package: "com.neptunebusiness.connexio",
       adaptiveIcon: {
         backgroundColor: "#020713"
       },
-      permissions: ["POST_NOTIFICATIONS"]
+      permissions: [
+        "POST_NOTIFICATIONS",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     },
     plugins: [
       "expo-router",
@@ -73,11 +94,31 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         {
           defaultChannel: "messages"
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          photosPermission:
+            "Connexio accède aux photos et vidéos que vous choisissez de partager.",
+          cameraPermission:
+            "Connexio utilise la caméra pour créer un contenu à partager.",
+          microphonePermission:
+            "Connexio utilise le microphone lors de l’enregistrement vidéo."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          locationWhenInUsePermission:
+            "Connexio utilise votre position uniquement à votre demande."
+        }
+      ],
+      "expo-document-picker"
     ],
     extra: {
       apiBaseUrl,
       realtimeUrl,
+      callBaseUrl,
       mockMode,
       buildProfile,
       ...(easProjectId
