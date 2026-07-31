@@ -6,7 +6,11 @@ import type {
   MapMemberMoment,
   QuickReaction
 } from "../../types/experience";
-import type { Conversation, MessageAttachment } from "../../types/messaging";
+import type {
+  AppUser,
+  Conversation,
+  MessageAttachment
+} from "../../types/messaging";
 import { authenticatedRequest } from "./authenticatedRequest";
 
 export interface CreateHighlightInput {
@@ -26,10 +30,24 @@ export interface StartCallResponse {
 export class NeptuneExperienceApi {
   constructor(private readonly fallbackAccessToken?: string | null) {}
 
-  createPrivateConversation(memberIds: string[], name?: string): Promise<Conversation> {
-    const path = memberIds.length === 1
-      ? "/v1/conversations/direct"
-      : "/v1/conversations/private-group";
+  listMembers(query?: string): Promise<AppUser[]> {
+    const params = new URLSearchParams({ visible: "true" });
+    if (query?.trim()) params.set("query", query.trim());
+    return authenticatedRequest<AppUser[]>(
+      `/v1/members?${params.toString()}`,
+      {},
+      this.fallbackAccessToken
+    );
+  }
+
+  createPrivateConversation(
+    memberIds: string[],
+    name?: string
+  ): Promise<Conversation> {
+    const path =
+      memberIds.length === 1
+        ? "/v1/conversations/direct"
+        : "/v1/conversations/private-group";
     return authenticatedRequest<Conversation>(
       path,
       {
@@ -76,7 +94,10 @@ export class NeptuneExperienceApi {
     );
   }
 
-  async setConversationMuted(conversationId: string, muted: boolean): Promise<void> {
+  async setConversationMuted(
+    conversationId: string,
+    muted: boolean
+  ): Promise<void> {
     await authenticatedRequest(
       `/v1/groups/${encodeURIComponent(conversationId)}/mute`,
       { method: muted ? "POST" : "DELETE" },
@@ -92,7 +113,11 @@ export class NeptuneExperienceApi {
     );
   }
 
-  async reactToMessage(messageId: string, emoji: string, active: boolean): Promise<void> {
+  async reactToMessage(
+    messageId: string,
+    emoji: string,
+    active: boolean
+  ): Promise<void> {
     await authenticatedRequest(
       active
         ? `/v1/messages/${encodeURIComponent(messageId)}/reactions`
@@ -105,7 +130,9 @@ export class NeptuneExperienceApi {
     );
   }
 
-  listHighlights(cursor?: string): Promise<{ items: HighlightPost[]; nextCursor: string | null }> {
+  listHighlights(
+    cursor?: string
+  ): Promise<{ items: HighlightPost[]; nextCursor: string | null }> {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
     return authenticatedRequest(
       `/v1/highlights${query}`,
@@ -119,20 +146,30 @@ export class NeptuneExperienceApi {
       "/v1/highlights",
       {
         method: "POST",
+        headers: {
+          "Idempotency-Key": `highlight-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        },
         body: JSON.stringify({
           kind: input.kind,
           body: input.body,
           media_id: input.media?.id ?? null,
           mentioned_user_ids: input.mentionedUserIds ?? [],
           coordinates: input.coordinates ?? null,
-          sync_targets: input.kind === "besoin" ? ["connexio", "business"] : ["connexio"]
+          sync_targets:
+            input.kind === "besoin"
+              ? ["connexio", "business"]
+              : ["connexio"]
         })
       },
       this.fallbackAccessToken
     );
   }
 
-  async reactToHighlight(postId: string, emoji: QuickReaction, active: boolean): Promise<void> {
+  async reactToHighlight(
+    postId: string,
+    emoji: QuickReaction,
+    active: boolean
+  ): Promise<void> {
     await authenticatedRequest(
       active
         ? `/v1/highlights/${encodeURIComponent(postId)}/reactions`
@@ -145,7 +182,7 @@ export class NeptuneExperienceApi {
     );
   }
 
-  async addComment(
+  addComment(
     postId: string,
     body: string,
     parentCommentId?: string,
@@ -164,7 +201,11 @@ export class NeptuneExperienceApi {
     );
   }
 
-  async reactToComment(commentId: string, emoji: QuickReaction, active: boolean): Promise<void> {
+  async reactToComment(
+    commentId: string,
+    emoji: QuickReaction,
+    active: boolean
+  ): Promise<void> {
     await authenticatedRequest(
       active
         ? `/v1/comments/${encodeURIComponent(commentId)}/reactions`
@@ -177,7 +218,9 @@ export class NeptuneExperienceApi {
     );
   }
 
-  async shareHighlight(postId: string): Promise<{ url: string; shareCount: number }> {
+  shareHighlight(
+    postId: string
+  ): Promise<{ url: string; shareCount: number }> {
     return authenticatedRequest(
       `/v1/highlights/${encodeURIComponent(postId)}/share`,
       { method: "POST" },
@@ -224,7 +267,10 @@ export class NeptuneExperienceApi {
     );
   }
 
-  startCall(memberId: string, type: "audio" | "video"): Promise<StartCallResponse> {
+  startCall(
+    memberId: string,
+    type: "audio" | "video"
+  ): Promise<StartCallResponse> {
     return authenticatedRequest(
       "/v1/calls",
       {
@@ -244,7 +290,11 @@ export class NeptuneExperienceApi {
       "/v1/reports",
       {
         method: "POST",
-        body: JSON.stringify({ target_type: targetType, target_id: targetId, reason })
+        body: JSON.stringify({
+          target_type: targetType,
+          target_id: targetId,
+          reason
+        })
       },
       this.fallbackAccessToken
     );
@@ -259,9 +309,14 @@ export class NeptuneExperienceApi {
   }
 }
 
-export function attachmentIds(attachments: readonly MessageAttachment[]): string[] {
+export function attachmentIds(
+  attachments: readonly MessageAttachment[]
+): string[] {
   return attachments
     .filter((attachment) => attachment.status === "ready")
-    .filter((attachment) => attachment.kind !== "location" && attachment.kind !== "contact")
+    .filter(
+      (attachment) =>
+        attachment.kind !== "location" && attachment.kind !== "contact"
+    )
     .map((attachment) => attachment.id);
 }
