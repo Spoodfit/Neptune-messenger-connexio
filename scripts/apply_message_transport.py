@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Déclenchement contrôlé du transport média.
 path = Path("src/providers/MessagingProvider.tsx")
 text = path.read_text()
 
