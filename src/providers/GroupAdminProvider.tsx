@@ -10,7 +10,11 @@ import {
 
 import { useSession } from "./SessionProvider";
 import type { GroupDraft } from "../types/experience";
-import type { ChatMessage, Conversation } from "../types/messaging";
+import type {
+  ChatMessage,
+  Conversation,
+  MessageAttachment
+} from "../types/messaging";
 
 interface GroupAdminContextValue {
   createdGroups: Conversation[];
@@ -22,7 +26,9 @@ interface GroupAdminContextValue {
   sendCreatedGroupMessage: (
     conversationId: string,
     body: string,
-    replyTo?: ChatMessage
+    replyTo?: ChatMessage,
+    attachments?: MessageAttachment[],
+    mentionedUserIds?: string[]
   ) => Promise<boolean>;
   removeCreatedGroup: (conversationId: string) => void;
 }
@@ -55,7 +61,7 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
         ownerId: currentUser.id,
         adminIds: [currentUser.id],
         memberIds: [currentUser.id],
-        lastMessage: "Groupe créé. Le backend ajoutera les membres éligibles.",
+        lastMessage: "Groupe créé.",
         lastMessageAt: new Date().toISOString()
       };
       setCreatedGroups((previous) => [group, ...previous]);
@@ -104,11 +110,19 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
     async (
       conversationId: string,
       body: string,
-      replyTo?: ChatMessage
+      replyTo?: ChatMessage,
+      attachments: MessageAttachment[] = [],
+      mentionedUserIds: string[] = []
     ): Promise<boolean> => {
       const cleanBody = body.trim();
       const group = createdGroups.find((item) => item.id === conversationId);
-      if (!group?.canPost || !cleanBody || cleanBody.length > 4_000) return false;
+      if (
+        !group?.canPost ||
+        (!cleanBody && attachments.length === 0) ||
+        cleanBody.length > 4_000
+      ) {
+        return false;
+      }
       const createdAt = new Date().toISOString();
       const message: ChatMessage = {
         id: `local-group-message-${Crypto.randomUUID()}`,
@@ -123,6 +137,8 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
         status: "sent",
         isMine: true,
         replyToMessageId: replyTo?.id,
+        attachments,
+        mentionedUserIds,
         replyPreview: replyTo
           ? {
               messageId: replyTo.id,
@@ -138,7 +154,15 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
       setCreatedGroups((previous) =>
         previous.map((item) =>
           item.id === conversationId
-            ? { ...item, lastMessage: cleanBody, lastMessageAt: createdAt }
+            ? {
+                ...item,
+                lastMessage:
+                  cleanBody ||
+                  (attachments.length === 1
+                    ? `📎 ${attachments[0]?.name ?? "Pièce jointe"}`
+                    : `📎 ${attachments.length} pièces jointes`),
+                lastMessageAt: createdAt
+              }
             : item
         )
       );
