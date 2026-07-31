@@ -71,7 +71,6 @@ export default function SettingsScreen() {
     setSignOutError(null);
     try {
       await signOut();
-      router.replace("/sign-in");
     } catch {
       setSignOutError(
         "La déconnexion a été bloquée car les données locales n’ont pas pu être supprimées en sécurité. Fermez puis relancez l’application avant de réessayer."
