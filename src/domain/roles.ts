@@ -54,6 +54,20 @@ export function canAccessAllowedRoles(
   );
 }
 
+/**
+ * Les groupes officiels Connexio sont une capacité réservée aux Visionnaires.
+ * Le rôle technique `admin` n'est volontairement pas assimilé à cette capacité
+ * produit : le backend peut toujours intervenir via ses routes d'administration,
+ * mais l'interface membre ne doit pas exposer la création ou l'édition officielle.
+ */
+export function isVisionnaireRole(role: UserRole): boolean {
+  return normalizeUserRole(role) === "visionnaire";
+}
+
+/**
+ * Conservé pour les autres fonctions de gouvernance qui restent accessibles aux
+ * rôles historiques. Ne pas utiliser pour créer ou administrer un groupe officiel.
+ */
 export function isGovernanceRole(role: UserRole): boolean {
   const normalized = normalizeUserRole(role);
   return (
