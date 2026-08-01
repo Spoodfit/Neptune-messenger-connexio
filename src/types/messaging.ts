@@ -55,6 +55,17 @@ export interface AppUser {
   phone?: string;
   videoCallEnabled?: boolean;
   lastSeenAt?: string;
+  webProfileUrl?: string;
+}
+
+export interface EventVoteAlert {
+  id: string;
+  title: string;
+  clubName: string;
+  city?: string;
+  pendingCount: number;
+  webUrl: string;
+  closesAt?: string;
 }
 
 export interface Conversation {
@@ -76,11 +87,14 @@ export interface Conversation {
   avatarUrl?: string;
   iconName?: string;
   memberIds?: string[];
+  /** Membres les plus actifs, ordonnés par activité récente côté serveur. */
+  activeMemberIds?: string[];
   ownerId?: string;
   adminIds?: string[];
   muted?: boolean;
   archived?: boolean;
   left?: boolean;
+  eventVoteAlert?: EventVoteAlert;
 }
 
 export interface MessageAttachment {
@@ -88,6 +102,8 @@ export interface MessageAttachment {
   kind: AttachmentKind;
   name: string;
   uri?: string;
+  downloadUrl?: string;
+  thumbnailUrl?: string;
   mimeType?: string;
   sizeBytes?: number;
   durationSeconds?: number;
@@ -113,6 +129,34 @@ export interface ReplyPreview {
   body: string;
 }
 
+export interface PollOption {
+  id: string;
+  label: string;
+  voteCount: number;
+  votedByCurrentUser: boolean;
+}
+
+export interface MessagePoll {
+  id: string;
+  question: string;
+  options: PollOption[];
+  allowMultiple: boolean;
+  anonymous: boolean;
+  totalVotes: number;
+  closesAt?: string;
+  closedAt?: string;
+  eventVoteId?: string;
+  eventVoteUrl?: string;
+}
+
+export interface CreatePollInput {
+  question: string;
+  options: string[];
+  allowMultiple: boolean;
+  anonymous: boolean;
+  closesAt?: string;
+}
+
 export interface ChatMessage {
   id: string;
   clientMessageId?: string;
@@ -130,6 +174,7 @@ export interface ChatMessage {
   replyPreview?: ReplyPreview;
   attachments?: MessageAttachment[];
   reactions?: MessageReactionSummary[];
+  poll?: MessagePoll;
   mentionedUserIds?: string[];
   retryCount?: number;
   errorCode?: string;
