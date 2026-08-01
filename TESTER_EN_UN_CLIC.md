@@ -6,7 +6,9 @@ Ouvrir la prévisualisation web de démonstration :
 
 https://neptunebusinessclub.github.io/Neptune-messenger-connexio/
 
-Cette version utilise uniquement les données fictives locales. Elle permet de contrôler le design, la navigation, les conversations, la lecture seule et la responsivité. Elle ne valide pas les notifications natives, SQLCipher, le clavier mobile, APNs/FCM ni le backend Neptune.
+Le déploiement GitHub Pages est construit automatiquement depuis la branche `feat/production-hardening` en mode démonstration.
+
+Cette version utilise uniquement les données fictives locales. Elle permet de contrôler le design, la navigation, les conversations, les pièces jointes, les Temps forts, la Map, les appels et la responsivité. Elle ne valide pas les notifications natives, SQLCipher, le clavier mobile, APNs/FCM ni le backend Neptune.
 
 ## Option 2 — Double-clic sous Windows
 
