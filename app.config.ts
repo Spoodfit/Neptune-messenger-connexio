@@ -4,8 +4,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   const realtimeUrl = process.env.EXPO_PUBLIC_REALTIME_URL ?? "";
-  const callBaseUrl =
-    process.env.EXPO_PUBLIC_CALL_BASE_URL ?? "https://meet.jit.si";
+  const businessWebBaseUrl =
+    process.env.EXPO_PUBLIC_BUSINESS_WEB_BASE_URL ??
+    "https://neptunebusiness.com";
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
   const isGithubPages = process.env.EXPO_PUBLIC_GITHUB_PAGES === "true";
@@ -27,11 +28,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     if (!apiBaseUrl.startsWith("https://")) {
       throw new Error("EXPO_PUBLIC_API_BASE_URL doit utiliser HTTPS en production.");
     }
-    if (!realtimeUrl.startsWith("wss://")) {
-      throw new Error("EXPO_PUBLIC_REALTIME_URL doit utiliser WSS en production.");
+    if (!realtimeUrl.startsWith("wss://") && !realtimeUrl.startsWith("https://")) {
+      throw new Error(
+        "EXPO_PUBLIC_REALTIME_URL doit utiliser WSS ou HTTPS en production."
+      );
     }
-    if (!callBaseUrl.startsWith("https://")) {
-      throw new Error("EXPO_PUBLIC_CALL_BASE_URL doit utiliser HTTPS en production.");
+    if (!businessWebBaseUrl.startsWith("https://")) {
+      throw new Error(
+        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL doit utiliser HTTPS en production."
+      );
     }
   }
 
@@ -39,7 +44,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: "Connexio by Neptune",
     slug: "neptune-messenger-connexio",
-    version: "0.3.0",
+    version: "0.4.0",
     orientation: "portrait",
     scheme: "neptuneconnexio",
     userInterfaceStyle: "dark",
@@ -118,7 +123,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     extra: {
       apiBaseUrl,
       realtimeUrl,
-      callBaseUrl,
+      businessWebBaseUrl,
       mockMode,
       buildProfile,
       ...(easProjectId
