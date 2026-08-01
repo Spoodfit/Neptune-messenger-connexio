@@ -1,332 +1,265 @@
-# Connexio — contrat de remise frontend / backend
+# Connexio V13 — remise frontend / backend
 
-Ce document décrit le front Expo / React Native livré sur `feat/production-hardening` et les branchements obligatoires avant une remise en production.
+## 1. Statut de la livraison
 
-Le frontend est une référence fonctionnelle et visuelle. Il ne constitue jamais la source de vérité des droits, appartenances, blocages, statuts, localisations ou messages.
+Le client Expo / React Native de Connexio est livré comme application fonctionnelle web, iOS et Android.
 
-## 1. Inventaire des écrans
+Les fonctions utilisateur sont implémentées côté client : sélection et lecture des médias, documents, localisation, carte, appels audio/vidéo, partage natif, réactions, commentaires, gestion des groupes, préférences, blocage, export et suppression de compte.
 
-### Authentification et cycle de compte
+Le backend Neptune reste la source de vérité pour les identités, statuts, droits, contenus, fichiers, synchronisation, appels entrants, notifications et modération. L’intégrateur doit exposer les contrats ci-dessous ; il ne doit pas reconstruire les écrans ni les interactions.
 
-- `/sign-in` : code à usage unique et mode démonstration explicite.
-- `/access-help` : procédure d’obtention d’un code Neptune.
-- `/privacy` : centre de confidentialité et droits du compte.
-- `/account` : sessions, appareils, export et suppression.
-- `/notification-settings` : préférences par catégorie.
-- `/blocked-users` : état vide et règles du blocage.
-- `+not-found` : route invalide ou contenu devenu inaccessible.
+Le mode `EXPO_PUBLIC_MOCK_MODE=true` fournit une démonstration autonome. Il est interdit dans un build de production.
+
+## 2. Écrans livrés
+
+### Authentification et compte
+
+- `/sign-in` : code à usage unique et mode démonstration explicite ;
+- `/access-help` : aide à l’obtention du code ;
+- `/account` : profil synchronisé, appareils, révocation de sessions, export et suppression ;
+- `/notification-settings` : préférences synchronisées ;
+- `/privacy` : Map, profil, présence, téléphone et localisation approximative ;
+- `/blocked-users` : liste et déblocage ;
+- `+not-found` : route ou contenu inaccessible.
 
 ### Messagerie
 
-- `/(tabs)/messages` : deux filtres, **Groupes** et **Privées**.
-- `/new-conversation` : conversation directe, mini-groupe privé, groupe officiel administré.
-- `/chat/[id]` : messages, mentions, réponse, réactions, pièces jointes, lecture seule, appels privés.
-- `/conversation/[id]` : informations d’une conversation privée / mini-groupe.
-- `/group/[id]` : membres, sourdine, départ, identité, visibilité et permissions.
-- `/profile/[id]` : profil contact, derniers Temps forts et actions rapides.
+- `/(tabs)/messages` : onglets Groupes / Privées, mentions animées, maintien long ;
+- `/new-conversation` : conversation directe, mini-groupe de quatre personnes au total ou groupe officiel ;
+- `/chat/[id]` : texte, mentions, médias, documents, fichiers, localisation, réactions, réponse par glissement, hors-ligne et reprise ;
+- `/conversation/[id]` : membres d’une conversation privée ;
+- `/group/[id]` : membres, image, icône, visibilité par statut, publication, sourdine, départ et signalement ;
+- `/profile/[id]` : message, téléphone, appel audio, visio, blocage et signalement.
 
-### Temps forts et Map
+### Temps forts, Map et appels
 
-- `/(tabs)/highlights` : Feed et Map.
-- `/new-highlight` : texte, photo, vidéo courte, mentions, catégorie, position approximative.
-- `/highlight/[id]` : réactions, commentaires, réponses aux commentaires et partage.
+- `/(tabs)/highlights` : Feed, Map réelle, clustering, géolocalisation, bulles et actions rapides ;
+- `/new-highlight` : texte, photo, vidéo de 60 secondes maximum, mentions, position approximative et tag `BESOIN` ;
+- `/highlight/[id]` : réactions, commentaires, réponses et partage natif ;
+- `/(tabs)/calls` : historique et relance audio/vidéo ;
+- `/call/[id]` : salle Jitsi configurable via `EXPO_PUBLIC_CALL_BASE_URL`.
 
-### Appels et profil
+## 3. Configuration de production
 
-- `/(tabs)/calls` : historique audio / vidéo.
-- `/(tabs)/settings` : profil et accès à tous les réglages fonctionnels.
+Variables obligatoires :
 
-## 2. Rôles et permissions
-
-Rôles canoniques :
-
-- `visionnaire`
-- `amiral`
-- `capitaine`
-- `legende`
-- `moussaillon`
-- `triton`
-- `free`
-- `admin`
-
-Le mobile peut adapter l’affichage, mais le serveur doit autoriser chaque opération.
-
-### Matrice minimale côté serveur
-
-| Action | Contrôle obligatoire |
-|---|---|
-| Voir un groupe dans la liste | appartenance, rôle autorisé, blocage, état du groupe |
-| Ouvrir un groupe par URL | même contrôle que la liste, sans confiance dans le client |
-| Publier dans un groupe | membre actif + `can_post` calculé serveur |
-| Créer / modifier un groupe | permission de gouvernance ou permission explicite |
-| Modifier visibilité / statuts | permission administrateur + journal d’audit |
-| Ajouter / retirer un membre | permission de gestion + règle du groupe |
-| Quitter un groupe | règle du groupe officiel + transfert de propriété éventuel |
-| Voir un profil / téléphone | préférences de confidentialité du membre |
-| Appeler / visio | relation autorisée, blocage, disponibilité et ticket court |
-| Voir une position | consentement, Ghost Mode, précision et durée de conservation |
-
-Les contrôles doivent s’appliquer aux endpoints REST, WebSocket, notifications push, exports et liens profonds.
-
-## 3. Authentification
-
-### Endpoints attendus
-
-- `POST /v1/session/exchange-code`
-- `POST /v1/session/refresh`
-- `POST /v1/session/revoke`
-- `GET /v1/me`
-- `GET /v1/me/sessions`
-- `DELETE /v1/me/sessions/:sessionId`
-
-### Exigences
-
-- code court, à usage unique, lié à l’appareil et expirant rapidement ;
-- access token uniquement en mémoire ;
-- refresh token dans SecureStore ;
-- rotation et révocation ;
-- aucune build production avec `MOCK_MODE=true` ;
-- aucun transport HTTP ou WebSocket non chiffré.
-
-## 4. Conversations et groupes
-
-### Endpoints attendus
-
-- `GET /v1/conversations?type=group|private&cursor=`
-- `POST /v1/conversations/direct`
-- `POST /v1/conversations/private-group`
-- `POST /v1/groups`
-- `GET /v1/conversations/:id`
-- `PATCH /v1/groups/:id`
-- `DELETE /v1/groups/:id`
-- `POST /v1/groups/:id/leave`
-- `POST /v1/groups/:id/mute`
-- `DELETE /v1/groups/:id/mute`
-- `GET /v1/groups/:id/members?cursor=`
-- `POST /v1/groups/:id/members`
-- `DELETE /v1/groups/:id/members/:userId`
-
-### Mini-groupes privés
-
-La limite produit est de **quatre participants au total**, créateur compris. Le serveur doit refuser toute cinquième personne, y compris en concurrence.
-
-### Groupe officiel
-
-Champs minimaux :
-
-```json
-{
-  "name": "string",
-  "description": "string",
-  "avatar_url": "https://...",
-  "icon_name": "people",
-  "allowed_roles": ["visionnaire", "amiral"],
-  "members_can_post": true
-}
+```text
+EAS_BUILD_PROFILE=production
+EXPO_PUBLIC_MOCK_MODE=false
+EXPO_PUBLIC_API_BASE_URL=https://api.neptune.example
+EXPO_PUBLIC_REALTIME_URL=wss://api.neptune.example/v1/realtime
+EXPO_PUBLIC_EAS_PROJECT_ID=<uuid EAS>
 ```
 
-Toute modification de visibilité ou de droit d’écriture doit créer une entrée d’audit.
+Variable d’appel facultative :
 
-## 5. Messages
+```text
+EXPO_PUBLIC_CALL_BASE_URL=https://meet.jit.si
+```
 
-### Endpoints attendus
+Une instance Jitsi dédiée peut remplacer l’URL publique sans modification d’écran.
 
-- `GET /v1/conversations/:id/messages?cursor=`
-- `POST /v1/conversations/:id/messages`
-- `PATCH /v1/messages/:id`
-- `DELETE /v1/messages/:id`
-- `POST /v1/messages/:id/reactions`
-- `DELETE /v1/messages/:id/reactions/:emoji`
-- `POST /v1/conversations/:id/read`
+Le build refuse : mode mock, API HTTP, WebSocket non chiffré ou configuration EAS absente.
 
-### Envoi
+## 4. Authentification
 
-Corps recommandé :
+| Méthode | Route |
+|---|---|
+| Échanger un code à usage unique | `POST /v1/auth/exchange-code` |
+| Rafraîchir la session | `POST /v1/auth/refresh` |
+| Révoquer la session | `POST /v1/auth/revoke` |
+
+Le refresh token est conservé dans SecureStore. Le client gère le rafraîchissement single-flight et rejoue une requête après un `401`.
+
+## 5. Messagerie et temps réel
+
+| Fonction | Route |
+|---|---|
+| Conversations visibles | `GET /v1/conversations` |
+| Messages paginés | `GET /v1/conversations/:id/messages?cursor=` |
+| Envoyer un message | `POST /v1/conversations/:id/messages` |
+| Marquer comme lu | `POST /v1/conversations/:id/read` |
+| Ticket WebSocket court | `POST /v1/realtime/ticket` |
+| Enregistrer un appareil push | `POST /v1/devices/push-tokens` |
+| Révoquer un appareil push | `POST /v1/devices/push-tokens/revoke` |
+
+L’envoi contient :
 
 ```json
 {
   "client_message_id": "uuid",
-  "body": "texte",
-  "reply_to_message_id": "uuid|null",
-  "mentioned_user_ids": ["uuid"],
-  "attachment_ids": ["uuid"]
+  "body": "message",
+  "reply_to_message_id": null,
+  "mentioned_user_ids": ["user-id"],
+  "attachments": [
+    {
+      "id": "media-id",
+      "kind": "photo",
+      "name": "photo.jpg",
+      "uri": "https://cdn/...",
+      "mime_type": "image/jpeg",
+      "size_bytes": 123456,
+      "duration_seconds": null,
+      "width": 1600,
+      "height": 1200
+    }
+  ]
 }
 ```
 
-Le serveur doit garantir l’unicité de `(sender_id, client_message_id)` et renvoyer le message canonique. Une reconnexion, un retry ou un événement WebSocket rejoué ne doit jamais créer de doublon.
+`Idempotency-Key` correspond au `client_message_id`.
 
-### Mentions
+Événements temps réel pris en charge :
 
-Le frontend suggère les membres lors de `@`. Le serveur doit :
+- `message.created` ;
+- `message.updated` ;
+- `message.deleted` ;
+- `conversation.read` ;
+- `conversation.membership.changed`.
 
-1. résoudre les destinataires par identifiant, jamais par texte uniquement ;
-2. vérifier qu’ils appartiennent à la conversation ;
-3. stocker `mentioned_user_ids` ;
-4. calculer `mention_count` par utilisateur ;
-5. envoyer une notification dédiée selon les préférences ;
-6. supprimer l’état visuel après lecture / acquittement.
+Le client réconcilie REST, temps réel et état optimiste. L’outbox native est chiffrée par SQLCipher et conserve texte, réponse, mentions et pièces jointes.
 
-## 6. Pièces jointes et médias
+## 6. Médias et fichiers
 
-### Endpoints attendus
+Cycle d’upload :
 
-- `POST /v1/uploads/prepare`
-- upload direct vers stockage objet privé ;
-- `POST /v1/uploads/:id/complete`
-- `DELETE /v1/uploads/:id`
+| Étape | Route |
+|---|---|
+| Préparer un upload de message | `POST /v1/uploads/prepare` |
+| Préparer un média de Temps fort | `POST /v1/highlights/uploads/prepare` |
+| Préparer une image de groupe | `POST /v1/groups/avatar/uploads/prepare` |
+| Envoyer les octets | URL pré-signée retournée par le serveur |
+| Finaliser l’upload | `POST /v1/uploads/:id/complete` |
 
-### Exigences
+Le client gère :
 
-- validation MIME réelle côté serveur ;
-- taille maximale par type ;
-- antivirus / analyse ;
-- compression photo et vidéo ;
-- vidéo Temps fort limitée à 60 secondes ;
-- URL signée et courte ;
-- progression, reprise et annulation ;
-- suppression différée et journalisée ;
-- aucune URL publique permanente contenant un contenu privé.
+- picker système photo/vidéo/document/fichier ;
+- contrôle de taille ;
+- limite vidéo de 60 secondes pour un Temps fort ;
+- progression ;
+- erreur et reprise ;
+- affichage photo ;
+- lecture vidéo avec contrôles natifs ;
+- ouverture des documents et localisations.
 
-Types prévus : photo, vidéo, document, fichier, audio, localisation et contact.
+Le serveur doit renvoyer une URL privée ou signée lisible par l’utilisateur autorisé.
 
-## 7. Temps forts
+## 7. Conversations privées et groupes
 
-### Endpoints attendus
+| Fonction | Route |
+|---|---|
+| Membres visibles | `GET /v1/members?visible=true&query=` |
+| Conversation directe | `POST /v1/conversations/direct` |
+| Mini-groupe privé | `POST /v1/conversations/private-group` |
+| Créer un groupe officiel | `POST /v1/groups` |
+| Modifier un groupe | `PATCH /v1/groups/:id` |
+| Mettre en sourdine | `POST /v1/groups/:id/mute` |
+| Retirer la sourdine | `DELETE /v1/groups/:id/mute` |
+| Quitter | `POST /v1/groups/:id/leave` |
 
-- `GET /v1/highlights?cursor=`
-- `POST /v1/highlights`
-- `GET /v1/highlights/:id`
-- `PATCH /v1/highlights/:id`
-- `DELETE /v1/highlights/:id`
-- `POST /v1/highlights/:id/reactions`
-- `DELETE /v1/highlights/:id/reactions/:emoji`
-- `POST /v1/highlights/:id/comments`
-- `POST /v1/comments/:id/replies`
-- `POST /v1/comments/:id/reactions`
-- `POST /v1/highlights/:id/share`
+Le serveur valide impérativement :
 
-### BESOIN — synchronisation Neptune Business
+- quatre participants maximum au total dans un mini-groupe privé ;
+- unicité d’une conversation directe entre deux personnes ;
+- rôles autorisés : Visionnaire, Amiral, Capitaine, Légende, Moussaillon, Triton et Free ;
+- droits de création, administration, lecture et écriture ;
+- filtrage de tous les groupes avant réponse au client.
 
-Le backend Neptune est la source de vérité. La synchronisation doit être bidirectionnelle et idempotente :
+## 8. Réactions, Temps forts et synchronisation `BESOIN`
 
-- identifiant global partagé entre les deux applications ;
-- origine et version du contenu ;
-- propagation création / modification / suppression ;
-- traitement des conflits ;
-- même politique de visibilité ;
-- aucun doublon lors d’un retry ;
-- journal d’erreur et reprise automatique.
+| Fonction | Route |
+|---|---|
+| Réagir à un message | `POST /v1/messages/:id/reactions` |
+| Retirer une réaction message | `DELETE /v1/messages/:id/reactions/:emoji` |
+| Feed paginé | `GET /v1/highlights?cursor=` |
+| Créer un Temps fort | `POST /v1/highlights` |
+| Réagir à un Temps fort | `POST /v1/highlights/:id/reactions` |
+| Retirer une réaction | `DELETE /v1/highlights/:id/reactions/:emoji` |
+| Commenter | `POST /v1/highlights/:id/comments` |
+| Répondre | `POST /v1/comments/:id/replies` |
+| Réagir à un commentaire | `POST /v1/comments/:id/reactions` |
+| Retirer une réaction commentaire | `DELETE /v1/comments/:id/reactions/:emoji` |
+| Créer un lien de partage | `POST /v1/highlights/:id/share` |
 
-## 8. Map et géolocalisation
+Un `BESOIN` est envoyé avec :
 
-### Web
+```json
+{
+  "kind": "besoin",
+  "sync_targets": ["connexio", "business"]
+}
+```
 
-Le composant `NeptuneMap.web.tsx` utilise Leaflet, CARTO / OpenStreetMap, géolocalisation navigateur et clustering automatique.
+Le serveur doit attribuer un identifiant canonique commun, publier l’événement dans les deux applications et appliquer la même règle aux modifications et suppressions. L’idempotence empêche les doublons. Un changement reçu depuis Neptune Business doit être renvoyé dans le Feed et le WebSocket Connexio.
 
-### Natif
+## 9. Map et localisation
 
-`NeptuneMap.native.tsx` est un adaptateur visuel. Il doit être remplacé par `react-native-maps`, Expo Maps ou MapLibre sans changer le contrat `NeptuneMapProps`.
+| Fonction | Route |
+|---|---|
+| Moments visibles | `GET /v1/map/moments?bounds=&zoom=` |
+| Mettre à jour la position | `PUT /v1/me/location` |
+| Effacer la position | `DELETE /v1/me/location` |
 
-### Endpoints attendus
+Le client web et natif utilise Leaflet, MarkerCluster, zoom, déplacement, géolocalisation, avatars, fallback initiales et contours pulsants.
 
-- `PUT /v1/me/location`
-- `DELETE /v1/me/location`
-- `GET /v1/map/moments?bounds=&zoom=`
-- `PATCH /v1/me/location-preferences`
+Le serveur ne doit jamais renvoyer l’adresse ou les coordonnées exactes non consenties. Le rayon de confidentialité attendu est compris entre 1 et 3 km.
 
-### Confidentialité obligatoire
+## 10. Appels
 
-- coordonnée exacte jamais renvoyée au client d’un autre membre ;
-- obfuscation serveur avec rayon minimal ;
-- expiration automatique ;
-- Ghost Mode appliqué serveur ;
-- fréquence limitée ;
-- visibilité selon consentement et rôle ;
-- pas de localisation en arrière-plan sans justification et permission dédiée.
+Les salles audio et vidéo sont opérationnelles via Jitsi et un nom de salle déterministe dérivé de la conversation.
 
-### Clustering
+Pour les appels entrants, l’historique et la signalisation métier, le contrat prévoit :
 
-Le backend peut renvoyer des points, mais le clustering visuel dépend du zoom et de la distance écran. Ne jamais empiler les avatars au même pixel.
+```text
+POST /v1/calls
+```
 
-## 9. Appels audio / vidéo
+avec `member_id` et `type`. Le backend peut renvoyer une `joinUrl` dédiée. APNs/FCM doit réveiller le client et ouvrir `/call/:conversationId?mode=audio|video`.
 
-Le frontend expose les actions et l’historique. Restent à connecter :
+Une infrastructure Jitsi privée, TURN/STUN, journalisation et politiques de conservation restent des opérations d’infrastructure, sans reprise des écrans.
 
-- ticket de signalisation court ;
-- WebRTC ;
-- STUN / TURN ;
-- appels entrants ;
-- CallKit iOS / ConnectionService Android ;
-- permissions micro / caméra uniquement au premier usage ;
-- reprise réseau ;
-- appel manqué ;
-- blocage et confidentialité ;
-- aucune action d’appel dans les groupes officiels.
+## 11. Compte, notifications et confidentialité
 
-## 10. Temps réel
+| Fonction | Route |
+|---|---|
+| Sessions | `GET /v1/account/sessions` |
+| Révoquer une session | `DELETE /v1/account/sessions/:id` |
+| Export des données | `POST /v1/account/export` |
+| Resynchroniser le profil | `POST /v1/account/resync` |
+| Demander la suppression | `POST /v1/account/deletion` |
+| Lire les notifications | `GET /v1/me/notification-preferences` |
+| Modifier les notifications | `PUT /v1/me/notification-preferences` |
+| Lire la confidentialité | `GET /v1/me/privacy-preferences` |
+| Modifier la confidentialité | `PUT /v1/me/privacy-preferences` |
+| Membres bloqués | `GET /v1/me/blocked-users` |
+| Bloquer | `PUT /v1/me/blocked-users/:id` |
+| Débloquer | `DELETE /v1/me/blocked-users/:id` |
+| Signaler un contenu | `POST /v1/reports` |
 
-Événements minimaux :
+Les réglages doivent être appliqués côté serveur avant l’envoi d’une notification, d’un profil, d’une position ou d’une action rapide.
 
-- `message.created`
-- `message.updated`
-- `message.deleted`
-- `message.reaction.changed`
-- `conversation.updated`
-- `conversation.member.changed`
-- `conversation.permission.changed`
-- `conversation.mention.changed`
-- `highlight.created`
-- `highlight.updated`
-- `highlight.deleted`
-- `highlight.comment.changed`
-- `highlight.reaction.changed`
-- `profile.updated`
-- `call.incoming`
-- `call.updated`
+## 12. Validation avant publication
 
-Chaque événement doit posséder un identifiant, une version, une date serveur et un contrôle d’autorisation au moment de l’émission.
+Gates logiciels :
 
-## 11. Notifications push
+```text
+npm ci
+npm audit --omit=dev --audit-level=high
+npm run typecheck
+npm run test:domain
+npx expo install --check
+npx expo config --type public
+npm run web:build
+```
 
-- APNs / FCM par appareil ;
-- rotation et révocation du token ;
-- préférences globales et par conversation ;
-- priorité spécifique pour mentions et appels ;
-- deep link vers le contenu ;
-- revalidation d’accès après ouverture ;
-- aperçu confidentiel sur écran verrouillé ;
-- aucun contenu de message dans les logs serveur.
+Les workflows contrôlent également :
 
-## 12. Modération et sécurité
+- formats 280×568, 320×568, 390×844, 430×720, tablette et paysage ;
+- zoom navigateur à 140 % ;
+- chat faible hauteur ;
+- conversation en lecture seule ;
+- double envoi ;
+- déconnexion et reconnexion ;
+- Feed, Map, Appels, Profil, création et administration.
 
-Avant pilote :
-
-- blocage ;
-- signalement message, profil, groupe, publication et commentaire ;
-- masquage ;
-- rate limiting ;
-- anti-spam ;
-- suspension / bannissement ;
-- journal d’administration ;
-- export et suppression ;
-- politique de conservation ;
-- sauvegarde et restauration testées ;
-- observabilité sans contenu privé.
-
-## 13. Critères d’acceptation développeur
-
-Le branchement n’est pas terminé tant que :
-
-- aucune donnée fictive n’apparaît avec `MOCK_MODE=false` ;
-- toutes les erreurs réseau possèdent un état visible et une nouvelle tentative ;
-- les groupes sont filtrés côté serveur ;
-- le mini-groupe refuse un cinquième participant ;
-- les messages restent uniques après 20 retries ;
-- les pièces jointes reprennent après coupure ;
-- les mentions sont acquittées ;
-- BESOIN est identique dans les deux applications ;
-- Ghost Mode supprime immédiatement la visibilité serveur ;
-- la déconnexion révoque session, push et données locales ;
-- VoiceOver / TalkBack et les cibles tactiles sont validés sur appareils ;
-- le pipeline CI est vert ;
-- le pilote et le rollback sont documentés.
+Avant mise en ligne publique, l’équipe backend/infrastructure doit encore valider les endpoints sur l’environnement réel, APNs/FCM, Jitsi/TURN, CDN privé, politiques de conservation, observabilité, sauvegardes, rollback et appareils physiques. Ces validations ne nécessitent pas de reconstruction du frontend.
