@@ -9,7 +9,8 @@ import type { CallSurfaceProps } from "./CallSurface.types";
 export default function CallSurface({
   session,
   displayName,
-  onClose
+  onClose,
+  onUnanswered
 }: CallSurfaceProps) {
   const html = useMemo(
     () => buildIntegratedCallHtml(session, displayName),
@@ -18,8 +19,24 @@ export default function CallSurface({
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
-      const payload = JSON.parse(event.nativeEvent.data) as { type?: string };
+      const payload = JSON.parse(event.nativeEvent.data) as {
+        type?: string;
+        callId?: string;
+        conversationId?: string;
+        reason?: string;
+      };
       if (payload.type === "ended") onClose();
+      if (
+        payload.type === "unanswered" &&
+        payload.callId &&
+        payload.conversationId
+      ) {
+        onUnanswered?.({
+          callId: payload.callId,
+          conversationId: payload.conversationId,
+          reason: payload.reason
+        });
+      }
     } catch {
       // Les messages invalides sont ignorés sans interrompre l’appel.
     }
