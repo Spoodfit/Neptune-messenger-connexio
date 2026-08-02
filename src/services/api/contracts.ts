@@ -1,6 +1,9 @@
 import type {
+  AppUser,
   ChatMessage,
   Conversation,
+  CreatePollInput,
+  MessageAttachment,
   PushTokenRegistration,
   RealtimeTicket,
   SessionPayload
@@ -15,9 +18,14 @@ export interface SendMessageInput {
   clientMessageId: string;
   body: string;
   replyToMessageId?: string;
+  attachments?: MessageAttachment[];
+  mentionedUserIds?: string[];
 }
 
 export interface SessionApi {
+  loginWithCredentials(email: string, password: string): Promise<AppUser>;
+  getCurrentUser(): Promise<AppUser>;
+  logoutCookieSession(): Promise<void>;
   exchangeOneTimeCode(code: string, deviceId: string): Promise<SessionPayload>;
   refreshSession(refreshToken: string): Promise<SessionPayload>;
   revokeSession(refreshToken: string): Promise<void>;
@@ -32,6 +40,15 @@ export interface MessagingApi {
   sendMessage(
     conversationId: string,
     input: SendMessageInput
+  ): Promise<ChatMessage>;
+  createPoll(
+    conversationId: string,
+    input: CreatePollInput
+  ): Promise<ChatMessage>;
+  votePoll(
+    messageId: string,
+    optionId: string,
+    active: boolean
   ): Promise<ChatMessage>;
   markConversationRead(
     conversationId: string,

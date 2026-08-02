@@ -2,38 +2,51 @@
 
 Application mobile iOS et Android dédiée à la messagerie de l’écosystème Neptune Business.
 
-## Objectif
+## Règle d’architecture
 
-Connexio remplace progressivement la communauté WhatsApp par une application mobile synchronisée avec Neptune Business Point App. Les deux interfaces doivent utiliser les mêmes utilisateurs, les mêmes rôles, les mêmes groupes, les mêmes messages et les mêmes règles d’accès.
+Connexio remplace progressivement la communauté WhatsApp par un client mobile synchronisé avec Neptune Business Point App. Les deux interfaces utilisent les mêmes utilisateurs, identifiants, rôles, groupes, messages et règles d’accès.
 
-La V1 ne crée pas un second écosystème. Elle agit comme un **client mobile du backend Neptune existant**.
+Connexio ne crée ni backend, ni base utilisateurs, ni système de permissions parallèle.
 
-## État actuel
+## État technique
 
-Le dépôt contient un MVP fonctionnel en mode démonstration :
+Le dépôt contient un noyau mobile Expo / React Native / TypeScript durci pour la préproduction :
 
-- interface mobile inspirée de l’identité Neptune ;
-- liste des conversations et groupes métiers ;
-- groupes par ville : Carcassonne, Toulouse, Montpellier, Narbonne et Limoux ;
-- espaces Visionnaires, Amiraux, Capitaines, SAV, Boost réseaux sociaux, réussites, besoins, publicité, rencontres et membres online ;
-- écran de conversation avec envoi local de messages ;
-- rôles et restrictions d’accès visibles ;
-- architecture API et temps réel prête à raccorder ;
-- inscription aux notifications push Expo ;
-- deep links vers une conversation ;
-- documentation technique, contrat backend et checklist de publication.
+- connexion par code Neptune à usage unique ;
+- access token court et refresh token stocké dans SecureStore ;
+- rafraîchissement proactif et nouvelle tentative unique après HTTP 401 ;
+- client API authentifié avec erreurs structurées ;
+- validation stricte des réponses REST et événements WebSocket ;
+- file d’envoi SQLite chiffrée, idempotence et retry borné ;
+- fusion dédupliquée REST / temps réel / messages optimistes ;
+- pagination par curseur de l’historique ;
+- notifications Expo, deep links et rotation des tokens push ;
+- révocation locale, serveur et push lors de la déconnexion ;
+- états hors ligne, échec et nouvelle tentative visibles ;
+- tests de domaine, dont une fusion de 500 messages sans perte ni doublon ;
+- configuration production fail-closed : mock interdit, HTTPS et WSS obligatoires.
 
-## Démarrage
+Les données de démonstration ne sont utilisées que lorsque `EXPO_PUBLIC_MOCK_MODE=true` est explicitement défini. Une build mal configurée ne bascule pas silencieusement sur de faux membres.
+
+## Démarrage reproductible
 
 Prérequis : Node.js 22.13 ou supérieur.
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
 npm run start
 ```
 
-Les notifications push distantes nécessitent un **development build** ou une build EAS. Elles ne fonctionnent pas dans Expo Go.
+Vérification locale :
+
+```bash
+npm run verify
+npm run doctor
+npx expo config --type public
+```
+
+Les notifications push distantes nécessitent un development build ou une build EAS. Elles ne fonctionnent pas dans Expo Go.
 
 ```bash
 npx eas login
@@ -43,13 +56,13 @@ npm run build:preview
 
 ## Modes d’exécution
 
-### Démonstration
+### Démonstration explicite
 
 ```env
 EXPO_PUBLIC_MOCK_MODE=true
 ```
 
-L’application utilise les données locales de `src/data/mockData.ts`.
+L’application utilise alors les données locales de `src/data/mockData.ts`.
 
 ### Backend Neptune
 
@@ -57,48 +70,53 @@ L’application utilise les données locales de `src/data/mockData.ts`.
 EXPO_PUBLIC_MOCK_MODE=false
 EXPO_PUBLIC_API_BASE_URL=https://api.votre-domaine.fr
 EXPO_PUBLIC_REALTIME_URL=wss://api.votre-domaine.fr/v1/realtime
+EXPO_PUBLIC_EAS_PROJECT_ID=identifiant-eas
 ```
 
-L’intégration se concentre dans :
-
-- `src/services/api/neptuneApi.ts`
-- `src/services/realtime/RealtimeClient.ts`
-- `src/services/notifications/pushNotifications.ts`
+Une build EAS `production` échoue si une de ces valeurs manque, si le mock est actif ou si les transports ne sont pas chiffrés.
 
 ## Architecture
 
 ```text
 app/                         Routes mobiles Expo Router
 src/components/              Composants UI
-src/config/                  Variables d’environnement
-src/data/                    Données de démonstration
+src/config/                  Configuration fail-closed
+src/data/                    Données de démonstration uniquement
+src/domain/                  Règles testables sans dépendance UI
 src/providers/               Session et état de messagerie
-src/services/api/            Contrat et client API
-src/services/notifications/  Notifications push
-src/services/realtime/       WebSocket et reconnexion
+src/services/api/            HTTP, contrat et normalisation réseau
+src/services/auth/           Runtime de session authentifiée
+src/services/notifications/  Notifications et cycle de vie du token
+src/services/realtime/       WebSocket, validation et reconnexion
+src/storage/                 Outbox SQLite / SQLCipher
 src/theme/                   Design system Neptune
 src/types/                   Modèles métier
-docs/                        Documentation d’intégration
+tests/                       Tests Node du domaine et des contrats
+docs/                        Architecture, sécurité et release gates
 ```
 
-## Ce qui reste à brancher
+## Gates encore externes au dépôt
 
-1. échange de session entre Neptune Business Point App et Connexio ;
-2. endpoints réels de conversations, messages, membres et lecture ;
-3. WebSocket ou service temps réel ;
-4. endpoint d’enregistrement des tokens push ;
-5. identifiants Apple, Google et EAS ;
-6. icônes, splash screen et captures App Store définitives ;
-7. politique de confidentialité, CGU et procédure de suppression de compte ;
-8. tests de charge et audit de sécurité.
+Le code ne suffit pas à valider ces points :
 
-## Limite volontaire
+1. endpoints réels Neptune et autorisations serveur par rôle ;
+2. contrainte d’idempotence et pagination prouvées sur la base de préproduction ;
+3. WebSocket et ticket court testés sur réseau faible ;
+4. APNs / FCM, certificats EAS et token push testés sur appareils physiques ;
+5. identifiants Apple et Google définitifs ;
+6. icônes, splash screen et captures stores définitives ;
+7. blocage, signalement, modération, export et suppression de compte ;
+8. VoiceOver, TalkBack, iPhone et deux Android réels ;
+9. pilote mesuré avec crash-free sessions ≥ 99,5 % ;
+10. restauration backend et procédure de rollback exercées.
 
-Ce MVP ne prétend pas reproduire tout WhatsApp. Les appels, statuts, stories, chiffrement de bout en bout, sauvegardes cloud et import de l’historique WhatsApp sont hors périmètre. Les ajouter dès la V1 serait coûteux, lent et risqué.
+Les pièces jointes, vocaux, appels, Map et Story Time restent hors du noyau publiable tant que permissions, stockage, confidentialité, modération et tests physiques ne sont pas terminés.
 
-Voir :
+## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Contrat backend](docs/BACKEND_CONTRACT.md)
 - [Stratégie de synchronisation](docs/SYNC_STRATEGY.md)
+- [Modèle de menace](docs/THREAT_MODEL.md)
+- [Critères de production](docs/PRODUCTION_READINESS.md)
 - [Publication iOS et Android](docs/STORE_RELEASE.md)

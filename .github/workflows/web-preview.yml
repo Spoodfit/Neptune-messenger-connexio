@@ -6,63 +6,133 @@ on:
       - main
   push:
     branches:
+      - feat/production-hardening
       - feat/mvp-mobile-messenger
       - main
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
-  id-token: write
+  issues: write
 
 concurrency:
-  group: github-pages
+  group: connexio-web-preview
   cancel-in-progress: true
 
 jobs:
-  build:
+  preview:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          show-progress: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
+          cache: npm
 
-      - name: Install dependencies
-        run: npm install --silent --no-audit --no-fund
-
-      - name: Install Expo web dependencies
-        run: npx expo install react-dom react-native-web @expo/metro-runtime
-
-      - name: Configure GitHub Pages
-        if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
 
       - name: Build web preview
         env:
           EXPO_PUBLIC_GITHUB_PAGES: "true"
           EXPO_PUBLIC_MOCK_MODE: "true"
-        run: npx expo export -p web
+        run: npm run web:build
 
-      - name: Upload Pages artifact
+      - name: Publish static build to gh-pages
         if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          touch dist/.nojekyll
+          cd dist
+          git init
+          git checkout -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Deploy Connexio preview ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin gh-pages
 
-  deploy:
-    if: github.event_name != 'pull_request'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Configure gh-pages as Pages source
+        if: github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const source = { branch: 'gh-pages', path: '/' };
+            try {
+              await github.request('GET /repos/{owner}/{repo}/pages', { owner, repo });
+              await github.request('PUT /repos/{owner}/{repo}/pages', {
+                owner,
+                repo,
+                build_type: 'legacy',
+                source
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.request('POST /repos/{owner}/{repo}/pages', {
+                owner,
+                repo,
+                build_type: 'legacy',
+                source
+              });
+            }
+
+      - name: Wait for public preview
+        if: github.event_name != 'pull_request'
+        run: |
+          URL="https://neptunebusinessclub.github.io/Neptune-messenger-connexio/"
+          for attempt in $(seq 1 30); do
+            code=$(curl --location --silent --output /tmp/connexio-page --write-out "%{http_code}" "$URL" || true)
+            if [ "$code" = "200" ] && grep -qi "connexio\|expo" /tmp/connexio-page; then
+              echo "Preview available: $URL"
+              exit 0
+            fi
+            echo "Attempt $attempt/30: HTTP $code"
+            sleep 5
+          done
+          echo "GitHub Pages did not become available in time."
+          exit 1
+
+      - name: Publish preview status on PR 3
+        if: always() && github.event_name == 'push' && github.ref_name == 'feat/production-hardening'
+        uses: actions/github-script@v7
+        env:
+          JOB_STATUS: ${{ job.status }}
+        with:
+          script: |
+            const marker = '<!-- connexio-web-preview -->';
+            const pageUrl = 'https://neptunebusinessclub.github.io/Neptune-messenger-connexio/';
+            const ok = process.env.JOB_STATUS === 'success';
+            const body = `${marker}\n## Prévisualisation Connexio\n\n- Publication : **${process.env.JOB_STATUS}**\n- Commit : \`${context.sha}\`\n- Exécution : ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n${ok ? `✅ [Ouvrir la démonstration](${pageUrl})` : '❌ Le site n’est pas encore accessible. L’exécution ci-dessus contient la cause exacte.'}`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 3,
+              per_page: 100
+            });
+            const existing = comments.find((comment) => comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: 3,
+                body
+              });
+            }

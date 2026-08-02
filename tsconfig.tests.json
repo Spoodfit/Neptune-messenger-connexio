@@ -1,18 +1,28 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "Node16",
+    "moduleResolution": "Node16",
     "rootDir": ".",
     "outDir": ".test-dist",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"]
   },
   "include": [
     "src/domain/**/*.ts",
+    "src/services/auth/**/*.ts",
+    "src/services/api/contracts.ts",
+    "src/services/api/realtimeTicketWire.ts",
+    "src/services/api/wire.ts",
+    "src/services/realtime/realtimeEvents.ts",
+    "src/storage/outboxStore.memory.ts",
+    "src/storage/outboxStore.types.ts",
+    "src/theme/**/*.ts",
     "src/types/messaging.ts",
+    "src/utils/date.ts",
     "src/utils/redact.ts",
     "tests/**/*.ts"
   ]

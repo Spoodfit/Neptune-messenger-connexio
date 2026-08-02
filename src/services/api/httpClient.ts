@@ -1,4 +1,9 @@
 import { env } from "../../config/env";
+import {
+  classifyAbort,
+  isJsonMediaType,
+  parseRetryAfterMs
+} from "../../domain/httpProtocol";
 
 export class ApiError extends Error {
   readonly retryable: boolean;
@@ -7,7 +12,9 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly payload?: unknown,
-    public readonly requestId?: string
+    public readonly requestId?: string,
+    public readonly code?: string,
+    public readonly retryAfterMs?: number
   ) {
     super(message);
     this.name = "ApiError";
@@ -21,6 +28,12 @@ interface RequestOptions extends RequestInit {
   timeoutMs?: number;
 }
 
+interface ErrorPayload {
+  message?: unknown;
+  code?: unknown;
+  error?: unknown;
+}
+
 function joinUrl(base: string, path: string): string {
   return `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 }
@@ -30,14 +43,50 @@ async function parsePayload(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) return null;
   const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
+  if (isJsonMediaType(contentType)) {
     try {
       return JSON.parse(text) as unknown;
     } catch {
-      throw new ApiError("Réponse JSON invalide.", response.status);
+      throw new ApiError(
+        "Réponse JSON invalide.",
+        response.ok ? 502 : response.status,
+        undefined,
+        response.headers.get("x-request-id") ?? undefined,
+        "invalid-json"
+      );
     }
   }
   return text;
+}
+
+function getErrorDetails(
+  payload: unknown,
+  status: number
+): { message: string; code?: string } {
+  if (typeof payload === "string" && payload.trim()) {
+    return { message: payload.trim() };
+  }
+  if (payload && typeof payload === "object") {
+    const candidate = payload as ErrorPayload;
+    const code = typeof candidate.code === "string" ? candidate.code : undefined;
+    if (typeof candidate.message === "string" && candidate.message.trim()) {
+      return { message: candidate.message.trim(), code };
+    }
+    if (typeof candidate.error === "string" && candidate.error.trim()) {
+      return { message: candidate.error.trim(), code };
+    }
+    if (candidate.error && typeof candidate.error === "object") {
+      const nested = candidate.error as ErrorPayload;
+      if (typeof nested.message === "string" && nested.message.trim()) {
+        return {
+          message: nested.message.trim(),
+          code: typeof nested.code === "string" ? nested.code : code
+        };
+      }
+    }
+    return { message: `Erreur API ${status}`, code };
+  }
+  return { message: `Erreur API ${status}` };
 }
 
 export async function apiRequest<T>(
@@ -49,13 +98,19 @@ export async function apiRequest<T>(
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15_000);
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, options.timeoutMs ?? 15_000);
   const externalSignal = options.signal;
   const abortFromExternal = () => controller.abort();
-  externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
 
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
+  headers.set("Accept-Language", "fr-FR");
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -73,11 +128,14 @@ export async function apiRequest<T>(
     const requestId = response.headers.get("x-request-id") ?? undefined;
 
     if (!response.ok) {
+      const details = getErrorDetails(payload, response.status);
       throw new ApiError(
-        `Erreur API ${response.status}`,
+        details.message,
         response.status,
         payload,
-        requestId
+        requestId,
+        details.code,
+        parseRetryAfterMs(response.headers.get("retry-after"))
       );
     }
 
@@ -85,9 +143,19 @@ export async function apiRequest<T>(
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (controller.signal.aborted) {
-      throw new ApiError("Requête interrompue ou expirée.", 408);
+      const classification = classifyAbort(
+        timedOut,
+        Boolean(externalSignal?.aborted)
+      );
+      throw new ApiError(
+        classification.message,
+        classification.status,
+        undefined,
+        undefined,
+        classification.code
+      );
     }
-    throw new ApiError("Backend Neptune indisponible.", 0, error);
+    throw new ApiError("Backend Neptune indisponible.", 0, error, undefined, "network");
   } finally {
     clearTimeout(timeout);
     externalSignal?.removeEventListener("abort", abortFromExternal);

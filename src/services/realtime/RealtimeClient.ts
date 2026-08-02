@@ -1,28 +1,9 @@
-import type { ChatMessage } from "../../types/messaging";
+import {
+  normalizeRealtimeEvent,
+  type RealtimeEvent
+} from "./realtimeEvents";
 
-export type RealtimeEvent =
-  | { type: "message.created"; payload: ChatMessage }
-  | { type: "message.updated"; payload: ChatMessage }
-  | {
-      type: "message.deleted";
-      payload: { conversationId: string; messageId: string };
-    }
-  | {
-      type: "conversation.read";
-      payload: {
-        conversationId: string;
-        userId: string;
-        lastReadMessageId: string;
-      };
-    }
-  | {
-      type: "presence.changed";
-      payload: { userId: string; online: boolean };
-    }
-  | {
-      type: "conversation.membership.changed";
-      payload: { conversationId: string; active: boolean };
-    };
+export type { RealtimeEvent } from "./realtimeEvents";
 
 interface RealtimeClientOptions {
   url: string;
@@ -30,37 +11,43 @@ interface RealtimeClientOptions {
   onEvent: (event: RealtimeEvent) => void;
   onConnectionChange?: (connected: boolean) => void;
   random?: () => number;
+  connectionTimeoutMs?: number;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function isRealtimeEvent(value: unknown): value is RealtimeEvent {
-  if (!isRecord(value) || typeof value.type !== "string" || !("payload" in value)) {
-    return false;
+function buildSocketIoWebSocketUrl(baseUrl: string, ticket: string): string {
+  const url = new URL(baseUrl);
+  url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
+  if (!url.pathname.includes("socket.io")) {
+    url.pathname = `${url.pathname.replace(/\/$/, "")}/socket.io/`;
   }
-  return [
-    "message.created",
-    "message.updated",
-    "message.deleted",
-    "conversation.read",
-    "presence.changed",
-    "conversation.membership.changed"
-  ].includes(value.type);
+  url.searchParams.set("EIO", "4");
+  url.searchParams.set("transport", "websocket");
+  url.searchParams.set("ticket", ticket);
+  return url.toString();
+}
+
+function asSocketEventPayload(eventName: string, payload: unknown): unknown {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const record = payload as Record<string, unknown>;
+    return "type" in record ? record : { type: eventName, ...record };
+  }
+  return { type: eventName, payload };
 }
 
 export class RealtimeClient {
   private socket: WebSocket | null = null;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectionTimer: ReturnType<typeof setTimeout> | null = null;
   private closedByClient = false;
   private generation = 0;
+  private opening = false;
+  private activeTicket: string | null = null;
 
   constructor(private readonly options: RealtimeClientOptions) {}
 
   connect(): void {
-    if (this.socket) return;
+    if (this.socket || this.opening || this.reconnectTimer) return;
     this.closedByClient = false;
     this.generation += 1;
     void this.openSocket(this.generation);
@@ -69,60 +56,156 @@ export class RealtimeClient {
   disconnect(): void {
     this.closedByClient = true;
     this.generation += 1;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    this.socket?.close();
+    this.opening = false;
+    this.activeTicket = null;
+    this.clearReconnectTimer();
+    this.clearConnectionTimer();
+    const socket = this.socket;
     this.socket = null;
+    if (socket?.readyState === WebSocket.OPEN) {
+      try {
+        socket.send("41");
+      } catch {
+        // La fermeture locale reste prioritaire.
+      }
+    }
+    socket?.close();
     this.options.onConnectionChange?.(false);
   }
 
+  private clearReconnectTimer(): void {
+    if (!this.reconnectTimer) return;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+  }
+
+  private clearConnectionTimer(): void {
+    if (!this.connectionTimer) return;
+    clearTimeout(this.connectionTimer);
+    this.connectionTimer = null;
+  }
+
+  private finalizeSocket(socket: WebSocket, generation: number): void {
+    if (socket !== this.socket) return;
+    this.clearConnectionTimer();
+    this.socket = null;
+    this.activeTicket = null;
+    this.options.onConnectionChange?.(false);
+    if (!this.closedByClient && generation === this.generation) {
+      this.scheduleReconnect();
+    }
+  }
+
+  private dispatchPayload(payload: unknown): void {
+    const normalized = normalizeRealtimeEvent(payload);
+    if (normalized) this.options.onEvent(normalized);
+  }
+
+  private handleFrame(socket: WebSocket, rawData: unknown): void {
+    const text = String(rawData);
+
+    // Engine.IO ouvre la connexion avec `0{...}`. On rejoint ensuite le namespace
+    // Socket.IO principal avec le ticket éphémère, sans exposer le JWT utilisateur.
+    if (text.startsWith("0")) {
+      const auth = this.activeTicket ? { ticket: this.activeTicket } : {};
+      socket.send(`40${JSON.stringify(auth)}`);
+      return;
+    }
+
+    // Heartbeat Engine.IO.
+    if (text === "2") {
+      socket.send("3");
+      return;
+    }
+
+    // Connexion Socket.IO confirmée.
+    if (text.startsWith("40")) {
+      this.clearConnectionTimer();
+      this.reconnectAttempt = 0;
+      this.options.onConnectionChange?.(true);
+      return;
+    }
+
+    // Evènement Socket.IO : 42["message.created", {...}]
+    if (text.startsWith("42")) {
+      try {
+        const decoded = JSON.parse(text.slice(2)) as unknown;
+        if (!Array.isArray(decoded) || typeof decoded[0] !== "string") return;
+        this.dispatchPayload(asSocketEventPayload(decoded[0], decoded[1]));
+      } catch {
+        // Trame invalide ignorée sans interrompre le canal.
+      }
+      return;
+    }
+
+    // Compatibilité avec un éventuel endpoint WSS JSON direct déjà déployé.
+    try {
+      this.dispatchPayload(JSON.parse(text) as unknown);
+    } catch {
+      // Les trames Engine.IO non pertinentes et les données invalides sont ignorées.
+    }
+  }
+
   private async openSocket(generation: number): Promise<void> {
+    if (this.opening || this.closedByClient || generation !== this.generation) return;
+    this.opening = true;
     try {
       const ticket = await this.options.ticketProvider();
       if (this.closedByClient || generation !== this.generation) return;
-      const separator = this.options.url.includes("?") ? "&" : "?";
-      const url = `${this.options.url}${separator}ticket=${encodeURIComponent(ticket)}`;
-      const socket = new WebSocket(url);
+      this.activeTicket = ticket;
+      const socket = new WebSocket(buildSocketIoWebSocketUrl(this.options.url, ticket));
       this.socket = socket;
+      this.connectionTimer = setTimeout(() => {
+        if (socket !== this.socket) return;
+        try {
+          socket.close();
+        } finally {
+          this.finalizeSocket(socket, generation);
+        }
+      }, this.options.connectionTimeoutMs ?? 12_000);
 
       socket.onopen = () => {
-        if (socket !== this.socket) return;
-        this.reconnectAttempt = 0;
-        this.options.onConnectionChange?.(true);
+        if (socket !== this.socket || generation !== this.generation) return;
+        // Le canal est physiquement ouvert. La disponibilité applicative est
+        // confirmée par la trame Socket.IO `40`.
       };
 
       socket.onmessage = (event) => {
-        try {
-          const parsed: unknown = JSON.parse(String(event.data));
-          if (isRealtimeEvent(parsed)) this.options.onEvent(parsed);
-        } catch {
-          // Un événement invalide est ignoré sans interrompre la connexion.
-        }
+        if (socket !== this.socket || generation !== this.generation) return;
+        this.handleFrame(socket, event.data);
       };
 
       socket.onerror = () => {
-        if (socket === this.socket) this.options.onConnectionChange?.(false);
+        if (socket !== this.socket || generation !== this.generation) return;
+        this.options.onConnectionChange?.(false);
+        try {
+          socket.close();
+        } catch {
+          this.finalizeSocket(socket, generation);
+          return;
+        }
+        setTimeout(() => this.finalizeSocket(socket, generation), 250);
       };
 
       socket.onclose = () => {
-        if (socket !== this.socket) return;
-        this.options.onConnectionChange?.(false);
-        this.socket = null;
-        if (!this.closedByClient) this.scheduleReconnect();
+        this.finalizeSocket(socket, generation);
       };
     } catch {
       this.options.onConnectionChange?.(false);
-      if (!this.closedByClient) this.scheduleReconnect();
+      if (!this.closedByClient && generation === this.generation) {
+        this.scheduleReconnect();
+      }
+    } finally {
+      if (generation === this.generation) this.opening = false;
     }
   }
 
   private scheduleReconnect(): void {
     if (this.reconnectTimer || this.closedByClient) return;
     const random = this.options.random ?? Math.random;
+    const randomValue = Math.min(1, Math.max(0, random()));
     const base = Math.min(30_000, 1_000 * 2 ** this.reconnectAttempt);
-    const delay = base + Math.floor(base * 0.2 * random());
+    const delay = base + Math.floor(base * 0.2 * randomValue);
     this.reconnectAttempt += 1;
     const generation = this.generation;
     this.reconnectTimer = setTimeout(() => {

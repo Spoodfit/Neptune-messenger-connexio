@@ -16,3 +16,8 @@ test("les permissions comparent les rôles normalisés", () => {
   assert.equal(canAccessAllowedRoles("captain", ["capitaine"]), true);
   assert.equal(canAccessAllowedRoles("triton", ["visionnaire"]), false);
 });
+
+test("une conversation restreinte sans rôles autorisés reste invisible", () => {
+  assert.equal(canAccessAllowedRoles("admin"), false);
+  assert.equal(canAccessAllowedRoles("visionnaire", []), false);
+});

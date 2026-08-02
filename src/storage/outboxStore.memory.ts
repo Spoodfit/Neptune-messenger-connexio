@@ -1,8 +1,11 @@
 import { dedupeOutbox, type OutboxItem } from "../domain/outbox";
 import type { OutboxStore } from "./outboxStore.types";
 
+const memoryStores = new Set<Map<string, OutboxItem>>();
+
 export function createMemoryOutboxStore(): OutboxStore {
   const items = new Map<string, OutboxItem>();
+  memoryStores.add(items);
 
   return {
     async enqueue(item) {
@@ -49,6 +52,13 @@ export function createMemoryOutboxStore(): OutboxStore {
     },
     async remove(clientMessageId) {
       items.delete(clientMessageId);
+    },
+    async clear() {
+      items.clear();
     }
   };
+}
+
+export async function purgeOutboxData(): Promise<void> {
+  for (const items of memoryStores) items.clear();
 }

@@ -13,9 +13,15 @@ import {
 
 import { env } from "../config/env";
 import {
-  calculateBackoffMs,
-  type OutboxItem
-} from "../domain/outbox";
+  latestPersistedMessageId,
+  mergeMessagesNewestFirst
+} from "../domain/messageCollections";
+import {
+  hasKnownMessage,
+  rememberMessage,
+  rememberMessages
+} from "../domain/messageIdentity";
+import { calculateBackoffMs, type OutboxItem } from "../domain/outbox";
 import {
   createOptimisticMessage,
   markMessageFailed,
@@ -36,7 +42,11 @@ import {
   type RealtimeEvent
 } from "../services/realtime/RealtimeClient";
 import { createOutboxStore } from "../storage/outboxStore";
-import type { ChatMessage, Conversation } from "../types/messaging";
+import type {
+  ChatMessage,
+  Conversation,
+  MessageAttachment
+} from "../types/messaging";
 
 export type ConnectionState = "offline" | "connecting" | "online";
 
@@ -44,16 +54,22 @@ interface MessagingContextValue {
   visibleConversations: Conversation[];
   getConversation: (conversationId: string) => Conversation | undefined;
   getMessages: (conversationId: string) => ChatMessage[];
+  refreshConversations: () => Promise<void>;
   loadMessages: (conversationId: string) => Promise<void>;
+  loadMoreMessages: (conversationId: string) => Promise<void>;
+  hasMoreMessages: (conversationId: string) => boolean;
   sendMessage: (
     conversationId: string,
     body: string,
-    replyToMessageId?: string
-  ) => Promise<void>;
+    replyToMessageId?: string,
+    attachments?: MessageAttachment[],
+    mentionedUserIds?: string[]
+  ) => Promise<boolean>;
   retryMessage: (clientMessageId: string) => Promise<void>;
   markConversationRead: (conversationId: string) => Promise<void>;
   loadingConversations: boolean;
   loadingConversationIds: ReadonlySet<string>;
+  loadingMoreConversationIds: ReadonlySet<string>;
   connectionState: ConnectionState;
   lastError: string | null;
 }
@@ -61,26 +77,51 @@ interface MessagingContextValue {
 const MessagingContext = createContext<MessagingContextValue | null>(null);
 const sleep = (duration: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, duration));
+const demoConversations: Conversation[] = initialConversations.map(
+  (conversation) => ({
+    ...conversation,
+    canPost: conversation.canPost ?? conversation.type !== "announcement"
+  })
+);
 
 export function MessagingProvider({ children }: PropsWithChildren) {
   const { currentUser, accessToken } = useSession();
   const [conversations, setConversations] = useState<Conversation[]>(
-    env.mockMode ? initialConversations : []
+    env.mockMode ? demoConversations : []
   );
   const [messagesByConversation, setMessagesByConversation] = useState<
     Record<string, ChatMessage[]>
   >(env.mockMode ? initialMessages : {});
+  const [nextCursorByConversation, setNextCursorByConversation] = useState<
+    Record<string, string | null | undefined>
+  >({});
   const [loadingConversations, setLoadingConversations] = useState(!env.mockMode);
   const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(
     new Set()
   );
+  const [loadingMoreConversationIds, setLoadingMoreConversationIds] = useState<
+    Set<string>
+  >(new Set());
   const [connectionState, setConnectionState] =
     useState<ConnectionState>(env.mockMode ? "online" : "offline");
   const [lastError, setLastError] = useState<string | null>(null);
   const outbox = useRef(createOutboxStore()).current;
   const flushing = useRef<Promise<void> | null>(null);
+  const flushRequested = useRef(false);
+  const outboxHydrated = useRef(env.mockMode);
+  const outboxHydrationStarted = useRef(false);
+  const loadingInitialRef = useRef(new Set<string>());
+  const loadingMoreRef = useRef(new Set<string>());
+  const refreshingConversationsRef = useRef<Promise<void> | null>(null);
+  const realtimeClientRef = useRef<RealtimeClient | null>(null);
+  const knownMessageKeys = useRef(new Set<string>()).current;
+  const seededMockMessagesRef = useRef(false);
+  if (env.mockMode && !seededMockMessagesRef.current) {
+    rememberMessages(knownMessageKeys, Object.values(initialMessages).flat());
+    seededMockMessagesRef.current = true;
+  }
   const api = useMemo(
-    () => (accessToken ? new NeptuneMessagingApi(accessToken) : null),
+    () => (env.mockMode ? null : new NeptuneMessagingApi(accessToken)),
     [accessToken]
   );
 
@@ -105,12 +146,28 @@ export function MessagingProvider({ children }: PropsWithChildren) {
     [messagesByConversation]
   );
 
+  const hasMoreMessages = useCallback(
+    (conversationId: string) =>
+      typeof nextCursorByConversation[conversationId] === "string",
+    [nextCursorByConversation]
+  );
+
+  const normalizeMessagesForCurrentUser = useCallback(
+    (messages: readonly ChatMessage[]) =>
+      messages.map((message) => ({
+        ...message,
+        isMine: message.isMine || message.senderId === currentUser.id
+      })),
+    [currentUser.id]
+  );
+
   const upsertMessage = useCallback(
     (incoming: ChatMessage) => {
       const normalized: ChatMessage = {
         ...incoming,
         isMine: incoming.isMine || incoming.senderId === currentUser.id
       };
+      rememberMessage(knownMessageKeys, normalized);
       setMessagesByConversation((previous) => {
         const current = previous[normalized.conversationId] ?? [];
         const index = current.findIndex(
@@ -132,7 +189,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         return { ...previous, [normalized.conversationId]: next };
       });
     },
-    [currentUser.id]
+    [currentUser.id, knownMessageKeys]
   );
 
   const updateLocalMessage = useCallback(
@@ -153,23 +210,61 @@ export function MessagingProvider({ children }: PropsWithChildren) {
     []
   );
 
+  const refreshConversations = useCallback(async (): Promise<void> => {
+    if (env.mockMode || !api) return;
+    if (refreshingConversationsRef.current) {
+      return refreshingConversationsRef.current;
+    }
+    const operation = (async () => {
+      setLoadingConversations(true);
+      try {
+        const items = await api.listConversations();
+        setConversations(items);
+        setLastError(null);
+      } catch {
+        setLastError("Impossible de charger les discussions.");
+      } finally {
+        setLoadingConversations(false);
+      }
+    })().finally(() => {
+      refreshingConversationsRef.current = null;
+    });
+    refreshingConversationsRef.current = operation;
+    return operation;
+  }, [api]);
+
   const loadMessages = useCallback(
     async (conversationId: string) => {
-      if (env.mockMode || !api) return;
+      if (env.mockMode) {
+        setNextCursorByConversation((previous) => ({
+          ...previous,
+          [conversationId]: null
+        }));
+        return;
+      }
+      if (!api || loadingInitialRef.current.has(conversationId)) return;
+      loadingInitialRef.current.add(conversationId);
       setLoadingConversationIds((previous) => new Set(previous).add(conversationId));
       try {
         const page = await api.listMessages(conversationId);
+        const normalized = normalizeMessagesForCurrentUser(page.items);
+        rememberMessages(knownMessageKeys, normalized);
         setMessagesByConversation((previous) => ({
           ...previous,
-          [conversationId]: page.items.map((message) => ({
-            ...message,
-            isMine: message.senderId === currentUser.id
-          }))
+          [conversationId]: mergeMessagesNewestFirst(
+            previous[conversationId] ?? [],
+            normalized
+          )
+        }));
+        setNextCursorByConversation((previous) => ({
+          ...previous,
+          [conversationId]: page.nextCursor
         }));
         setLastError(null);
       } catch {
         setLastError("Impossible de charger les messages.");
       } finally {
+        loadingInitialRef.current.delete(conversationId);
         setLoadingConversationIds((previous) => {
           const next = new Set(previous);
           next.delete(conversationId);
@@ -177,70 +272,151 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         });
       }
     },
-    [api, currentUser.id]
+    [api, knownMessageKeys, normalizeMessagesForCurrentUser]
+  );
+
+  const loadMoreMessages = useCallback(
+    async (conversationId: string) => {
+      if (env.mockMode || !api || loadingMoreRef.current.has(conversationId)) return;
+      const cursor = nextCursorByConversation[conversationId];
+      if (typeof cursor !== "string" || !cursor) return;
+
+      loadingMoreRef.current.add(conversationId);
+      setLoadingMoreConversationIds((previous) =>
+        new Set(previous).add(conversationId)
+      );
+      try {
+        const page = await api.listMessages(conversationId, cursor);
+        const normalized = normalizeMessagesForCurrentUser(page.items);
+        rememberMessages(knownMessageKeys, normalized);
+        setMessagesByConversation((previous) => ({
+          ...previous,
+          [conversationId]: mergeMessagesNewestFirst(
+            previous[conversationId] ?? [],
+            normalized
+          )
+        }));
+        setNextCursorByConversation((previous) => ({
+          ...previous,
+          [conversationId]: page.nextCursor
+        }));
+        setLastError(null);
+      } catch {
+        setLastError("Impossible de charger les messages précédents.");
+      } finally {
+        loadingMoreRef.current.delete(conversationId);
+        setLoadingMoreConversationIds((previous) => {
+          const next = new Set(previous);
+          next.delete(conversationId);
+          return next;
+        });
+      }
+    },
+    [api, knownMessageKeys, nextCursorByConversation, normalizeMessagesForCurrentUser]
   );
 
   const flushOutbox = useCallback(async (): Promise<void> => {
-    if (flushing.current) return flushing.current;
+    if (!outboxHydrated.current) return;
+    if (flushing.current) {
+      flushRequested.current = true;
+      return flushing.current;
+    }
+
     const operation = (async () => {
-      const dueItems = await outbox.listDue(Date.now());
-      for (const item of dueItems) {
-        if (!env.mockMode && !api) continue;
-        await outbox.markSending(item.clientMessageId);
-        updateLocalMessage(item.clientMessageId, markMessageSending);
+      do {
+        flushRequested.current = false;
+        let dueItems: OutboxItem[];
         try {
-          let serverMessage: ChatMessage;
-          if (env.mockMode) {
-            await sleep(260);
-            serverMessage = {
-              id: `mock-${item.clientMessageId}`,
-              clientMessageId: item.clientMessageId,
-              conversationId: item.conversationId,
-              senderId: currentUser.id,
-              senderName: currentUser.name,
-              senderInitials: currentUser.initials,
-              senderAvatarUrl: currentUser.avatarUrl,
-              body: item.body,
-              createdAt: item.createdAt,
-              status: "sent",
-              isMine: true,
-              replyToMessageId: item.replyToMessageId
-            };
-          } else {
-            serverMessage = await api!.sendMessage(item.conversationId, {
-              clientMessageId: item.clientMessageId,
-              body: item.body,
-              replyToMessageId: item.replyToMessageId
-            });
-          }
-          upsertMessage(serverMessage);
-          await outbox.remove(item.clientMessageId);
-          setLastError(null);
-        } catch (error) {
-          if (error instanceof ApiError && error.status === 409 && api) {
-            await outbox.remove(item.clientMessageId);
-            await loadMessages(item.conversationId);
-            continue;
-          }
-          const attempts = item.attempts + 1;
-          const errorCode =
-            error instanceof ApiError ? `api-${error.status}` : "network";
-          const retryable = !(error instanceof ApiError) || error.retryable;
-          const nextAttemptAt = retryable
-            ? Date.now() + calculateBackoffMs(attempts)
-            : Number.MAX_SAFE_INTEGER;
-          await outbox.markFailure(
-            item.clientMessageId,
-            attempts,
-            nextAttemptAt,
-            errorCode
-          );
-          updateLocalMessage(item.clientMessageId, (message) =>
-            markMessageFailed(message, errorCode)
-          );
-          setLastError("Un message n’a pas été envoyé.");
+          dueItems = await outbox.listDue(Date.now());
+        } catch {
+          setLastError("Le stockage local des messages est indisponible.");
+          return;
         }
-      }
+
+        for (const item of dueItems) {
+          if (!env.mockMode && !api) continue;
+          try {
+            await outbox.markSending(item.clientMessageId);
+          } catch {
+            setLastError("Le stockage local des messages est indisponible.");
+            break;
+          }
+          updateLocalMessage(item.clientMessageId, markMessageSending);
+
+          try {
+            let serverMessage: ChatMessage;
+            if (env.mockMode) {
+              await sleep(260);
+              serverMessage = {
+                id: `mock-${item.clientMessageId}`,
+                clientMessageId: item.clientMessageId,
+                conversationId: item.conversationId,
+                senderId: currentUser.id,
+                senderName: currentUser.name,
+                senderInitials: currentUser.initials,
+                senderAvatarUrl: currentUser.avatarUrl,
+                body: item.body,
+                createdAt: item.createdAt,
+                status: "sent",
+                isMine: true,
+                replyToMessageId: item.replyToMessageId,
+                attachments: item.attachments,
+                mentionedUserIds: item.mentionedUserIds
+              };
+            } else {
+              serverMessage = await api!.sendMessage(item.conversationId, {
+                clientMessageId: item.clientMessageId,
+                body: item.body,
+                replyToMessageId: item.replyToMessageId,
+                attachments: item.attachments,
+                mentionedUserIds: item.mentionedUserIds
+              });
+            }
+            upsertMessage(serverMessage);
+            await outbox.remove(item.clientMessageId);
+            setLastError(null);
+          } catch (error) {
+            if (error instanceof ApiError && error.status === 409 && api) {
+              try {
+                await outbox.remove(item.clientMessageId);
+                await loadMessages(item.conversationId);
+              } catch {
+                setLastError("Le stockage local des messages est indisponible.");
+              }
+              continue;
+            }
+
+            const attempts = item.attempts + 1;
+            const errorCode =
+              error instanceof ApiError
+                ? error.code ?? `api-${error.status}`
+                : "network";
+            const retryable = !(error instanceof ApiError) || error.retryable;
+            const backoff = calculateBackoffMs(attempts);
+            const nextAttemptAt = retryable
+              ? Date.now() +
+                Math.max(
+                  backoff,
+                  error instanceof ApiError ? error.retryAfterMs ?? 0 : 0
+                )
+              : Number.MAX_SAFE_INTEGER;
+            try {
+              await outbox.markFailure(
+                item.clientMessageId,
+                attempts,
+                nextAttemptAt,
+                errorCode
+              );
+            } catch {
+              setLastError("Le stockage local des messages est indisponible.");
+            }
+            updateLocalMessage(item.clientMessageId, (message) =>
+              markMessageFailed(message, errorCode)
+            );
+            setLastError("Un message n’a pas été envoyé.");
+          }
+        }
+      } while (flushRequested.current);
     })().finally(() => {
       flushing.current = null;
     });
@@ -248,14 +424,93 @@ export function MessagingProvider({ children }: PropsWithChildren) {
     return operation;
   }, [api, currentUser, loadMessages, outbox, updateLocalMessage, upsertMessage]);
 
+  useEffect(() => {
+    if (outboxHydrationStarted.current) return;
+    outboxHydrationStarted.current = true;
+    if (env.mockMode) {
+      outboxHydrated.current = true;
+      return;
+    }
+
+    let cancelled = false;
+    void outbox
+      .listDue(Number.MAX_SAFE_INTEGER)
+      .then((items) => {
+        if (cancelled) return;
+        const hydratedByConversation: Record<string, ChatMessage[]> = {};
+        for (const item of items) {
+          let message = createOptimisticMessage({
+            clientMessageId: item.clientMessageId,
+            conversationId: item.conversationId,
+            senderId: currentUser.id,
+            senderName: currentUser.name,
+            senderInitials: currentUser.initials,
+            senderAvatarUrl: currentUser.avatarUrl,
+            body: item.body,
+            createdAt: item.createdAt,
+            replyToMessageId: item.replyToMessageId,
+            attachments: item.attachments,
+            mentionedUserIds: item.mentionedUserIds
+          });
+          if (item.state === "sending") message = markMessageSending(message);
+          if (item.state === "failed") {
+            message = markMessageFailed(message, item.lastError ?? "send-failed");
+          }
+          rememberMessage(knownMessageKeys, message);
+          hydratedByConversation[item.conversationId] = [
+            message,
+            ...(hydratedByConversation[item.conversationId] ?? [])
+          ];
+        }
+        setMessagesByConversation((previous) => {
+          const next = { ...previous };
+          for (const [conversationId, hydrated] of Object.entries(
+            hydratedByConversation
+          )) {
+            next[conversationId] = mergeMessagesNewestFirst(
+              previous[conversationId] ?? [],
+              hydrated
+            );
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLastError("Le stockage local des messages est indisponible.");
+        }
+      })
+      .finally(() => {
+        if (cancelled) return;
+        outboxHydrated.current = true;
+        void flushOutbox();
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, flushOutbox, knownMessageKeys, outbox]);
+
   const sendMessage = useCallback(
     async (
       conversationId: string,
       body: string,
-      replyToMessageId?: string
-    ) => {
+      replyToMessageId?: string,
+      attachments: MessageAttachment[] = [],
+      mentionedUserIds: string[] = []
+    ): Promise<boolean> => {
+      const conversation = getConversation(conversationId);
       const cleanBody = body.trim();
-      if (!cleanBody) return;
+      if (!conversation || conversation.canPost !== true) {
+        setLastError("Vous n’êtes pas autorisé à publier dans cette conversation.");
+        return false;
+      }
+      if (!cleanBody && attachments.length === 0) return false;
+      if (cleanBody.length > 4_000) {
+        setLastError("Le message dépasse la limite de 4 000 caractères.");
+        return false;
+      }
+
       const clientMessageId = Crypto.randomUUID();
       const createdAt = new Date().toISOString();
       const optimistic = createOptimisticMessage({
@@ -267,42 +522,67 @@ export function MessagingProvider({ children }: PropsWithChildren) {
         senderAvatarUrl: currentUser.avatarUrl,
         body: cleanBody,
         createdAt,
-        replyToMessageId
+        replyToMessageId,
+        attachments,
+        mentionedUserIds
       });
       const outboxItem: OutboxItem = {
         clientMessageId,
         conversationId,
         body: cleanBody,
         replyToMessageId,
+        attachments,
+        mentionedUserIds,
         createdAt,
         attempts: 0,
         nextAttemptAt: Date.now(),
         state: "pending"
       };
+
+      try {
+        await outbox.enqueue(outboxItem);
+      } catch {
+        setLastError("Impossible d’enregistrer le message sur cet appareil.");
+        return false;
+      }
+
+      rememberMessage(knownMessageKeys, optimistic);
       setMessagesByConversation((previous) => ({
         ...previous,
         [conversationId]: [optimistic, ...(previous[conversationId] ?? [])]
       }));
       setConversations((previous) =>
-        previous.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, lastMessage: cleanBody, lastMessageAt: createdAt }
-            : conversation
+        previous.map((item) =>
+          item.id === conversationId
+            ? {
+                ...item,
+                lastMessage:
+                  cleanBody ||
+                  (attachments.length === 1
+                    ? `📎 ${attachments[0]?.name ?? "Pièce jointe"}`
+                    : `📎 ${attachments.length} pièces jointes`),
+                lastMessageAt: createdAt
+              }
+            : item
         )
       );
-      await outbox.enqueue(outboxItem);
       await flushOutbox();
+      return true;
     },
-    [currentUser, flushOutbox, outbox]
+    [currentUser, flushOutbox, getConversation, knownMessageKeys, outbox]
   );
 
   const retryMessage = useCallback(
     async (clientMessageId: string) => {
-      const existing = await outbox.get(clientMessageId);
-      if (!existing) return;
-      await outbox.requeue(clientMessageId);
-      updateLocalMessage(clientMessageId, queueMessageForRetry);
-      await flushOutbox();
+      try {
+        const existing = await outbox.get(clientMessageId);
+        if (!existing) return;
+        await outbox.requeue(clientMessageId);
+        updateLocalMessage(clientMessageId, queueMessageForRetry);
+        await flushOutbox();
+      } catch {
+        setLastError("Le stockage local des messages est indisponible.");
+      }
     },
     [flushOutbox, outbox, updateLocalMessage]
   );
@@ -310,8 +590,8 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const markConversationRead = useCallback(
     async (conversationId: string) => {
       const messages = messagesByConversation[conversationId] ?? [];
-      const lastMessage = messages[0];
-      if (!lastMessage) return;
+      const lastReadMessageId = latestPersistedMessageId(messages);
+      if (!lastReadMessageId) return;
       setConversations((previous) =>
         previous.map((conversation) =>
           conversation.id === conversationId
@@ -321,44 +601,46 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       );
       if (!env.mockMode && api) {
         try {
-          await api.markConversationRead(conversationId, lastMessage.id);
+          await api.markConversationRead(conversationId, lastReadMessageId);
         } catch {
-          // Le serveur recalculera le non-lu lors de la prochaine synchronisation.
+          void refreshConversations();
         }
       }
     },
-    [api, messagesByConversation]
+    [api, messagesByConversation, refreshConversations]
   );
 
   useEffect(() => {
-    if (env.mockMode || !api) return;
-    let cancelled = false;
-    setLoadingConversations(true);
-    void api
-      .listConversations()
-      .then((items) => {
-        if (!cancelled) {
-          setConversations(items);
-          setLastError(null);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setLastError("Impossible de charger les discussions.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingConversations(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api]);
+    void refreshConversations();
+  }, [refreshConversations]);
 
   const handleRealtimeEvent = useCallback(
     (event: RealtimeEvent) => {
       if (event.type === "message.created" || event.type === "message.updated") {
+        const isNewMessage = !hasKnownMessage(knownMessageKeys, event.payload);
         upsertMessage(event.payload);
+        if (event.type === "message.created" && isNewMessage) {
+          setConversations((previous) =>
+            previous.map((conversation) =>
+              conversation.id === event.payload.conversationId
+                ? {
+                    ...conversation,
+                    lastMessage: event.payload.body,
+                    lastMessageAt: event.payload.createdAt,
+                    unreadCount:
+                      event.payload.senderId === currentUser.id
+                        ? conversation.unreadCount
+                        : conversation.unreadCount + 1
+                  }
+                : conversation
+            )
+          );
+        }
+        if (event.type === "message.updated") void refreshConversations();
         if (event.payload.clientMessageId) {
-          void outbox.remove(event.payload.clientMessageId);
+          void outbox.remove(event.payload.clientMessageId).catch(() => {
+            setLastError("Le stockage local des messages est indisponible.");
+          });
         }
         return;
       }
@@ -369,61 +651,114 @@ export function MessagingProvider({ children }: PropsWithChildren) {
             previous[event.payload.conversationId] ?? []
           ).filter((message) => message.id !== event.payload.messageId)
         }));
+        void refreshConversations();
         return;
       }
-      if (
-        event.type === "conversation.membership.changed" &&
-        !event.payload.active
-      ) {
-        setConversations((previous) =>
-          previous.filter(
-            (conversation) => conversation.id !== event.payload.conversationId
-          )
-        );
+      if (event.type === "conversation.read") {
+        if (event.payload.userId === currentUser.id) return;
+        setMessagesByConversation((previous) => {
+          const messages = previous[event.payload.conversationId] ?? [];
+          const readIndex = messages.findIndex(
+            (message) => message.id === event.payload.lastReadMessageId
+          );
+          if (readIndex < 0) return previous;
+          return {
+            ...previous,
+            [event.payload.conversationId]: messages.map((message, index) =>
+              index >= readIndex && message.isMine
+                ? { ...message, status: "read" }
+                : message
+            )
+          };
+        });
+        return;
+      }
+      if (event.type === "conversation.membership.changed") {
+        if (!event.payload.active) {
+          setConversations((previous) =>
+            previous.filter(
+              (conversation) => conversation.id !== event.payload.conversationId
+            )
+          );
+        } else {
+          void refreshConversations();
+        }
       }
     },
-    [outbox, upsertMessage]
+    [
+      currentUser.id,
+      knownMessageKeys,
+      outbox,
+      refreshConversations,
+      upsertMessage
+    ]
   );
 
   useEffect(() => {
     if (env.mockMode || !api || !env.realtimeUrl) return;
-    setConnectionState("connecting");
     const client = new RealtimeClient({
       url: env.realtimeUrl,
       ticketProvider: async () => (await api.requestRealtimeTicket()).ticket,
       onEvent: handleRealtimeEvent,
       onConnectionChange: (connected) => {
         setConnectionState(connected ? "online" : "offline");
-        if (connected) void flushOutbox();
+        if (connected) {
+          void flushOutbox();
+          void refreshConversations();
+        }
       }
     });
-    client.connect();
-    return () => client.disconnect();
-  }, [api, flushOutbox, handleRealtimeEvent]);
+    realtimeClientRef.current = client;
+    if (AppState.currentState === "active") {
+      setConnectionState("connecting");
+      client.connect();
+    }
+    return () => {
+      if (realtimeClientRef.current === client) realtimeClientRef.current = null;
+      client.disconnect();
+    };
+  }, [api, flushOutbox, handleRealtimeEvent, refreshConversations]);
 
   useEffect(() => {
-    const interval = setInterval(() => void flushOutbox(), 12_000);
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") void flushOutbox();
+    }, 12_000);
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void flushOutbox();
+      const realtimeClient = realtimeClientRef.current;
+      if (state === "active") {
+        if (realtimeClient) {
+          setConnectionState("connecting");
+          realtimeClient.connect();
+        }
+        void flushOutbox();
+        void refreshConversations();
+      } else {
+        realtimeClient?.disconnect();
+        if (!env.mockMode) setConnectionState("offline");
+      }
     });
     void flushOutbox();
     return () => {
       clearInterval(interval);
       subscription.remove();
     };
-  }, [flushOutbox]);
+  }, [flushOutbox, refreshConversations]);
 
   const value = useMemo<MessagingContextValue>(
     () => ({
       visibleConversations,
       getConversation,
       getMessages,
+      refreshConversations,
       loadMessages,
+      loadMoreMessages,
+      hasMoreMessages,
       sendMessage,
       retryMessage,
       markConversationRead,
       loadingConversations,
       loadingConversationIds,
+      loadingMoreConversationIds,
       connectionState,
       lastError
     }),
@@ -431,11 +766,15 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       connectionState,
       getConversation,
       getMessages,
+      hasMoreMessages,
       lastError,
       loadMessages,
+      loadMoreMessages,
       loadingConversationIds,
       loadingConversations,
+      loadingMoreConversationIds,
       markConversationRead,
+      refreshConversations,
       retryMessage,
       sendMessage,
       visibleConversations
