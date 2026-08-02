@@ -196,10 +196,8 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
   if (!isRecord(value)) return normalizeBaseMessage(value);
   const rawPoll = first(value, "poll", "survey");
   const poll = normalizePoll(rawPoll);
-  const input =
-    poll && !optionalString(first(value, "body")) && !Array.isArray(first(value, "attachments"))
-      ? { ...value, body: "Sondage" }
-      : value;
+  const hasBody = Boolean(optionalString(first(value, "body")));
+  const input = poll && !hasBody ? { ...value, body: "Sondage" } : value;
   const message = normalizeBaseMessage(input);
   const rawAttachments = first(value, "attachments");
   const attachments =
@@ -210,7 +208,7 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
       : message.attachments;
   return {
     ...message,
-    body: poll && !optionalString(first(value, "body")) ? "" : message.body,
+    body: poll && !hasBody ? "" : message.body,
     attachments,
     poll
   };
