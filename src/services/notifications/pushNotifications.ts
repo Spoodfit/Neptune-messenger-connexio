@@ -96,7 +96,9 @@ export async function scheduleCallBackReminder(
       }
     },
     trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: Math.max(1, Math.round(delaySeconds)),
+      repeats: false,
       channelId: Platform.OS === "android" ? "calls" : undefined
     }
   });
