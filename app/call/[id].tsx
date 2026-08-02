@@ -8,11 +8,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View
 } from "react-native";
 
 import CallSurface from "@/components/CallSurface";
+import { VoicePromptInput } from "@/components/VoicePromptInput";
 import type { CallUnansweredEvent } from "@/components/CallSurface.types";
 import { env } from "@/config/env";
 import { useMessaging } from "@/providers/MessagingProvider";
@@ -256,15 +256,12 @@ export default function CallRoomScreen() {
     >
       <View style={styles.reasonEditor}>
         <Text style={styles.label}>Objet de l’appel</Text>
-        <TextInput
-          value={reason}
-          onChangeText={setReason}
-          placeholder="Ex. Valider le lieu de l’afterwork de vendredi"
-          placeholderTextColor={colors.textMuted}
-          maxLength={160}
-          multiline
-          textAlignVertical="top"
-          style={styles.input}
+        <VoicePromptInput
+value={reason}
+onChangeText={setReason}
+placeholder="Ex. Valider le lieu de l’afterwork de vendredi"
+prompt="Quel est l’objet de votre appel ?"
+maxLength={160}
         />
         <Text style={styles.counter}>{reason.length}/160</Text>
       </View>

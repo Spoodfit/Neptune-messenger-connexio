@@ -158,7 +158,7 @@ export default function ScheduleMessageScreen() {
     [accessToken]
   );
 
-  const initialDate = useMemo(() => PRESETS[2].resolve(new Date()), []);
+  const initialDate = useMemo(() => PRESETS.find((preset) => preset.id === "tomorrow-nine")?.resolve(new Date()) ?? new Date(Date.now() + 86_400_000), []);
   const [body, setBody] = useState("");
   const [dateValue, setDateValue] = useState(formatDateInput(initialDate));
   const [timeValue, setTimeValue] = useState(formatTimeInput(initialDate));

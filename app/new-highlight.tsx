@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HighlightMediaView } from "@/components/HighlightMediaView";
-import VoiceRecorderModal from "@/components/VoiceRecorderModal";
+import { InlineVoiceRecorder } from "@/components/InlineVoiceRecorder";
 import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useSession } from "@/providers/SessionProvider";
@@ -44,6 +45,20 @@ const KINDS: Array<{
   { value: "reussite", label: "Réussite", icon: "trophy-outline" },
   { value: "offre", label: "Offre", icon: "pricetag-outline" }
 ];
+
+const HIGHLIGHT_PROMPTS: Record<HighlightKind, string> = {
+  standard: "Qu’est-ce qui mérite d’être partagé maintenant ?",
+  besoin: "Quel coup de main peut débloquer la situation ?",
+  reussite: "Qu’est-ce que le réseau doit célébrer avec vous ?",
+  offre: "Quelle opportunité mérite d’être saisie ?"
+};
+
+const HIGHLIGHT_STARTERS: Record<HighlightKind, string[]> = {
+  standard: ["Aujourd’hui, il s’est passé…", "Le moment à retenir :", "Petite histoire, grand déclic :"],
+  besoin: ["Je recherche…", "J’aurais besoin d’un contact pour…", "Qui connaît quelqu’un qui…"],
+  reussite: ["Petite victoire du jour :", "Objectif atteint :", "On l’a fait 🎉"],
+  offre: ["Je peux vous aider à…", "Opportunité disponible :", "Avantage réservé au réseau :"]
+};
 
 const DEMO_PLACES: PlaceSuggestion[] = [
   {
@@ -88,6 +103,9 @@ export default function NewHighlightScreen() {
   const [searchingPlace, setSearchingPlace] = useState(false);
   const [locating, setLocating] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const entrance = useRef(new Animated.Value(0)).current;
+  const completionSteps = Number(body.trim().length >= 12) + Number(Boolean(media)) + Number(Boolean(selectedLocation));
+  const completionProgress = completionSteps / 3;
 
   const mentionQuery = useMemo(() => {
     const match = body.match(/(?:^|\s)@([^\s@]*)$/u);
@@ -121,6 +139,16 @@ export default function NewHighlightScreen() {
         .map((member) => member.id),
     [body, members]
   );
+
+  useEffect(() => {
+    Animated.spring(entrance, {
+      toValue: 1,
+      useNativeDriver: true,
+      damping: 18,
+      stiffness: 135,
+      mass: 0.8
+    }).start();
+  }, [entrance]);
 
   useEffect(() => {
     const query = locationQuery.trim();
@@ -178,6 +206,7 @@ export default function NewHighlightScreen() {
   };
 
   const useRecordedVoice = (attachment: MessageAttachment) => {
+    setVoiceRecorderOpen(false);
     setMedia({
       id: attachment.id,
       kind: "audio",
@@ -348,7 +377,7 @@ export default function NewHighlightScreen() {
           {publishing ? (
             <ActivityIndicator size="small" color={colors.orange} />
           ) : (
-            <Text style={styles.publishText}>Publier</Text>
+            <Text style={styles.publishText}>Partager ✦</Text>
           )}
         </Pressable>
       </View>
@@ -365,7 +394,42 @@ export default function NewHighlightScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionTitle}>Type de publication</Text>
+        <Animated.View
+style={[
+  styles.animatedContent,
+  {
+    opacity: entrance,
+    transform: [
+      { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) },
+      { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.975, 1] }) }
+    ]
+  }
+]}
+        >
+        <View style={styles.momentumCard}>
+<LinearGradient colors={gradients.primaryWarm} style={styles.momentumGradient}>
+  <View style={styles.momentumCopy}>
+    <Text style={styles.momentumEyebrow}>CAPTUREZ L’INSTANT</Text>
+    <Text style={styles.momentumTitle}>{HIGHLIGHT_PROMPTS[kind]}</Text>
+    <Text style={styles.momentumSubtitle}>
+      {completionSteps === 0
+        ? "Commencez par une phrase. Le reste viendra naturellement."
+        : completionSteps === 3
+          ? "Votre Temps fort est prêt à créer de l’interaction."
+          : "Encore un détail et votre publication prendra vie."}
+    </Text>
+  </View>
+  <View style={styles.progressBadge}>
+    <Text style={styles.progressValue}>{Math.round(completionProgress * 100)}%</Text>
+    <Text style={styles.progressLabel}>prêt</Text>
+  </View>
+</LinearGradient>
+<View style={styles.progressTrack}>
+  <View style={[styles.progressFill, { width: `${Math.max(8, completionProgress * 100)}%` }]} />
+</View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Donnez le ton</Text>
         <View style={styles.kindGrid}>
           {KINDS.map((item) => {
             const selected = kind === item.value;
@@ -409,7 +473,26 @@ export default function NewHighlightScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Contenu</Text>
+        <Text style={styles.sectionTitle}>{HIGHLIGHT_PROMPTS[kind]}</Text>
+        <ScrollView
+horizontal
+showsHorizontalScrollIndicator={false}
+keyboardShouldPersistTaps="handled"
+contentContainerStyle={styles.starterRow}
+        >
+{HIGHLIGHT_STARTERS[kind].map((starter) => (
+  <Pressable
+    key={starter}
+    accessibilityRole="button"
+    accessibilityLabel={`Commencer par ${starter}`}
+    onPress={() => setBody((current) => current.trim() ? current : `${starter} `)}
+    style={styles.starterChip}
+  >
+    <Ionicons name="flash-outline" size={14} color={colors.orange} />
+    <Text style={styles.starterText}>{starter}</Text>
+  </Pressable>
+))}
+        </ScrollView>
         <TextInput
           value={body}
           onChangeText={setBody}
@@ -473,6 +556,14 @@ export default function NewHighlightScreen() {
             <Text style={styles.mediaLabel}>Vocal</Text>
           </Pressable>
         </View>
+        {voiceRecorderOpen ? (
+<View style={styles.inlineRecorderWrap}>
+  <InlineVoiceRecorder
+    onCancel={() => setVoiceRecorderOpen(false)}
+    onRecorded={useRecordedVoice}
+  />
+</View>
+        ) : null}
         <Text style={styles.mediaHint}>
           Vidéo : 60 secondes maximum · Vocal : 5 minutes maximum.
         </Text>
@@ -589,13 +680,8 @@ export default function NewHighlightScreen() {
             </Pressable>
           </View>
         ) : null}
+        </Animated.View>
       </ScrollView>
-
-      <VoiceRecorderModal
-        visible={voiceRecorderOpen}
-        onClose={() => setVoiceRecorderOpen(false)}
-        onRecorded={useRecordedVoice}
-      />
     </LinearGradient>
   );
 }
@@ -629,6 +715,29 @@ const styles = StyleSheet.create({
   },
   publishText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
   content: { width: "100%", maxWidth: 680, alignSelf: "center" },
+  animatedContent: { width: "100%" },
+  momentumCard: {
+    marginTop: 6,
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(244,177,131,0.24)",
+    backgroundColor: colors.surface
+  },
+  momentumGradient: { minHeight: 138, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: 12 },
+  momentumCopy: { flex: 1, minWidth: 0 },
+  momentumEyebrow: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "900", letterSpacing: 1.2 },
+  momentumTitle: { color: colors.white, fontSize: 19, lineHeight: 25, fontWeight: "900", marginTop: 7 },
+  momentumSubtitle: { color: colors.whiteMuted, fontSize: 10, lineHeight: 15, marginTop: 7 },
+  progressBadge: { width: 64, height: 64, borderRadius: 22, backgroundColor: "rgba(2,7,19,0.28)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
+  progressValue: { color: colors.white, fontSize: 16, fontWeight: "900" },
+  progressLabel: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "800", marginTop: 1 },
+  progressTrack: { height: 4, backgroundColor: "rgba(255,255,255,0.08)" },
+  progressFill: { height: 4, borderRadius: 2, backgroundColor: colors.orange },
+  starterRow: { gap: 7, paddingRight: 12, marginBottom: 9 },
+  starterChip: { minHeight: 38, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 6 },
+  starterText: { color: colors.textSecondary, fontSize: 9.5, fontWeight: "800" },
+  inlineRecorderWrap: { marginTop: 9 },
   sectionTitle: {
     ...typography.heading3,
     color: colors.text,

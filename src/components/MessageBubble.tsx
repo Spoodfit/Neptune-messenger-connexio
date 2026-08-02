@@ -73,7 +73,7 @@ export function MessageBubble({
   const currentReaction = reactions.find(
     (reaction) => reaction.reactedByCurrentUser
   )?.emoji;
-  const showDetachedReactionButton = reactions.length === 0;
+  const showDetachedReactionButton = Boolean(onReact);
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -209,12 +209,7 @@ export function MessageBubble({
   );
 
   return (
-    <View
-      style={[
-        styles.gestureStage,
-        showDetachedReactionButton && styles.gestureStageWithReactionTrigger
-      ]}
-    >
+    <View style={styles.gestureStage}>
       <Animated.View
         pointerEvents="none"
         style={[styles.replyIndicator, { opacity: replyOpacity }]}
@@ -318,7 +313,7 @@ export function MessageBubble({
                 ]}
               >
                 <View style={styles.reactionAddVisual}>
-                  <Ionicons name="add" size={12} color={colors.textMuted} />
+                  <Ionicons name="add" size={10} color={colors.textMuted} />
                 </View>
               </Pressable>
             ) : null}
@@ -351,14 +346,6 @@ export function MessageBubble({
                   </View>
                 </Pressable>
               ))}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Fermer les réactions"
-                onPress={() => setReactionOpen(false)}
-                style={styles.reactionClose}
-              >
-                <Ionicons name="close" size={17} color={colors.textMuted} />
-              </Pressable>
             </Animated.View>
           ) : null}
 
@@ -412,7 +399,6 @@ export function MessageBubble({
 
 const styles = StyleSheet.create({
   gestureStage: { width: "100%", position: "relative" },
-  gestureStageWithReactionTrigger: { paddingBottom: 18 },
   replyIndicator: {
     position: "absolute",
     left: 8,
@@ -463,7 +449,7 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: "100%", height: "100%" },
   avatarText: { color: colors.text, fontSize: 10, fontWeight: "900" },
-  wrapper: { minWidth: 0, flexShrink: 1 },
+  wrapper: { minWidth: 0, flexShrink: 1, position: "relative", overflow: "visible" },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
   senderPressable: { minWidth: 44, minHeight: 44, justifyContent: "flex-end" },
@@ -534,31 +520,36 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   reactionPicker: {
-    marginTop: 5,
-    minHeight: 46,
-    paddingHorizontal: 3,
+    position: "absolute",
+    left: 0,
+    bottom: "100%",
+    marginBottom: 7,
+    height: 42,
+    paddingHorizontal: 4,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: "rgba(8,18,38,0.98)",
     flexDirection: "row",
+    flexWrap: "nowrap",
     alignItems: "center",
-    alignSelf: "flex-start",
+    zIndex: 40,
+    elevation: 18,
     shadowColor: "#000000",
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 }
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 }
   },
-  reactionPickerMine: { alignSelf: "flex-end" },
+  reactionPickerMine: { left: undefined, right: 0 },
   reactionChoiceTarget: {
-    width: 42,
-    height: 42,
+    width: 36,
+    height: 40,
     alignItems: "center",
     justifyContent: "center"
   },
   reactionChoiceVisual: {
-    width: 34,
-    height: 30,
+    width: 30,
+    height: 28,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center"
@@ -568,13 +559,7 @@ const styles = StyleSheet.create({
     borderColor: colors.violet,
     backgroundColor: "rgba(107,79,234,0.22)"
   },
-  reactionChoiceEmoji: { fontSize: 20 },
-  reactionClose: {
-    width: 42,
-    height: 42,
-    alignItems: "center",
-    justifyContent: "center"
-  },
+  reactionChoiceEmoji: { fontSize: 19 },
   reactionLine: {
     minHeight: 29,
     marginTop: 2,
@@ -609,29 +594,30 @@ const styles = StyleSheet.create({
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   reactionAdd: {
     position: "absolute",
-    bottom: -35,
-    width: 44,
-    height: 44,
+    right: -7,
+    bottom: -15,
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 5
+    zIndex: 12,
+    elevation: 9
   },
-  reactionAddMine: { right: -1 },
-  reactionAddOther: { left: -1 },
+  reactionAddMine: { right: -7 },
+  reactionAddOther: { right: -7 },
   reactionAddVisual: {
-    width: 21,
-    height: 21,
-    borderRadius: 11,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 1,
-    borderColor: "rgba(174,184,210,0.36)",
-    backgroundColor: "rgba(8,18,38,0.94)",
+    borderColor: "rgba(174,184,210,0.32)",
+    backgroundColor: "rgba(8,18,38,0.96)",
     alignItems: "center",
     justifyContent: "center",
-    transform: [{ translateY: -8 }],
     shadowColor: "#000000",
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 }
+    shadowOpacity: 0.24,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 }
   },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }

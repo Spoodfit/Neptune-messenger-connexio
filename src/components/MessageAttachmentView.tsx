@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useState } from "react";
 import {
   Alert,
@@ -79,8 +80,34 @@ function VoiceAttachment({
   isMine
 }: MessageAttachmentViewProps) {
   const [transcriptVisible, setTranscriptVisible] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const sourceUri = attachment.downloadUrl ?? attachment.uri ?? null;
+  const player = useAudioPlayer(sourceUri, { updateInterval: 180 });
+  const playerStatus = useAudioPlayerStatus(player);
   const transcriptReady = Boolean(attachment.transcript?.trim());
   const waveform = [7, 13, 19, 10, 23, 15, 8, 18, 25, 12, 20, 9, 16, 22, 11, 17, 7];
+
+  const togglePlayback = () => {
+    if (!sourceUri) {
+      Alert.alert("Vocal indisponible", "Ce message vocal n’est plus accessible.");
+      return;
+    }
+    if (playerStatus.playing) {
+      player.pause();
+      return;
+    }
+    if (playerStatus.didJustFinish || (playerStatus.duration > 0 && playerStatus.currentTime >= playerStatus.duration)) {
+      void player.seekTo(0);
+    }
+    player.setPlaybackRate(playbackRate);
+    player.play();
+  };
+
+  const cyclePlaybackRate = () => {
+    const next = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+    setPlaybackRate(next);
+    player.setPlaybackRate(next);
+  };
 
   return (
     <View
@@ -96,16 +123,16 @@ function VoiceAttachment({
       <View style={styles.voiceMain}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Lire le message vocal"
-          onPress={() => void openAttachment(attachment)}
+          accessibilityLabel={playerStatus.playing ? "Mettre le vocal en pause" : "Lire le message vocal"}
+onPress={togglePlayback}
           style={[
             styles.voicePlay,
             isMine ? styles.voicePlayMine : styles.voicePlayOther
           ]}
         >
           <Ionicons
-            name="play"
-            size={19}
+            name={playerStatus.playing ? "pause" : "play"}
+  size={19}
             color={isMine ? colors.primary : colors.white}
           />
         </Pressable>
@@ -130,18 +157,30 @@ function VoiceAttachment({
               ]}
             >
               {attachment.status === "uploading"
-                ? `${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
-                : formatDuration(attachment.durationSeconds)}
+      ? `${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
+      : playerStatus.playing
+        ? `${formatDuration(playerStatus.currentTime)} / ${formatDuration(playerStatus.duration || attachment.durationSeconds)}`
+        : formatDuration(attachment.durationSeconds)}
             </Text>
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.voiceName,
-                isMine ? styles.mineMeta : styles.otherMeta
-              ]}
-            >
-              Vocal Neptune
-            </Text>
+            <Pressable
+    accessibilityRole="button"
+    accessibilityLabel={`Vitesse de lecture ${playbackRate} fois`}
+    onPress={cyclePlaybackRate}
+    style={styles.speedButton}
+  >
+    <Text style={[styles.speedText, isMine ? styles.mineText : styles.otherText]}>
+      {playbackRate}×
+    </Text>
+  </Pressable>
+  <Text
+    numberOfLines={1}
+    style={[
+      styles.voiceName,
+      isMine ? styles.mineMeta : styles.otherMeta
+    ]}
+  >
+    Vocal Neptune
+  </Text>
           </View>
         </View>
       </View>
@@ -385,6 +424,17 @@ const styles = StyleSheet.create({
     gap: 8
   },
   voiceDuration: { fontSize: 9, fontWeight: "900" },
+  speedButton: {
+    minWidth: 34,
+    minHeight: 26,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  speedText: { fontSize: 9, fontWeight: "900" },
   voiceName: { flex: 1, fontSize: 8.5, textAlign: "right", fontWeight: "700" },
   transcriptPending: {
     minHeight: 34,
