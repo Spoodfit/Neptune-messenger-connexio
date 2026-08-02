@@ -84,6 +84,12 @@ function normalizePoll(value: unknown): MessagePoll | undefined {
   }
   const options = rawOptions.slice(0, 10).map(normalizePollOption);
   const calculatedVotes = options.reduce((sum, option) => sum + option.voteCount, 0);
+  const closesAt = optionalString(first(value, "closesAt", "closes_at"));
+  const explicitlyClosed = first(value, "closed", "is_closed") === true;
+  const expired = Boolean(closesAt && Date.parse(closesAt) <= Date.now());
+  const eventVoteUrl = safeHttpsUrl(
+    first(value, "eventVoteUrl", "event_vote_url", "business_url", "url")
+  );
   return {
     id: optionalString(first(value, "id", "poll_id")) ?? "poll",
     question,
@@ -97,33 +103,40 @@ function normalizePoll(value: unknown): MessagePoll | undefined {
         optionalNumber(first(value, "totalVotes", "total_votes")) ?? calculatedVotes
       )
     ),
-    closesAt: optionalString(first(value, "closesAt", "closes_at")),
-    closed:
-      first(value, "closed", "is_closed") === true ||
-      (typeof first(value, "closesAt", "closes_at") === "string" &&
-        Date.parse(String(first(value, "closesAt", "closes_at"))) <= Date.now()),
-    syncedEventId: optionalString(
-      first(value, "syncedEventId", "synced_event_id", "event_id")
-    )
+    closesAt,
+    closedAt:
+      optionalString(first(value, "closedAt", "closed_at")) ??
+      (explicitlyClosed || expired ? closesAt ?? new Date().toISOString() : undefined),
+    eventVoteId: optionalString(
+      first(value, "eventVoteId", "event_vote_id", "synced_event_id", "event_id")
+    ),
+    eventVoteUrl
   };
 }
 
 function normalizeEventVoteAlert(value: unknown): EventVoteAlert | undefined {
   if (!isRecord(value)) return undefined;
   const title = optionalString(first(value, "title", "label"));
-  const url = safeHttpsUrl(first(value, "businessUrl", "business_url", "url"));
-  if (!title || !url) return undefined;
+  const webUrl = safeHttpsUrl(
+    first(value, "webUrl", "web_url", "businessUrl", "business_url", "url")
+  );
+  if (!title || !webUrl) return undefined;
+  const clubName =
+    optionalString(first(value, "clubName", "club_name", "thread_name", "group_name")) ??
+    optionalString(first(value, "subtitle", "description")) ??
+    "Club Neptune";
   return {
     id: optionalString(first(value, "id", "alert_id")) ?? title,
     title,
-    subtitle: optionalString(first(value, "subtitle", "description")),
+    clubName,
+    city: optionalString(first(value, "city", "ville")),
     pendingCount: Math.max(
       0,
       Math.trunc(
         optionalNumber(first(value, "pendingCount", "pending_count")) ?? 0
       )
     ),
-    businessUrl: url,
+    webUrl,
     closesAt: optionalString(first(value, "closesAt", "closes_at"))
   };
 }
