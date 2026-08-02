@@ -6,9 +6,7 @@ on:
       - feat/production-hardening
     paths:
       - .github/workflows/v14-governance-pass.yml
-      - scripts/.tmp_core.*.b64
-      - scripts/.tmp_providers.*.b64
-      - scripts/.tmp_automation.*.b64
+      - scripts/.tmp_patch_*.py.gz
       - scripts/.tmp_ringtone.*.b64
       - scripts/.tmp_notification.b64
 
@@ -31,26 +29,9 @@ jobs:
 
       - name: Restore patch scripts and sounds
         run: |
-          cat <<'CHECKSUMS' | sha256sum -c -
-          4840f7bb4d74fb1a4b3263d018b77c33e62331ba09086fa5546997072904e44a  scripts/.tmp_core.00a1.b64
-          a0a39a21f9d0a59db7cdff05abaae248a5e2d56855a47438de5ef0dc2e322a4d  scripts/.tmp_core.00a2a.b64
-          40711d38619c32eedee8ecdd392213e8b9f1f9f6c540d5e315a97187aa1cc247  scripts/.tmp_core.00a2b.b64
-          ba2b2f299932b363edd7e2432ecc7fef92714c9f1fae9c53bc05176777571836  scripts/.tmp_core.00b.b64
-          bbd1cde9b58414aaa07cbbfed9a03f05dd60070e96b9cd6c0abfc2d3a3c94029  scripts/.tmp_core.01.b64
-          80c82e2e75c50d97c1babbd24e5c0ea31c50170f3f9a72095f8dcf9bf343b242  scripts/.tmp_core.02.b64
-          82839e53f3ffecf7ac13ff71e4452cf7e4f3ebbba2e282ba8369f8b5aebe5696  scripts/.tmp_core.03.b64
-          0bf1f65c9e16f002d76b41643d5d9571e5a95f910fb5ce32b7ef35fc1f58c862  scripts/.tmp_providers.00.b64
-          abd1f7f813ed39ccf486400079ae1459a947de6bf226d0bf9db8053380c91e43  scripts/.tmp_providers.01a.b64
-          7046a7d0b200d1c02ca20504869d076c2ac35488f3f5a0602ac215c94e798791  scripts/.tmp_providers.01b.b64
-          a76ff504ba8425e9ab4c7cf79a791497143b4a7fa36d333cf39e7aa9163105cd  scripts/.tmp_providers.02.b64
-          caf7137cd2fa84fd4a5655bc4bd3054097cd227657b591f870dcfc42944f33f1  scripts/.tmp_automation.00.b64
-          b1a8ea3563a2e60dddc1cad3059ab13caae6edc891e2844b084937e28e27ccc4  scripts/.tmp_automation.01.b64
-          755bb7002db2aaf5cdbf21b2047f0257b45f14c10a871a04e6e75e8d7bf2d82e  scripts/.tmp_automation.02.b64
-          cab39bb30ac66b833f7b8e8922acfcd2f2df1127202381289ffc643b12f374e9  scripts/.tmp_automation.03.b64
-          CHECKSUMS
-          cat scripts/.tmp_core.00a1.b64 scripts/.tmp_core.00a2a.b64 scripts/.tmp_core.00a2b.b64 scripts/.tmp_core.00b.b64 scripts/.tmp_core.01.b64 scripts/.tmp_core.02.b64 scripts/.tmp_core.03.b64 | base64 -d | gzip -d > /tmp/patch_core.py
-          cat scripts/.tmp_providers.00.b64 scripts/.tmp_providers.01a.b64 scripts/.tmp_providers.01b.b64 scripts/.tmp_providers.02.b64 | base64 -d | gzip -d > /tmp/patch_providers.py
-          cat scripts/.tmp_automation.00.b64 scripts/.tmp_automation.01.b64 scripts/.tmp_automation.02.b64 scripts/.tmp_automation.03.b64 | base64 -d | gzip -d > /tmp/patch_automation.py
+          gzip -dc scripts/.tmp_patch_core.py.gz > /tmp/patch_core.py
+          gzip -dc scripts/.tmp_patch_providers.py.gz > /tmp/patch_providers.py
+          gzip -dc scripts/.tmp_patch_automation.py.gz > /tmp/patch_automation.py
           mkdir -p assets/audio
           cat scripts/.tmp_ringtone.00.b64 scripts/.tmp_ringtone.01.b64 scripts/.tmp_ringtone.02.b64 | base64 -d > assets/audio/connexio-ringtone.mp3
           base64 -d scripts/.tmp_notification.b64 > assets/audio/connexio-notification.mp3
@@ -84,6 +65,9 @@ jobs:
                 scripts/.tmp_patch_core.py.gz.b64 \
                 scripts/.tmp_patch_providers.py.gz.b64 \
                 scripts/.tmp_patch_automation.py.gz.b64 \
+                scripts/.tmp_patch_core.py.gz \
+                scripts/.tmp_patch_providers.py.gz \
+                scripts/.tmp_patch_automation.py.gz \
                 scripts/.tmp_core.*.b64 \
                 scripts/.tmp_providers.*.b64 \
                 scripts/.tmp_automation.*.b64 \
