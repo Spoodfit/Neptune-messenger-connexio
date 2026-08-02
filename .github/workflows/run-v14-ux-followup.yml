@@ -34,15 +34,18 @@ jobs:
         run: |
           python <<'RUNNER'
           from pathlib import Path
-          from textwrap import dedent
 
           workflow = Path('.github/workflows/apply-v14-ux-followup.yml').read_text()
           marker_start = "          python <<'PY'\n"
           marker_end = "\n          PY\n"
           if marker_start not in workflow or marker_end not in workflow:
               raise SystemExit('Embedded product patch was not found.')
-          script = workflow.split(marker_start, 1)[1].split(marker_end, 1)[0]
-          exec(dedent(script), {'__name__': '__main__'})
+          embedded = workflow.split(marker_start, 1)[1].split(marker_end, 1)[0]
+          script = "\n".join(
+              line[10:] if line.startswith("          ") else line
+              for line in embedded.splitlines()
+          )
+          exec(compile(script, '<v14-product-patch>', 'exec'), {'__name__': '__main__'})
           RUNNER
 
       - name: Install compatible audio and speech modules
