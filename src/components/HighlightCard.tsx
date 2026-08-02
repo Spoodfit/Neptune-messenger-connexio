@@ -16,8 +16,9 @@ import {
 import { env } from "../config/env";
 import { useSession } from "../providers/SessionProvider";
 import { NeptuneExperienceApi } from "../services/api/experienceApi";
-import { colors, gradients, radii, typography } from "../theme";
+import { colors, gradients, typography } from "../theme";
 import type { HighlightPost, QuickReaction } from "../types/experience";
+import { ActionSheet, type ActionSheetOption } from "./ActionSheet";
 import { HighlightMediaView } from "./HighlightMediaView";
 
 interface HighlightCardProps {
@@ -46,6 +47,7 @@ export function HighlightCard({
     [accessToken]
   );
   const [reactionOpen, setReactionOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [sharing, setSharing] = useState(false);
   const totalReactions = post.reactions.reduce(
@@ -80,45 +82,54 @@ export function HighlightCard({
     }
   };
 
-  const reportPost = () => {
-    Alert.alert(
-      "Signaler cette publication",
-      "Le signalement sera transmis à la modération Neptune.",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Signaler",
-          style: "destructive",
-          onPress: () => {
-            if (!api) {
-              Alert.alert("Signalement enregistré", "Mode démonstration.");
-              return;
-            }
-            void api
-              .reportContent(
-                "highlight",
-                post.id,
-                "Contenu signalé depuis Connexio"
-              )
-              .then(() =>
-                Alert.alert(
-                  "Signalement transmis",
-                  "La modération Neptune examinera cette publication."
-                )
-              )
-              .catch((error: unknown) =>
-                Alert.alert(
-                  "Signalement impossible",
-                  error instanceof Error
-                    ? error.message
-                    : "Réessayez ultérieurement."
-                )
-              );
-          }
-        }
-      ]
-    );
+  const reportPost = async () => {
+    if (!api) {
+      Alert.alert(
+        "Signalement enregistré",
+        "Le mode démonstration a simulé la transmission à la modération."
+      );
+      return;
+    }
+    try {
+      await api.reportContent(
+        "highlight",
+        post.id,
+        "Contenu signalé depuis Connexio"
+      );
+      Alert.alert(
+        "Signalement transmis",
+        "La modération Neptune examinera cette publication."
+      );
+    } catch (error) {
+      Alert.alert(
+        "Signalement impossible",
+        error instanceof Error ? error.message : "Réessayez ultérieurement."
+      );
+    }
   };
+
+  const menuOptions: ActionSheetOption[] = [
+    {
+      id: "profile",
+      label: `Voir le profil de ${post.author.name}`,
+      icon: "person-outline",
+      onPress: () =>
+        router.push(`/profile/${encodeURIComponent(post.author.id)}`)
+    },
+    {
+      id: "share",
+      label: "Partager cette publication",
+      icon: "paper-plane-outline",
+      onPress: sharePost
+    },
+    {
+      id: "report",
+      label: "Signaler cette publication",
+      icon: "flag-outline",
+      destructive: true,
+      onPress: reportPost
+    }
+  ];
 
   return (
     <LinearGradient
@@ -167,7 +178,7 @@ export function HighlightCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Options de la publication"
-          onPress={reportPost}
+          onPress={() => setMenuOpen(true)}
           style={styles.moreButton}
         >
           <Ionicons
@@ -182,13 +193,15 @@ export function HighlightCard({
         <View
           style={[
             styles.kindBadge,
-            post.kind === "besoin" && styles.needBadge
+            post.kind === "besoin" && styles.needBadge,
+            post.kind === "offre" && styles.offerBadge
           ]}
         >
           <Text
             style={[
               styles.kindText,
-              post.kind === "besoin" && styles.needText
+              post.kind === "besoin" && styles.needText,
+              post.kind === "offre" && styles.offerText
             ]}
           >
             {kindLabel[post.kind]}
@@ -197,7 +210,11 @@ export function HighlightCard({
         {post.syncedWithBusinessApp ? (
           <View style={styles.syncBadge}>
             <Ionicons name="sync" size={12} color={colors.success} />
-            <Text style={styles.syncText}>Neptune Business</Text>
+            {!compact ? (
+              <Text style={styles.syncText}>
+                {post.kind === "offre" ? "Comité Avantage" : "Neptune Business"}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -219,32 +236,55 @@ export function HighlightCard({
         </View>
       ) : null}
 
-      <Text style={styles.body} numberOfLines={compact ? 5 : undefined}>
+      <Text style={[styles.body, compact && styles.compactBody]} numberOfLines={compact ? 4 : undefined}>
         {post.body}
       </Text>
+
+      {post.coordinates ? (
+        <View style={styles.locationLine}>
+          <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {post.locationLabel ?? "Position approximative"}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.metrics}>
         <Text style={styles.metricText}>{totalReactions} réactions</Text>
         <Text style={styles.metricText}>{post.comments.length} commentaires</Text>
-        <Text style={styles.metricText}>{post.shareCount} partages</Text>
+        {!compact ? <Text style={styles.metricText}>{post.shareCount} partages</Text> : null}
       </View>
 
       {reactionOpen ? (
         <View style={styles.reactionPicker}>
-          {REACTIONS.map((emoji) => (
-            <Pressable
-              key={emoji}
-              accessibilityRole="button"
-              accessibilityLabel={`Réagir avec ${emoji}`}
-              onPress={() => {
-                onReact(emoji);
-                setReactionOpen(false);
-              }}
-              style={styles.reactionChoice}
-            >
-              <Text style={styles.reactionEmoji}>{emoji}</Text>
-            </Pressable>
-          ))}
+          {REACTIONS.map((emoji) => {
+            const active = post.reactions.some(
+              (reaction) =>
+                reaction.emoji === emoji && reaction.reactedByCurrentUser
+            );
+            return (
+              <Pressable
+                key={emoji}
+                accessibilityRole="button"
+                accessibilityLabel={`Réagir avec ${emoji}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => {
+                  onReact(emoji);
+                  setReactionOpen(false);
+                }}
+                style={styles.reactionChoiceTarget}
+              >
+                <View
+                  style={[
+                    styles.reactionChoiceVisual,
+                    active && styles.reactionChoiceActive
+                  ]}
+                >
+                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
 
@@ -255,14 +295,19 @@ export function HighlightCard({
               key={reaction.emoji}
               accessibilityRole="button"
               accessibilityLabel={`${reaction.emoji}, ${reaction.count} réactions`}
+              accessibilityState={{ selected: reaction.reactedByCurrentUser }}
               onPress={() => onReact(reaction.emoji)}
-              style={[
-                styles.reactionPill,
-                reaction.reactedByCurrentUser && styles.reactionPillActive
-              ]}
+              style={styles.reactionTarget}
             >
-              <Text style={styles.reactionPillEmoji}>{reaction.emoji}</Text>
-              <Text style={styles.reactionPillCount}>{reaction.count}</Text>
+              <View
+                style={[
+                  styles.reactionVisual,
+                  reaction.reactedByCurrentUser && styles.reactionActive
+                ]}
+              >
+                <Text style={styles.reactionPillEmoji}>{reaction.emoji}</Text>
+                <Text style={styles.reactionPillCount}>{reaction.count}</Text>
+              </View>
             </Pressable>
           ))}
         </View>
@@ -275,8 +320,8 @@ export function HighlightCard({
           onPress={() => setReactionOpen((value) => !value)}
           style={styles.action}
         >
-          <Ionicons name="happy-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.actionText}>Réagir</Text>
+          <Ionicons name="happy-outline" size={19} color={colors.textMuted} />
+          {!compact ? <Text style={styles.actionText}>Réagir</Text> : null}
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -286,10 +331,10 @@ export function HighlightCard({
         >
           <Ionicons
             name="chatbubble-outline"
-            size={17}
+            size={18}
             color={colors.textMuted}
           />
-          <Text style={styles.actionText}>Commenter</Text>
+          {!compact ? <Text style={styles.actionText}>Commenter</Text> : null}
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -301,12 +346,20 @@ export function HighlightCard({
         >
           <Ionicons
             name={sharing ? "hourglass-outline" : "paper-plane-outline"}
-            size={17}
+            size={18}
             color={colors.textMuted}
           />
-          <Text style={styles.actionText}>Partager</Text>
+          {!compact ? <Text style={styles.actionText}>Partager</Text> : null}
         </Pressable>
       </View>
+
+      <ActionSheet
+        visible={menuOpen}
+        title="Options du Temps fort"
+        subtitle={post.author.name}
+        options={menuOptions}
+        onClose={() => setMenuOpen(false)}
+      />
     </LinearGradient>
   );
 }
@@ -323,7 +376,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 }
   },
-  compactCard: { minHeight: 205 },
+  compactCard: { minHeight: 205, padding: 10 },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   authorPressable: {
     flex: 1,
@@ -351,16 +404,16 @@ const styles = StyleSheet.create({
   meta: { color: colors.textMuted, fontSize: 8.5, marginTop: 2 },
   moreButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   kindRow: {
-    marginTop: 10,
+    marginTop: 8,
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
     gap: 6
   },
   kindBadge: {
-    minHeight: 25,
+    minHeight: 24,
     paddingHorizontal: 8,
-    borderRadius: 13,
+    borderRadius: 8,
     backgroundColor: "rgba(244,177,131,0.12)",
     borderWidth: 1,
     borderColor: "rgba(244,177,131,0.24)",
@@ -371,26 +424,31 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,123,134,0.13)",
     borderColor: "rgba(255,123,134,0.35)"
   },
+  offerBadge: {
+    backgroundColor: "rgba(66,211,146,0.12)",
+    borderColor: "rgba(66,211,146,0.35)"
+  },
   kindText: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
   needText: { color: colors.danger },
+  offerText: { color: colors.success },
   syncBadge: {
-    minHeight: 25,
-    paddingHorizontal: 8,
-    borderRadius: 13,
+    minHeight: 24,
+    paddingHorizontal: 7,
+    borderRadius: 8,
     backgroundColor: colors.successSoft,
     flexDirection: "row",
     alignItems: "center",
     gap: 4
   },
   syncText: { color: colors.success, fontSize: 8.5, fontWeight: "900" },
-  mediaWrap: { marginTop: 10, position: "relative" },
+  mediaWrap: { marginTop: 9, position: "relative" },
   duration: {
     position: "absolute",
     right: 8,
     bottom: 8,
     paddingHorizontal: 7,
     paddingVertical: 4,
-    borderRadius: 9,
+    borderRadius: 7,
     backgroundColor: "rgba(2,7,19,0.78)"
   },
   durationText: { color: colors.white, fontSize: 9, fontWeight: "900" },
@@ -398,15 +456,18 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
     lineHeight: 19,
-    marginTop: 10
+    marginTop: 9
   },
-  metrics: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  metricText: { color: colors.textMuted, fontSize: 9.5, fontWeight: "700" },
+  compactBody: { fontSize: 11, lineHeight: 16 },
+  locationLine: { minHeight: 26, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 4 },
+  locationText: { flex: 1, color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
+  metrics: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  metricText: { color: colors.textMuted, fontSize: 9, fontWeight: "700" },
   reactionPicker: {
-    marginTop: 10,
-    minHeight: 52,
-    paddingHorizontal: 5,
-    borderRadius: 26,
+    marginTop: 8,
+    minHeight: 48,
+    paddingHorizontal: 3,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
@@ -414,13 +475,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-around"
   },
-  reactionChoice: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  reactionEmoji: { fontSize: 23 },
-  reactionSummary: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 5 },
-  reactionPill: {
-    minHeight: 44,
-    paddingHorizontal: 10,
-    borderRadius: 22,
+  reactionChoiceTarget: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  reactionChoiceVisual: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  reactionChoiceActive: { borderWidth: 1, borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
+  reactionEmoji: { fontSize: 21 },
+  reactionSummary: { marginTop: 5, flexDirection: "row", flexWrap: "wrap", gap: 1 },
+  reactionTarget: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  reactionVisual: {
+    minHeight: 27,
+    paddingHorizontal: 7,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
@@ -428,15 +492,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4
   },
-  reactionPillActive: {
-    borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.22)"
-  },
+  reactionActive: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
   reactionPillEmoji: { fontSize: 12 },
   reactionPillCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   actions: {
-    marginTop: 10,
-    paddingTop: 8,
+    marginTop: 6,
+    paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
     flexDirection: "row"
