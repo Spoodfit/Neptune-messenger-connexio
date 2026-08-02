@@ -14,14 +14,23 @@ export async function authenticatedRequest<T>(
   fallbackAccessToken?: string | null
 ): Promise<T> {
   const token = await resolveSessionAccessToken(fallbackAccessToken);
-  if (!token) throw new ApiError("Session Neptune absente.", 401);
 
   try {
-    return await apiRequest<T>(path, { ...options, token });
+    return await apiRequest<T>(path, {
+      ...options,
+      token,
+      credentials: "include"
+    });
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+    if (!(error instanceof ApiError) || error.status !== 401 || !token) {
+      throw error;
+    }
     const refreshedToken = await refreshSessionAccessToken();
     if (!refreshedToken) throw error;
-    return apiRequest<T>(path, { ...options, token: refreshedToken });
+    return apiRequest<T>(path, {
+      ...options,
+      token: refreshedToken,
+      credentials: "include"
+    });
   }
 }
