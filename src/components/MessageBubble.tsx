@@ -12,22 +12,24 @@ import {
   View
 } from "react-native";
 
-import { colors, gradients, radii, spacing, typography } from "../theme";
-import { MessageAttachmentView } from "./MessageAttachmentView";
+import { colors, gradients, spacing, typography } from "../theme";
 import type {
   ChatMessage,
   MessageReactionSummary,
   MessageStatus
 } from "../types/messaging";
 import { formatMessageTime } from "../utils/date";
+import { MessageAttachmentsGrid } from "./MessageAttachmentsGrid";
+import { PollMessageCard } from "./PollMessageCard";
 
 interface MessageBubbleProps {
   message: ChatMessage;
   reactions?: MessageReactionSummary[];
   onRetry?: (clientMessageId: string) => void;
-  onReactionRequest?: (message: ChatMessage) => void;
+  onReact?: (message: ChatMessage, emoji: string) => void | Promise<void>;
   onReply?: (message: ChatMessage) => void;
   onOpenProfile?: (memberId: string) => void;
+  onVotePoll?: (message: ChatMessage, optionId: string) => void | Promise<void>;
 }
 
 const STATUS_LABELS: Record<MessageStatus, string> = {
@@ -39,6 +41,7 @@ const STATUS_LABELS: Record<MessageStatus, string> = {
   failed: "Échec de l’envoi"
 };
 
+const QUICK_REACTIONS = ["❤️", "🔥", "👏", "💡", "🤝", "😂"];
 const AVATAR_SIZE = 44;
 const MAX_BUBBLE_WIDTH = 520;
 const REPLY_THRESHOLD = 54;
@@ -47,13 +50,16 @@ export function MessageBubble({
   message,
   reactions = message.reactions ?? [],
   onRetry,
-  onReactionRequest,
+  onReact,
   onReply,
-  onOpenProfile
+  onOpenProfile,
+  onVotePoll
 }: MessageBubbleProps) {
   const { width: viewportWidth } = useWindowDimensions();
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [reactionOpen, setReactionOpen] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
+  const reactionProgress = useRef(new Animated.Value(0)).current;
   const statusLabel = STATUS_LABELS[message.status];
   const retryable =
     message.isMine && message.status === "failed" && message.clientMessageId;
@@ -64,10 +70,23 @@ export function MessageBubble({
       : availableRowWidth - AVATAR_SIZE - spacing.sm,
     MAX_BUBBLE_WIDTH
   );
+  const currentReaction = reactions.find(
+    (reaction) => reaction.reactedByCurrentUser
+  )?.emoji;
 
   useEffect(() => {
     setAvatarFailed(false);
   }, [message.senderAvatarUrl]);
+
+  useEffect(() => {
+    Animated.spring(reactionProgress, {
+      toValue: reactionOpen ? 1 : 0,
+      useNativeDriver: true,
+      damping: 19,
+      stiffness: 240,
+      mass: 0.7
+    }).start();
+  }, [reactionOpen, reactionProgress]);
 
   const panResponder = useMemo(
     () =>
@@ -104,6 +123,28 @@ export function MessageBubble({
     outputRange: [0, 1],
     extrapolate: "clamp"
   });
+  const reactionStyle = {
+    opacity: reactionProgress,
+    transform: [
+      {
+        translateY: reactionProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-8, 0]
+        })
+      },
+      {
+        scale: reactionProgress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0.92, 1]
+        })
+      }
+    ]
+  };
+
+  const chooseReaction = (emoji: string) => {
+    void onReact?.(message, emoji);
+    setReactionOpen(false);
+  };
 
   const bubbleContent = (
     <>
@@ -121,13 +162,19 @@ export function MessageBubble({
         </View>
       ) : null}
 
-      {message.attachments?.map((attachment) => (
-        <MessageAttachmentView
-          key={attachment.id}
-          attachment={attachment}
+      {message.attachments?.length ? (
+        <MessageAttachmentsGrid
+          attachments={message.attachments}
           isMine={message.isMine}
         />
-      ))}
+      ) : null}
+
+      {message.poll ? (
+        <PollMessageCard
+          poll={message.poll}
+          onVote={(optionId) => onVotePoll?.(message, optionId)}
+        />
+      ) : null}
 
       {message.body ? (
         <Text
@@ -231,8 +278,8 @@ export function MessageBubble({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Message. Maintenir pour réagir."
-            onLongPress={() => onReactionRequest?.(message)}
-            delayLongPress={360}
+            onLongPress={() => setReactionOpen(true)}
+            delayLongPress={320}
           >
             {message.isMine ? (
               <LinearGradient
@@ -255,22 +302,71 @@ export function MessageBubble({
             )}
           </Pressable>
 
-          {reactions.length > 0 ? (
-            <View style={styles.reactions}>
-              {reactions.map((reaction) => (
-                <View
-                  key={reaction.emoji}
+          {reactionOpen ? (
+            <Animated.View style={[styles.reactionPicker, reactionStyle]}>
+              {QUICK_REACTIONS.map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Réagir avec ${emoji}`}
+                  accessibilityState={{ selected: currentReaction === emoji }}
+                  onPress={() => chooseReaction(emoji)}
                   style={[
-                    styles.reactionPill,
-                    reaction.reactedByCurrentUser && styles.reactionPillActive
+                    styles.reactionChoice,
+                    currentReaction === emoji && styles.reactionChoiceActive
                   ]}
                 >
-                  <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-                  <Text style={styles.reactionCount}>{reaction.count}</Text>
-                </View>
+                  <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
+                </Pressable>
               ))}
-            </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fermer les réactions"
+                onPress={() => setReactionOpen(false)}
+                style={styles.reactionClose}
+              >
+                <Ionicons name="close" size={16} color={colors.textMuted} />
+              </Pressable>
+            </Animated.View>
           ) : null}
+
+          <View style={styles.reactionLine}>
+            {reactions.length > 0 ? (
+              <View style={styles.reactions}>
+                {reactions.map((reaction) => (
+                  <Pressable
+                    key={reaction.emoji}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${reaction.emoji}, ${reaction.count} réaction${reaction.count > 1 ? "s" : ""}`}
+                    accessibilityState={{ selected: reaction.reactedByCurrentUser }}
+                    onPress={() => chooseReaction(reaction.emoji)}
+                    style={[
+                      styles.reactionPill,
+                      reaction.reactedByCurrentUser && styles.reactionPillActive
+                    ]}
+                  >
+                    <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
+                    <Text style={styles.reactionCount}>{reaction.count}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter ou modifier une réaction"
+              onPress={() => setReactionOpen((value) => !value)}
+              style={[
+                styles.reactionAdd,
+                currentReaction ? styles.reactionAddActive : undefined
+              ]}
+            >
+              {currentReaction ? (
+                <Text style={styles.reactionAddEmoji}>{currentReaction}</Text>
+              ) : (
+                <Ionicons name="add" size={16} color={colors.textMuted} />
+              )}
+            </Pressable>
+          </View>
 
           {retryable ? (
             <Pressable
@@ -383,27 +479,6 @@ const styles = StyleSheet.create({
   replyContent: { flex: 1, minWidth: 0 },
   replyAuthor: { color: colors.orange, fontSize: 10, fontWeight: "900" },
   replyBody: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-  attachment: {
-    minWidth: 190,
-    maxWidth: "100%",
-    padding: 9,
-    borderRadius: 13,
-    backgroundColor: "rgba(2,7,19,0.22)",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10
-  },
-  attachmentIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.09)"
-  },
-  attachmentContent: { flex: 1, minWidth: 0 },
-  attachmentName: { fontSize: 12, fontWeight: "800" },
-  attachmentMeta: { fontSize: 9, marginTop: 2, fontWeight: "700" },
   body: { ...typography.body, flexShrink: 1, fontSize: 13, lineHeight: 19 },
   mineBody: { color: colors.white },
   otherBody: { color: colors.text },
@@ -427,17 +502,49 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: "right"
   },
-  reactions: {
-    marginTop: -4,
+  reactionPicker: {
+    marginTop: 5,
+    minHeight: 46,
     paddingHorizontal: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 }
+  },
+  reactionChoice: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionChoiceActive: {
+    borderWidth: 1,
+    borderColor: colors.violet,
+    backgroundColor: "rgba(107,79,234,0.22)"
+  },
+  reactionChoiceEmoji: { fontSize: 21 },
+  reactionClose: { width: 36, height: 40, alignItems: "center", justifyContent: "center" },
+  reactionLine: {
+    minHeight: 34,
+    marginTop: -4,
+    paddingHorizontal: 4,
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4
   },
+  reactions: { flexDirection: "row", flexWrap: "wrap", gap: 4, flexShrink: 1 },
   reactionPill: {
-    minHeight: 25,
+    minHeight: 28,
     paddingHorizontal: 7,
-    borderRadius: 13,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
@@ -451,6 +558,19 @@ const styles = StyleSheet.create({
   },
   reactionEmoji: { fontSize: 12 },
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  reactionAdd: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  reactionAddActive: { borderColor: colors.violet },
+  reactionAddEmoji: { fontSize: 14 },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryPressed: { opacity: 0.72 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
