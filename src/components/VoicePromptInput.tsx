@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     gap: 6
   },
   suggestion: {
-    minHeight: 36,
+    minHeight: 44,
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
