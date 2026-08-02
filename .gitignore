@@ -3,6 +3,7 @@ node_modules/
 dist/
 web-build/
 coverage/
+.eslintcache
 .env
 .env.local
 *.jks
