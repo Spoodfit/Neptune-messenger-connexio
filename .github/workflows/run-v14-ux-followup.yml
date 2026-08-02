@@ -90,6 +90,18 @@ jobs:
                   raise SystemExit('Expo plugin anchor not found.')
               config = config.replace(anchor, anchor + '      "expo-audio",\n', 1)
               config_path.write_text(config)
+
+          schedule_path = Path('app/schedule-message/[id].tsx')
+          schedule = schedule_path.read_text()
+          schedule_anchor = '  const initialDate = useMemo(() => PRESETS[2].resolve(new Date()), []);'
+          schedule_replacement = '''  const initialDate = useMemo(
+    () =>
+      PRESETS.find((preset) => preset.id === "tomorrow-nine")?.resolve(new Date()) ??
+      new Date(Date.now() + 24 * 60 * 60 * 1000),
+    []
+  );'''
+          if schedule_anchor in schedule:
+              schedule_path.write_text(schedule.replace(schedule_anchor, schedule_replacement, 1))
           RUNNER
 
       - name: Install compatible audio and speech modules
