@@ -271,35 +271,67 @@ export function MessageBubble({
             </Pressable>
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Message. Maintenir pour réagir."
-            onLongPress={() => setReactionOpen(true)}
-            delayLongPress={320}
-          >
-            {message.isMine ? (
-              <LinearGradient
-                colors={[colors.primary, colors.violet]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.bubble, styles.mine]}
+          <View style={styles.bubbleStage}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Message. Maintenir pour réagir."
+              onLongPress={() => setReactionOpen(true)}
+              delayLongPress={320}
+            >
+              {message.isMine ? (
+                <LinearGradient
+                  colors={[colors.primary, colors.violet]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.bubble, styles.mine]}
+                >
+                  {bubbleContent}
+                </LinearGradient>
+              ) : (
+                <LinearGradient
+                  colors={gradients.glass}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0.85, y: 1 }}
+                  style={[styles.bubble, styles.other]}
+                >
+                  {bubbleContent}
+                </LinearGradient>
+              )}
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter ou modifier une réaction"
+              onPress={() => setReactionOpen((value) => !value)}
+              hitSlop={8}
+              style={[
+                styles.reactionAdd,
+                message.isMine ? styles.reactionAddMine : styles.reactionAddOther
+              ]}
+            >
+              <View
+                style={[
+                  styles.reactionAddVisual,
+                  currentReaction && styles.reactionAddActive
+                ]}
               >
-                {bubbleContent}
-              </LinearGradient>
-            ) : (
-              <LinearGradient
-                colors={gradients.glass}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0.85, y: 1 }}
-                style={[styles.bubble, styles.other]}
-              >
-                {bubbleContent}
-              </LinearGradient>
-            )}
-          </Pressable>
+                {currentReaction ? (
+                  <Text style={styles.reactionAddEmoji}>{currentReaction}</Text>
+                ) : (
+                  <Ionicons name="add" size={12} color={colors.textMuted} />
+                )}
+              </View>
+            </Pressable>
+          </View>
 
           {reactionOpen ? (
-            <Animated.View style={[styles.reactionPicker, reactionStyle]}>
+            <Animated.View
+              style={[
+                styles.reactionPicker,
+                message.isMine && styles.reactionPickerMine,
+                reactionStyle
+              ]}
+            >
               {QUICK_REACTIONS.map((emoji) => (
                 <Pressable
                   key={emoji}
@@ -330,8 +362,13 @@ export function MessageBubble({
             </Animated.View>
           ) : null}
 
-          <View style={styles.reactionLine}>
-            {reactions.length > 0 ? (
+          {reactions.length > 0 ? (
+            <View
+              style={[
+                styles.reactionLine,
+                message.isMine ? styles.reactionLineMine : styles.reactionLineOther
+              ]}
+            >
               <View style={styles.reactions}>
                 {reactions.map((reaction) => (
                   <Pressable
@@ -354,27 +391,8 @@ export function MessageBubble({
                   </Pressable>
                 ))}
               </View>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajouter ou modifier une réaction"
-              onPress={() => setReactionOpen((value) => !value)}
-              style={styles.reactionAdd}
-            >
-              <View
-                style={[
-                  styles.reactionAddVisual,
-                  currentReaction && styles.reactionAddActive
-                ]}
-              >
-                {currentReaction ? (
-                  <Text style={styles.reactionAddEmoji}>{currentReaction}</Text>
-                ) : (
-                  <Ionicons name="add" size={17} color={colors.textMuted} />
-                )}
-              </View>
-            </Pressable>
-          </View>
+            </View>
+          ) : null}
 
           {retryable ? (
             <Pressable
@@ -416,7 +434,11 @@ const styles = StyleSheet.create({
   },
   mineRow: { justifyContent: "flex-end" },
   otherRow: { justifyContent: "flex-start" },
-  avatarPressable: { width: AVATAR_SIZE, minHeight: 44, justifyContent: "flex-end" },
+  avatarPressable: {
+    width: AVATAR_SIZE,
+    minHeight: 44,
+    justifyContent: "flex-end"
+  },
   avatarShell: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -454,6 +476,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlignVertical: "center"
   },
+  bubbleStage: { maxWidth: "100%", position: "relative" },
   bubble: {
     maxWidth: "100%",
     borderRadius: 17,
@@ -510,10 +533,10 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   reactionPicker: {
-    marginTop: 4,
-    minHeight: 48,
+    marginTop: 5,
+    minHeight: 46,
     paddingHorizontal: 3,
-    borderRadius: 17,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceStrong,
@@ -525,16 +548,17 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 }
   },
+  reactionPickerMine: { alignSelf: "flex-end" },
   reactionChoiceTarget: {
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     alignItems: "center",
     justifyContent: "center"
   },
   reactionChoiceVisual: {
     width: 34,
-    height: 34,
-    borderRadius: 11,
+    height: 30,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -545,30 +569,30 @@ const styles = StyleSheet.create({
   },
   reactionChoiceEmoji: { fontSize: 20 },
   reactionClose: {
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     alignItems: "center",
     justifyContent: "center"
   },
   reactionLine: {
-    minHeight: 44,
-    marginTop: -4,
-    paddingHorizontal: 2,
+    minHeight: 29,
+    marginTop: 2,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 2
+    alignItems: "center"
   },
-  reactions: { flexDirection: "row", flexWrap: "wrap", gap: 2, flexShrink: 1 },
+  reactionLineMine: { justifyContent: "flex-end" },
+  reactionLineOther: { justifyContent: "flex-start" },
+  reactions: { flexDirection: "row", flexWrap: "wrap", gap: 3, flexShrink: 1 },
   reactionPillTarget: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: 34,
+    minHeight: 29,
     alignItems: "center",
     justifyContent: "center"
   },
   reactionPillVisual: {
-    minHeight: 28,
-    paddingHorizontal: 7,
-    borderRadius: 10,
+    minHeight: 24,
+    paddingHorizontal: 8,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
@@ -583,24 +607,32 @@ const styles = StyleSheet.create({
   reactionEmoji: { fontSize: 12 },
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   reactionAdd: {
-    width: 44,
-    height: 44,
+    position: "absolute",
+    bottom: -12,
+    width: 32,
+    height: 32,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0
+    zIndex: 5
   },
+  reactionAddMine: { right: -13 },
+  reactionAddOther: { left: -13 },
   reactionAddVisual: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 21,
+    height: 21,
+    borderRadius: 11,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surfaceStrong,
+    borderColor: "rgba(174,184,210,0.36)",
+    backgroundColor: "rgba(8,18,38,0.94)",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    shadowColor: "#000000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 }
   },
   reactionAddActive: { borderColor: colors.violet },
-  reactionAddEmoji: { fontSize: 14 },
+  reactionAddEmoji: { fontSize: 11 },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
 });
