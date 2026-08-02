@@ -33,7 +33,8 @@ jobs:
         run: |
           cat <<'CHECKSUMS' | sha256sum -c -
           4840f7bb4d74fb1a4b3263d018b77c33e62331ba09086fa5546997072904e44a  scripts/.tmp_core.00a1.b64
-          a3c22b5245cc085f44cca1600afdc715fb17993ffe9c183b9def211e9802543a  scripts/.tmp_core.00a2.b64
+          a0a39a21f9d0a59db7cdff05abaae248a5e2d56855a47438de5ef0dc2e322a4d  scripts/.tmp_core.00a2a.b64
+          40711d38619c32eedee8ecdd392213e8b9f1f9f6c540d5e315a97187aa1cc247  scripts/.tmp_core.00a2b.b64
           ba2b2f299932b363edd7e2432ecc7fef92714c9f1fae9c53bc05176777571836  scripts/.tmp_core.00b.b64
           bbd1cde9b58414aaa07cbbfed9a03f05dd60070e96b9cd6c0abfc2d3a3c94029  scripts/.tmp_core.01.b64
           80c82e2e75c50d97c1babbd24e5c0ea31c50170f3f9a72095f8dcf9bf343b242  scripts/.tmp_core.02.b64
@@ -47,7 +48,7 @@ jobs:
           755bb7002db2aaf5cdbf21b2047f0257b45f14c10a871a04e6e75e8d7bf2d82e  scripts/.tmp_automation.02.b64
           cab39bb30ac66b833f7b8e8922acfcd2f2df1127202381289ffc643b12f374e9  scripts/.tmp_automation.03.b64
           CHECKSUMS
-          cat scripts/.tmp_core.00a1.b64 scripts/.tmp_core.00a2.b64 scripts/.tmp_core.00b.b64 scripts/.tmp_core.01.b64 scripts/.tmp_core.02.b64 scripts/.tmp_core.03.b64 | base64 -d | gzip -d > /tmp/patch_core.py
+          cat scripts/.tmp_core.00a1.b64 scripts/.tmp_core.00a2a.b64 scripts/.tmp_core.00a2b.b64 scripts/.tmp_core.00b.b64 scripts/.tmp_core.01.b64 scripts/.tmp_core.02.b64 scripts/.tmp_core.03.b64 | base64 -d | gzip -d > /tmp/patch_core.py
           cat scripts/.tmp_providers.00.b64 scripts/.tmp_providers.01a.b64 scripts/.tmp_providers.01b.b64 scripts/.tmp_providers.02.b64 | base64 -d | gzip -d > /tmp/patch_providers.py
           cat scripts/.tmp_automation.00.b64 scripts/.tmp_automation.01.b64 scripts/.tmp_automation.02.b64 scripts/.tmp_automation.03.b64 | base64 -d | gzip -d > /tmp/patch_automation.py
           mkdir -p assets/audio
