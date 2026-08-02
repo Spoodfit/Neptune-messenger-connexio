@@ -106,6 +106,9 @@ export function VoicePromptInput({
       <View style={[styles.field, listening && styles.fieldListening]}>
         <TextInput
           autoFocus
+          autoCapitalize="sentences"
+          accessibilityLabel="Objet de l’appel"
+          accessibilityHint="Écrivez la raison de l’appel ou utilisez le microphone"
           value={value}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmit}
