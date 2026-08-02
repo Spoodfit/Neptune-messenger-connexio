@@ -1,0 +1,111 @@
+name: Fix reaction hit target
+
+on:
+  pull_request:
+    branches:
+      - feat/production-hardening
+    types:
+      - synchronize
+      - opened
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v14-ux-calls-moderation
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Patch reaction accessibility geometry
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('src/components/MessageBubble.tsx')
+          text = path.read_text()
+
+          old_message = '''            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Message. Maintenir pour réagir."
+              onLongPress={() => setReactionOpen(true)}'''
+          new_message = '''            <Pressable
+              accessible={false}
+              onLongPress={() => setReactionOpen(true)}'''
+          if old_message not in text:
+              raise SystemExit('Message interaction anchor not found.')
+          text = text.replace(old_message, new_message, 1)
+
+          old_target = '''  reactionAdd: {
+    position: "absolute",
+    right: -7,
+    bottom: -15,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 12,
+    elevation: 9
+  },
+  reactionAddMine: { right: -7 },
+  reactionAddOther: { right: -7 },'''
+          new_target = '''  reactionAdd: {
+    position: "absolute",
+    right: -16,
+    bottom: -22,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 12,
+    elevation: 9
+  },
+  reactionAddMine: { right: -16 },
+  reactionAddOther: { right: -16 },'''
+          if old_target not in text:
+              raise SystemExit('Reaction target style anchor not found.')
+          text = text.replace(old_target, new_target, 1)
+
+          old_visual = '''    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 }
+  },'''
+          new_visual = '''    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    transform: [{ translateX: 6 }]
+  },'''
+          if old_visual not in text:
+              raise SystemExit('Reaction visual style anchor not found.')
+          path.write_text(text.replace(old_visual, new_visual, 1))
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify
+        shell: bash
+        run: |
+          npm run verify
+          rm -rf .test-dist
+
+      - name: Commit verified patch
+        shell: bash
+        run: |
+          rm -f .github/workflows/fix-reaction-hit-target.yml
+          git config user.name "Neptune Product Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: keep reaction button discreet and accessible"
+          git push origin HEAD:feat/v14-ux-calls-moderation
