@@ -1,12 +1,18 @@
 name: V14 governance pass
 
 on:
-  workflow_dispatch:
-  push:
+  pull_request:
     branches:
-      - feat/v14-ux-calls-moderation
+      - feat/production-hardening
     paths:
       - .github/workflows/v14-governance-pass.yml
+      - scripts/.tmp_patch_core.py.gz.b64
+      - scripts/.tmp_patch_providers.py.gz.b64
+      - scripts/.tmp_patch_automation.py.gz.b64
+      - scripts/.tmp_ringtone.00.b64
+      - scripts/.tmp_ringtone.01.b64
+      - scripts/.tmp_ringtone.02.b64
+      - scripts/.tmp_notification.b64
 
 permissions:
   contents: write
@@ -69,5 +75,3 @@ jobs:
           git add -A
           git commit -m "feat: enforce governance access media and custom sounds"
           git push origin HEAD:feat/v14-ux-calls-moderation
-
-# trigger: 2026-08-02T22:41+02:00
