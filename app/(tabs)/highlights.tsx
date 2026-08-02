@@ -25,42 +25,49 @@ import { NeptuneExperienceApi } from "@/services/api/experienceApi";
 import { colors, gradients, typography } from "@/theme";
 import type { HighlightPost } from "@/types/experience";
 
-type FeedBlock =
-  | { id: string; type: "wide"; post: HighlightPost }
-  | { id: string; type: "pair"; posts: [HighlightPost, HighlightPost?] };
+type FeedRow =
+  | { id: string; kind: "wide"; post: HighlightPost }
+  | { id: string; kind: "pair"; left: HighlightPost; right?: HighlightPost };
 
-function isCompactEligible(post: HighlightPost): boolean {
+function canUseCompactColumn(post: HighlightPost): boolean {
   if (post.kind === "besoin") return false;
   if (post.media?.kind === "video") return false;
-  if (post.body.length > 220) return false;
-  if (post.comments.length > 8) return false;
-  return true;
+  if (post.media && (post.media.height ?? 0) > (post.media.width ?? 0) * 1.35) {
+    return false;
+  }
+  return post.body.trim().length <= 280;
 }
 
-function buildFeedBlocks(posts: HighlightPost[]): FeedBlock[] {
-  const blocks: FeedBlock[] = [];
-  let index = 0;
-  while (index < posts.length) {
-    const post = posts[index]!;
-    if (!isCompactEligible(post)) {
-      blocks.push({ id: `wide-${post.id}`, type: "wide", post });
-      index += 1;
+function buildFeedRows(posts: HighlightPost[]): FeedRow[] {
+  const rows: FeedRow[] = [];
+  let pending: HighlightPost | null = null;
+
+  for (const post of posts) {
+    if (!canUseCompactColumn(post)) {
+      if (pending) {
+        rows.push({ id: `pair-${pending.id}-ad`, kind: "pair", left: pending });
+        pending = null;
+      }
+      rows.push({ id: `wide-${post.id}`, kind: "wide", post });
       continue;
     }
-    const next = posts[index + 1];
-    if (next && isCompactEligible(next)) {
-      blocks.push({
-        id: `pair-${post.id}-${next.id}`,
-        type: "pair",
-        posts: [post, next]
-      });
-      index += 2;
+
+    if (!pending) {
+      pending = post;
       continue;
     }
-    blocks.push({ id: `pair-${post.id}-ad`, type: "pair", posts: [post] });
-    index += 1;
+
+    rows.push({
+      id: `pair-${pending.id}-${post.id}`,
+      kind: "pair",
+      left: pending,
+      right: post
+    });
+    pending = null;
   }
-  return blocks;
+
+  if (pending) rows.push({ id: `pair-${pending.id}-ad`, kind: "pair", left: pending });
+  return rows;
 }
 
 export default function HighlightsScreen() {
@@ -74,8 +81,7 @@ export default function HighlightsScreen() {
     mapMoments,
     localConversations,
     togglePostReaction,
-    createPrivateConversation,
-    refreshExperience
+    createPrivateConversation
   } = useExperience();
   const { visibleConversations, refreshConversations } = useMessaging();
   const api = useMemo(
@@ -87,8 +93,8 @@ export default function HighlightsScreen() {
   const [openingAction, setOpeningAction] = useState(false);
   const overlayProgress = useRef(new Animated.Value(0)).current;
   const publishProgress = useRef(new Animated.Value(publishedId ? 0 : 1)).current;
+  const feedRows = useMemo(() => buildFeedRows(posts), [posts]);
 
-  const feedBlocks = useMemo(() => buildFeedBlocks(posts), [posts]);
   const selectedMoment = useMemo(
     () => mapMoments.find((moment) => moment.member.id === selectedMemberId),
     [mapMoments, selectedMemberId]
@@ -113,15 +119,22 @@ export default function HighlightsScreen() {
 
   useEffect(() => {
     if (!publishedId) return;
-    setMode("feed");
-    void refreshExperience();
     publishProgress.setValue(0);
-    Animated.timing(publishProgress, {
-      toValue: 1,
-      duration: 460,
-      useNativeDriver: true
-    }).start();
-  }, [publishProgress, publishedId, refreshExperience]);
+    Animated.sequence([
+      Animated.timing(publishProgress, {
+        toValue: 0.55,
+        duration: 220,
+        useNativeDriver: true
+      }),
+      Animated.spring(publishProgress, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 15,
+        stiffness: 185,
+        mass: 0.72
+      })
+    ]).start();
+  }, [publishIdSafe(publishedId), publishProgress]);
 
   const ensureSelectedConversation = async () => {
     if (!selectedMoment) throw new Error("Membre introuvable.");
@@ -132,9 +145,7 @@ export default function HighlightsScreen() {
     );
     if (existing) return existing;
     if (api) {
-      const conversation = await api.createPrivateConversation([
-        selectedMoment.member.id
-      ]);
+      const conversation = await api.createPrivateConversation([selectedMoment.member.id]);
       await refreshConversations();
       return conversation;
     }
@@ -160,36 +171,36 @@ export default function HighlightsScreen() {
   };
 
   const renderPost = (post: HighlightPost, compact: boolean) => {
-    const card = (
-      <HighlightCard
-        post={post}
-        compact={compact}
-        onReact={(emoji) => togglePostReaction(post.id, emoji)}
-      />
-    );
-    if (post.id !== publishedId) return card;
+    const newlyPublished = publishedId === post.id;
     return (
       <Animated.View
-        accessibilityLabel="Nouveau Temps fort publié"
-        style={{
-          opacity: publishProgress,
-          transform: [
-            {
-              translateY: publishProgress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [36, 0]
-              })
-            },
-            {
-              scale: publishProgress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.94, 1]
-              })
-            }
-          ]
-        }}
+        style={
+          newlyPublished
+            ? {
+                opacity: publishProgress,
+                transform: [
+                  {
+                    translateY: publishProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [28, 0]
+                    })
+                  },
+                  {
+                    scale: publishProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.94, 1]
+                    })
+                  }
+                ]
+              }
+            : undefined
+        }
       >
-        {card}
+        <HighlightCard
+          post={post}
+          compact={compact}
+          onReact={(emoji) => togglePostReaction(post.id, emoji)}
+        />
       </Animated.View>
     );
   };
@@ -217,10 +228,7 @@ export default function HighlightsScreen() {
                 style={styles.modeButton}
               >
                 {active ? (
-                  <LinearGradient
-                    colors={gradients.activeTab}
-                    style={StyleSheet.absoluteFill}
-                  />
+                  <LinearGradient colors={gradients.activeTab} style={StyleSheet.absoluteFill} />
                 ) : null}
                 <Ionicons
                   name={item === "feed" ? "sparkles" : "map"}
@@ -247,30 +255,29 @@ export default function HighlightsScreen() {
       </View>
 
       {mode === "feed" ? (
-        <ScrollView
-          contentContainerStyle={styles.feed}
-          showsVerticalScrollIndicator={false}
-        >
-          {feedBlocks.map((block) =>
-            block.type === "wide" ? (
-              <View key={block.id} style={styles.wideRow}>
-                {renderPost(block.post, false)}
-              </View>
-            ) : (
-              <View key={block.id} style={styles.pairRow}>
-                <View style={styles.halfColumn}>{renderPost(block.posts[0], true)}</View>
-                <View style={styles.halfColumn}>
-                  {block.posts[1] ? renderPost(block.posts[1], true) : <AdvantageAdCard />}
+        <ScrollView contentContainerStyle={styles.feed} showsVerticalScrollIndicator={false}>
+          <View style={styles.rows}>
+            {feedRows.map((row) =>
+              row.kind === "wide" ? (
+                <View key={row.id} style={styles.wideRow}>
+                  {renderPost(row.post, false)}
                 </View>
+              ) : (
+                <View key={row.id} style={styles.pairRow}>
+                  <View style={styles.halfColumn}>{renderPost(row.left, true)}</View>
+                  <View style={styles.halfColumn}>
+                    {row.right ? renderPost(row.right, true) : <AdvantageAdCard />}
+                  </View>
+                </View>
+              )
+            )}
+            {posts.length === 0 ? (
+              <View style={styles.emptyFeed}>
+                <Ionicons name="sparkles-outline" size={28} color={colors.textMuted} />
+                <Text style={styles.emptyText}>Aucun Temps fort visible.</Text>
               </View>
-            )
-          )}
-          {posts.length === 0 ? (
-            <View style={styles.emptyFeed}>
-              <Ionicons name="sparkles-outline" size={28} color={colors.textMuted} />
-              <Text style={styles.emptyText}>Aucun Temps fort visible.</Text>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
         </ScrollView>
       ) : (
         <View style={styles.mapStage}>
@@ -278,9 +285,7 @@ export default function HighlightsScreen() {
             moments={mapMoments}
             selectedMemberId={selectedMemberId}
             onSelectMember={(memberId) =>
-              setSelectedMemberId((current) =>
-                current === memberId ? null : memberId
-              )
+              setSelectedMemberId((current) => (current === memberId ? null : memberId))
             }
           />
 
@@ -306,157 +311,70 @@ export default function HighlightsScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Ouvrir le profil de ${selectedMoment.member.name}`}
                   onPress={() =>
-                    router.push(
-                      `/profile/${encodeURIComponent(selectedMoment.member.id)}`
-                    )
+                    router.push(`/profile/${encodeURIComponent(selectedMoment.member.id)}`)
                   }
                   style={styles.memberIdentity}
                 >
-                  <LinearGradient
-                    colors={gradients.primaryWarm}
-                    style={styles.memberAvatar}
-                  >
+                  <LinearGradient colors={gradients.primaryWarm} style={styles.memberAvatar}>
                     <View style={styles.memberAvatarInner}>
                       {selectedMoment.member.avatarUrl ? (
-                        <Image
-                          source={{ uri: selectedMoment.member.avatarUrl }}
-                          style={styles.avatarImage}
-                        />
+                        <Image source={{ uri: selectedMoment.member.avatarUrl }} style={styles.avatarImage} />
                       ) : (
-                        <Text style={styles.memberInitials}>
-                          {selectedMoment.member.initials}
-                        </Text>
+                        <Text style={styles.memberInitials}>{selectedMoment.member.initials}</Text>
                       )}
                     </View>
                   </LinearGradient>
                   <View style={styles.memberText}>
-                    <Text style={styles.memberName} numberOfLines={1}>
-                      {selectedMoment.member.name}
-                    </Text>
+                    <Text style={styles.memberName} numberOfLines={1}>{selectedMoment.member.name}</Text>
                     <Text style={styles.memberMeta} numberOfLines={1}>
                       {selectedMoment.member.company} · position approximative
                     </Text>
                   </View>
                 </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Fermer les publications"
-                  onPress={() => setSelectedMemberId(null)}
-                  style={styles.closeButton}
-                >
+                <Pressable accessibilityRole="button" accessibilityLabel="Fermer les publications" onPress={() => setSelectedMemberId(null)} style={styles.closeButton}>
                   <Ionicons name="close" size={20} color={colors.textMuted} />
                 </Pressable>
               </View>
 
-              <ScrollView
-                style={styles.momentScroll}
-                contentContainerStyle={styles.floatingMoments}
-                showsVerticalScrollIndicator={false}
-              >
+              <ScrollView style={styles.momentScroll} contentContainerStyle={styles.floatingMoments} showsVerticalScrollIndicator={false}>
                 {selectedPosts.slice(0, 3).map((post, index) => (
-                  <View
-                    key={post.id}
-                    style={[
-                      styles.momentBubble,
-                      {
-                        marginLeft: index * 12,
-                        marginRight: Math.max(0, 24 - index * 10)
-                      }
-                    ]}
-                  >
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Ouvrir la publication"
-                      onPress={() =>
-                        router.push(`/highlight/${encodeURIComponent(post.id)}`)
-                      }
-                    >
-                      <View style={styles.momentTop}>
-                        <Text style={styles.momentKind}>
-                          {post.kind.toLocaleUpperCase("fr")}
-                        </Text>
-                        <Text style={styles.momentDate}>
-                          {new Date(post.createdAt).toLocaleTimeString("fr-FR", {
-                            hour: "2-digit",
-                            minute: "2-digit"
-                          })}
-                        </Text>
-                      </View>
-                      <Text style={styles.momentBody} numberOfLines={3}>
-                        {post.body}
-                      </Text>
+                  <View key={post.id} style={[styles.momentBubble, { marginLeft: index * 12, marginRight: Math.max(0, 24 - index * 10) }]}>
+                    <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir la publication" onPress={() => router.push(`/highlight/${encodeURIComponent(post.id)}`)}>
+                      <View style={styles.momentTop}><Text style={styles.momentKind}>{post.kind.toLocaleUpperCase("fr")}</Text><Text style={styles.momentDate}>{new Date(post.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</Text></View>
+                      <Text style={styles.momentBody} numberOfLines={3}>{post.body}</Text>
                     </Pressable>
                     <View style={styles.bubbleActions}>
                       {(["❤️", "🔥", "👏"] as const).map((emoji) => (
-                        <Pressable
-                          key={emoji}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Réagir avec ${emoji}`}
-                          onPress={() => togglePostReaction(post.id, emoji)}
-                          style={styles.bubbleReaction}
-                        >
-                          <Text style={styles.bubbleEmoji}>{emoji}</Text>
-                        </Pressable>
+                        <Pressable key={emoji} accessibilityRole="button" accessibilityLabel={`Réagir avec ${emoji}`} onPress={() => togglePostReaction(post.id, emoji)} style={styles.bubbleReaction}><Text style={styles.bubbleEmoji}>{emoji}</Text></Pressable>
                       ))}
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Commenter"
-                        onPress={() =>
-                          router.push(`/highlight/${encodeURIComponent(post.id)}`)
-                        }
-                        style={styles.bubbleComment}
-                      >
-                        <Ionicons
-                          name="chatbubble-outline"
-                          size={17}
-                          color={colors.textMuted}
-                        />
-                        <Text style={styles.momentStat}>{post.comments.length}</Text>
-                      </Pressable>
+                      <Pressable accessibilityRole="button" accessibilityLabel="Commenter" onPress={() => router.push(`/highlight/${encodeURIComponent(post.id)}`)} style={styles.bubbleComment}><Ionicons name="chatbubble-outline" size={17} color={colors.textMuted} /><Text style={styles.momentStat}>{post.comments.length}</Text></Pressable>
                     </View>
                   </View>
                 ))}
               </ScrollView>
 
               <View style={styles.quickActions}>
-                {openingAction ? (
-                  <View style={styles.actionLoader}>
-                    <ActivityIndicator size="small" color={colors.violet} />
-                  </View>
-                ) : null}
-                {(
-                  [
-                    ["message", "chatbubble", "Message"],
-                    ["audio", "call", "Appeler"],
-                    ["video", "videocam", "Visio"]
-                  ] as const
-                ).map(([action, icon, label]) => (
-                  <Pressable
-                    key={action}
-                    accessibilityRole="button"
-                    accessibilityLabel={label}
-                    disabled={openingAction}
-                    onPress={() => void openSelectedAction(action)}
-                    style={styles.quickAction}
-                  >
-                    <Ionicons name={icon} size={20} color={colors.text} />
-                    <Text style={styles.quickText}>{label}</Text>
-                  </Pressable>
+                {openingAction ? <View style={styles.actionLoader}><ActivityIndicator size="small" color={colors.violet} /></View> : null}
+                {([
+                  ["message", "chatbubble", "Message"],
+                  ["audio", "call", "Appeler"],
+                  ["video", "videocam", "Visio"]
+                ] as const).map(([action, icon, label]) => (
+                  <Pressable key={action} accessibilityRole="button" disabled={openingAction} onPress={() => void openSelectedAction(action)} style={styles.quickAction}><Ionicons name={icon} size={19} color={colors.text} /><Text style={styles.quickText}>{label}</Text></Pressable>
                 ))}
               </View>
             </Animated.View>
           ) : (
-            <View style={styles.mapHint}>
-              <Ionicons name="sparkles" size={16} color={colors.orange} />
-              <Text style={styles.mapHintText}>
-                Les contours pulsants indiquent une publication récente.
-              </Text>
-            </View>
+            <View style={styles.mapHint}><Ionicons name="sparkles" size={16} color={colors.orange} /><Text style={styles.mapHintText}>Les contours pulsants indiquent une publication récente.</Text></View>
           )}
         </View>
       )}
     </LinearGradient>
   );
+}
+
+function publishIdSafe(value?: string): string {
+  return value ?? "";
 }
 
 const styles = StyleSheet.create({
@@ -468,7 +386,8 @@ const styles = StyleSheet.create({
   modeLabelActive: { color: colors.text },
   createButton: { width: 44, height: 44, borderRadius: 15, overflow: "hidden" },
   createGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
-  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24, gap: 9 },
+  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24 },
+  rows: { gap: 9 },
   wideRow: { width: "100%" },
   pairRow: { width: "100%", flexDirection: "row", alignItems: "stretch", gap: 9 },
   halfColumn: { flex: 1, minWidth: 0 },
@@ -487,21 +406,21 @@ const styles = StyleSheet.create({
   memberText: { flex: 1, minWidth: 0 },
   memberName: { color: colors.text, fontSize: 13, fontWeight: "900" },
   memberMeta: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
-  closeButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  momentScroll: { maxHeight: 330 },
-  floatingMoments: { gap: 8, paddingVertical: 7 },
+  closeButton: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceStrong },
+  momentScroll: { maxHeight: 310, marginTop: 6 },
+  floatingMoments: { gap: 8, paddingBottom: 4 },
   momentBubble: { padding: 11, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
   momentTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   momentKind: { color: colors.orange, fontSize: 8, fontWeight: "900" },
-  momentDate: { color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
-  momentBody: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 6 },
-  bubbleActions: { minHeight: 44, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 2 },
+  momentDate: { color: colors.textMuted, fontSize: 8 },
+  momentBody: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 5 },
+  bubbleActions: { minHeight: 44, marginTop: 5, flexDirection: "row", alignItems: "center", gap: 2 },
   bubbleReaction: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  bubbleEmoji: { fontSize: 18 },
-  bubbleComment: { minWidth: 52, height: 44, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  bubbleEmoji: { fontSize: 17 },
+  bubbleComment: { minWidth: 44, height: 44, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   momentStat: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
-  quickActions: { minHeight: 58, borderTopWidth: 1, borderTopColor: colors.borderSoft, flexDirection: "row", alignItems: "center", position: "relative" },
-  actionLoader: { position: "absolute", top: -30, left: 0, right: 0, alignItems: "center" },
-  quickAction: { flex: 1, minHeight: 50, alignItems: "center", justifyContent: "center", gap: 3 },
-  quickText: { color: colors.textSecondary, fontSize: 9, fontWeight: "800" }
+  quickActions: { minHeight: 56, marginTop: 7, flexDirection: "row", alignItems: "center", gap: 7, position: "relative" },
+  quickAction: { flex: 1, minHeight: 48, borderRadius: 16, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  quickText: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  actionLoader: { position: "absolute", left: 0, right: 0, top: -38, alignItems: "center" }
 });
