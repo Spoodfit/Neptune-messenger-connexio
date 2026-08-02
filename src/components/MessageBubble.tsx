@@ -82,8 +82,8 @@ export function MessageBubble({
     Animated.spring(reactionProgress, {
       toValue: reactionOpen ? 1 : 0,
       useNativeDriver: true,
-      damping: 19,
-      stiffness: 240,
+      damping: 18,
+      stiffness: 235,
       mass: 0.7
     }).start();
   }, [reactionOpen, reactionProgress]);
@@ -129,13 +129,13 @@ export function MessageBubble({
       {
         translateY: reactionProgress.interpolate({
           inputRange: [0, 1],
-          outputRange: [-8, 0]
+          outputRange: [8, 0]
         })
       },
       {
         scale: reactionProgress.interpolate({
           inputRange: [0, 1],
-          outputRange: [0.92, 1]
+          outputRange: [0.94, 1]
         })
       }
     ]
@@ -187,6 +187,7 @@ export function MessageBubble({
           {message.body}
         </Text>
       ) : null}
+
       <View style={styles.metadata}>
         <Text
           style={[
@@ -233,11 +234,7 @@ export function MessageBubble({
             onPress={() => onOpenProfile?.(message.senderId)}
             style={styles.avatarPressable}
           >
-            <LinearGradient
-              colors={gradients.primaryWarm}
-              style={styles.avatarShell}
-              accessibilityElementsHidden
-            >
+            <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
               <View style={styles.avatar}>
                 {message.senderAvatarUrl && !avatarFailed ? (
                   <Image
@@ -266,7 +263,6 @@ export function MessageBubble({
               accessibilityRole="button"
               accessibilityLabel={`Ouvrir le profil de ${message.senderName}`}
               onPress={() => onOpenProfile?.(message.senderId)}
-              hitSlop={6}
               style={styles.senderPressable}
             >
               <Text numberOfLines={1} style={styles.sender}>
@@ -311,12 +307,16 @@ export function MessageBubble({
                   accessibilityLabel={`Réagir avec ${emoji}`}
                   accessibilityState={{ selected: currentReaction === emoji }}
                   onPress={() => chooseReaction(emoji)}
-                  style={[
-                    styles.reactionChoice,
-                    currentReaction === emoji && styles.reactionChoiceActive
-                  ]}
+                  style={styles.reactionChoiceTarget}
                 >
-                  <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
+                  <View
+                    style={[
+                      styles.reactionChoiceVisual,
+                      currentReaction === emoji && styles.reactionChoiceActive
+                    ]}
+                  >
+                    <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
+                  </View>
                 </Pressable>
               ))}
               <Pressable
@@ -325,7 +325,7 @@ export function MessageBubble({
                 onPress={() => setReactionOpen(false)}
                 style={styles.reactionClose}
               >
-                <Ionicons name="close" size={16} color={colors.textMuted} />
+                <Ionicons name="close" size={17} color={colors.textMuted} />
               </Pressable>
             </Animated.View>
           ) : null}
@@ -340,13 +340,17 @@ export function MessageBubble({
                     accessibilityLabel={`${reaction.emoji}, ${reaction.count} réaction${reaction.count > 1 ? "s" : ""}`}
                     accessibilityState={{ selected: reaction.reactedByCurrentUser }}
                     onPress={() => chooseReaction(reaction.emoji)}
-                    style={[
-                      styles.reactionPill,
-                      reaction.reactedByCurrentUser && styles.reactionPillActive
-                    ]}
+                    style={styles.reactionPillTarget}
                   >
-                    <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-                    <Text style={styles.reactionCount}>{reaction.count}</Text>
+                    <View
+                      style={[
+                        styles.reactionPillVisual,
+                        reaction.reactedByCurrentUser && styles.reactionPillActive
+                      ]}
+                    >
+                      <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
+                      <Text style={styles.reactionCount}>{reaction.count}</Text>
+                    </View>
                   </Pressable>
                 ))}
               </View>
@@ -355,16 +359,20 @@ export function MessageBubble({
               accessibilityRole="button"
               accessibilityLabel="Ajouter ou modifier une réaction"
               onPress={() => setReactionOpen((value) => !value)}
-              style={[
-                styles.reactionAdd,
-                currentReaction ? styles.reactionAddActive : undefined
-              ]}
+              style={styles.reactionAdd}
             >
-              {currentReaction ? (
-                <Text style={styles.reactionAddEmoji}>{currentReaction}</Text>
-              ) : (
-                <Ionicons name="add" size={16} color={colors.textMuted} />
-              )}
+              <View
+                style={[
+                  styles.reactionAddVisual,
+                  currentReaction && styles.reactionAddActive
+                ]}
+              >
+                {currentReaction ? (
+                  <Text style={styles.reactionAddEmoji}>{currentReaction}</Text>
+                ) : (
+                  <Ionicons name="add" size={17} color={colors.textMuted} />
+                )}
+              </View>
             </Pressable>
           </View>
 
@@ -372,9 +380,8 @@ export function MessageBubble({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Réessayer l’envoi de ce message"
-              hitSlop={8}
               onPress={() => onRetry?.(message.clientMessageId!)}
-              style={({ pressed }) => [styles.retry, pressed && styles.retryPressed]}
+              style={styles.retry}
             >
               <Text style={styles.retryText}>Réessayer</Text>
             </Pressable>
@@ -503,10 +510,10 @@ const styles = StyleSheet.create({
     textAlign: "right"
   },
   reactionPicker: {
-    marginTop: 5,
-    minHeight: 46,
-    paddingHorizontal: 5,
-    borderRadius: 16,
+    marginTop: 4,
+    minHeight: 48,
+    paddingHorizontal: 3,
+    borderRadius: 17,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceStrong,
@@ -518,10 +525,16 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 8 }
   },
-  reactionChoice: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  reactionChoiceTarget: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionChoiceVisual: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -530,18 +543,29 @@ const styles = StyleSheet.create({
     borderColor: colors.violet,
     backgroundColor: "rgba(107,79,234,0.22)"
   },
-  reactionChoiceEmoji: { fontSize: 21 },
-  reactionClose: { width: 36, height: 40, alignItems: "center", justifyContent: "center" },
+  reactionChoiceEmoji: { fontSize: 20 },
+  reactionClose: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   reactionLine: {
-    minHeight: 34,
+    minHeight: 44,
     marginTop: -4,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 2
   },
-  reactions: { flexDirection: "row", flexWrap: "wrap", gap: 4, flexShrink: 1 },
-  reactionPill: {
+  reactions: { flexDirection: "row", flexWrap: "wrap", gap: 2, flexShrink: 1 },
+  reactionPillTarget: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionPillVisual: {
     minHeight: 28,
     paddingHorizontal: 7,
     borderRadius: 10,
@@ -559,6 +583,13 @@ const styles = StyleSheet.create({
   reactionEmoji: { fontSize: 12 },
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   reactionAdd: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  reactionAddVisual: {
     width: 30,
     height: 30,
     borderRadius: 10,
@@ -566,12 +597,10 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
     alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0
+    justifyContent: "center"
   },
   reactionAddActive: { borderColor: colors.violet },
   reactionAddEmoji: { fontSize: 14 },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
-  retryPressed: { opacity: 0.72 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
 });
