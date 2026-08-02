@@ -1,0 +1,1328 @@
+name: Apply requested V14 interaction polish
+
+on:
+  push:
+    branches:
+      - feat/v14-ux-calls-moderation
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v14-ux-calls-moderation
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Apply product changes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          def replace(path: str, old: str, new: str, count: int = 1) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise SystemExit(f"Missing patch anchor in {path}: {old[:120]!r}")
+              file.write_text(text.replace(old, new, count))
+
+          def write(path: str, content: str) -> None:
+              file = Path(path)
+              file.parent.mkdir(parents=True, exist_ok=True)
+              file.write_text(dedent(content).lstrip())
+
+          # Floating message reactions: absolute overlay, one row, no layout shift.
+          replace(
+              "src/components/MessageBubble.tsx",
+              '  const showDetachedReactionButton = reactions.length === 0;',
+              '  const showDetachedReactionButton = Boolean(onReact);'
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''    <View
+              style={[
+                styles.gestureStage,
+                showDetachedReactionButton && styles.gestureStageWithReactionTrigger
+              ]}
+            >''',
+              '    <View style={styles.gestureStage}>'
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '<Ionicons name="add" size={12} color={colors.textMuted} />',
+              '<Ionicons name="add" size={10} color={colors.textMuted} />'
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fermer les réactions"
+                onPress={() => setReactionOpen(false)}
+                style={styles.reactionClose}
+              >
+                <Ionicons name="close" size={17} color={colors.textMuted} />
+              </Pressable>
+''',
+              ''
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '  gestureStageWithReactionTrigger: { paddingBottom: 18 },\n',
+              ''
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '  wrapper: { minWidth: 0, flexShrink: 1 },',
+              '  wrapper: { minWidth: 0, flexShrink: 1, position: "relative", overflow: "visible" },'
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''  reactionPicker: {
+    marginTop: 5,
+    minHeight: 46,
+    paddingHorizontal: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    shadowColor: "#000000",
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 }
+  },
+  reactionPickerMine: { alignSelf: "flex-end" },
+  reactionChoiceTarget: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionChoiceVisual: {
+    width: 34,
+    height: 30,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
+  },''',
+              '''  reactionPicker: {
+    position: "absolute",
+    left: 0,
+    bottom: "100%",
+    marginBottom: 7,
+    height: 42,
+    paddingHorizontal: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "rgba(8,18,38,0.98)",
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    alignItems: "center",
+    zIndex: 40,
+    elevation: 18,
+    shadowColor: "#000000",
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 }
+  },
+  reactionPickerMine: { left: undefined, right: 0 },
+  reactionChoiceTarget: {
+    width: 36,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionChoiceVisual: {
+    width: 30,
+    height: 28,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
+  },'''
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '  reactionChoiceEmoji: { fontSize: 20 },',
+              '  reactionChoiceEmoji: { fontSize: 19 },'
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''  reactionClose: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+''',
+              ''
+          )
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''  reactionAdd: {
+    position: "absolute",
+    bottom: -35,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 5
+  },
+  reactionAddMine: { right: -1 },
+  reactionAddOther: { left: -1 },
+  reactionAddVisual: {
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(174,184,210,0.36)",
+    backgroundColor: "rgba(8,18,38,0.94)",
+    alignItems: "center",
+    justifyContent: "center",
+    transform: [{ translateY: -8 }],
+    shadowColor: "#000000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 }
+  },''',
+              '''  reactionAdd: {
+    position: "absolute",
+    right: -7,
+    bottom: -15,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 12,
+    elevation: 9
+  },
+  reactionAddMine: { right: -7 },
+  reactionAddOther: { right: -7 },
+  reactionAddVisual: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(174,184,210,0.32)",
+    backgroundColor: "rgba(8,18,38,0.96)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000000",
+    shadowOpacity: 0.24,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 }
+  },'''
+          )
+
+          write("src/domain/smartReplies.ts", r'''
+          import type { AppUser, ChatMessage } from "../types/messaging";
+
+          const normalize = (value: string) =>
+            value.toLocaleLowerCase("fr").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+          const unique = (items: string[]) => [...new Set(items)].slice(0, 3);
+
+          export function buildSmartReplySuggestions(
+            message: ChatMessage | undefined,
+            currentUser: Pick<AppUser, "id" | "name" | "company">
+          ): string[] {
+            if (!message || message.isMine || !message.body.trim()) return [];
+
+            const body = normalize(message.body);
+            const firstName = currentUser.name.split(" ")[0] ?? currentUser.name;
+            const mentionTokens = [firstName, currentUser.name, currentUser.company]
+              .filter(Boolean)
+              .map((value) => `@${normalize(value)}`);
+            const mentioned =
+              message.mentionedUserIds?.includes(currentUser.id) ||
+              mentionTokens.some((token) => body.includes(token));
+            const replies: string[] = [];
+
+            if (mentioned) {
+              replies.push(
+                "Je viens de voir ta mention — je m’en occupe.",
+                "Bien reçu, je te réponds juste après.",
+                "Tu as besoin de quoi précisément ?"
+              );
+            }
+
+            if (/\?|qui |quoi |quand |comment |pourquoi |est-ce|peux-tu|pouvez-vous/.test(body)) {
+              replies.push(
+                "Oui, je regarde ça.",
+                "Je te réponds dans quelques minutes.",
+                "Peux-tu me donner un peu plus de détails ?"
+              );
+            }
+
+            if (/rdv|rendez-vous|creneau|dispo|disponible|agenda|heure|demain|vendredi|lundi/.test(body)) {
+              replies.push(
+                "Oui, c’est bon pour moi.",
+                "Je vérifie mon agenda.",
+                "Propose-moi deux créneaux."
+              );
+            }
+
+            if (/merci|top|parfait|super|bravo/.test(body)) {
+              replies.push("Avec plaisir !", "Merci à toi 🙌", "Parfait, on avance.");
+            }
+
+            if (/bonjour|salut|hello|coucou|bonsoir/.test(body)) {
+              replies.push("Salut ! Comment vas-tu ?", "Bonjour 👋", "Ravi de te lire.");
+            }
+
+            return unique(replies);
+          }
+          ''')
+
+          write("src/components/InlineVoiceRecorder.tsx", r'''
+          import { Ionicons } from "@expo/vector-icons";
+          import {
+            RecordingPresets,
+            requestRecordingPermissionsAsync,
+            setAudioModeAsync,
+            useAudioRecorder,
+            useAudioRecorderState
+          } from "expo-audio";
+          import * as Crypto from "expo-crypto";
+          import { LinearGradient } from "expo-linear-gradient";
+          import { useEffect, useMemo, useRef, useState } from "react";
+          import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+
+          import { colors, gradients } from "../theme";
+          import type { MessageAttachment } from "../types/messaging";
+
+          interface InlineVoiceRecorderProps {
+            onCancel: () => void;
+            onRecorded: (attachment: MessageAttachment) => void | Promise<void>;
+            maxDurationSeconds?: number;
+          }
+
+          function formatDuration(seconds: number): string {
+            const total = Math.max(0, Math.floor(seconds));
+            return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+          }
+
+          export function InlineVoiceRecorder({
+            onCancel,
+            onRecorded,
+            maxDurationSeconds = 300
+          }: InlineVoiceRecorderProps) {
+            const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+            const recorderState = useAudioRecorderState(recorder, 90);
+            const [preparing, setPreparing] = useState(true);
+            const [finishing, setFinishing] = useState(false);
+            const mountedRef = useRef(true);
+            const elapsedSeconds = recorderState.durationMillis / 1000;
+            const waveform = useMemo(
+              () =>
+                Array.from({ length: 24 }, (_, index) => {
+                  const phase = elapsedSeconds * 7 + index * 0.9;
+                  return 7 + Math.round(Math.abs(Math.sin(phase)) * 22);
+                }),
+              [elapsedSeconds]
+            );
+
+            useEffect(() => {
+              mountedRef.current = true;
+              void (async () => {
+                try {
+                  const permission = await requestRecordingPermissionsAsync();
+                  if (!permission.granted) {
+                    throw new Error("Autorisez le microphone pour enregistrer un vocal.");
+                  }
+                  await setAudioModeAsync({
+                    allowsRecording: true,
+                    playsInSilentMode: true
+                  });
+                  await recorder.prepareToRecordAsync();
+                  recorder.record({ forDuration: maxDurationSeconds });
+                  if (mountedRef.current) setPreparing(false);
+                } catch (error) {
+                  Alert.alert(
+                    "Microphone indisponible",
+                    error instanceof Error ? error.message : "L’enregistrement vocal n’a pas pu démarrer."
+                  );
+                  onCancel();
+                }
+              })();
+
+              return () => {
+                mountedRef.current = false;
+                if (recorder.isRecording) void recorder.stop().catch(() => undefined);
+                void setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+              };
+            }, [maxDurationSeconds, onCancel, recorder]);
+
+            const cancel = async () => {
+              if (finishing) return;
+              setFinishing(true);
+              if (recorder.isRecording) await recorder.stop().catch(() => undefined);
+              await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+              onCancel();
+            };
+
+            const send = async () => {
+              if (finishing || preparing) return;
+              setFinishing(true);
+              try {
+                if (recorder.isRecording) await recorder.stop();
+                await setAudioModeAsync({ allowsRecording: false });
+                const uri = recorder.uri;
+                if (!uri) throw new Error("Le fichier vocal n’a pas été créé.");
+                await onRecorded({
+                  id: `local-voice-${Crypto.randomUUID()}`,
+                  kind: "audio",
+                  name: `vocal-${Date.now()}.m4a`,
+                  uri,
+                  mimeType: "audio/mp4",
+                  durationSeconds: Math.max(1, Math.round(elapsedSeconds)),
+                  status: "local",
+                  uploadProgress: 0,
+                  transcriptStatus: "pending"
+                });
+              } catch (error) {
+                setFinishing(false);
+                Alert.alert(
+                  "Vocal indisponible",
+                  error instanceof Error ? error.message : "Le vocal n’a pas pu être envoyé."
+                );
+              }
+            };
+
+            return (
+              <View style={styles.shell} accessibilityLiveRegion="polite">
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Annuler le vocal"
+                  onPress={() => void cancel()}
+                  style={styles.action}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                </Pressable>
+                <View style={styles.recordingContent}>
+                  <View style={styles.recordingHeader}>
+                    <View style={styles.liveDot} />
+                    <Text style={styles.timer}>{formatDuration(elapsedSeconds)}</Text>
+                    <Text style={styles.status}>{preparing ? "Microphone…" : "Enregistrement"}</Text>
+                  </View>
+                  <View style={styles.waveform} accessibilityElementsHidden>
+                    {waveform.map((height, index) => (
+                      <View key={`inline-wave-${index}`} style={[styles.waveBar, { height }]} />
+                    ))}
+                  </View>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Envoyer le vocal"
+                  accessibilityState={{ busy: finishing, disabled: preparing }}
+                  disabled={preparing || finishing}
+                  onPress={() => void send()}
+                  style={styles.sendTarget}
+                >
+                  <LinearGradient colors={gradients.primary} style={styles.sendButton}>
+                    {preparing || finishing ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Ionicons name="send" size={19} color={colors.white} />
+                    )}
+                  </LinearGradient>
+                </Pressable>
+              </View>
+            );
+          }
+
+          const styles = StyleSheet.create({
+            shell: {
+              minHeight: 58,
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: "rgba(107,79,234,0.42)",
+              backgroundColor: colors.surfaceStrong,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 7,
+              paddingHorizontal: 5,
+              overflow: "hidden"
+            },
+            action: { width: 44, height: 48, alignItems: "center", justifyContent: "center" },
+            recordingContent: { flex: 1, minWidth: 0 },
+            recordingHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+            liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.danger },
+            timer: { color: colors.text, fontSize: 11, fontWeight: "900" },
+            status: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+            waveform: { height: 31, flexDirection: "row", alignItems: "center", gap: 2, overflow: "hidden" },
+            waveBar: { width: 2.5, borderRadius: 2, backgroundColor: colors.orange },
+            sendTarget: { width: 50, height: 50, alignItems: "center", justifyContent: "center" },
+            sendButton: { width: 42, height: 42, borderRadius: 15, alignItems: "center", justifyContent: "center" }
+          });
+          ''')
+
+          write("src/components/VoicePromptInput.tsx", r'''
+          import { Ionicons } from "@expo/vector-icons";
+          import * as Speech from "expo-speech";
+          import {
+            ExpoSpeechRecognitionModule,
+            useSpeechRecognitionEvent
+          } from "expo-speech-recognition";
+          import { useEffect, useMemo, useRef, useState } from "react";
+          import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+
+          import { colors } from "../theme";
+
+          interface VoicePromptInputProps {
+            value: string;
+            onChangeText: (value: string) => void;
+            placeholder: string;
+            prompt: string;
+            maxLength: number;
+          }
+
+          export function VoicePromptInput({
+            value,
+            onChangeText,
+            placeholder,
+            prompt,
+            maxLength
+          }: VoicePromptInputProps) {
+            const [listening, setListening] = useState(false);
+            const [volume, setVolume] = useState(0);
+            const [error, setError] = useState<string | null>(null);
+            const promptedRef = useRef(false);
+            const bars = useMemo(
+              () => Array.from({ length: 7 }, (_, index) => 8 + Math.max(0, volume) * (1 + (index % 3) * 0.25)),
+              [volume]
+            );
+
+            useSpeechRecognitionEvent("start", () => {
+              setListening(true);
+              setError(null);
+            });
+            useSpeechRecognitionEvent("end", () => {
+              setListening(false);
+              setVolume(0);
+            });
+            useSpeechRecognitionEvent("result", (event) => {
+              const transcript = event.results[0]?.transcript?.trim();
+              if (transcript) onChangeText(transcript.slice(0, maxLength));
+            });
+            useSpeechRecognitionEvent("volumechange", (event) => {
+              setVolume(Math.max(0, event.value));
+            });
+            useSpeechRecognitionEvent("error", (event) => {
+              if (event.error === "aborted") return;
+              setListening(false);
+              setError(event.message || "La dictée a été interrompue.");
+            });
+
+            useEffect(() => {
+              if (promptedRef.current) return;
+              promptedRef.current = true;
+              const timer = setTimeout(() => {
+                Speech.speak(prompt, { language: "fr-FR", rate: 0.92, pitch: 1 });
+              }, 260);
+              return () => {
+                clearTimeout(timer);
+                Speech.stop();
+                ExpoSpeechRecognitionModule.abort();
+              };
+            }, [prompt]);
+
+            const toggleListening = async () => {
+              if (listening) {
+                ExpoSpeechRecognitionModule.stop();
+                return;
+              }
+              try {
+                await Speech.stop();
+                const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+                if (!permission.granted) {
+                  throw new Error("Autorisez le microphone et la reconnaissance vocale pour dicter l’objet de l’appel.");
+                }
+                ExpoSpeechRecognitionModule.start({
+                  lang: "fr-FR",
+                  interimResults: true,
+                  continuous: false,
+                  maxAlternatives: 1,
+                  volumeChangeEventOptions: { enabled: true, intervalMillis: 120 }
+                });
+              } catch (recognitionError) {
+                const message = recognitionError instanceof Error
+                  ? recognitionError.message
+                  : "La dictée vocale n’est pas disponible sur cet appareil.";
+                setError(message);
+                Alert.alert("Dictée indisponible", message);
+              }
+            };
+
+            return (
+              <View>
+                <View style={[styles.field, listening && styles.fieldListening]}>
+                  <TextInput
+                    value={value}
+                    onChangeText={onChangeText}
+                    placeholder={placeholder}
+                    placeholderTextColor={colors.textMuted}
+                    maxLength={maxLength}
+                    multiline
+                    textAlignVertical="top"
+                    style={styles.input}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={listening ? "Arrêter la dictée" : "Dicter l’objet de l’appel"}
+                    accessibilityState={{ selected: listening }}
+                    onPress={() => void toggleListening()}
+                    style={[styles.micButton, listening && styles.micButtonListening]}
+                  >
+                    <Ionicons name={listening ? "stop" : "mic"} size={21} color={colors.white} />
+                  </Pressable>
+                </View>
+                <View style={styles.voiceStatus}>
+                  <View style={styles.waveform} accessibilityElementsHidden>
+                    {bars.map((height, index) => (
+                      <View key={`prompt-wave-${index}`} style={[styles.waveBar, { height: listening ? Math.min(25, height) : 5 }]} />
+                    ))}
+                  </View>
+                  <Text style={[styles.hint, error && styles.error]} numberOfLines={2}>
+                    {error ?? (listening ? "Je vous écoute…" : "Touchez le micro puis parlez.")}
+                  </Text>
+                </View>
+              </View>
+            );
+          }
+
+          const styles = StyleSheet.create({
+            field: {
+              minHeight: 96,
+              marginTop: 8,
+              padding: 6,
+              borderRadius: 17,
+              borderWidth: 1,
+              borderColor: colors.borderSoft,
+              backgroundColor: colors.surfaceStrong,
+              flexDirection: "row",
+              alignItems: "flex-end",
+              gap: 5
+            },
+            fieldListening: { borderColor: colors.violet },
+            input: { flex: 1, minHeight: 82, padding: 7, color: colors.text, fontSize: 14, lineHeight: 20 },
+            micButton: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+            micButtonListening: { backgroundColor: colors.danger },
+            voiceStatus: { minHeight: 28, marginTop: 5, flexDirection: "row", alignItems: "center", gap: 8 },
+            waveform: { width: 52, height: 25, flexDirection: "row", alignItems: "center", gap: 2 },
+            waveBar: { width: 4, borderRadius: 2, backgroundColor: colors.orange },
+            hint: { flex: 1, color: colors.textMuted, fontSize: 9.5, fontWeight: "800" },
+            error: { color: colors.danger }
+          });
+          ''')
+
+          # Chat: smart reply chips and inline, one-step voice sending.
+          replace(
+              "app/chat/[id].tsx",
+              'import { MessageBubble } from "../../src/components/MessageBubble";\nimport { PollComposerModal } from "../../src/components/PollComposerModal";\nimport VoiceRecorderModal from "../../src/components/VoiceRecorderModal";',
+              'import { InlineVoiceRecorder } from "../../src/components/InlineVoiceRecorder";\nimport { MessageBubble } from "../../src/components/MessageBubble";\nimport { PollComposerModal } from "../../src/components/PollComposerModal";'
+          )
+          replace(
+              "app/chat/[id].tsx",
+              'import { isPrivateConversation } from "../../src/domain/conversationFilter";',
+              'import { isPrivateConversation } from "../../src/domain/conversationFilter";\nimport { buildSmartReplySuggestions } from "../../src/domain/smartReplies";'
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '  const submitLockRef = useRef(false);',
+              '  const submitLockRef = useRef(false);\n  const composerInputRef = useRef<TextInput>(null);'
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '''  const canSubmit = Boolean(
+    conversation?.canPost &&
+      !submitting &&
+      (draft.trim() || pendingAttachments.length > 0)
+  );''',
+              '''  const latestIncomingMessage = messages.find((message) => !message.isMine);
+  const smartReplies = useMemo(
+    () => buildSmartReplySuggestions(latestIncomingMessage, currentUser),
+    [currentUser, latestIncomingMessage]
+  );
+  const canSubmit = Boolean(
+    conversation?.canPost &&
+      !submitting &&
+      (draft.trim() || pendingAttachments.length > 0)
+  );'''
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '''  const insertMention = (name: string) => {
+    setDraft((current) =>
+      current.replace(/@[^\\s@]*$/u, `@${name.split(" ")[0]} `)
+    );
+  };
+''',
+              '''  const insertMention = (name: string) => {
+    setDraft((current) =>
+      current.replace(/@[^\\s@]*$/u, `@${name.split(" ")[0]} `)
+    );
+  };
+
+  const useSmartReply = (reply: string) => {
+    setDraft(reply);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  };
+'''
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '''  const addAttachment = async (kind: AttachmentKind) => {''',
+              '''  const sendRecordedVoice = async (attachment: MessageAttachment) => {
+    setVoiceRecorderOpen(false);
+    setSubmitting(true);
+    const originalReply = replyingTo;
+    try {
+      const readyAttachment =
+        env.mockMode || localOnly
+          ? { ...attachment, status: "ready" as const, uploadProgress: 1 }
+          : await uploadMessageAttachment(attachment);
+      const accepted =
+        source === "admin"
+          ? await sendCreatedGroupMessage(
+              conversation.id,
+              "🎙️ Message vocal",
+              originalReply ?? undefined,
+              [readyAttachment],
+              []
+            )
+          : source === "private"
+            ? await sendLocalMessage(
+                conversation.id,
+                "🎙️ Message vocal",
+                originalReply ?? undefined,
+                [readyAttachment],
+                []
+              )
+            : await sendMessage(
+                conversation.id,
+                "🎙️ Message vocal",
+                originalReply?.id,
+                [readyAttachment],
+                []
+              );
+      if (!accepted) throw new Error("Le vocal a été refusé.");
+      setReplyingTo(null);
+    } catch (error) {
+      appendPendingAttachment({ ...attachment, status: "failed" });
+      Alert.alert(
+        "Envoi du vocal impossible",
+        `${error instanceof Error ? error.message : "Le vocal n’a pas été envoyé."} Il reste disponible dans le brouillon.`
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const addAttachment = async (kind: AttachmentKind) => {'''
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '''          {replyingTo ? (
+            <View style={styles.replyComposer}>''',
+              '''          {smartReplies.length > 0 && !draft.trim() && !voiceRecorderOpen ? (
+            <View style={styles.smartReplyPanel}>
+              <View style={styles.smartReplyHeading}>
+                <Ionicons name="sparkles" size={14} color={colors.orange} />
+                <Text style={styles.smartReplyLabel}>Réponses suggérées</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.smartReplyRow}
+              >
+                {smartReplies.map((reply) => (
+                  <Pressable
+                    key={reply}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Insérer la réponse : ${reply}`}
+                    onPress={() => useSmartReply(reply)}
+                    style={styles.smartReplyChip}
+                  >
+                    <Text style={styles.smartReplyText}>{reply}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
+          {replyingTo ? (
+            <View style={styles.replyComposer}>'''
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '''          <View style={styles.composer}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ajouter une pièce jointe ou un sondage"
+              onPress={() => setAttachmentMenuOpen(true)}
+              style={styles.attachButton}
+            >
+              <Ionicons name="add" size={24} color={colors.text} />
+            </Pressable>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              accessibilityLabel="Écrire un message"
+              accessibilityHint="Utilisez arobase pour mentionner un membre"
+              placeholder="Écrire un message…"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={styles.input}
+              maxLength={4_000}
+              returnKeyType="default"
+            />
+            {showSendButton ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Envoyer le message"
+                accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+                onPress={submit}
+                style={({ pressed }) => [
+                  styles.sendButton,
+                  pressed && canSubmit && styles.sendPressed,
+                  !canSubmit && styles.sendDisabled
+                ]}
+                disabled={!canSubmit}
+              >
+                <LinearGradient colors={gradients.primary} style={styles.sendGradient}>
+                  {submitting ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="send" size={19} color={colors.white} />
+                  )}
+                </LinearGradient>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Enregistrer un message vocal"
+                onPress={() => setVoiceRecorderOpen(true)}
+                style={styles.voiceButton}
+              >
+                <LinearGradient colors={gradients.activeTab} style={styles.sendGradient}>
+                  <Ionicons name="mic" size={21} color={colors.text} />
+                </LinearGradient>
+              </Pressable>
+            )}
+          </View>''',
+              '''          {voiceRecorderOpen ? (
+            <InlineVoiceRecorder
+              onCancel={() => setVoiceRecorderOpen(false)}
+              onRecorded={sendRecordedVoice}
+            />
+          ) : (
+            <View style={styles.composer}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter une pièce jointe ou un sondage"
+                onPress={() => setAttachmentMenuOpen(true)}
+                style={styles.attachButton}
+              >
+                <Ionicons name="add" size={24} color={colors.text} />
+              </Pressable>
+              <TextInput
+                ref={composerInputRef}
+                value={draft}
+                onChangeText={setDraft}
+                accessibilityLabel="Écrire un message"
+                accessibilityHint="Utilisez arobase pour mentionner un membre"
+                placeholder="Écrire un message…"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                style={styles.input}
+                maxLength={4_000}
+                returnKeyType="default"
+              />
+              {showSendButton ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Envoyer le message"
+                  accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+                  onPress={submit}
+                  style={({ pressed }) => [
+                    styles.sendButton,
+                    pressed && canSubmit && styles.sendPressed,
+                    !canSubmit && styles.sendDisabled
+                  ]}
+                  disabled={!canSubmit}
+                >
+                  <LinearGradient colors={gradients.primary} style={styles.sendGradient}>
+                    {submitting ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Ionicons name="send" size={19} color={colors.white} />
+                    )}
+                  </LinearGradient>
+                </Pressable>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Enregistrer un message vocal"
+                  onPress={() => setVoiceRecorderOpen(true)}
+                  style={styles.voiceButton}
+                >
+                  <LinearGradient colors={gradients.activeTab} style={styles.sendGradient}>
+                    <Ionicons name="mic" size={21} color={colors.text} />
+                  </LinearGradient>
+                </Pressable>
+              )}
+            </View>
+          )}'''
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '''
+      <VoiceRecorderModal
+        visible={voiceRecorderOpen}
+        onClose={() => setVoiceRecorderOpen(false)}
+        onRecorded={appendPendingAttachment}
+      />''',
+              ''
+          )
+          replace(
+              "app/chat/[id].tsx",
+              '''  mentionSuggestions: {
+    marginBottom: 6,''',
+              '''  smartReplyPanel: { marginBottom: 7 },
+  smartReplyHeading: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 6 },
+  smartReplyLabel: { color: colors.textSecondary, fontSize: 9.5, fontWeight: "900" },
+  smartReplyRow: { gap: 7, paddingRight: 10 },
+  smartReplyChip: {
+    minHeight: 38,
+    maxWidth: 260,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(107,79,234,0.34)",
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  smartReplyText: { color: colors.text, fontSize: 10.5, fontWeight: "800" },
+  mentionSuggestions: {
+    marginBottom: 6,'''
+          )
+
+          # In-app voice playback and 1x / 1.5x / 2x speed.
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              'import { Ionicons } from "@expo/vector-icons";\nimport { useState } from "react";',
+              'import { Ionicons } from "@expo/vector-icons";\nimport { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";\nimport { useState } from "react";'
+          )
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              '''  const [transcriptVisible, setTranscriptVisible] = useState(false);
+  const transcriptReady = Boolean(attachment.transcript?.trim());''',
+              '''  const [transcriptVisible, setTranscriptVisible] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const sourceUri = attachment.downloadUrl ?? attachment.uri ?? null;
+  const player = useAudioPlayer(sourceUri, { updateInterval: 180 });
+  const playerStatus = useAudioPlayerStatus(player);
+  const transcriptReady = Boolean(attachment.transcript?.trim());'''
+          )
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              '''  const waveform = [7, 13, 19, 10, 23, 15, 8, 18, 25, 12, 20, 9, 16, 22, 11, 17, 7];
+
+  return (''',
+              '''  const waveform = [7, 13, 19, 10, 23, 15, 8, 18, 25, 12, 20, 9, 16, 22, 11, 17, 7];
+
+  const togglePlayback = () => {
+    if (!sourceUri) {
+      Alert.alert("Vocal indisponible", "Ce message vocal n’est plus accessible.");
+      return;
+    }
+    if (playerStatus.playing) {
+      player.pause();
+      return;
+    }
+    if (playerStatus.didJustFinish || (playerStatus.duration > 0 && playerStatus.currentTime >= playerStatus.duration)) {
+      void player.seekTo(0);
+    }
+    player.setPlaybackRate(playbackRate);
+    player.play();
+  };
+
+  const cyclePlaybackRate = () => {
+    const next = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+    setPlaybackRate(next);
+    player.setPlaybackRate(next);
+  };
+
+  return ('''
+          )
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              '''          accessibilityLabel="Lire le message vocal"
+          onPress={() => void openAttachment(attachment)}''',
+              '''          accessibilityLabel={playerStatus.playing ? "Mettre le vocal en pause" : "Lire le message vocal"}
+          onPress={togglePlayback}'''
+          )
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              '''            name="play"
+            size={19}''',
+              '''            name={playerStatus.playing ? "pause" : "play"}
+            size={19}'''
+          )
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              '''              {attachment.status === "uploading"
+                ? `${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
+                : formatDuration(attachment.durationSeconds)}''',
+              '''              {attachment.status === "uploading"
+                ? `${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
+                : playerStatus.playing
+                  ? `${formatDuration(playerStatus.currentTime)} / ${formatDuration(playerStatus.duration || attachment.durationSeconds)}`
+                  : formatDuration(attachment.durationSeconds)}'''
+          )
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              '''            <Text
+              numberOfLines={1}
+              style={[
+                styles.voiceName,
+                isMine ? styles.mineMeta : styles.otherMeta
+              ]}
+            >
+              Vocal Neptune
+            </Text>''',
+              '''            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Vitesse de lecture ${playbackRate} fois`}
+              onPress={cyclePlaybackRate}
+              style={styles.speedButton}
+            >
+              <Text style={[styles.speedText, isMine ? styles.mineText : styles.otherText]}>
+                {playbackRate}×
+              </Text>
+            </Pressable>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.voiceName,
+                isMine ? styles.mineMeta : styles.otherMeta
+              ]}
+            >
+              Vocal Neptune
+            </Text>'''
+          )
+          replace(
+              "src/components/MessageAttachmentView.tsx",
+              '  voiceName: { flex: 1, fontSize: 8.5, textAlign: "right", fontWeight: "700" },',
+              '''  speedButton: {
+    minWidth: 34,
+    minHeight: 26,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  speedText: { fontSize: 9, fontWeight: "900" },
+  voiceName: { flex: 1, fontSize: 8.5, textAlign: "right", fontWeight: "700" },'''
+          )
+
+          # Spoken call reason prompt and dictation.
+          replace(
+              "app/call/[id].tsx",
+              '  TextInput,\n',
+              ''
+          )
+          replace(
+              "app/call/[id].tsx",
+              'import CallSurface from "@/components/CallSurface";',
+              'import CallSurface from "@/components/CallSurface";\nimport { VoicePromptInput } from "@/components/VoicePromptInput";'
+          )
+          replace(
+              "app/call/[id].tsx",
+              '''        <TextInput
+          value={reason}
+          onChangeText={setReason}
+          placeholder="Ex. Valider le lieu de l’afterwork de vendredi"
+          placeholderTextColor={colors.textMuted}
+          maxLength={160}
+          multiline
+          textAlignVertical="top"
+          style={styles.input}
+        />''',
+              '''        <VoicePromptInput
+          value={reason}
+          onChangeText={setReason}
+          placeholder="Ex. Valider le lieu de l’afterwork de vendredi"
+          prompt="Quel est l’objet de votre appel ?"
+          maxLength={160}
+        />'''
+          )
+
+          # More engaging Highlight composer and inline voice capture.
+          replace(
+              "app/new-highlight.tsx",
+              'import { useEffect, useMemo, useState } from "react";',
+              'import { useEffect, useMemo, useRef, useState } from "react";'
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '  ActivityIndicator,\n  Alert,',
+              '  ActivityIndicator,\n  Alert,\n  Animated,'
+          )
+          replace(
+              "app/new-highlight.tsx",
+              'import { HighlightMediaView } from "@/components/HighlightMediaView";\nimport VoiceRecorderModal from "@/components/VoiceRecorderModal";',
+              'import { HighlightMediaView } from "@/components/HighlightMediaView";\nimport { InlineVoiceRecorder } from "@/components/InlineVoiceRecorder";'
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '''const DEMO_PLACES: PlaceSuggestion[] = [''',
+              '''const HIGHLIGHT_PROMPTS: Record<HighlightKind, string> = {
+  standard: "Qu’est-ce qui mérite d’être partagé maintenant ?",
+  besoin: "Quel coup de main peut débloquer la situation ?",
+  reussite: "Qu’est-ce que le réseau doit célébrer avec vous ?",
+  offre: "Quelle opportunité mérite d’être saisie ?"
+};
+
+const HIGHLIGHT_STARTERS: Record<HighlightKind, string[]> = {
+  standard: ["Aujourd’hui, il s’est passé…", "Le moment à retenir :", "Petite histoire, grand déclic :"],
+  besoin: ["Je recherche…", "J’aurais besoin d’un contact pour…", "Qui connaît quelqu’un qui…"],
+  reussite: ["Petite victoire du jour :", "Objectif atteint :", "On l’a fait 🎉"],
+  offre: ["Je peux vous aider à…", "Opportunité disponible :", "Avantage réservé au réseau :"]
+};
+
+const DEMO_PLACES: PlaceSuggestion[] = ['''
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '  const [publishing, setPublishing] = useState(false);',
+              '''  const [publishing, setPublishing] = useState(false);
+  const entrance = useRef(new Animated.Value(0)).current;
+  const completionSteps = Number(body.trim().length >= 12) + Number(Boolean(media)) + Number(Boolean(selectedLocation));
+  const completionProgress = completionSteps / 3;'''
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '''  useEffect(() => {
+    const query = locationQuery.trim();''',
+              '''  useEffect(() => {
+    Animated.spring(entrance, {
+      toValue: 1,
+      useNativeDriver: true,
+      damping: 18,
+      stiffness: 135,
+      mass: 0.8
+    }).start();
+  }, [entrance]);
+
+  useEffect(() => {
+    const query = locationQuery.trim();'''
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '''  const useRecordedVoice = (attachment: MessageAttachment) => {
+    setMedia({''',
+              '''  const useRecordedVoice = (attachment: MessageAttachment) => {
+    setVoiceRecorderOpen(false);
+    setMedia({'''
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '<Text style={styles.publishText}>Publier</Text>',
+              '<Text style={styles.publishText}>Partager ✦</Text>'
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '''      >
+        <Text style={styles.sectionTitle}>Type de publication</Text>''',
+              '''      >
+        <Animated.View
+          style={[
+            styles.animatedContent,
+            {
+              opacity: entrance,
+              transform: [
+                { translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [26, 0] }) },
+                { scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.975, 1] }) }
+              ]
+            }
+          ]}
+        >
+        <View style={styles.momentumCard}>
+          <LinearGradient colors={gradients.primaryWarm} style={styles.momentumGradient}>
+            <View style={styles.momentumCopy}>
+              <Text style={styles.momentumEyebrow}>CAPTUREZ L’INSTANT</Text>
+              <Text style={styles.momentumTitle}>{HIGHLIGHT_PROMPTS[kind]}</Text>
+              <Text style={styles.momentumSubtitle}>
+                {completionSteps === 0
+                  ? "Commencez par une phrase. Le reste viendra naturellement."
+                  : completionSteps === 3
+                    ? "Votre Temps fort est prêt à créer de l’interaction."
+                    : "Encore un détail et votre publication prendra vie."}
+              </Text>
+            </View>
+            <View style={styles.progressBadge}>
+              <Text style={styles.progressValue}>{Math.round(completionProgress * 100)}%</Text>
+              <Text style={styles.progressLabel}>prêt</Text>
+            </View>
+          </LinearGradient>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${Math.max(8, completionProgress * 100)}%` }]} />
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Donnez le ton</Text>'''
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '<Text style={styles.sectionTitle}>Contenu</Text>\n        <TextInput',
+              '''<Text style={styles.sectionTitle}>{HIGHLIGHT_PROMPTS[kind]}</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.starterRow}
+        >
+          {HIGHLIGHT_STARTERS[kind].map((starter) => (
+            <Pressable
+              key={starter}
+              accessibilityRole="button"
+              accessibilityLabel={`Commencer par ${starter}`}
+              onPress={() => setBody((current) => current.trim() ? current : `${starter} `)}
+              style={styles.starterChip}
+            >
+              <Ionicons name="flash-outline" size={14} color={colors.orange} />
+              <Text style={styles.starterText}>{starter}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        <TextInput'''
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '''        </View>
+        <Text style={styles.mediaHint}>''',
+              '''        </View>
+        {voiceRecorderOpen ? (
+          <View style={styles.inlineRecorderWrap}>
+            <InlineVoiceRecorder
+              onCancel={() => setVoiceRecorderOpen(false)}
+              onRecorded={useRecordedVoice}
+            />
+          </View>
+        ) : null}
+        <Text style={styles.mediaHint}>''',
+              1
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '''        ) : null}
+      </ScrollView>
+
+      <VoiceRecorderModal
+        visible={voiceRecorderOpen}
+        onClose={() => setVoiceRecorderOpen(false)}
+        onRecorded={useRecordedVoice}
+      />''',
+              '''        ) : null}
+        </Animated.View>
+      </ScrollView>'''
+          )
+          replace(
+              "app/new-highlight.tsx",
+              '  content: { width: "100%", maxWidth: 680, alignSelf: "center" },',
+              '''  content: { width: "100%", maxWidth: 680, alignSelf: "center" },
+  animatedContent: { width: "100%" },
+  momentumCard: {
+    marginTop: 6,
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(244,177,131,0.24)",
+    backgroundColor: colors.surface
+  },
+  momentumGradient: { minHeight: 138, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: 12 },
+  momentumCopy: { flex: 1, minWidth: 0 },
+  momentumEyebrow: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "900", letterSpacing: 1.2 },
+  momentumTitle: { color: colors.white, fontSize: 19, lineHeight: 25, fontWeight: "900", marginTop: 7 },
+  momentumSubtitle: { color: colors.whiteMuted, fontSize: 10, lineHeight: 15, marginTop: 7 },
+  progressBadge: { width: 64, height: 64, borderRadius: 22, backgroundColor: "rgba(2,7,19,0.28)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
+  progressValue: { color: colors.white, fontSize: 16, fontWeight: "900" },
+  progressLabel: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "800", marginTop: 1 },
+  progressTrack: { height: 4, backgroundColor: "rgba(255,255,255,0.08)" },
+  progressFill: { height: 4, borderRadius: 2, backgroundColor: colors.orange },
+  starterRow: { gap: 7, paddingRight: 12, marginBottom: 9 },
+  starterChip: { minHeight: 38, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 6 },
+  starterText: { color: colors.textSecondary, fontSize: 9.5, fontWeight: "800" },
+  inlineRecorderWrap: { marginTop: 9 },'''
+          )
+
+          # Native permissions and recognition plugin.
+          replace(
+              "app.config.ts",
+              '''        NSMicrophoneUsageDescription:
+          "Connexio utilise le microphone pour les messages audio et les appels.",''',
+              '''        NSMicrophoneUsageDescription:
+          "Connexio utilise le microphone pour les messages audio et les appels.",
+        NSSpeechRecognitionUsageDescription:
+          "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",'''
+          )
+          replace(
+              "app.config.ts",
+              '''      "expo-router",
+      "expo-secure-store",''',
+              '''      "expo-router",
+      [
+        "expo-speech-recognition",
+        {
+          microphonePermission:
+            "Connexio utilise le microphone pour dicter l’objet d’un appel.",
+          speechRecognitionPermission:
+            "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
+          androidSpeechServicePackages: [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.as"
+          ]
+        }
+      ],
+      "expo-secure-store",'''
+          )
+          PY
+
+      - name: Install compatible audio and speech modules
+        run: |
+          npm install expo-speech-recognition@56.0.1
+          npx expo install expo-audio expo-speech
+
+      - name: Verify TypeScript and domain tests
+        run: npm run verify
+
+      - name: Commit verified changes
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-v14-ux-followup.yml
+          git config user.name "Neptune Product Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: polish reactions, smart replies and voice UX"
+          git push origin HEAD:feat/v14-ux-calls-moderation
