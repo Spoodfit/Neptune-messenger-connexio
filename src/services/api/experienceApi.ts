@@ -1,9 +1,11 @@
 import type {
   GroupDraft,
   HighlightKind,
+  HighlightLocation,
   HighlightMedia,
   HighlightPost,
   MapMemberMoment,
+  PlaceSuggestion,
   QuickReaction
 } from "../../types/experience";
 import type {
@@ -19,12 +21,7 @@ export interface CreateHighlightInput {
   media?: HighlightMedia;
   mentionedUserIds?: string[];
   coordinates?: HighlightPost["coordinates"];
-}
-
-export interface StartCallResponse {
-  id: string;
-  joinUrl: string;
-  expiresAt?: string;
+  location?: HighlightLocation;
 }
 
 export class NeptuneExperienceApi {
@@ -99,7 +96,7 @@ export class NeptuneExperienceApi {
     muted: boolean
   ): Promise<void> {
     await authenticatedRequest(
-      `/v1/groups/${encodeURIComponent(conversationId)}/mute`,
+      `/v1/conversations/${encodeURIComponent(conversationId)}/mute`,
       { method: muted ? "POST" : "DELETE" },
       this.fallbackAccessToken
     );
@@ -142,6 +139,12 @@ export class NeptuneExperienceApi {
   }
 
   createHighlight(input: CreateHighlightInput): Promise<HighlightPost> {
+    const syncTargets =
+      input.kind === "besoin"
+        ? ["connexio", "business-needs"]
+        : input.kind === "offre"
+          ? ["connexio", "advantages-committee"]
+          : ["connexio"];
     return authenticatedRequest<HighlightPost>(
       "/v1/highlights",
       {
@@ -155,10 +158,17 @@ export class NeptuneExperienceApi {
           media_id: input.media?.id ?? null,
           mentioned_user_ids: input.mentionedUserIds ?? [],
           coordinates: input.coordinates ?? null,
-          sync_targets:
-            input.kind === "besoin"
-              ? ["connexio", "business"]
-              : ["connexio"]
+          location: input.location
+            ? {
+                place_id: input.location.placeId ?? null,
+                label: input.location.label,
+                address: input.location.address ?? null,
+                latitude: input.location.latitude,
+                longitude: input.location.longitude,
+                accuracy_radius_meters: input.location.accuracyRadiusMeters
+              }
+            : null,
+          sync_targets: syncTargets
         })
       },
       this.fallbackAccessToken
@@ -240,6 +250,15 @@ export class NeptuneExperienceApi {
     );
   }
 
+  searchPlaces(query: string): Promise<PlaceSuggestion[]> {
+    const params = new URLSearchParams({ query: query.trim(), limit: "6" });
+    return authenticatedRequest(
+      `/v1/places/search?${params.toString()}`,
+      {},
+      this.fallbackAccessToken
+    );
+  }
+
   async updateLocation(
     latitude: number,
     longitude: number,
@@ -263,20 +282,6 @@ export class NeptuneExperienceApi {
     await authenticatedRequest(
       "/v1/me/location",
       { method: "DELETE" },
-      this.fallbackAccessToken
-    );
-  }
-
-  startCall(
-    memberId: string,
-    type: "audio" | "video"
-  ): Promise<StartCallResponse> {
-    return authenticatedRequest(
-      "/v1/calls",
-      {
-        method: "POST",
-        body: JSON.stringify({ member_id: memberId, type })
-      },
       this.fallbackAccessToken
     );
   }
