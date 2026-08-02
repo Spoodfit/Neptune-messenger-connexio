@@ -28,19 +28,14 @@ interface HighlightCardProps {
 }
 
 const REACTIONS: QuickReaction[] = ["❤️", "🔥", "👏", "💡", "🤝", "😂"];
-
-const kindLabel: Record<HighlightPost["kind"], string> = {
+const KIND_LABELS: Record<HighlightPost["kind"], string> = {
   standard: "TEMPS FORT",
   besoin: "BESOIN",
   reussite: "RÉUSSITE",
   offre: "OFFRE"
 };
 
-export function HighlightCard({
-  post,
-  compact = false,
-  onReact
-}: HighlightCardProps) {
+export function HighlightCard({ post, compact = false, onReact }: HighlightCardProps) {
   const { accessToken } = useSession();
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
@@ -51,9 +46,14 @@ export function HighlightCard({
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [sharing, setSharing] = useState(false);
   const totalReactions = post.reactions.reduce(
-    (sum, reaction) => sum + reaction.count,
+    (total, reaction) => total + reaction.count,
     0
   );
+  const locationLabel = post.location?.label ?? post.locationLabel;
+  const synchronized =
+    post.kind === "offre"
+      ? post.syncedWithAdvantagesCommittee || post.syncedWithBusinessApp
+      : post.syncedWithBusinessApp;
 
   const sharePost = async () => {
     if (sharing) return;
@@ -73,9 +73,7 @@ export function HighlightCard({
     } catch (error) {
       Alert.alert(
         "Partage impossible",
-        error instanceof Error
-          ? error.message
-          : "La publication n’a pas pu être partagée."
+        error instanceof Error ? error.message : "La publication n’a pas pu être partagée."
       );
     } finally {
       setSharing(false);
@@ -84,22 +82,12 @@ export function HighlightCard({
 
   const reportPost = async () => {
     if (!api) {
-      Alert.alert(
-        "Signalement enregistré",
-        "Le mode démonstration a simulé la transmission à la modération."
-      );
+      Alert.alert("Signalement enregistré", "Le signalement est simulé en démonstration.");
       return;
     }
     try {
-      await api.reportContent(
-        "highlight",
-        post.id,
-        "Contenu signalé depuis Connexio"
-      );
-      Alert.alert(
-        "Signalement transmis",
-        "La modération Neptune examinera cette publication."
-      );
+      await api.reportContent("highlight", post.id, "Contenu signalé depuis Connexio");
+      Alert.alert("Signalement transmis", "La modération Neptune examinera ce contenu.");
     } catch (error) {
       Alert.alert(
         "Signalement impossible",
@@ -113,8 +101,7 @@ export function HighlightCard({
       id: "profile",
       label: `Voir le profil de ${post.author.name}`,
       icon: "person-outline",
-      onPress: () =>
-        router.push(`/profile/${encodeURIComponent(post.author.id)}`)
+      onPress: () => router.push(`/profile/${encodeURIComponent(post.author.id)}`)
     },
     {
       id: "share",
@@ -142,9 +129,7 @@ export function HighlightCard({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Ouvrir le profil de ${post.author.name}`}
-          onPress={() =>
-            router.push(`/profile/${encodeURIComponent(post.author.id)}`)
-          }
+          onPress={() => router.push(`/profile/${encodeURIComponent(post.author.id)}`)}
           style={styles.authorPressable}
         >
           <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
@@ -165,12 +150,9 @@ export function HighlightCard({
               {post.author.name}
             </Text>
             <Text style={styles.meta} numberOfLines={1}>
-              {post.author.company} ·{" "}
-              {new Date(post.createdAt).toLocaleDateString("fr-FR", {
+              {post.author.company} · {new Date(post.createdAt).toLocaleDateString("fr-FR", {
                 day: "2-digit",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit"
+                month: "short"
               })}
             </Text>
           </View>
@@ -181,11 +163,7 @@ export function HighlightCard({
           onPress={() => setMenuOpen(true)}
           style={styles.moreButton}
         >
-          <Ionicons
-            name="ellipsis-horizontal"
-            size={20}
-            color={colors.textMuted}
-          />
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
         </Pressable>
       </View>
 
@@ -204,10 +182,10 @@ export function HighlightCard({
               post.kind === "offre" && styles.offerText
             ]}
           >
-            {kindLabel[post.kind]}
+            {KIND_LABELS[post.kind]}
           </Text>
         </View>
-        {post.syncedWithBusinessApp ? (
+        {synchronized ? (
           <View style={styles.syncBadge}>
             <Ionicons name="sync" size={12} color={colors.success} />
             {!compact ? (
@@ -226,25 +204,25 @@ export function HighlightCard({
             <View style={styles.duration}>
               <Text style={styles.durationText}>
                 {Math.floor(post.media.durationSeconds / 60)}:
-                {String(Math.floor(post.media.durationSeconds % 60)).padStart(
-                  2,
-                  "0"
-                )}
+                {String(Math.floor(post.media.durationSeconds % 60)).padStart(2, "0")}
               </Text>
             </View>
           ) : null}
         </View>
       ) : null}
 
-      <Text style={[styles.body, compact && styles.compactBody]} numberOfLines={compact ? 4 : undefined}>
+      <Text
+        style={[styles.body, compact && styles.compactBody]}
+        numberOfLines={compact ? 5 : undefined}
+      >
         {post.body}
       </Text>
 
-      {post.coordinates ? (
+      {locationLabel || post.coordinates ? (
         <View style={styles.locationLine}>
           <Ionicons name="location-outline" size={13} color={colors.textMuted} />
           <Text style={styles.locationText} numberOfLines={1}>
-            {post.locationLabel ?? "Position approximative"}
+            {locationLabel ?? "Position approximative"}
           </Text>
         </View>
       ) : null}
@@ -259,8 +237,7 @@ export function HighlightCard({
         <View style={styles.reactionPicker}>
           {REACTIONS.map((emoji) => {
             const active = post.reactions.some(
-              (reaction) =>
-                reaction.emoji === emoji && reaction.reactedByCurrentUser
+              (reaction) => reaction.emoji === emoji && reaction.reactedByCurrentUser
             );
             return (
               <Pressable
@@ -272,14 +249,9 @@ export function HighlightCard({
                   onReact(emoji);
                   setReactionOpen(false);
                 }}
-                style={styles.reactionChoiceTarget}
+                style={styles.reactionTarget}
               >
-                <View
-                  style={[
-                    styles.reactionChoiceVisual,
-                    active && styles.reactionChoiceActive
-                  ]}
-                >
+                <View style={[styles.reactionVisual, active && styles.reactionActive]}>
                   <Text style={styles.reactionEmoji}>{emoji}</Text>
                 </View>
               </Pressable>
@@ -297,11 +269,11 @@ export function HighlightCard({
               accessibilityLabel={`${reaction.emoji}, ${reaction.count} réactions`}
               accessibilityState={{ selected: reaction.reactedByCurrentUser }}
               onPress={() => onReact(reaction.emoji)}
-              style={styles.reactionTarget}
+              style={styles.reactionSummaryTarget}
             >
               <View
                 style={[
-                  styles.reactionVisual,
+                  styles.reactionSummaryVisual,
                   reaction.reactedByCurrentUser && styles.reactionActive
                 ]}
               >
@@ -329,11 +301,7 @@ export function HighlightCard({
           onPress={() => router.push(`/highlight/${encodeURIComponent(post.id)}`)}
           style={styles.action}
         >
-          <Ionicons
-            name="chatbubble-outline"
-            size={18}
-            color={colors.textMuted}
-          />
+          <Ionicons name="chatbubble-outline" size={18} color={colors.textMuted} />
           {!compact ? <Text style={styles.actionText}>Commenter</Text> : null}
         </Pressable>
         <Pressable
@@ -403,38 +371,26 @@ const styles = StyleSheet.create({
   authorName: { color: colors.text, fontSize: 12, fontWeight: "900" },
   meta: { color: colors.textMuted, fontSize: 8.5, marginTop: 2 },
   moreButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  kindRow: {
-    marginTop: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6
-  },
+  kindRow: { marginTop: 8, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   kindBadge: {
     minHeight: 24,
     paddingHorizontal: 8,
-    borderRadius: 8,
+    borderRadius: 7,
     backgroundColor: "rgba(244,177,131,0.12)",
     borderWidth: 1,
     borderColor: "rgba(244,177,131,0.24)",
     alignItems: "center",
     justifyContent: "center"
   },
-  needBadge: {
-    backgroundColor: "rgba(255,123,134,0.13)",
-    borderColor: "rgba(255,123,134,0.35)"
-  },
-  offerBadge: {
-    backgroundColor: "rgba(66,211,146,0.12)",
-    borderColor: "rgba(66,211,146,0.35)"
-  },
+  needBadge: { backgroundColor: "rgba(255,123,134,0.13)", borderColor: "rgba(255,123,134,0.35)" },
+  offerBadge: { backgroundColor: "rgba(66,211,146,0.12)", borderColor: "rgba(66,211,146,0.35)" },
   kindText: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
   needText: { color: colors.danger },
   offerText: { color: colors.success },
   syncBadge: {
     minHeight: 24,
     paddingHorizontal: 7,
-    borderRadius: 8,
+    borderRadius: 7,
     backgroundColor: colors.successSoft,
     flexDirection: "row",
     alignItems: "center",
@@ -452,36 +408,37 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(2,7,19,0.78)"
   },
   durationText: { color: colors.white, fontSize: 9, fontWeight: "900" },
-  body: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    lineHeight: 19,
-    marginTop: 9
-  },
+  body: { ...typography.bodySmall, color: colors.textSecondary, lineHeight: 19, marginTop: 9 },
   compactBody: { fontSize: 11, lineHeight: 16 },
   locationLine: { minHeight: 26, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 4 },
   locationText: { flex: 1, color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
-  metrics: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  metricText: { color: colors.textMuted, fontSize: 9, fontWeight: "700" },
+  metrics: {
+    minHeight: 28,
+    marginTop: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8
+  },
+  metricText: { color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
   reactionPicker: {
-    marginTop: 8,
     minHeight: 48,
-    paddingHorizontal: 3,
-    borderRadius: 16,
+    marginTop: 4,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: colors.border,
     backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around"
+    flexWrap: "wrap"
   },
-  reactionChoiceTarget: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  reactionChoiceVisual: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  reactionChoiceActive: { borderWidth: 1, borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
-  reactionEmoji: { fontSize: 21 },
-  reactionSummary: { marginTop: 5, flexDirection: "row", flexWrap: "wrap", gap: 1 },
-  reactionTarget: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
-  reactionVisual: {
+  reactionTarget: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  reactionVisual: { width: 34, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  reactionActive: { borderWidth: 1, borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
+  reactionEmoji: { fontSize: 19 },
+  reactionSummary: { minHeight: 44, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 2 },
+  reactionSummaryTarget: { minWidth: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  reactionSummaryVisual: {
     minHeight: 27,
     paddingHorizontal: 7,
     borderRadius: 8,
@@ -492,23 +449,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4
   },
-  reactionActive: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
   reactionPillEmoji: { fontSize: 12 },
-  reactionPillCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  reactionPillCount: { color: colors.textSecondary, fontSize: 9, fontWeight: "900" },
   actions: {
-    marginTop: 6,
-    paddingTop: 6,
+    minHeight: 48,
+    marginTop: 2,
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
-    flexDirection: "row"
+    flexDirection: "row",
+    alignItems: "center"
   },
   action: {
     flex: 1,
+    minWidth: 44,
     minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 5
   },
-  actionText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" }
+  actionText: { color: colors.textMuted, fontSize: 9.5, fontWeight: "800" }
 });
