@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   reactionAdd: {
     position: "absolute",
-    right: -16,
+    right: -8,
     bottom: -22,
     width: 44,
     height: 44,
@@ -602,8 +602,8 @@ const styles = StyleSheet.create({
     zIndex: 12,
     elevation: 9
   },
-  reactionAddMine: { right: -16 },
-  reactionAddOther: { right: -16 },
+  reactionAddMine: { right: -8 },
+  reactionAddOther: { right: -8 },
   reactionAddVisual: {
     width: 18,
     height: 18,
