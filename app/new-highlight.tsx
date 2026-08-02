@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
     marginBottom: 9
   },
   starterChip: {
-    minHeight: 44,
+    minHeight: 46,
     maxWidth: "100%",
     paddingHorizontal: 11,
     borderRadius: 999,
@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
   },
   kindGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   kindButton: {
-    minHeight: 44,
+    minHeight: 46,
     paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
