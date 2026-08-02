@@ -24,6 +24,7 @@ import { MemberAvatarStack } from "../../src/components/MemberAvatarStack";
 import { MessageAttachmentsGrid } from "../../src/components/MessageAttachmentsGrid";
 import { MessageBubble } from "../../src/components/MessageBubble";
 import { PollComposerModal } from "../../src/components/PollComposerModal";
+import VoiceRecorderModal from "../../src/components/VoiceRecorderModal";
 import { env } from "../../src/config/env";
 import { isPrivateConversation } from "../../src/domain/conversationFilter";
 import { useExperience } from "../../src/providers/ExperienceProvider";
@@ -161,6 +162,7 @@ export default function ChatScreen() {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  const [voiceRecorderOpen, setVoiceRecorderOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<
     MessageAttachment[]
   >([]);
@@ -219,6 +221,9 @@ export default function ChatScreen() {
     conversation?.canPost &&
       !submitting &&
       (draft.trim() || pendingAttachments.length > 0)
+  );
+  const showSendButton = Boolean(
+    submitting || draft.trim() || pendingAttachments.length > 0
   );
 
   const goBackToDiscussions = () => {
@@ -294,6 +299,21 @@ export default function ChatScreen() {
     setDraft((current) =>
       current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `)
     );
+  };
+
+  const appendPendingAttachment = (attachment: MessageAttachment) => {
+    try {
+      const next = [...pendingAttachments, attachment];
+      assertAttachmentBatch(next);
+      setPendingAttachments(next);
+    } catch (error) {
+      Alert.alert(
+        "Vocal indisponible",
+        error instanceof Error
+          ? error.message
+          : "Le message vocal ne peut pas être ajouté à cet envoi."
+      );
+    }
   };
 
   const addAttachment = async (kind: AttachmentKind) => {
@@ -387,7 +407,9 @@ export default function ChatScreen() {
         const fallbackBody =
           body ||
           (readyAttachments.length === 1
-            ? `📎 ${readyAttachments[0]?.name ?? "Pièce jointe"}`
+            ? readyAttachments[0]?.kind === "audio"
+              ? "🎙️ Message vocal"
+              : `📎 ${readyAttachments[0]?.name ?? "Pièce jointe"}`
             : `📎 ${readyAttachments.length} pièces jointes`);
         const accepted =
           source === "admin"
@@ -804,7 +826,7 @@ export default function ChatScreen() {
                     style={styles.pendingChip}
                   >
                     <Text style={styles.pendingText} numberOfLines={1}>
-                      {attachment.name}
+                      {attachment.kind === "audio" ? "Message vocal" : attachment.name}
                       {attachment.status === "uploading"
                         ? ` · ${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
                         : ""}
@@ -841,26 +863,39 @@ export default function ChatScreen() {
               maxLength={4_000}
               returnKeyType="default"
             />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Envoyer le message"
-              accessibilityState={{ disabled: !canSubmit, busy: submitting }}
-              onPress={submit}
-              style={({ pressed }) => [
-                styles.sendButton,
-                pressed && canSubmit && styles.sendPressed,
-                !canSubmit && styles.sendDisabled
-              ]}
-              disabled={!canSubmit}
-            >
-              <LinearGradient colors={gradients.primary} style={styles.sendGradient}>
-                {submitting ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <Ionicons name="send" size={19} color={colors.white} />
-                )}
-              </LinearGradient>
-            </Pressable>
+            {showSendButton ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Envoyer le message"
+                accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+                onPress={submit}
+                style={({ pressed }) => [
+                  styles.sendButton,
+                  pressed && canSubmit && styles.sendPressed,
+                  !canSubmit && styles.sendDisabled
+                ]}
+                disabled={!canSubmit}
+              >
+                <LinearGradient colors={gradients.primary} style={styles.sendGradient}>
+                  {submitting ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Ionicons name="send" size={19} color={colors.white} />
+                  )}
+                </LinearGradient>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Enregistrer un message vocal"
+                onPress={() => setVoiceRecorderOpen(true)}
+                style={styles.voiceButton}
+              >
+                <LinearGradient colors={gradients.activeTab} style={styles.sendGradient}>
+                  <Ionicons name="mic" size={21} color={colors.text} />
+                </LinearGradient>
+              </Pressable>
+            )}
           </View>
         </View>
       ) : (
@@ -919,6 +954,23 @@ export default function ChatScreen() {
               ))}
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Enregistrer un message vocal"
+                onPress={() => {
+                  setAttachmentMenuOpen(false);
+                  setVoiceRecorderOpen(true);
+                }}
+                style={styles.attachmentChoice}
+              >
+                <LinearGradient
+                  colors={gradients.activeTab}
+                  style={styles.attachmentChoiceIcon}
+                >
+                  <Ionicons name="mic-outline" size={23} color={colors.text} />
+                </LinearGradient>
+                <Text style={styles.attachmentChoiceText}>Vocal</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel="Créer un sondage"
                 onPress={() => {
                   setAttachmentMenuOpen(false);
@@ -947,6 +999,12 @@ export default function ChatScreen() {
         visible={pollComposerOpen}
         onClose={() => setPollComposerOpen(false)}
         onCreate={createPoll}
+      />
+
+      <VoiceRecorderModal
+        visible={voiceRecorderOpen}
+        onClose={() => setVoiceRecorderOpen(false)}
+        onRecorded={appendPendingAttachment}
       />
     </KeyboardAvoidingView>
   );
@@ -1134,6 +1192,14 @@ const styles = StyleSheet.create({
     ...typography.bodySmall
   },
   sendButton: { width: 46, height: 46, borderRadius: 17, overflow: "hidden" },
+  voiceButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 17,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.borderSoft
+  },
   sendGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
   sendDisabled: { opacity: 0.4 },
   sendPressed: { transform: [{ scale: 0.95 }] },
