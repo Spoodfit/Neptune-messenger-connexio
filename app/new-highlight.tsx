@@ -474,12 +474,7 @@ style={[
         ) : null}
 
         <Text style={styles.sectionTitle}>{HIGHLIGHT_PROMPTS[kind]}</Text>
-        <ScrollView
-horizontal
-showsHorizontalScrollIndicator={false}
-keyboardShouldPersistTaps="handled"
-contentContainerStyle={styles.starterRow}
-        >
+        <View style={styles.starterRow}>
 {HIGHLIGHT_STARTERS[kind].map((starter) => (
   <Pressable
     key={starter}
@@ -492,7 +487,7 @@ contentContainerStyle={styles.starterRow}
     <Text style={styles.starterText}>{starter}</Text>
   </Pressable>
 ))}
-        </ScrollView>
+        </View>
         <TextInput
           value={body}
           onChangeText={setBody}
@@ -734,8 +729,24 @@ const styles = StyleSheet.create({
   progressLabel: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "800", marginTop: 1 },
   progressTrack: { height: 4, backgroundColor: "rgba(255,255,255,0.08)" },
   progressFill: { height: 4, borderRadius: 2, backgroundColor: colors.orange },
-  starterRow: { gap: 7, paddingRight: 12, marginBottom: 9 },
-  starterChip: { minHeight: 38, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 6 },
+  starterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginBottom: 9
+  },
+  starterChip: {
+    minHeight: 44,
+    maxWidth: "100%",
+    paddingHorizontal: 11,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
   starterText: { color: colors.textSecondary, fontSize: 9.5, fontWeight: "800" },
   inlineRecorderWrap: { marginTop: 9 },
   sectionTitle: {
