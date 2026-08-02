@@ -1,8 +1,7 @@
-import type { CallMode } from "../services/calls/callRoom";
+import type { IntegratedCallSession } from "../services/calls/callRoom";
 
 export interface CallSurfaceProps {
-  conversationId: string;
-  mode: CallMode;
+  session: IntegratedCallSession;
   displayName: string;
   onClose: () => void;
 }
