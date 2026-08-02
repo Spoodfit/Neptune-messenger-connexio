@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { env } from "../config/env";
 import {
   GROUP_VISIBILITY_ROLES,
-  isGovernanceRole,
+  isVisionnaireRole,
   ROLE_LABELS
 } from "../domain/roles";
 import {
@@ -33,8 +33,11 @@ import { useSession } from "../providers/SessionProvider";
 import { NeptuneExperienceApi } from "../services/api/experienceApi";
 import { uploadGroupAvatar } from "../services/api/uploadApi";
 import { pickGroupAvatar } from "../services/media/mediaPicker";
-import { colors, gradients, spacing, typography } from "../theme";
-import type { CanonicalUserRole } from "../types/messaging";
+import { colors, gradients, radii, spacing, typography } from "../theme";
+import type {
+  CanonicalUserRole,
+  Conversation
+} from "../types/messaging";
 
 const GROUP_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   "people",
@@ -49,17 +52,39 @@ const GROUP_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   "construct"
 ];
 
+function sameParticipants(
+  conversation: Conversation,
+  participantIds: string[]
+): boolean {
+  if (
+    conversation.type !== "direct" &&
+    conversation.type !== "small_group"
+  ) {
+    return false;
+  }
+  const existing = [...(conversation.memberIds ?? [])].sort();
+  const requested = [...participantIds].sort();
+  return (
+    existing.length === requested.length &&
+    existing.every((id, index) => id === requested[index])
+  );
+}
+
 export default function NewConversationScreen() {
   const insets = useSafeAreaInsets();
   const { currentUser, accessToken } = useSession();
-  const { members, createPrivateConversation } = useExperience();
+  const {
+    members,
+    localConversations,
+    createPrivateConversation
+  } = useExperience();
   const { createGroup } = useGroupAdmin();
-  const { refreshConversations } = useMessaging();
+  const { visibleConversations, refreshConversations } = useMessaging();
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
     [accessToken]
   );
-  const canCreateOfficialGroup = isGovernanceRole(currentUser.role);
+  const canCreateOfficialGroup = isVisionnaireRole(currentUser.role);
 
   const [mode, setMode] = useState<"private" | "group">("private");
   const [query, setQuery] = useState("");
@@ -90,6 +115,19 @@ export default function NewConversationScreen() {
           : true
       );
   }, [currentUser.id, members, query]);
+
+  const existingPrivateConversation = useMemo(() => {
+    if (selectedIds.length === 0) return undefined;
+    const participantIds = [currentUser.id, ...selectedIds];
+    return [...visibleConversations, ...localConversations].find((conversation) =>
+      sameParticipants(conversation, participantIds)
+    );
+  }, [
+    currentUser.id,
+    localConversations,
+    selectedIds,
+    visibleConversations
+  ]);
 
   const toggleMember = (memberId: string) => {
     setSelectedIds((previous) => {
@@ -129,17 +167,38 @@ export default function NewConversationScreen() {
     }
   };
 
+  const openExistingConversation = (conversation: Conversation) => {
+    router.replace(`/chat/${encodeURIComponent(conversation.id)}`);
+  };
+
   const submit = async () => {
     if (creating) return;
-    if (mode === "private" && selectedIds.length === 0) {
-      Alert.alert("Contact requis", "Sélectionnez au moins un membre.");
-      return;
+    if (mode === "private") {
+      if (selectedIds.length === 0) {
+        Alert.alert("Contact requis", "Sélectionnez au moins un membre.");
+        return;
+      }
+      if (existingPrivateConversation) {
+        Alert.alert(
+          "Conversation déjà ouverte",
+          "Une conversation existe déjà avec exactement ces participants.",
+          [
+            { text: "Annuler", style: "cancel" },
+            {
+              text: "Ouvrir",
+              onPress: () => openExistingConversation(existingPrivateConversation)
+            }
+          ]
+        );
+        return;
+      }
     }
+
     if (mode === "group") {
       if (!canCreateOfficialGroup) {
         Alert.alert(
-          "Autorisation insuffisante",
-          "Votre statut Neptune ne permet pas de créer un groupe officiel."
+          "Réservé aux Visionnaires",
+          "Seuls les Visionnaires peuvent créer ou administrer un groupe officiel."
         );
         return;
       }
@@ -235,33 +294,44 @@ export default function NewConversationScreen() {
       </View>
 
       <View style={styles.tabs} accessibilityRole="tablist">
-        {(["private", "group"] as const).map((value) => {
-          const active = mode === value;
-          return (
-            <Pressable
-              key={value}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              onPress={() => setMode(value)}
-              style={styles.tab}
-            >
-              {active ? (
-                <LinearGradient
-                  colors={gradients.activeTab}
-                  style={StyleSheet.absoluteFill}
-                />
-              ) : null}
-              <Ionicons
-                name={value === "private" ? "chatbubbles" : "people"}
-                size={17}
-                color={active ? colors.text : colors.textMuted}
-              />
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>
-                {value === "private" ? "Privée" : "Groupe officiel"}
-              </Text>
-            </Pressable>
-          );
-        })}
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: mode === "private" }}
+          onPress={() => setMode("private")}
+          style={styles.tab}
+        >
+          {mode === "private" ? (
+            <LinearGradient colors={gradients.activeTab} style={StyleSheet.absoluteFill} />
+          ) : null}
+          <Ionicons
+            name="chatbubbles"
+            size={17}
+            color={mode === "private" ? colors.text : colors.textMuted}
+          />
+          <Text style={[styles.tabText, mode === "private" && styles.tabTextActive]}>
+            Privée
+          </Text>
+        </Pressable>
+        {canCreateOfficialGroup ? (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: mode === "group" }}
+            onPress={() => setMode("group")}
+            style={styles.tab}
+          >
+            {mode === "group" ? (
+              <LinearGradient colors={gradients.activeTab} style={StyleSheet.absoluteFill} />
+            ) : null}
+            <Ionicons
+              name="people"
+              size={17}
+              color={mode === "group" ? colors.text : colors.textMuted}
+            />
+            <Text style={[styles.tabText, mode === "group" && styles.tabTextActive]}>
+              Groupe officiel
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <ScrollView
@@ -309,6 +379,24 @@ export default function NewConversationScreen() {
               </Text>
             </View>
 
+            {existingPrivateConversation ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ouvrir la conversation déjà existante"
+                onPress={() => openExistingConversation(existingPrivateConversation)}
+                style={styles.existingBanner}
+              >
+                <Ionicons name="chatbubble-ellipses" size={20} color={colors.orange} />
+                <View style={styles.existingContent}>
+                  <Text style={styles.existingTitle}>Conversation déjà ouverte</Text>
+                  <Text style={styles.existingText} numberOfLines={1}>
+                    {existingPrivateConversation.name}
+                  </Text>
+                </View>
+                <Ionicons name="arrow-forward" size={18} color={colors.orange} />
+              </Pressable>
+            ) : null}
+
             <View style={styles.memberList}>
               {filteredMembers.map((member) => {
                 const selected = selectedIds.includes(member.id);
@@ -350,20 +438,18 @@ export default function NewConversationScreen() {
           </>
         ) : (
           <>
-            {!canCreateOfficialGroup ? (
-              <View style={[styles.infoCard, styles.warningCard]}>
-                <Ionicons name="lock-closed" size={19} color={colors.warning} />
-                <Text style={styles.infoText}>
-                  Seuls les statuts de gouvernance autorisés peuvent créer un groupe officiel.
-                </Text>
-              </View>
-            ) : null}
+            <View style={[styles.infoCard, styles.visionnaireCard]}>
+              <Ionicons name="diamond" size={19} color={colors.orange} />
+              <Text style={styles.infoText}>
+                Administration officielle réservée aux Visionnaires. Les droits sont également contrôlés par le backend.
+              </Text>
+            </View>
 
             <Text style={styles.label}>Identité du groupe</Text>
             <View style={styles.identityRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Choisir l’image du groupe"
+                accessibilityLabel="Choisir et recadrer l’image du groupe"
                 onPress={() => void selectAvatar()}
                 style={styles.groupAvatar}
               >
@@ -372,6 +458,9 @@ export default function NewConversationScreen() {
                 ) : (
                   <Ionicons name={iconName} size={28} color={colors.text} />
                 )}
+                <View style={styles.cropBadge}>
+                  <Ionicons name="crop-outline" size={14} color={colors.white} />
+                </View>
               </Pressable>
               <View style={styles.identityFields}>
                 <TextInput
@@ -382,7 +471,9 @@ export default function NewConversationScreen() {
                   maxLength={70}
                   style={styles.input}
                 />
-                <Text style={styles.helperText}>Touchez l’avatar pour choisir une image.</Text>
+                <Text style={styles.helperText}>
+                  Touchez l’image pour zoomer et la recadrer au format carré.
+                </Text>
               </View>
             </View>
 
@@ -443,7 +534,7 @@ export default function NewConversationScreen() {
               <View style={styles.switchContent}>
                 <Text style={styles.switchTitle}>Les membres peuvent publier</Text>
                 <Text style={styles.switchSubtitle}>
-                  Sinon, seuls les administrateurs autorisés pourront envoyer des messages.
+                  Sinon, seuls les Visionnaires autorisés pourront envoyer des messages.
                 </Text>
               </View>
               <Switch
@@ -485,82 +576,92 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   createAction: {
-    minWidth: 64,
+    minWidth: 62,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center"
   },
   createActionText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
   tabs: {
-    height: 52,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    padding: 3,
-    borderRadius: 16,
+    width: "100%",
+    maxWidth: 680,
+    alignSelf: "center",
+    minHeight: 52,
+    padding: 4,
+    marginBottom: 4,
+    borderRadius: 17,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
-    flexDirection: "row",
-    overflow: "hidden"
+    flexDirection: "row"
   },
   tab: {
     flex: 1,
     minHeight: 44,
-    borderRadius: 13,
     overflow: "hidden",
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6
+    gap: 7
   },
-  tabText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  tabText: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
   tabTextActive: { color: colors.text },
   content: {
     width: "100%",
     maxWidth: 680,
     alignSelf: "center",
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm
+    gap: 9
   },
   infoCard: {
     minHeight: 60,
-    marginBottom: spacing.sm,
     padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    backgroundColor: colors.successSoft,
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10
+    alignItems: "center",
+    gap: 9
   },
-  warningCard: { borderColor: "rgba(244,177,131,0.38)" },
+  visionnaireCard: { backgroundColor: "rgba(244,177,131,0.11)" },
   infoText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
   input: {
-    minHeight: 48,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    borderRadius: 16,
+    minHeight: 50,
+    paddingHorizontal: 13,
+    borderRadius: 17,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
     color: colors.text,
-    ...typography.body
+    ...typography.bodySmall
   },
-  multiline: { minHeight: 96 },
+  multiline: { minHeight: 92, paddingVertical: 12 },
   selectionRow: {
     minHeight: 34,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.sm
+    gap: 8
   },
-  selectionText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
-  participantText: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
+  selectionText: { color: colors.textSecondary, fontSize: 10, fontWeight: "900" },
+  participantText: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  existingBanner: {
+    minHeight: 58,
+    padding: 10,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: "rgba(244,177,131,0.40)",
+    backgroundColor: "rgba(244,177,131,0.10)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9
+  },
+  existingContent: { flex: 1, minWidth: 0 },
+  existingTitle: { color: colors.orange, fontSize: 11, fontWeight: "900" },
+  existingText: { color: colors.textSecondary, fontSize: 9.5, marginTop: 2 },
   memberList: { gap: 7 },
   memberRow: {
-    minHeight: 68,
+    minHeight: 65,
     padding: 10,
     borderRadius: 18,
     borderWidth: 1,
@@ -568,13 +669,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12
+    gap: 10
   },
   memberRowSelected: {
     borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.13)"
+    backgroundColor: "rgba(107,79,234,0.16)"
   },
-  pressed: { opacity: 0.8, transform: [{ scale: 0.992 }] },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.993 }] },
   avatar: {
     width: 44,
     height: 44,
@@ -587,83 +688,84 @@ const styles = StyleSheet.create({
   avatarImage: { width: "100%", height: "100%" },
   initials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   memberContent: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  memberMeta: { color: colors.textMuted, fontSize: 10, marginTop: 3 },
+  memberName: { color: colors.text, fontSize: 12, fontWeight: "900" },
+  memberMeta: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
   check: {
-    width: 28,
-    height: 28,
+    width: 27,
+    height: 27,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center"
   },
-  checkSelected: { borderColor: colors.violet, backgroundColor: colors.violet },
-  label: {
-    ...typography.heading3,
-    color: colors.text,
-    marginTop: spacing.sm,
-    marginBottom: 8
-  },
-  identityRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  checkSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  label: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 7 },
+  identityRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   groupAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
+    width: 84,
+    height: 84,
+    borderRadius: 26,
     overflow: "hidden",
+    position: "relative",
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
     alignItems: "center",
     justifyContent: "center"
   },
-  identityFields: { flex: 1, minWidth: 0 },
-  helperText: { color: colors.textMuted, fontSize: 9, marginTop: -5, marginBottom: 10 },
-  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  cropBadge: {
+    position: "absolute",
+    right: 5,
+    bottom: 5,
+    width: 29,
+    height: 29,
+    borderRadius: 10,
+    backgroundColor: "rgba(2,7,19,0.82)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  identityFields: { flex: 1, minWidth: 0, gap: 5 },
+  helperText: { color: colors.textMuted, fontSize: 8.5, lineHeight: 12 },
+  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   iconChoice: {
     width: 48,
     height: 48,
-    borderRadius: 16,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center"
   },
-  iconChoiceSelected: {
-    borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.2)"
-  },
+  iconChoiceSelected: { borderColor: colors.orange, backgroundColor: "rgba(244,177,131,0.12)" },
   roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   roleChip: {
-    minHeight: 44,
+    minHeight: 42,
     paddingHorizontal: 11,
-    borderRadius: 16,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center"
   },
-  roleChipSelected: {
-    borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.2)"
-  },
+  roleChipSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.18)" },
   roleText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
   roleTextSelected: { color: colors.text },
   switchRow: {
-    marginTop: spacing.lg,
-    padding: spacing.md,
+    minHeight: 74,
+    padding: 12,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md
+    gap: 12
   },
   switchContent: { flex: 1, minWidth: 0 },
-  switchTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  switchSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
+  switchTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
+  switchSubtitle: { color: colors.textMuted, fontSize: 9, lineHeight: 13, marginTop: 3 },
   switchControl: { width: 48, height: 44 }
 });
