@@ -1,0 +1,58 @@
+name: Stage reaction target clipping fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  staged-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guarded patch source
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, count: int = 1) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise SystemExit(f"Missing patch anchor in {path}: {old[:120]!r}")
+              file.write_text(text.replace(old, new, count))
+
+          def write(path: str, content: str) -> None:
+              file = Path(path)
+              file.parent.mkdir(parents=True, exist_ok=True)
+              file.write_text(content)
+
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''            <Pressable
+    accessible={false}
+    onLongPress={() => setReactionOpen(true)}''',
+              '''            <Pressable
+              accessible={false}
+              onLongPress={() => setReactionOpen(true)}'''
+          )
+
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''    right: -16,
+    bottom: -22,
+    width: 44,''',
+              '''    right: -8,
+    bottom: -22,
+    width: 44,'''
+          )
+
+          replace(
+              "src/components/MessageBubble.tsx",
+              '''  reactionAddMine: { right: -16 },
+  reactionAddOther: { right: -16 },''',
+              '''  reactionAddMine: { right: -8 },
+  reactionAddOther: { right: -8 },'''
+          )
+          PY
