@@ -14,6 +14,26 @@ interface RealtimeClientOptions {
   connectionTimeoutMs?: number;
 }
 
+function buildSocketIoWebSocketUrl(baseUrl: string, ticket: string): string {
+  const url = new URL(baseUrl);
+  url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
+  if (!url.pathname.includes("socket.io")) {
+    url.pathname = `${url.pathname.replace(/\/$/, "")}/socket.io/`;
+  }
+  url.searchParams.set("EIO", "4");
+  url.searchParams.set("transport", "websocket");
+  url.searchParams.set("ticket", ticket);
+  return url.toString();
+}
+
+function asSocketEventPayload(eventName: string, payload: unknown): unknown {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const record = payload as Record<string, unknown>;
+    return "type" in record ? record : { type: eventName, ...record };
+  }
+  return { type: eventName, payload };
+}
+
 export class RealtimeClient {
   private socket: WebSocket | null = null;
   private reconnectAttempt = 0;
@@ -22,6 +42,7 @@ export class RealtimeClient {
   private closedByClient = false;
   private generation = 0;
   private opening = false;
+  private activeTicket: string | null = null;
 
   constructor(private readonly options: RealtimeClientOptions) {}
 
@@ -36,10 +57,18 @@ export class RealtimeClient {
     this.closedByClient = true;
     this.generation += 1;
     this.opening = false;
+    this.activeTicket = null;
     this.clearReconnectTimer();
     this.clearConnectionTimer();
     const socket = this.socket;
     this.socket = null;
+    if (socket?.readyState === WebSocket.OPEN) {
+      try {
+        socket.send("41");
+      } catch {
+        // La fermeture locale reste prioritaire.
+      }
+    }
     socket?.close();
     this.options.onConnectionChange?.(false);
   }
@@ -60,9 +89,60 @@ export class RealtimeClient {
     if (socket !== this.socket) return;
     this.clearConnectionTimer();
     this.socket = null;
+    this.activeTicket = null;
     this.options.onConnectionChange?.(false);
     if (!this.closedByClient && generation === this.generation) {
       this.scheduleReconnect();
+    }
+  }
+
+  private dispatchPayload(payload: unknown): void {
+    const normalized = normalizeRealtimeEvent(payload);
+    if (normalized) this.options.onEvent(normalized);
+  }
+
+  private handleFrame(socket: WebSocket, rawData: unknown): void {
+    const text = String(rawData);
+
+    // Engine.IO ouvre la connexion avec `0{...}`. On rejoint ensuite le namespace
+    // Socket.IO principal avec le ticket éphémère, sans exposer le JWT utilisateur.
+    if (text.startsWith("0")) {
+      const auth = this.activeTicket ? { ticket: this.activeTicket } : {};
+      socket.send(`40${JSON.stringify(auth)}`);
+      return;
+    }
+
+    // Heartbeat Engine.IO.
+    if (text === "2") {
+      socket.send("3");
+      return;
+    }
+
+    // Connexion Socket.IO confirmée.
+    if (text.startsWith("40")) {
+      this.clearConnectionTimer();
+      this.reconnectAttempt = 0;
+      this.options.onConnectionChange?.(true);
+      return;
+    }
+
+    // Evènement Socket.IO : 42["message.created", {...}]
+    if (text.startsWith("42")) {
+      try {
+        const decoded = JSON.parse(text.slice(2)) as unknown;
+        if (!Array.isArray(decoded) || typeof decoded[0] !== "string") return;
+        this.dispatchPayload(asSocketEventPayload(decoded[0], decoded[1]));
+      } catch {
+        // Trame invalide ignorée sans interrompre le canal.
+      }
+      return;
+    }
+
+    // Compatibilité avec un éventuel endpoint WSS JSON direct déjà déployé.
+    try {
+      this.dispatchPayload(JSON.parse(text) as unknown);
+    } catch {
+      // Les trames Engine.IO non pertinentes et les données invalides sont ignorées.
     }
   }
 
@@ -72,9 +152,8 @@ export class RealtimeClient {
     try {
       const ticket = await this.options.ticketProvider();
       if (this.closedByClient || generation !== this.generation) return;
-      const separator = this.options.url.includes("?") ? "&" : "?";
-      const url = `${this.options.url}${separator}ticket=${encodeURIComponent(ticket)}`;
-      const socket = new WebSocket(url);
+      this.activeTicket = ticket;
+      const socket = new WebSocket(buildSocketIoWebSocketUrl(this.options.url, ticket));
       this.socket = socket;
       this.connectionTimer = setTimeout(() => {
         if (socket !== this.socket) return;
@@ -87,20 +166,13 @@ export class RealtimeClient {
 
       socket.onopen = () => {
         if (socket !== this.socket || generation !== this.generation) return;
-        this.clearConnectionTimer();
-        this.reconnectAttempt = 0;
-        this.options.onConnectionChange?.(true);
+        // Le canal est physiquement ouvert. La disponibilité applicative est
+        // confirmée par la trame Socket.IO `40`.
       };
 
       socket.onmessage = (event) => {
         if (socket !== this.socket || generation !== this.generation) return;
-        try {
-          const parsed: unknown = JSON.parse(String(event.data));
-          const normalized = normalizeRealtimeEvent(parsed);
-          if (normalized) this.options.onEvent(normalized);
-        } catch {
-          // Un événement invalide est ignoré sans interrompre la connexion.
-        }
+        this.handleFrame(socket, event.data);
       };
 
       socket.onerror = () => {
