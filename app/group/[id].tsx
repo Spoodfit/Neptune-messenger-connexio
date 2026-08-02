@@ -16,10 +16,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { MemberAvatarStack } from "@/components/MemberAvatarStack";
 import { env } from "@/config/env";
 import {
   GROUP_VISIBILITY_ROLES,
-  isGovernanceRole,
+  isVisionnaireRole,
   ROLE_LABELS
 } from "@/domain/roles";
 import { useExperience } from "@/providers/ExperienceProvider";
@@ -72,11 +73,7 @@ export default function GroupSettingsScreen() {
   const conversation = rawConversation
     ? decorateConversation(rawConversation)
     : undefined;
-  const canManage = Boolean(
-    conversation?.canManage ||
-      conversation?.adminIds?.includes(currentUser.id) ||
-      isGovernanceRole(currentUser.role)
-  );
+  const canManage = isVisionnaireRole(currentUser.role);
 
   const [name, setName] = useState(conversation?.name ?? "");
   const [description, setDescription] = useState(conversation?.description ?? "");
@@ -101,6 +98,7 @@ export default function GroupSettingsScreen() {
     ) ?? GROUP_VISIBILITY_ROLES) as CanonicalUserRole[]
   );
   const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!conversation) return;
@@ -122,6 +120,21 @@ export default function GroupSettingsScreen() {
     }
     return members.slice(0, conversation.memberCount || members.length);
   }, [conversation, members]);
+  const exactMemberCount = conversation?.memberIds?.length ?? conversation?.memberCount ?? 0;
+  const activeMemberIds = conversation?.activeMemberIds?.length
+    ? conversation.activeMemberIds
+    : conversation?.memberIds ?? [];
+
+  const hasChanges = Boolean(
+    conversation &&
+      (name.trim() !== conversation.name ||
+        description.trim() !== (conversation.description ?? "") ||
+        avatarUrl !== (conversation.avatarUrl ?? "") ||
+        iconName !== ((conversation.iconName as keyof typeof Ionicons.glyphMap) ?? "people") ||
+        membersCanPost !== (conversation.canPost ?? true) ||
+        JSON.stringify([...allowedRoles].sort()) !==
+          JSON.stringify([...(conversation.allowedRoles ?? GROUP_VISIBILITY_ROLES)].sort()))
+  );
 
   if (!conversation) {
     return (
@@ -147,13 +160,17 @@ export default function GroupSettingsScreen() {
         ? previous.filter((item) => item !== role)
         : [...previous, role]
     );
+    setSavedAt(null);
   };
 
   const selectAvatar = async () => {
     if (!canManage) return;
     try {
       const selected = await pickGroupAvatar();
-      if (selected) setAvatarUrl(selected);
+      if (selected) {
+        setAvatarUrl(selected);
+        setSavedAt(null);
+      }
     } catch (error) {
       Alert.alert(
         "Image indisponible",
@@ -175,14 +192,15 @@ export default function GroupSettingsScreen() {
       return;
     }
     setSaving(true);
+    setSavedAt(null);
     try {
       let readyAvatar = avatarUrl.trim() || undefined;
       if (api && readyAvatar?.startsWith("file:")) {
         readyAvatar = await uploadGroupAvatar(readyAvatar, accessToken);
       }
       const draft = {
-        name,
-        description,
+        name: name.trim(),
+        description: description.trim(),
         avatarUrl: readyAvatar,
         iconName,
         allowedRoles,
@@ -197,6 +215,11 @@ export default function GroupSettingsScreen() {
         updateGroup(id, draft);
       }
       setAvatarUrl(readyAvatar ?? "");
+      const timestamp = new Date().toLocaleTimeString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+      setSavedAt(timestamp);
       Alert.alert("Paramètres enregistrés", "Les règles du groupe sont actives.");
     } catch (error) {
       Alert.alert(
@@ -294,13 +317,15 @@ export default function GroupSettingsScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Enregistrer les paramètres"
-            accessibilityState={{ busy: saving }}
-            disabled={saving}
+            accessibilityState={{ busy: saving, disabled: saving || !hasChanges }}
+            disabled={saving || !hasChanges}
             onPress={() => void save()}
-            style={styles.saveButton}
+            style={[styles.saveButton, !hasChanges && styles.saveDisabled]}
           >
             {saving ? (
               <ActivityIndicator size="small" color={colors.orange} />
+            ) : savedAt && !hasChanges ? (
+              <Ionicons name="checkmark-circle" size={23} color={colors.success} />
             ) : (
               <Text style={styles.saveText}>Enregistrer</Text>
             )}
@@ -328,10 +353,17 @@ export default function GroupSettingsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {savedAt ? (
+          <View style={styles.savedBanner}>
+            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+            <Text style={styles.savedText}>Enregistré à {savedAt}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.identityCard}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={canManage ? "Modifier l’image du groupe" : "Image du groupe"}
+            accessibilityLabel={canManage ? "Modifier et recadrer l’image du groupe" : "Image du groupe"}
             disabled={!canManage}
             onPress={() => void selectAvatar()}
           >
@@ -342,12 +374,24 @@ export default function GroupSettingsScreen() {
                 ) : (
                   <Ionicons name={iconName} size={34} color={colors.text} />
                 )}
+                {canManage ? (
+                  <View style={styles.cropBadge}>
+                    <Ionicons name="crop-outline" size={14} color={colors.white} />
+                  </View>
+                ) : null}
               </View>
             </LinearGradient>
           </Pressable>
           <Text style={styles.groupName}>{conversation.name}</Text>
+          <MemberAvatarStack
+            memberIds={activeMemberIds}
+            members={members}
+            memberCount={exactMemberCount}
+            maxVisible={5}
+            size={28}
+          />
           <Text style={styles.groupMeta}>
-            {conversation.memberCount} membre{conversation.memberCount > 1 ? "s" : ""} · {conversation.categoryLabel}
+            {exactMemberCount} membre{exactMemberCount > 1 ? "s" : ""} · {conversation.categoryLabel}
           </Text>
           {conversation.description ? (
             <Text style={styles.description}>{conversation.description}</Text>
@@ -424,12 +468,18 @@ export default function GroupSettingsScreen() {
 
         {canManage ? (
           <>
+            <View style={styles.visionnaireNote}>
+              <Ionicons name="diamond" size={18} color={colors.orange} />
+              <Text style={styles.visionnaireText}>
+                Administration réservée aux Visionnaires et vérifiée par le serveur.
+              </Text>
+            </View>
             <Text style={styles.sectionTitle}>Administration</Text>
             <View style={styles.panelForm}>
               <Text style={styles.fieldLabel}>Nom</Text>
               <TextInput
                 value={name}
-                onChangeText={setName}
+                onChangeText={(value) => { setName(value); setSavedAt(null); }}
                 style={styles.input}
                 placeholderTextColor={colors.textMuted}
                 maxLength={70}
@@ -437,7 +487,7 @@ export default function GroupSettingsScreen() {
               <Text style={styles.fieldLabel}>Description</Text>
               <TextInput
                 value={description}
-                onChangeText={setDescription}
+                onChangeText={(value) => { setDescription(value); setSavedAt(null); }}
                 style={[styles.input, styles.multiline]}
                 placeholder="Description du groupe"
                 placeholderTextColor={colors.textMuted}
@@ -454,7 +504,7 @@ export default function GroupSettingsScreen() {
                       key={icon}
                       accessibilityRole="radio"
                       accessibilityState={{ selected }}
-                      onPress={() => setIconName(icon)}
+                      onPress={() => { setIconName(icon); setSavedAt(null); }}
                       style={[styles.iconChoice, selected && styles.iconChoiceSelected]}
                     >
                       <Ionicons
@@ -491,14 +541,14 @@ export default function GroupSettingsScreen() {
                 <View style={styles.switchContent}>
                   <Text style={styles.switchTitle}>Les membres peuvent publier</Text>
                   <Text style={styles.switchSubtitle}>
-                    Sinon, l’écriture est réservée aux administrateurs du groupe.
+                    Sinon, l’écriture est réservée aux Visionnaires autorisés.
                   </Text>
                 </View>
                 <Switch
                   accessibilityLabel="Autoriser les membres à publier"
                   style={styles.switchControl}
                   value={membersCanPost}
-                  onValueChange={setMembersCanPost}
+                  onValueChange={(value) => { setMembersCanPost(value); setSavedAt(null); }}
                   trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
                   thumbColor={colors.white}
                 />
@@ -516,16 +566,20 @@ const styles = StyleSheet.create({
   header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
   headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   headerTitle: { ...typography.heading3, color: colors.text, flex: 1, textAlign: "center" },
-  saveButton: { minWidth: 82, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  saveButton: { minWidth: 88, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  saveDisabled: { opacity: 0.5 },
   saveText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
   content: { width: "100%", maxWidth: 720, alignSelf: "center" },
-  identityCard: { padding: spacing.lg, alignItems: "center" },
+  savedBanner: { minHeight: 42, marginBottom: 6, paddingHorizontal: 12, borderRadius: 15, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  savedText: { color: colors.success, fontSize: 10, fontWeight: "900" },
+  identityCard: { padding: spacing.lg, alignItems: "center", gap: 6 },
   avatarShell: { width: 84, height: 84, borderRadius: 29, padding: 3 },
-  avatarInner: { flex: 1, borderRadius: 26, overflow: "hidden", backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface },
+  avatarInner: { flex: 1, borderRadius: 26, overflow: "hidden", position: "relative", backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface },
+  cropBadge: { position: "absolute", right: 4, bottom: 4, width: 28, height: 28, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.80)", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: "100%", height: "100%" },
-  groupName: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 12 },
-  groupMeta: { ...typography.caption, color: colors.textMuted, marginTop: 3 },
-  description: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center", marginTop: 10, maxWidth: 440 },
+  groupName: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 6 },
+  groupMeta: { ...typography.caption, color: colors.textMuted },
+  description: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center", marginTop: 5, maxWidth: 440 },
   quickActions: { flexDirection: "row", gap: 8, marginBottom: spacing.lg },
   quickAction: { flex: 1, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 5 },
   quickLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
@@ -542,6 +596,8 @@ const styles = StyleSheet.create({
   adminBadge: { minHeight: 23, paddingHorizontal: 7, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
   adminText: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
   emptyMembers: { color: colors.textMuted, textAlign: "center", padding: spacing.lg },
+  visionnaireNote: { minHeight: 52, padding: 11, borderRadius: 17, backgroundColor: "rgba(244,177,131,0.10)", flexDirection: "row", alignItems: "center", gap: 8 },
+  visionnaireText: { flex: 1, color: colors.textSecondary, fontSize: 10, lineHeight: 14, fontWeight: "800" },
   panelForm: { padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, marginBottom: spacing.lg },
   fieldLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 10, marginBottom: 6 },
   input: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, ...typography.bodySmall },
