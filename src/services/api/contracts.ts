@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   Conversation,
+  CreatePollInput,
   MessageAttachment,
   PushTokenRegistration,
   RealtimeTicket,
@@ -35,6 +36,15 @@ export interface MessagingApi {
   sendMessage(
     conversationId: string,
     input: SendMessageInput
+  ): Promise<ChatMessage>;
+  createPoll(
+    conversationId: string,
+    input: CreatePollInput
+  ): Promise<ChatMessage>;
+  votePoll(
+    messageId: string,
+    optionId: string,
+    active: boolean
   ): Promise<ChatMessage>;
   markConversationRead(
     conversationId: string,
