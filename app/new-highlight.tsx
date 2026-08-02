@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -47,36 +47,30 @@ const DEMO_PLACES: PlaceSuggestion[] = [
   {
     id: "demo-teleski-bram",
     label: "Téléski Nautique de Bram",
-    address: "Lac de Buzerens, Bram",
-    city: "Bram",
-    latitude: 43.242,
-    longitude: 2.116,
-    source: "google"
+    address: "Lac de Buzerens, 11150 Bram",
+    latitude: 43.244,
+    longitude: 2.116
   },
   {
-    id: "demo-carcassonne",
+    id: "demo-cite-carcassonne",
     label: "Cité de Carcassonne",
-    address: "1 rue Viollet-le-Duc, Carcassonne",
-    city: "Carcassonne",
+    address: "1 Rue Viollet le Duc, 11000 Carcassonne",
     latitude: 43.206,
-    longitude: 2.364,
-    source: "google"
+    longitude: 2.364
   },
   {
     id: "demo-narbonne",
-    label: "Les Barques",
-    address: "Cours Mirabeau, Narbonne",
-    city: "Narbonne",
-    latitude: 43.183,
-    longitude: 3.004,
-    source: "google"
+    label: "Narbonne",
+    address: "11100 Narbonne",
+    latitude: 43.184,
+    longitude: 3.003
   }
 ];
 
 export default function NewHighlightScreen() {
   const insets = useSafeAreaInsets();
   const { accessToken } = useSession();
-  const { members, createPost } = useExperience();
+  const { members, createPost, refreshExperience } = useExperience();
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
     [accessToken]
@@ -84,11 +78,11 @@ export default function NewHighlightScreen() {
   const [kind, setKind] = useState<HighlightKind>("standard");
   const [body, setBody] = useState("");
   const [media, setMedia] = useState<HighlightMedia | undefined>();
-  const [locationMode, setLocationMode] = useState<"none" | "current" | "place">("none");
-  const [placeQuery, setPlaceQuery] = useState("");
-  const [placeResults, setPlaceResults] = useState<PlaceSuggestion[]>([]);
-  const [selectedPlace, setSelectedPlace] = useState<PlaceSuggestion | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<HighlightLocation | null>(null);
   const [searchingPlace, setSearchingPlace] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   const mentionQuery = useMemo(() => {
@@ -111,23 +105,54 @@ export default function NewHighlightScreen() {
       members
         .filter((member) => {
           const text = body.toLocaleLowerCase("fr");
-          const firstName =
-            member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
+          const firstName = member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
           return (
             (firstName && text.includes(`@${firstName}`)) ||
             text.includes(`@${member.name.toLocaleLowerCase("fr")}`) ||
-            (member.company &&
-              text.includes(`@${member.company.toLocaleLowerCase("fr")}`))
+            (member.company && text.includes(`@${member.company.toLocaleLowerCase("fr")}`))
           );
         })
         .map((member) => member.id),
     [body, members]
   );
 
+  useEffect(() => {
+    const query = locationQuery.trim();
+    if (query.length < 3 || selectedLocation?.label === query) {
+      setPlaceSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setSearchingPlace(true);
+      const operation = api
+        ? api.searchPlaces(query)
+        : Promise.resolve(
+            DEMO_PLACES.filter((place) =>
+              `${place.label} ${place.address ?? ""}`
+                .toLocaleLowerCase("fr")
+                .includes(query.toLocaleLowerCase("fr"))
+            )
+          );
+      void operation
+        .then((items) => {
+          if (!cancelled) setPlaceSuggestions(items.slice(0, 6));
+        })
+        .catch(() => {
+          if (!cancelled) setPlaceSuggestions([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearchingPlace(false);
+        });
+    }, 320);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [api, locationQuery, selectedLocation?.label]);
+
   const insertMention = (name: string) => {
-    setBody((current) =>
-      current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `)
-    );
+    setBody((current) => current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `));
   };
 
   const selectMedia = async (mediaKind: "photo" | "video") => {
@@ -137,66 +162,45 @@ export default function NewHighlightScreen() {
     } catch (error) {
       Alert.alert(
         "Média indisponible",
-        error instanceof Error
-          ? error.message
-          : "Le média n’a pas pu être sélectionné."
+        error instanceof Error ? error.message : "Le média n’a pas pu être sélectionné."
       );
     }
   };
 
-  const searchPlaces = async () => {
-    const query = placeQuery.trim();
-    if (query.length < 2 || searchingPlace) return;
-    setSearchingPlace(true);
+  const choosePlace = (place: PlaceSuggestion) => {
+    setSelectedLocation({
+      label: place.label,
+      placeId: place.id,
+      address: place.address,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      accuracyRadiusMeters: 100
+    });
+    setLocationQuery(place.label);
+    setPlaceSuggestions([]);
+  };
+
+  const useCurrentLocation = async () => {
+    if (locating) return;
+    setLocating(true);
     try {
-      const results = api
-        ? await api.searchPlaces(query)
-        : DEMO_PLACES.filter((place) =>
-            [place.label, place.address, place.city]
-              .filter(Boolean)
-              .join(" ")
-              .toLocaleLowerCase("fr")
-              .includes(query.toLocaleLowerCase("fr"))
-          );
-      setPlaceResults(results);
-      if (results.length === 0) {
-        Alert.alert(
-          "Aucun lieu trouvé",
-          "Essayez le nom de l’établissement suivi de la ville."
-        );
-      }
+      const coordinates = await pickApproximateLocation();
+      const location: HighlightLocation = {
+        label: "Ma position approximative",
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        accuracyRadiusMeters: coordinates.accuracyRadiusMeters
+      };
+      setSelectedLocation(location);
+      setLocationQuery(location.label);
     } catch (error) {
       Alert.alert(
-        "Recherche indisponible",
-        error instanceof Error ? error.message : "Le lieu n’a pas pu être recherché."
+        "Localisation impossible",
+        error instanceof Error ? error.message : "La position n’a pas pu être obtenue."
       );
     } finally {
-      setSearchingPlace(false);
+      setLocating(false);
     }
-  };
-
-  const resolveLocation = async (): Promise<HighlightLocation | undefined> => {
-    if (locationMode === "none") return undefined;
-    if (locationMode === "place") {
-      if (!selectedPlace) {
-        throw new Error("Sélectionnez un lieu dans les résultats de recherche.");
-      }
-      return {
-        label: selectedPlace.label,
-        placeId: selectedPlace.id,
-        address: selectedPlace.address,
-        latitude: selectedPlace.latitude,
-        longitude: selectedPlace.longitude,
-        accuracyRadiusMeters: 120
-      };
-    }
-    const coordinates = await pickApproximateLocation();
-    return {
-      label: "Position actuelle approximative",
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
-      accuracyRadiusMeters: coordinates.accuracyRadiusMeters
-    };
   };
 
   const publish = async () => {
@@ -228,17 +232,15 @@ export default function NewHighlightScreen() {
                 : current
             )
         );
-        setMedia(readyMedia);
       }
 
-      const location = await resolveLocation();
-      if (location && api && locationMode === "current") {
-        await api.updateLocation(
-          location.latitude,
-          location.longitude,
-          location.accuracyRadiusMeters
-        );
-      }
+      const coordinates = selectedLocation
+        ? {
+            latitude: selectedLocation.latitude,
+            longitude: selectedLocation.longitude,
+            accuracyRadiusMeters: selectedLocation.accuracyRadiusMeters
+          }
+        : undefined;
 
       const post = api
         ? await api.createHighlight({
@@ -246,14 +248,8 @@ export default function NewHighlightScreen() {
             body: cleanBody,
             media: readyMedia,
             mentionedUserIds,
-            coordinates: location
-              ? {
-                  latitude: location.latitude,
-                  longitude: location.longitude,
-                  accuracyRadiusMeters: location.accuracyRadiusMeters
-                }
-              : undefined,
-            location
+            coordinates,
+            location: selectedLocation ?? undefined
           })
         : createPost({
             kind,
@@ -262,28 +258,19 @@ export default function NewHighlightScreen() {
               ? { ...readyMedia, status: "ready", uploadProgress: 1 }
               : undefined,
             mentionedUserIds,
-            coordinates: location
-              ? {
-                  latitude: location.latitude,
-                  longitude: location.longitude,
-                  accuracyRadiusMeters: location.accuracyRadiusMeters
-                }
-              : undefined
+            coordinates
           });
 
+      if (api) await refreshExperience();
       router.replace({
         pathname: "/(tabs)/highlights",
         params: { published: post.id }
       });
     } catch (error) {
-      setMedia((current) =>
-        current ? { ...current, status: "failed" } : current
-      );
+      setMedia((current) => (current ? { ...current, status: "failed" } : current));
       Alert.alert(
         "Publication impossible",
-        error instanceof Error
-          ? error.message
-          : "Le Temps fort n’a pas pu être publié."
+        error instanceof Error ? error.message : "Le Temps fort n’a pas pu être publié."
       );
     } finally {
       setPublishing(false);
@@ -302,65 +289,24 @@ export default function NewHighlightScreen() {
           }
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fermer"
-          onPress={() => router.back()}
-          style={styles.headerButton}
-        >
+        <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={() => router.back()} style={styles.headerButton}>
           <Ionicons name="close" size={25} color={colors.text} />
         </Pressable>
-        <Text accessibilityRole="header" style={styles.headerTitle}>
-          Nouveau Temps fort
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Publier"
-          accessibilityState={{ busy: publishing, disabled: publishing }}
-          disabled={publishing}
-          onPress={() => void publish()}
-          style={styles.publishButton}
-        >
-          {publishing ? (
-            <ActivityIndicator size="small" color={colors.orange} />
-          ) : (
-            <Text style={styles.publishText}>Publier</Text>
-          )}
+        <Text accessibilityRole="header" style={styles.headerTitle}>Nouveau Temps fort</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Publier" accessibilityState={{ busy: publishing, disabled: publishing }} disabled={publishing} onPress={() => void publish()} style={styles.publishButton}>
+          {publishing ? <ActivityIndicator size="small" color={colors.orange} /> : <Text style={styles.publishText}>Publier</Text>}
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingLeft: spacing.md + insets.left,
-            paddingRight: spacing.md + insets.right,
-            paddingBottom: Math.max(insets.bottom, spacing.xl)
-          }
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={[styles.content, { paddingLeft: spacing.md + insets.left, paddingRight: spacing.md + insets.right, paddingBottom: Math.max(insets.bottom, spacing.xl) }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>Type de publication</Text>
         <View style={styles.kindGrid}>
           {KINDS.map((item) => {
             const selected = kind === item.value;
             return (
-              <Pressable
-                key={item.value}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                onPress={() => setKind(item.value)}
-                style={[styles.kindButton, selected && styles.kindButtonSelected]}
-              >
-                <Ionicons
-                  name={item.icon}
-                  size={18}
-                  color={selected ? colors.orange : colors.textMuted}
-                />
-                <Text style={[styles.kindLabel, selected && styles.kindLabelSelected]}>
-                  {item.label}
-                </Text>
+              <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setKind(item.value)} style={[styles.kindButton, selected && styles.kindButtonSelected]}>
+                <Ionicons name={item.icon} size={18} color={selected ? colors.orange : colors.textMuted} />
+                <Text style={[styles.kindLabel, selected && styles.kindLabelSelected]}>{item.label}</Text>
               </Pressable>
             );
           })}
@@ -369,175 +315,68 @@ export default function NewHighlightScreen() {
         {kind === "besoin" || kind === "offre" ? (
           <View style={styles.syncNote}>
             <Ionicons name="sync" size={19} color={colors.success} />
-            <Text style={styles.syncNoteText}>
-              {kind === "besoin"
-                ? "Ce besoin sera aussi publié dans Neptune Business. Toute modification y sera répercutée dans Connexio, et inversement."
-                : "Cette offre sera aussi publiée dans le Comité Avantage. Un avantage créé sur Neptune Business générera également son Temps fort Connexio."}
-            </Text>
+            <Text style={styles.syncNoteText}>{kind === "besoin" ? "Ce Besoin sera synchronisé avec Neptune Business dans les deux sens." : "Cette Offre sera publiée dans le Comité Avantage. Un avantage créé sur Neptune Business générera également un Temps fort Offre."}</Text>
           </View>
         ) : null}
 
         <Text style={styles.sectionTitle}>Contenu</Text>
-        <TextInput
-          value={body}
-          onChangeText={setBody}
-          placeholder="Partagez une réussite, un besoin ou une offre… Utilisez @ pour mentionner."
-          placeholderTextColor={colors.textMuted}
-          multiline
-          maxLength={2_000}
-          style={styles.editor}
-          textAlignVertical="top"
-        />
+        <TextInput value={body} onChangeText={setBody} placeholder="Partagez un moment, une offre ou un besoin… Utilisez @ pour mentionner." placeholderTextColor={colors.textMuted} multiline maxLength={2_000} style={styles.editor} textAlignVertical="top" />
         <Text style={styles.counter}>{body.length}/2 000</Text>
 
         {suggestions.length > 0 ? (
           <View style={styles.suggestions}>
             {suggestions.map((member) => (
-              <Pressable
-                key={member.id}
-                onPress={() => insertMention(member.name)}
-                style={styles.suggestionRow}
-              >
-                <View style={styles.suggestionAvatar}>
-                  <Text style={styles.suggestionInitials}>{member.initials}</Text>
-                </View>
-                <View style={styles.suggestionContent}>
-                  <Text style={styles.suggestionName}>{member.name}</Text>
-                  <Text style={styles.suggestionCompany} numberOfLines={1}>
-                    {member.company}
-                  </Text>
-                </View>
+              <Pressable key={member.id} onPress={() => insertMention(member.name)} style={styles.suggestionRow}>
+                <View style={styles.suggestionAvatar}><Text style={styles.suggestionInitials}>{member.initials}</Text></View>
+                <View style={styles.suggestionContent}><Text style={styles.suggestionName}>{member.name}</Text><Text style={styles.suggestionCompany} numberOfLines={1}>{member.company}</Text></View>
               </Pressable>
             ))}
           </View>
         ) : null}
 
         <View style={styles.mediaActions}>
-          <Pressable onPress={() => void selectMedia("photo")} style={styles.mediaButton}>
-            <Ionicons name="image-outline" size={21} color={colors.text} />
-            <Text style={styles.mediaLabel}>Photo</Text>
-          </Pressable>
-          <Pressable onPress={() => void selectMedia("video")} style={styles.mediaButton}>
-            <Ionicons name="videocam-outline" size={22} color={colors.text} />
-            <Text style={styles.mediaLabel}>Vidéo − 1 min</Text>
-          </Pressable>
+          <Pressable onPress={() => void selectMedia("photo")} style={styles.mediaButton}><Ionicons name="image-outline" size={21} color={colors.text} /><Text style={styles.mediaLabel}>Photo</Text></Pressable>
+          <Pressable onPress={() => void selectMedia("video")} style={styles.mediaButton}><Ionicons name="videocam-outline" size={22} color={colors.text} /><Text style={styles.mediaLabel}>Vidéo − 1 min</Text></Pressable>
         </View>
 
         {media ? (
           <View style={styles.mediaPreview}>
             <HighlightMediaView media={media} />
             <View style={styles.mediaPreviewTop}>
-              <Text style={styles.mediaPreviewLabel}>
-                {media.status === "uploading"
-                  ? `Envoi · ${Math.round((media.uploadProgress ?? 0) * 100)} %`
-                  : media.kind === "video"
-                    ? `Vidéo · ${Math.round(media.durationSeconds ?? 0)} secondes`
-                    : "Photo"}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Retirer le média"
-                disabled={publishing}
-                onPress={() => setMedia(undefined)}
-                style={styles.removeMedia}
-              >
-                <Ionicons name="close" size={20} color={colors.white} />
-              </Pressable>
+              <Text style={styles.mediaPreviewLabel}>{media.status === "uploading" ? `Envoi · ${Math.round((media.uploadProgress ?? 0) * 100)} %` : media.kind === "video" ? `Vidéo · ${Math.round(media.durationSeconds ?? 0)} secondes` : "Photo"}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Retirer le média" disabled={publishing} onPress={() => setMedia(undefined)} style={styles.removeMedia}><Ionicons name="close" size={20} color={colors.white} /></Pressable>
             </View>
           </View>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Localisation</Text>
-        <View style={styles.locationModes}>
-          {(
-            [
-              ["none", "Aucune", "location-outline"],
-              ["current", "Ma position", "navigate-outline"],
-              ["place", "Choisir un lieu", "search-outline"]
-            ] as const
-          ).map(([value, label, icon]) => {
-            const selected = locationMode === value;
-            return (
-              <Pressable
-                key={value}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  setLocationMode(value);
-                  if (value !== "place") setSelectedPlace(null);
-                }}
-                style={[styles.locationMode, selected && styles.locationModeSelected]}
-              >
-                <Ionicons name={icon} size={18} color={selected ? colors.orange : colors.textMuted} />
-                <Text style={[styles.locationModeText, selected && styles.locationModeTextSelected]}>
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <Text style={styles.sectionTitle}>Lieu du Temps fort</Text>
+        <View style={styles.locationSearch}>
+          <Ionicons name="search-outline" size={19} color={colors.textMuted} />
+          <TextInput value={locationQuery} onChangeText={(value) => { setLocationQuery(value); if (value !== selectedLocation?.label) setSelectedLocation(null); }} placeholder="Ex. Téléski nautique de Bram" placeholderTextColor={colors.textMuted} style={styles.locationInput} />
+          {searchingPlace ? <ActivityIndicator size="small" color={colors.violet} /> : null}
         </View>
 
-        {locationMode === "current" ? (
-          <View style={styles.locationInfo}>
-            <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
-            <Text style={styles.locationInfoText}>
-              La position sera obtenue lors de la publication et protégée par un rayon de confidentialité de 1 à 3 km.
-            </Text>
+        {placeSuggestions.length > 0 ? (
+          <View style={styles.placeSuggestions}>
+            {placeSuggestions.map((place) => (
+              <Pressable key={place.id} accessibilityRole="button" onPress={() => choosePlace(place)} style={styles.placeRow}>
+                <Ionicons name="location-outline" size={19} color={colors.orange} />
+                <View style={styles.placeContent}><Text style={styles.placeLabel}>{place.label}</Text>{place.address ? <Text style={styles.placeAddress} numberOfLines={1}>{place.address}</Text> : null}</View>
+              </Pressable>
+            ))}
           </View>
         ) : null}
 
-        {locationMode === "place" ? (
-          <View style={styles.placePanel}>
-            <View style={styles.placeSearchRow}>
-              <TextInput
-                value={placeQuery}
-                onChangeText={(value) => {
-                  setPlaceQuery(value);
-                  setSelectedPlace(null);
-                }}
-                placeholder="Ex. Téléski nautique de Bram"
-                placeholderTextColor={colors.textMuted}
-                returnKeyType="search"
-                onSubmitEditing={() => void searchPlaces()}
-                style={styles.placeInput}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Rechercher ce lieu"
-                disabled={searchingPlace || placeQuery.trim().length < 2}
-                onPress={() => void searchPlaces()}
-                style={styles.searchButton}
-              >
-                {searchingPlace ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <Ionicons name="search" size={20} color={colors.white} />
-                )}
-              </Pressable>
-            </View>
-            {placeResults.map((place) => {
-              const selected = selectedPlace?.id === place.id;
-              return (
-                <Pressable
-                  key={place.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setSelectedPlace(place)}
-                  style={[styles.placeResult, selected && styles.placeResultSelected]}
-                >
-                  <View style={styles.placeIcon}>
-                    <Ionicons name="location" size={18} color={selected ? colors.orange : colors.textMuted} />
-                  </View>
-                  <View style={styles.placeText}>
-                    <Text style={styles.placeName}>{place.label}</Text>
-                    <Text style={styles.placeAddress} numberOfLines={2}>
-                      {[place.address, place.city].filter(Boolean).join(" · ")}
-                    </Text>
-                  </View>
-                  {selected ? <Ionicons name="checkmark-circle" size={22} color={colors.success} /> : null}
-                </Pressable>
-              );
-            })}
+        <Pressable accessibilityRole="button" accessibilityState={{ busy: locating }} disabled={locating} onPress={() => void useCurrentLocation()} style={styles.currentLocationButton}>
+          <Ionicons name="locate-outline" size={20} color={colors.text} />
+          <Text style={styles.currentLocationText}>{locating ? "Localisation…" : "Utiliser ma position approximative"}</Text>
+        </Pressable>
+
+        {selectedLocation ? (
+          <View style={styles.selectedLocation}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <View style={styles.selectedLocationText}><Text style={styles.selectedLocationTitle}>{selectedLocation.label}</Text>{selectedLocation.address ? <Text style={styles.selectedLocationAddress}>{selectedLocation.address}</Text> : null}</View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Retirer le lieu" onPress={() => { setSelectedLocation(null); setLocationQuery(""); }} style={styles.removeLocation}><Ionicons name="close" size={19} color={colors.textMuted} /></Pressable>
           </View>
         ) : null}
       </ScrollView>
@@ -566,32 +405,29 @@ const styles = StyleSheet.create({
   suggestions: { marginTop: 7, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, overflow: "hidden" },
   suggestionRow: { minHeight: 52, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
   suggestionAvatar: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  suggestionInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  suggestionInitials: { color: colors.text, fontSize: 9, fontWeight: "900" },
   suggestionContent: { flex: 1, minWidth: 0 },
-  suggestionName: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  suggestionCompany: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
-  mediaActions: { flexDirection: "row", gap: 8, marginTop: spacing.md },
-  mediaButton: { flex: 1, minHeight: 52, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  mediaLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
-  mediaPreview: { marginTop: 10, borderRadius: 20, overflow: "hidden", position: "relative" },
-  mediaPreviewTop: { position: "absolute", top: 9, left: 9, right: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  mediaPreviewLabel: { color: colors.white, fontSize: 10, fontWeight: "900", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.72)" },
-  removeMedia: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(2,7,19,0.72)", alignItems: "center", justifyContent: "center" },
-  locationModes: { flexDirection: "row", gap: 7 },
-  locationMode: { flex: 1, minHeight: 56, paddingHorizontal: 6, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 4 },
-  locationModeSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.18)" },
-  locationModeText: { color: colors.textMuted, fontSize: 9, fontWeight: "800", textAlign: "center" },
-  locationModeTextSelected: { color: colors.text },
-  locationInfo: { marginTop: 8, minHeight: 58, padding: 11, borderRadius: 17, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", gap: 9 },
-  locationInfoText: { flex: 1, color: colors.textSecondary, fontSize: 9.5, lineHeight: 14 },
-  placePanel: { marginTop: 8, gap: 7 },
-  placeSearchRow: { flexDirection: "row", gap: 7 },
-  placeInput: { flex: 1, minWidth: 0, minHeight: 50, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, color: colors.text },
-  searchButton: { width: 50, height: 50, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  placeResult: { minHeight: 64, padding: 9, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 9 },
-  placeResultSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.16)" },
-  placeIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  placeText: { flex: 1, minWidth: 0 },
-  placeName: { color: colors.text, fontSize: 11.5, fontWeight: "900" },
-  placeAddress: { color: colors.textMuted, fontSize: 9, lineHeight: 13, marginTop: 3 }
+  suggestionName: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  suggestionCompany: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
+  mediaActions: { marginTop: 9, flexDirection: "row", gap: 8 },
+  mediaButton: { flex: 1, minHeight: 50, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  mediaLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
+  mediaPreview: { marginTop: 10, borderRadius: 22, overflow: "hidden", position: "relative" },
+  mediaPreviewTop: { position: "absolute", left: 8, right: 8, top: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  mediaPreviewLabel: { color: colors.white, fontSize: 9, fontWeight: "900", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8, backgroundColor: "rgba(2,7,19,0.75)" },
+  removeMedia: { width: 44, height: 44, borderRadius: 15, backgroundColor: "rgba(2,7,19,0.75)", alignItems: "center", justifyContent: "center" },
+  locationSearch: { minHeight: 52, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 8 },
+  locationInput: { flex: 1, minWidth: 0, minHeight: 50, color: colors.text, ...typography.bodySmall },
+  placeSuggestions: { marginTop: 7, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, overflow: "hidden" },
+  placeRow: { minHeight: 58, paddingHorizontal: 11, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  placeContent: { flex: 1, minWidth: 0 },
+  placeLabel: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  placeAddress: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
+  currentLocationButton: { minHeight: 50, marginTop: 8, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  currentLocationText: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
+  selectedLocation: { minHeight: 60, marginTop: 8, paddingHorizontal: 11, borderRadius: 17, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", gap: 9 },
+  selectedLocationText: { flex: 1, minWidth: 0 },
+  selectedLocationTitle: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  selectedLocationAddress: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
+  removeLocation: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }
 });
