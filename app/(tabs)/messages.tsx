@@ -43,6 +43,7 @@ export default function MessagesScreen() {
     lastError
   } = useMessaging();
   const {
+    members,
     localConversations,
     decorateConversation,
     isConversationVisible,
@@ -202,7 +203,7 @@ export default function MessagesScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Créer une nouvelle conversation"
-          accessibilityHint="Permet de créer une discussion privée ou, si autorisé, un groupe"
+          accessibilityHint="Permet de créer une discussion privée ou, pour les Visionnaires, un groupe officiel"
           onPress={() => router.push("/new-conversation")}
           style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}
         >
@@ -265,6 +266,7 @@ export default function MessagesScreen() {
           renderItem={({ item }) => (
             <ConversationRow
               conversation={item}
+              members={members}
               mentioned={matchesMention(item, mentionAliases)}
               muted={item.muted}
               onLongPress={() => openConversationSettings(item)}
@@ -290,8 +292,8 @@ export default function MessagesScreen() {
               </Text>
               <Text style={styles.feedbackText}>
                 {filter === "groups"
-                  ? "Les groupes apparaissent selon votre statut et les règles définies par les administrateurs."
-                  : "Créez une conversation individuelle ou un mini-groupe de quatre contacts maximum."}
+                  ? "Les groupes apparaissent selon votre statut et les règles définies par les Visionnaires."
+                  : "Créez une conversation individuelle ou un mini-groupe de quatre participants maximum."}
               </Text>
             </View>
           }
@@ -332,7 +334,7 @@ export default function MessagesScreen() {
             <Text style={styles.sheetSubtitle}>
               {selectedConversation?.type === "direct"
                 ? "Conversation privée"
-                : `${selectedConversation?.memberCount ?? 0} membres`}
+                : `${selectedConversation?.memberIds?.length ?? selectedConversation?.memberCount ?? 0} membres`}
             </Text>
 
             <Pressable style={styles.sheetAction} onPress={toggleMute}>
