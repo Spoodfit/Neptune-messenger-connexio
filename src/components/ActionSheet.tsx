@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft
   },
   optionIconDanger: { backgroundColor: colors.dangerSoft },
-  optionLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: "850" },
+  optionLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: "800" },
   optionLabelDanger: { color: colors.danger },
   pressed: { opacity: 0.75, transform: [{ scale: 0.993 }] },
   disabled: { opacity: 0.42 }
