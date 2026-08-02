@@ -73,6 +73,7 @@ export function MessageBubble({
   const currentReaction = reactions.find(
     (reaction) => reaction.reactedByCurrentUser
   )?.emoji;
+  const showDetachedReactionButton = reactions.length === 0;
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -208,7 +209,12 @@ export function MessageBubble({
   );
 
   return (
-    <View style={styles.gestureStage}>
+    <View
+      style={[
+        styles.gestureStage,
+        showDetachedReactionButton && styles.gestureStageWithReactionTrigger
+      ]}
+    >
       <Animated.View
         pointerEvents="none"
         style={[styles.replyIndicator, { opacity: replyOpacity }]}
@@ -299,29 +305,23 @@ export function MessageBubble({
               )}
             </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajouter ou modifier une réaction"
-              onPress={() => setReactionOpen((value) => !value)}
-              hitSlop={8}
-              style={[
-                styles.reactionAdd,
-                message.isMine ? styles.reactionAddMine : styles.reactionAddOther
-              ]}
-            >
-              <View
+            {showDetachedReactionButton ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter une réaction"
+                onPress={() => setReactionOpen((value) => !value)}
                 style={[
-                  styles.reactionAddVisual,
-                  currentReaction && styles.reactionAddActive
+                  styles.reactionAdd,
+                  message.isMine
+                    ? styles.reactionAddMine
+                    : styles.reactionAddOther
                 ]}
               >
-                {currentReaction ? (
-                  <Text style={styles.reactionAddEmoji}>{currentReaction}</Text>
-                ) : (
+                <View style={styles.reactionAddVisual}>
                   <Ionicons name="add" size={12} color={colors.textMuted} />
-                )}
-              </View>
-            </Pressable>
+                </View>
+              </Pressable>
+            ) : null}
           </View>
 
           {reactionOpen ? (
@@ -412,6 +412,7 @@ export function MessageBubble({
 
 const styles = StyleSheet.create({
   gestureStage: { width: "100%", position: "relative" },
+  gestureStageWithReactionTrigger: { paddingBottom: 18 },
   replyIndicator: {
     position: "absolute",
     left: 8,
@@ -608,15 +609,15 @@ const styles = StyleSheet.create({
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   reactionAdd: {
     position: "absolute",
-    bottom: -12,
-    width: 32,
-    height: 32,
+    bottom: -35,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 5
   },
-  reactionAddMine: { right: -13 },
-  reactionAddOther: { left: -13 },
+  reactionAddMine: { right: -1 },
+  reactionAddOther: { left: -1 },
   reactionAddVisual: {
     width: 21,
     height: 21,
@@ -626,13 +627,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(8,18,38,0.94)",
     alignItems: "center",
     justifyContent: "center",
+    transform: [{ translateY: -8 }],
     shadowColor: "#000000",
     shadowOpacity: 0.2,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 }
   },
-  reactionAddActive: { borderColor: colors.violet },
-  reactionAddEmoji: { fontSize: 11 },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
 });
