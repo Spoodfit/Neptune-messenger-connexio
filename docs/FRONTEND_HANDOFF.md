@@ -1,265 +1,220 @@
-# Connexio V13 — remise frontend / backend
+# Connexio V14 — contrat de remise backend
 
-## 1. Statut de la livraison
+## Architecture
 
-Le client Expo / React Native de Connexio est livré comme application fonctionnelle web, iOS et Android.
+Connexio est un second client de Neptune Business. Le frontend Expo/React Native consomme le backend existant : **Express 5**, **Prisma 7**, **PostgreSQL 16**, **Redis**, JWT en cookies httpOnly et **Socket.IO**.
 
-Les fonctions utilisateur sont implémentées côté client : sélection et lecture des médias, documents, localisation, carte, appels audio/vidéo, partage natif, réactions, commentaires, gestion des groupes, préférences, blocage, export et suppression de compte.
+`EXPO_PUBLIC_API_BASE_URL` doit pointer vers la racine qui précède `/v1`. Avec une API exposée sous `/api/v1`, la valeur attendue est par exemple `https://neptunebusiness.com/api`.
 
-Le backend Neptune reste la source de vérité pour les identités, statuts, droits, contenus, fichiers, synchronisation, appels entrants, notifications et modération. L’intégrateur doit exposer les contrats ci-dessous ; il ne doit pas reconstruire les écrans ni les interactions.
+## Authentification Neptune
 
-Le mode `EXPO_PUBLIC_MOCK_MODE=true` fournit une démonstration autonome. Il est interdit dans un build de production.
+| Méthode | Route | Usage |
+|---|---|---|
+| `POST` | `/v1/auth/login` | email/mot de passe et cookie JWT httpOnly |
+| `GET` | `/v1/auth/me` | restauration de la session |
+| `POST` | `/v1/auth/logout` | révocation de la session |
 
-## 2. Écrans livrés
+Toutes les requêtes utilisent `credentials: include`. Le mot de passe n’est jamais persisté dans Connexio.
 
-### Authentification et compte
+Le backend normalise `role`, `special_role` et `statut`. La création et l’administration des groupes officiels sont autorisées **uniquement aux Visionnaires ou aux administrateurs serveur**. L’interface applique la même règle, mais le backend reste l’autorité.
 
-- `/sign-in` : code à usage unique et mode démonstration explicite ;
-- `/access-help` : aide à l’obtention du code ;
-- `/account` : profil synchronisé, appareils, révocation de sessions, export et suppression ;
-- `/notification-settings` : préférences synchronisées ;
-- `/privacy` : Map, profil, présence, téléphone et localisation approximative ;
-- `/blocked-users` : liste et déblocage ;
-- `+not-found` : route ou contenu inaccessible.
+## Conversations et messages
 
-### Messagerie
+Routes utilisées :
 
-- `/(tabs)/messages` : onglets Groupes / Privées, mentions animées, maintien long ;
-- `/new-conversation` : conversation directe, mini-groupe de quatre personnes au total ou groupe officiel ;
-- `/chat/[id]` : texte, mentions, médias, documents, fichiers, localisation, réactions, réponse par glissement, hors-ligne et reprise ;
-- `/conversation/[id]` : membres d’une conversation privée ;
-- `/group/[id]` : membres, image, icône, visibilité par statut, publication, sourdine, départ et signalement ;
-- `/profile/[id]` : message, téléphone, appel audio, visio, blocage et signalement.
+- `GET /v1/conversations` ;
+- `POST /v1/conversations/private` ;
+- `POST /v1/groups` ;
+- `PATCH /v1/groups/:threadId` ;
+- `POST /v1/groups/:threadId/leave` ;
+- `POST /v1/conversations/:threadId/mute` ;
+- `GET /v1/conversations/:threadId/messages?cursor=` ;
+- `POST /v1/conversations/:threadId/messages` ;
+- `POST /v1/conversations/:threadId/read` ;
+- `PUT` et `DELETE /v1/messages/:messageId/reactions/:emoji`.
 
-### Temps forts, Map et appels
+Le serveur déduplique une conversation privée par ensemble exact de participants. Si elle existe, il la renvoie au lieu d’en créer une nouvelle.
 
-- `/(tabs)/highlights` : Feed, Map réelle, clustering, géolocalisation, bulles et actions rapides ;
-- `/new-highlight` : texte, photo, vidéo de 60 secondes maximum, mentions, position approximative et tag `BESOIN` ;
-- `/highlight/[id]` : réactions, commentaires, réponses et partage natif ;
-- `/(tabs)/calls` : historique et relance audio/vidéo ;
-- `/call/[id]` : salle Jitsi configurable via `EXPO_PUBLIC_CALL_BASE_URL`.
-
-## 3. Configuration de production
-
-Variables obligatoires :
-
-```text
-EAS_BUILD_PROFILE=production
-EXPO_PUBLIC_MOCK_MODE=false
-EXPO_PUBLIC_API_BASE_URL=https://api.neptune.example
-EXPO_PUBLIC_REALTIME_URL=wss://api.neptune.example/v1/realtime
-EXPO_PUBLIC_EAS_PROJECT_ID=<uuid EAS>
-```
-
-Variable d’appel facultative :
-
-```text
-EXPO_PUBLIC_CALL_BASE_URL=https://meet.jit.si
-```
-
-Une instance Jitsi dédiée peut remplacer l’URL publique sans modification d’écran.
-
-Le build refuse : mode mock, API HTTP, WebSocket non chiffré ou configuration EAS absente.
-
-## 4. Authentification
-
-| Méthode | Route |
-|---|---|
-| Échanger un code à usage unique | `POST /v1/auth/exchange-code` |
-| Rafraîchir la session | `POST /v1/auth/refresh` |
-| Révoquer la session | `POST /v1/auth/revoke` |
-
-Le refresh token est conservé dans SecureStore. Le client gère le rafraîchissement single-flight et rejoue une requête après un `401`.
-
-## 5. Messagerie et temps réel
-
-| Fonction | Route |
-|---|---|
-| Conversations visibles | `GET /v1/conversations` |
-| Messages paginés | `GET /v1/conversations/:id/messages?cursor=` |
-| Envoyer un message | `POST /v1/conversations/:id/messages` |
-| Marquer comme lu | `POST /v1/conversations/:id/read` |
-| Ticket WebSocket court | `POST /v1/realtime/ticket` |
-| Enregistrer un appareil push | `POST /v1/devices/push-tokens` |
-| Révoquer un appareil push | `POST /v1/devices/push-tokens/revoke` |
-
-L’envoi contient :
+Les threads renvoient notamment :
 
 ```json
 {
-  "client_message_id": "uuid",
-  "body": "message",
-  "reply_to_message_id": null,
-  "mentioned_user_ids": ["user-id"],
-  "attachments": [
+  "id": "thread-id",
+  "type": "group",
+  "name": "Carcassonne",
+  "member_ids": ["user-1", "user-2"],
+  "member_count": 2,
+  "active_member_ids": ["user-2", "user-1"],
+  "visibility_roles": ["visionnaire", "moussaillon", "free"],
+  "can_post": true,
+  "event_vote_alert": null
+}
+```
+
+`member_count` correspond toujours au nombre réel de participants. `active_member_ids` est ordonné par activité récente afin d’afficher les avatars superposés.
+
+## Pièces jointes
+
+Le client autorise au maximum **10 contenus et 120 Mo cumulés par message** : 15 Mo par photo, 80 Mo par vidéo et 50 Mo par document ou fichier.
+
+Flux attendu :
+
+1. `POST /v1/files/presign` ;
+2. upload vers le stockage privé ;
+3. `POST /v1/files/complete` ;
+4. envoi du message avec l’identifiant fichier ;
+5. génération de `download_url` et `thumbnail_url` temporaires.
+
+Le backend revérifie le nombre, la taille, le MIME réel, les droits d’accès et l’analyse antivirus. Les médias sont regroupés dans une grille compacte, puis restent ouvrables et téléchargeables.
+
+## Sondages
+
+- `POST /v1/conversations/:threadId/polls` ;
+- `POST /v1/messages/:messageId/poll-votes` ;
+- `DELETE /v1/messages/:messageId/poll-votes/:optionId`.
+
+Exemple de message :
+
+```json
+{
+  "poll": {
+    "id": "poll-id",
+    "question": "Quel créneau préférez-vous ?",
+    "allow_multiple": false,
+    "anonymous": false,
+    "total_votes": 31,
+    "closes_at": "2026-08-08T21:59:00.000Z",
+    "event_vote_id": "optional-event-id",
+    "event_vote_url": "https://neptunebusiness.com/events/votes/...",
+    "options": [
+      {
+        "id": "option-id",
+        "label": "Jeudi 20 août",
+        "vote_count": 18,
+        "voted_by_current_user": true
+      }
+    ]
+  }
+}
+```
+
+### Votes d’évènements
+
+Lorsqu’un vote concerne un club, le thread officiel de sa ville reçoit :
+
+```json
+{
+  "event_vote_alert": {
+    "id": "alert-id",
+    "title": "2 évènements attendent votre vote",
+    "club_name": "Club Carcassonne",
+    "city": "Carcassonne",
+    "pending_count": 2,
+    "web_url": "https://neptunebusiness.com/events/votes?club=carcassonne",
+    "closes_at": "2026-08-09T21:59:00.000Z"
+  }
+}
+```
+
+La création, la modification et la clôture d’un vote dans Neptune Business mettent à jour le sondage et l’alerte dans une transaction Prisma. Le web et Connexio utilisent le même identifiant canonique et une contrainte unique de vote.
+
+## Appels intégrés
+
+Connexio n’utilise pas Jitsi. L’appel est intégré à l’application avec `getUserMedia`, `RTCPeerConnection` et une signalisation Socket.IO.
+
+- `POST /v1/calls` ;
+- `POST /v1/calls/:callId/end`.
+
+Réponse de création :
+
+```json
+{
+  "call_id": "call-id",
+  "thread_id": "thread-id",
+  "type": "video",
+  "socket_url": "https://api.neptunebusiness.com",
+  "socket_path": "/socket.io",
+  "call_token": "jwt-court",
+  "initiator": true,
+  "ice_servers": [
+    { "urls": "stun:stun.example.com:3478" },
     {
-      "id": "media-id",
-      "kind": "photo",
-      "name": "photo.jpg",
-      "uri": "https://cdn/...",
-      "mime_type": "image/jpeg",
-      "size_bytes": 123456,
-      "duration_seconds": null,
-      "width": 1600,
-      "height": 1200
+      "urls": ["turn:turn.example.com:3478?transport=udp"],
+      "username": "temporary-user",
+      "credential": "temporary-password"
     }
-  ]
+  ],
+  "expires_at": "2026-08-02T13:30:00.000Z"
 }
 ```
 
-`Idempotency-Key` correspond au `client_message_id`.
+Évènements Socket.IO :
 
-Événements temps réel pris en charge :
+- client → serveur : `call:join`, `call:signal`, `call:end` ;
+- serveur → client : `call:participant-joined`, `call:signal`, `call:participant-left`, `call:ended`, `call:incoming`.
 
-- `message.created` ;
-- `message.updated` ;
-- `message.deleted` ;
-- `conversation.read` ;
-- `conversation.membership.changed`.
+Le serveur vérifie l’appartenance au thread, émet l’appel entrant et délivre un token court. Un serveur TURN est obligatoire pour la fiabilité mobile.
 
-Le client réconcilie REST, temps réel et état optimiste. L’outbox native est chiffrée par SQLCipher et conserve texte, réponse, mentions et pièces jointes.
+## Profils et modération
 
-## 6. Médias et fichiers
+- `GET /v1/members` ;
+- `POST` et `DELETE /v1/members/:memberId/block` ;
+- `POST /v1/moderation/reports`.
 
-Cycle d’upload :
+Le profil renvoie `web_profile_url`, `phone`, `video_call_enabled`, présence et règles de visibilité. Le menu `…` permet d’ouvrir le profil web, mettre la discussion en sourdine, signaler ou bloquer.
 
-| Étape | Route |
-|---|---|
-| Préparer un upload de message | `POST /v1/uploads/prepare` |
-| Préparer un média de Temps fort | `POST /v1/highlights/uploads/prepare` |
-| Préparer une image de groupe | `POST /v1/groups/avatar/uploads/prepare` |
-| Envoyer les octets | URL pré-signée retournée par le serveur |
-| Finaliser l’upload | `POST /v1/uploads/:id/complete` |
+## Temps forts, besoins et offres
 
-Le client gère :
+Routes :
 
-- picker système photo/vidéo/document/fichier ;
-- contrôle de taille ;
-- limite vidéo de 60 secondes pour un Temps fort ;
-- progression ;
-- erreur et reprise ;
-- affichage photo ;
-- lecture vidéo avec contrôles natifs ;
-- ouverture des documents et localisations.
+- `GET` et `POST /v1/highlights` ;
+- `GET /v1/highlights/:postId` ;
+- `PUT` et `DELETE /v1/highlights/:postId/reactions/:emoji` ;
+- `POST /v1/highlights/:postId/comments` ;
+- `POST /v1/highlights/:postId/share` ;
+- `GET /v1/places/search?query=`.
 
-Le serveur doit renvoyer une URL privée ou signée lisible par l’utilisateur autorisé.
-
-## 7. Conversations privées et groupes
-
-| Fonction | Route |
-|---|---|
-| Membres visibles | `GET /v1/members?visible=true&query=` |
-| Conversation directe | `POST /v1/conversations/direct` |
-| Mini-groupe privé | `POST /v1/conversations/private-group` |
-| Créer un groupe officiel | `POST /v1/groups` |
-| Modifier un groupe | `PATCH /v1/groups/:id` |
-| Mettre en sourdine | `POST /v1/groups/:id/mute` |
-| Retirer la sourdine | `DELETE /v1/groups/:id/mute` |
-| Quitter | `POST /v1/groups/:id/leave` |
-
-Le serveur valide impérativement :
-
-- quatre participants maximum au total dans un mini-groupe privé ;
-- unicité d’une conversation directe entre deux personnes ;
-- rôles autorisés : Visionnaire, Amiral, Capitaine, Légende, Moussaillon, Triton et Free ;
-- droits de création, administration, lecture et écriture ;
-- filtrage de tous les groupes avant réponse au client.
-
-## 8. Réactions, Temps forts et synchronisation `BESOIN`
-
-| Fonction | Route |
-|---|---|
-| Réagir à un message | `POST /v1/messages/:id/reactions` |
-| Retirer une réaction message | `DELETE /v1/messages/:id/reactions/:emoji` |
-| Feed paginé | `GET /v1/highlights?cursor=` |
-| Créer un Temps fort | `POST /v1/highlights` |
-| Réagir à un Temps fort | `POST /v1/highlights/:id/reactions` |
-| Retirer une réaction | `DELETE /v1/highlights/:id/reactions/:emoji` |
-| Commenter | `POST /v1/highlights/:id/comments` |
-| Répondre | `POST /v1/comments/:id/replies` |
-| Réagir à un commentaire | `POST /v1/comments/:id/reactions` |
-| Retirer une réaction commentaire | `DELETE /v1/comments/:id/reactions/:emoji` |
-| Créer un lien de partage | `POST /v1/highlights/:id/share` |
-
-Un `BESOIN` est envoyé avec :
+Un `BESOIN` envoie :
 
 ```json
-{
-  "kind": "besoin",
-  "sync_targets": ["connexio", "business"]
-}
+"sync_targets": ["connexio", "business"]
 ```
 
-Le serveur doit attribuer un identifiant canonique commun, publier l’événement dans les deux applications et appliquer la même règle aux modifications et suppressions. L’idempotence empêche les doublons. Un changement reçu depuis Neptune Business doit être renvoyé dans le Feed et le WebSocket Connexio.
+Une `OFFRE` envoie :
 
-## 9. Map et localisation
-
-| Fonction | Route |
-|---|---|
-| Moments visibles | `GET /v1/map/moments?bounds=&zoom=` |
-| Mettre à jour la position | `PUT /v1/me/location` |
-| Effacer la position | `DELETE /v1/me/location` |
-
-Le client web et natif utilise Leaflet, MarkerCluster, zoom, déplacement, géolocalisation, avatars, fallback initiales et contours pulsants.
-
-Le serveur ne doit jamais renvoyer l’adresse ou les coordonnées exactes non consenties. Le rayon de confidentialité attendu est compris entre 1 et 3 km.
-
-## 10. Appels
-
-Les salles audio et vidéo sont opérationnelles via Jitsi et un nom de salle déterministe dérivé de la conversation.
-
-Pour les appels entrants, l’historique et la signalisation métier, le contrat prévoit :
-
-```text
-POST /v1/calls
+```json
+"sync_targets": ["connexio", "advantage_committee"]
 ```
 
-avec `member_id` et `type`. Le backend peut renvoyer une `joinUrl` dédiée. APNs/FCM doit réveiller le client et ouvrir `/call/:conversationId?mode=audio|video`.
+Le backend utilise un identifiant canonique, une clé d’idempotence et une table de liaison pour synchroniser sans boucle : besoin ↔ application web, offre ↔ Comité Avantage. Un avantage publié sur le web crée ou met à jour son Temps fort Connexio.
 
-Une infrastructure Jitsi privée, TURN/STUN, journalisation et politiques de conservation restent des opérations d’infrastructure, sans reprise des écrans.
+La recherche de lieu s’effectue côté backend afin de ne jamais exposer la clé Google Places. Chaque résultat contient `id`, `label`, `address`, `city`, `latitude`, `longitude`.
 
-## 11. Compte, notifications et confidentialité
+## Socket.IO général
 
-| Fonction | Route |
-|---|---|
-| Sessions | `GET /v1/account/sessions` |
-| Révoquer une session | `DELETE /v1/account/sessions/:id` |
-| Export des données | `POST /v1/account/export` |
-| Resynchroniser le profil | `POST /v1/account/resync` |
-| Demander la suppression | `POST /v1/account/deletion` |
-| Lire les notifications | `GET /v1/me/notification-preferences` |
-| Modifier les notifications | `PUT /v1/me/notification-preferences` |
-| Lire la confidentialité | `GET /v1/me/privacy-preferences` |
-| Modifier la confidentialité | `PUT /v1/me/privacy-preferences` |
-| Membres bloqués | `GET /v1/me/blocked-users` |
-| Bloquer | `PUT /v1/me/blocked-users/:id` |
-| Débloquer | `DELETE /v1/me/blocked-users/:id` |
-| Signaler un contenu | `POST /v1/reports` |
+Évènements minimum :
 
-Les réglages doivent être appliqués côté serveur avant l’envoi d’une notification, d’un profil, d’une position ou d’une action rapide.
+- `message.created`, `message.updated`, `message.deleted` ;
+- `message.reaction.updated` ;
+- `poll.updated`, `poll.vote.updated` ;
+- `thread.updated`, `thread.member.updated` ;
+- `event.vote.updated` ;
+- `highlight.created`, `highlight.updated`, `highlight.deleted` ;
+- `highlight.reaction.updated`, `highlight.comment.created` ;
+- `presence.updated` ;
+- les évènements d’appel listés plus haut.
 
-## 12. Validation avant publication
+Chaque payload contient un `event_id` unique et un `updated_at` serveur.
 
-Gates logiciels :
+## Gates de production
 
-```text
-npm ci
-npm audit --omit=dev --audit-level=high
-npm run typecheck
-npm run test:domain
-npx expo install --check
-npx expo config --type public
-npm run web:build
-```
-
-Les workflows contrôlent également :
-
-- formats 280×568, 320×568, 390×844, 430×720, tablette et paysage ;
-- zoom navigateur à 140 % ;
-- chat faible hauteur ;
-- conversation en lecture seule ;
-- double envoi ;
-- déconnexion et reconnexion ;
-- Feed, Map, Appels, Profil, création et administration.
-
-Avant mise en ligne publique, l’équipe backend/infrastructure doit encore valider les endpoints sur l’environnement réel, APNs/FCM, Jitsi/TURN, CDN privé, politiques de conservation, observabilité, sauvegardes, rollback et appareils physiques. Ces validations ne nécessitent pas de reconstruction du frontend.
+1. HTTPS et WSS ;
+2. cookies CORS `Secure`, `HttpOnly` et `SameSite` ;
+3. Socket.IO avec adaptateur Redis ;
+4. stockage privé et antivirus ;
+5. serveur TURN ;
+6. APNs/FCM ;
+7. migrations Prisma et contraintes d’unicité ;
+8. tests de droits par rôle ;
+9. tests sur au moins deux Android et un iPhone ;
+10. appels testés entre Wi-Fi, 4G/5G et NAT restrictifs.
