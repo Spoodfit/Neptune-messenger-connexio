@@ -65,9 +65,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         NSCameraUsageDescription:
           "Connexio utilise la caméra pour envoyer des photos, publier des vidéos et participer aux appels vidéo.",
         NSMicrophoneUsageDescription:
-"Connexio utilise le microphone pour les messages audio et les appels.",
+          "Connexio utilise le microphone pour les messages audio et les appels.",
         NSSpeechRecognitionUsageDescription:
-"Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
+          "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
         NSPhotoLibraryUsageDescription:
           "Connexio accède à vos médias uniquement lorsque vous choisissez un contenu à partager.",
         NSLocationWhenInUseUsageDescription:
@@ -93,14 +93,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-speech-recognition",
         {
-microphonePermission:
-  "Connexio utilise le microphone pour dicter l’objet d’un appel.",
-speechRecognitionPermission:
-  "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
-androidSpeechServicePackages: [
-  "com.google.android.googlequicksearchbox",
-  "com.google.android.as"
-]
+          microphonePermission:
+            "Connexio utilise le microphone pour dicter l’objet d’un appel.",
+          speechRecognitionPermission:
+            "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
+          androidSpeechServicePackages: [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.as"
+          ]
         }
       ],
       "expo-secure-store",
