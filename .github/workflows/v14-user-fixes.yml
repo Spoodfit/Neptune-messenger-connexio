@@ -1,6 +1,7 @@
 name: V14 user fixes
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feat/v14-ux-calls-moderation
