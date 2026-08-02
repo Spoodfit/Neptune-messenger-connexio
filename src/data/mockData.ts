@@ -12,7 +12,8 @@ export const currentUser: AppUser = {
   city: "Carcassonne",
   role: "visionary",
   roleLabel: "Visionnaire",
-  online: true
+  online: true,
+  avatarUrl: "https://i.pravatar.cc/160?u=neptune-johan"
 };
 
 export const members: AppUser[] = [
@@ -25,7 +26,9 @@ export const members: AppUser[] = [
     city: "Carcassonne",
     role: "visionary",
     roleLabel: "Visionnaire",
-    online: true
+    online: true,
+    avatarUrl: "https://i.pravatar.cc/160?u=neptune-lea",
+    webProfileUrl: "https://neptunebusiness.com/profile/user-lea"
   },
   {
     id: "user-oceane",
@@ -35,7 +38,9 @@ export const members: AppUser[] = [
     city: "Carcassonne",
     role: "captain",
     roleLabel: "Capitaine",
-    online: true
+    online: true,
+    avatarUrl: "https://i.pravatar.cc/160?u=neptune-oceane",
+    webProfileUrl: "https://neptunebusiness.com/profile/user-oceane"
   },
   {
     id: "user-nabiha",
@@ -45,7 +50,9 @@ export const members: AppUser[] = [
     city: "Toulouse",
     role: "captain",
     roleLabel: "Capitaine",
-    online: false
+    online: false,
+    avatarUrl: "https://i.pravatar.cc/160?u=neptune-nabiha",
+    webProfileUrl: "https://neptunebusiness.com/profile/user-nabiha"
   },
   {
     id: "user-christelle",
@@ -55,9 +62,13 @@ export const members: AppUser[] = [
     city: "Montpellier",
     role: "captain",
     roleLabel: "Capitaine",
-    online: true
+    online: true,
+    avatarUrl: "https://i.pravatar.cc/160?u=neptune-christelle",
+    webProfileUrl: "https://neptunebusiness.com/profile/user-christelle"
   }
 ];
+
+const ACTIVE_MEMBERS = ["user-oceane", "user-lea", "user-johan", "user-nabiha"];
 
 export const conversations: Conversation[] = [
   {
@@ -71,7 +82,8 @@ export const conversations: Conversation[] = [
     lastMessage: "Le prochain atelier est ouvert aux votes.",
     lastMessageAt: "2026-07-24T11:30:00.000Z",
     pinnedMessage: "Seuls les administrateurs publient dans cet espace.",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-lea", "user-johan", "user-oceane"]
   },
   {
     id: "carcassonne",
@@ -83,7 +95,17 @@ export const conversations: Conversation[] = [
     unreadCount: 5,
     lastMessage: "Qui sera présent au prochain afterwork ?",
     lastMessageAt: "2026-07-24T12:08:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ACTIVE_MEMBERS,
+    eventVoteAlert: {
+      id: "vote-carcassonne-aout",
+      title: "2 évènements attendent votre vote",
+      clubName: "Club Carcassonne",
+      city: "Carcassonne",
+      pendingCount: 2,
+      webUrl: "https://neptunebusiness.com/events/votes?club=carcassonne",
+      closesAt: "2026-08-09T21:59:00.000Z"
+    }
   },
   {
     id: "toulouse",
@@ -95,7 +117,8 @@ export const conversations: Conversation[] = [
     unreadCount: 0,
     lastMessage: "Le Comptoir des Vins confirme le créneau.",
     lastMessageAt: "2026-07-23T17:45:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-nabiha", "user-lea", "user-johan"]
   },
   {
     id: "montpellier",
@@ -107,7 +130,8 @@ export const conversations: Conversation[] = [
     unreadCount: 0,
     lastMessage: "Bienvenue aux nouveaux membres.",
     lastMessageAt: "2026-07-23T09:15:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-christelle", "user-lea"]
   },
   {
     id: "narbonne",
@@ -119,7 +143,8 @@ export const conversations: Conversation[] = [
     unreadCount: 1,
     lastMessage: "Besoin d’un photographe pour mardi.",
     lastMessageAt: "2026-07-24T08:20:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-lea", "user-oceane", "user-johan"]
   },
   {
     id: "limoux",
@@ -131,7 +156,8 @@ export const conversations: Conversation[] = [
     unreadCount: 0,
     lastMessage: "Le groupe est désormais ouvert.",
     lastMessageAt: "2026-07-22T14:00:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-johan", "user-lea"]
   },
   {
     id: "visionnaires",
@@ -144,7 +170,8 @@ export const conversations: Conversation[] = [
     lastMessage: "Point sur Neptune Média à 17 h.",
     lastMessageAt: "2026-07-24T12:40:00.000Z",
     restricted: true,
-    allowedRoles: ["visionary", "admin"]
+    allowedRoles: ["visionary", "admin"],
+    activeMemberIds: ["user-johan", "user-lea"]
   },
   {
     id: "amiraux",
@@ -157,7 +184,8 @@ export const conversations: Conversation[] = [
     lastMessage: "Le suivi régional est à jour.",
     lastMessageAt: "2026-07-23T15:10:00.000Z",
     restricted: true,
-    allowedRoles: ["admiral", "visionary", "admin"]
+    allowedRoles: ["admiral", "visionary", "admin"],
+    activeMemberIds: ["user-lea", "user-johan"]
   },
   {
     id: "capitaines",
@@ -170,7 +198,8 @@ export const conversations: Conversation[] = [
     lastMessage: "Merci de valider les disponibilités partenaires.",
     lastMessageAt: "2026-07-24T10:52:00.000Z",
     restricted: true,
-    allowedRoles: ["captain", "admiral", "visionary", "admin"]
+    allowedRoles: ["captain", "admiral", "visionary", "admin"],
+    activeMemberIds: ["user-oceane", "user-nabiha", "user-christelle", "user-lea"]
   },
   {
     id: "sav",
@@ -182,7 +211,8 @@ export const conversations: Conversation[] = [
     unreadCount: 0,
     lastMessage: "Le problème de connexion a été corrigé.",
     lastMessageAt: "2026-07-22T11:20:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-johan", "user-lea"]
   },
   {
     id: "boost",
@@ -194,7 +224,8 @@ export const conversations: Conversation[] = [
     unreadCount: 7,
     lastMessage: "Nouveau post à soutenir aujourd’hui.",
     lastMessageAt: "2026-07-24T12:25:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ACTIVE_MEMBERS
   },
   {
     id: "reussites",
@@ -206,7 +237,8 @@ export const conversations: Conversation[] = [
     unreadCount: 1,
     lastMessage: "Premier contrat signé grâce à Neptune.",
     lastMessageAt: "2026-07-24T07:40:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-christelle", "user-oceane", "user-nabiha"]
   },
   {
     id: "besoins",
@@ -218,7 +250,8 @@ export const conversations: Conversation[] = [
     unreadCount: 2,
     lastMessage: "Je cherche un expert Meta Ads à Toulouse.",
     lastMessageAt: "2026-07-24T11:58:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ACTIVE_MEMBERS
   },
   {
     id: "publicite",
@@ -230,7 +263,8 @@ export const conversations: Conversation[] = [
     unreadCount: 0,
     lastMessage: "Offre de lancement disponible jusqu’à dimanche.",
     lastMessageAt: "2026-07-21T18:00:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-nabiha", "user-christelle", "user-oceane"]
   },
   {
     id: "rencontres",
@@ -242,7 +276,8 @@ export const conversations: Conversation[] = [
     unreadCount: 0,
     lastMessage: "Disponible demain matin à Carcassonne.",
     lastMessageAt: "2026-07-23T13:22:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ACTIVE_MEMBERS
   },
   {
     id: "online",
@@ -254,17 +289,55 @@ export const conversations: Conversation[] = [
     unreadCount: 0,
     lastMessage: "Visio networking mercredi prochain.",
     lastMessageAt: "2026-07-22T16:42:00.000Z",
-    restricted: false
+    restricted: false,
+    activeMemberIds: ["user-johan", "user-lea", "user-nabiha"]
   }
 ];
 
 const baseMessages: ChatMessage[] = [
+  {
+    id: "m-poll-carcassonne",
+    conversationId: "carcassonne",
+    senderId: "user-oceane",
+    senderName: "Océane",
+    senderInitials: "OC",
+    senderAvatarUrl: "https://i.pravatar.cc/160?u=neptune-oceane",
+    body: "",
+    createdAt: "2026-08-02T10:42:00.000Z",
+    status: "read",
+    isMine: false,
+    poll: {
+      id: "poll-afterwork-carcassonne",
+      question: "Quel créneau préférez-vous pour le prochain afterwork ?",
+      allowMultiple: false,
+      anonymous: false,
+      totalVotes: 31,
+      closesAt: "2026-08-08T21:59:00.000Z",
+      eventVoteId: "event-vote-carcassonne-august",
+      eventVoteUrl: "https://neptunebusiness.com/events/votes?club=carcassonne",
+      options: [
+        {
+          id: "option-thursday",
+          label: "Jeudi 20 août · 18 h 30",
+          voteCount: 18,
+          votedByCurrentUser: true
+        },
+        {
+          id: "option-friday",
+          label: "Vendredi 21 août · 19 h",
+          voteCount: 13,
+          votedByCurrentUser: false
+        }
+      ]
+    }
+  },
   {
     id: "m-1",
     conversationId: "carcassonne",
     senderId: "user-oceane",
     senderName: "Océane",
     senderInitials: "OC",
+    senderAvatarUrl: "https://i.pravatar.cc/160?u=neptune-oceane",
     body: "Qui sera présent au prochain afterwork ?",
     createdAt: "2026-07-24T12:08:00.000Z",
     status: "read",
@@ -276,6 +349,7 @@ const baseMessages: ChatMessage[] = [
     senderId: "user-johan",
     senderName: "Johan Zambelli",
     senderInitials: "JZ",
+    senderAvatarUrl: "https://i.pravatar.cc/160?u=neptune-johan",
     body: "Présent. Je prépare aussi une courte présentation de Connexio.",
     createdAt: "2026-07-24T12:10:00.000Z",
     status: "read",
@@ -287,6 +361,7 @@ const baseMessages: ChatMessage[] = [
     senderId: "user-lea",
     senderName: "Léa Despoulins",
     senderInitials: "LD",
+    senderAvatarUrl: "https://i.pravatar.cc/160?u=neptune-lea",
     body: "Le vote pour choisir la prochaine thématique d’atelier est ouvert.",
     createdAt: "2026-07-24T11:30:00.000Z",
     status: "read",
@@ -298,6 +373,7 @@ const baseMessages: ChatMessage[] = [
     senderId: "user-lea",
     senderName: "Léa Despoulins",
     senderInitials: "LD",
+    senderAvatarUrl: "https://i.pravatar.cc/160?u=neptune-lea",
     body: "Point sur Neptune Média à 17 h. Merci d’ajouter les chiffres de conversion.",
     createdAt: "2026-07-24T12:40:00.000Z",
     status: "delivered",
