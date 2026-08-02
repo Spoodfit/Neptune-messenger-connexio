@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -64,6 +65,26 @@ export default function CallRoomScreen() {
     () => (env.mockMode ? null : new NeptuneCallApi(accessToken)),
     [accessToken]
   );
+  const ringtonePlayer = useAudioPlayer(
+    require("../../assets/audio/connexio-ringtone.mp3")
+  );
+
+  useEffect(() => {
+    const shouldRing =
+      incoming && !session && !unanswered && !declining && !preparing;
+    ringtonePlayer.loop = true;
+    ringtonePlayer.volume = 0.68;
+    if (shouldRing) {
+      ringtonePlayer.play();
+    } else {
+      ringtonePlayer.pause();
+      void ringtonePlayer.seekTo(0);
+    }
+    return () => {
+      ringtonePlayer.pause();
+      void ringtonePlayer.seekTo(0);
+    };
+  }, [declining, incoming, preparing, ringtonePlayer, session, unanswered]);
 
   const close = async () => {
     const activeSession = session;
@@ -251,17 +272,17 @@ export default function CallRoomScreen() {
   return (
     <CallShell
       icon={mode === "audio" ? "call-outline" : "videocam-outline"}
-      title={mode === "audio" ? "Préparer l’appel audio" : "Préparer l’appel vidéo"}
-      description="Indiquez la raison de l’appel. Elle sera affichée avant que le destinataire accepte ou décline."
+      title="Pourquoi appelez-vous ?"
+      description="Une phrase suffit. Elle s’affichera avant que le destinataire décroche."
     >
       <View style={styles.reasonEditor}>
         <Text style={styles.label}>Objet de l’appel</Text>
         <VoicePromptInput
-value={reason}
-onChangeText={setReason}
-placeholder="Ex. Valider le lieu de l’afterwork de vendredi"
-prompt="Quel est l’objet de votre appel ?"
-maxLength={160}
+          value={reason}
+          onChangeText={setReason}
+          onSubmit={() => void startOutgoingCall()}
+          placeholder="Ex. Valider le lieu de l’afterwork de vendredi"
+          maxLength={160}
         />
         <Text style={styles.counter}>{reason.length}/160</Text>
       </View>
@@ -270,6 +291,7 @@ maxLength={160}
         icon={mode === "audio" ? "call" : "videocam"}
         label={preparing ? "Préparation…" : "Lancer l’appel"}
         busy={preparing}
+        disabled={reason.trim().length < 3}
         onPress={() => void startOutgoingCall()}
       />
       <SecondaryButton label="Annuler" onPress={() => void close()} />

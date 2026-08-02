@@ -571,29 +571,71 @@ export default function ChatScreen() {
   const votePoll = async (message: ChatMessage, optionId: string) => {
     if (!message.poll) return;
     const currentPoll = pollOverrides[message.id] ?? message.poll;
-    const active = !currentPoll.options.find((option) => option.id === optionId)
-      ?.votedByCurrentUser;
-    if (!messagingApi || message.id.startsWith("local-")) {
-      const updated = updateLocalPoll(currentPoll, optionId);
-      setPollOverrides((previous) => ({ ...previous, [message.id]: updated }));
-      return;
-    }
+    const optimisticPoll = updateLocalPoll(currentPoll, optionId);
+    const active = Boolean(
+      optimisticPoll.options.find((option) => option.id === optionId)
+        ?.votedByCurrentUser
+    );
+
+    setPollOverrides((previous) => ({
+      ...previous,
+      [message.id]: optimisticPoll
+    }));
+
+    if (!messagingApi || message.id.startsWith("local-")) return;
+
     try {
       const updatedMessage = await messagingApi.votePoll(
         message.id,
         optionId,
         active
       );
-      if (updatedMessage.poll) {
-        setPollOverrides((previous) => ({
-          ...previous,
-          [message.id]: updatedMessage.poll!
-        }));
-      }
+      if (!updatedMessage.poll) return;
+
+      setPollOverrides((previous) => {
+        if (previous[message.id] !== optimisticPoll) return previous;
+        const serverPoll = updatedMessage.poll!;
+        const optimisticById = new Map(
+          optimisticPoll.options.map((option) => [option.id, option])
+        );
+        const options = serverPoll.options.map((serverOption) => {
+          const optimisticOption = optimisticById.get(serverOption.id);
+          if (!optimisticOption) return serverOption;
+          const selected = optimisticOption.votedByCurrentUser;
+          const serverSelected = serverOption.votedByCurrentUser;
+          return {
+            ...serverOption,
+            votedByCurrentUser: selected,
+            voteCount: Math.max(
+              0,
+              serverOption.voteCount +
+                (selected && !serverSelected
+                  ? 1
+                  : !selected && serverSelected
+                    ? -1
+                    : 0)
+            )
+          };
+        });
+        const mergedPoll: MessagePoll = {
+          ...serverPoll,
+          allowMultiple: currentPoll.allowMultiple,
+          options,
+          totalVotes: options.reduce((sum, option) => sum + option.voteCount, 0)
+        };
+        return { ...previous, [message.id]: mergedPoll };
+      });
     } catch (error) {
+      setPollOverrides((previous) =>
+        previous[message.id] === optimisticPoll
+          ? { ...previous, [message.id]: currentPoll }
+          : previous
+      );
       Alert.alert(
         "Vote impossible",
-        error instanceof Error ? error.message : "Le vote n’a pas été enregistré."
+        error instanceof Error
+          ? error.message
+          : "Le vote n’a pas été enregistré."
       );
     }
   };

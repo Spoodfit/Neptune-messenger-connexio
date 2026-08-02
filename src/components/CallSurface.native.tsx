@@ -49,6 +49,7 @@ export default function CallSurface({
         javaScriptEnabled
         domStorageEnabled
         mediaPlaybackRequiresUserAction={false}
+        allowFileAccess
         allowsInlineMediaPlayback
         allowsFullscreenVideo
         originWhitelist={["https://*", "http://localhost*"]}

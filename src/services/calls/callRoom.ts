@@ -1,4 +1,10 @@
+import { Asset } from "expo-asset";
+
 export type CallMode = "audio" | "video";
+
+const CONNEXIO_RINGTONE_URI = Asset.fromModule(
+  require("../../../assets/audio/connexio-ringtone.mp3")
+).uri;
 
 export interface IntegratedCallSession {
   id: string;
@@ -51,7 +57,8 @@ export function buildIntegratedCallHtml(
     iceServers: session.iceServers,
     displayName,
     mock: session.mock === true,
-    icons: CALL_CONTROL_ICONS
+    icons: CALL_CONTROL_ICONS,
+    ringtoneUrl: CONNEXIO_RINGTONE_URI
   };
   const scriptUrl = socketClientScriptUrl(session);
 
@@ -121,9 +128,8 @@ export function buildIntegratedCallHtml(
     let cameraOff = cfg.mode === 'audio';
     let facingMode = 'user';
     let ended = false;
-    let ringbackTimer = null;
+    let ringtone = null;
     let noAnswerTimer = null;
-    let audioContext = null;
 
     muteButton.innerHTML = cfg.icons.mic;
     cameraButton.innerHTML = cfg.icons.camera;
@@ -147,38 +153,37 @@ export function buildIntegratedCallHtml(
       networkText.textContent = label;
     };
     const stopRingback = () => {
-      if (ringbackTimer) clearInterval(ringbackTimer);
       if (noAnswerTimer) clearTimeout(noAnswerTimer);
-      ringbackTimer = null;
       noAnswerTimer = null;
-    };
-    const playRingPulse = () => {
-      try {
-        audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
-        const now = audioContext.currentTime;
-        [440,480].forEach(frequency => {
-          const oscillator = audioContext.createOscillator();
-          const gain = audioContext.createGain();
-          oscillator.frequency.value = frequency;
-          gain.gain.setValueAtTime(.0001, now);
-          gain.gain.exponentialRampToValueAtTime(.055, now + .02);
-          gain.gain.setValueAtTime(.055, now + .72);
-          gain.gain.exponentialRampToValueAtTime(.0001, now + .86);
-          oscillator.connect(gain).connect(audioContext.destination);
-          oscillator.start(now);
-          oscillator.stop(now + .9);
-        });
-      } catch {}
+      if (ringtone) {
+        try {
+          ringtone.pause();
+          ringtone.currentTime = 0;
+        } catch {}
+      }
     };
     const startRingback = () => {
-      if (!cfg.initiator || ringbackTimer) return;
-      playRingPulse();
-      ringbackTimer = setInterval(playRingPulse, 3000);
+      if (!cfg.initiator || noAnswerTimer) return;
+      try {
+        ringtone = ringtone || new Audio(cfg.ringtoneUrl);
+        ringtone.loop = true;
+        ringtone.preload = 'auto';
+        ringtone.volume = .64;
+        ringtone.currentTime = 0;
+        const playback = ringtone.play();
+        if (playback && typeof playback.catch === 'function') {
+          playback.catch(() => {});
+        }
+      } catch {}
       noAnswerTimer = setTimeout(() => {
         stopRingback();
         status.textContent = 'Aucune réponse. Vous pouvez laisser un message vocal.';
         setNetwork('Sans réponse');
-        post('unanswered', { callId: cfg.callId, conversationId: cfg.conversationId, reason: cfg.reason });
+        post('unanswered', {
+          callId: cfg.callId,
+          conversationId: cfg.conversationId,
+          reason: cfg.reason
+        });
       }, 30000);
     };
     const fail = (message) => {
@@ -194,7 +199,6 @@ export function buildIntegratedCallHtml(
       if (stream) stream.getTracks().forEach(track => track.stop());
       if (peer) { try { peer.close(); } catch {} }
       if (socket) { try { socket.disconnect(); } catch {} }
-      if (audioContext) { try { audioContext.close(); } catch {} }
     };
     const endCall = (notify = true) => {
       if (ended) return;

@@ -56,7 +56,7 @@ export function InlineVoiceRecorder({
   );
   const waveform = useMemo(
     () =>
-      Array.from({ length: 24 }, (_, index) => {
+      Array.from({ length: 38 }, (_, index) => {
         const phase = elapsedSeconds * 7 + index * 0.9;
         const fallbackLevel = 0.18 + Math.abs(Math.sin(phase)) * 0.42;
         const liveLevel = recorderState.metering == null ? fallbackLevel : meteringLevel;
@@ -189,6 +189,8 @@ export function InlineVoiceRecorder({
 
 const styles = StyleSheet.create({
   shell: {
+    width: "100%",
+    alignSelf: "stretch",
     minHeight: 58,
     borderRadius: 22,
     borderWidth: 1,
@@ -206,7 +208,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  recordingContent: { flex: 1, minWidth: 0 },
+  recordingContent: {
+    flex: 1,
+    minWidth: 0,
+    alignSelf: "stretch",
+    justifyContent: "center"
+  },
   recordingHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   liveDot: {
     width: 7,
@@ -217,10 +224,11 @@ const styles = StyleSheet.create({
   timer: { color: colors.text, fontSize: 11, fontWeight: "900" },
   status: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
   waveform: {
+    width: "100%",
     height: 31,
     flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    justifyContent: "space-between",
     overflow: "hidden"
   },
   waveBar: { width: 2.5, borderRadius: 2, backgroundColor: colors.orange },

@@ -274,8 +274,8 @@ export function MessageBubble({
 
           <View style={styles.bubbleStage}>
             <Pressable
-    accessible={false}
-    onLongPress={() => setReactionOpen(true)}
+              accessible={false}
+              onLongPress={() => setReactionOpen(true)}
               delayLongPress={320}
             >
               {message.isMine ? (
@@ -299,54 +299,54 @@ export function MessageBubble({
               )}
             </Pressable>
 
-            {showDetachedReactionButton ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Ajouter une réaction"
-                onPress={() => setReactionOpen((value) => !value)}
-                style={[
-                  styles.reactionAdd,
-                  message.isMine
-                    ? styles.reactionAddMine
-                    : styles.reactionAddOther
-                ]}
-              >
-                <View style={styles.reactionAddVisual}>
-                  <Ionicons name="add" size={10} color={colors.textMuted} />
-                </View>
-              </Pressable>
-            ) : null}
-          </View>
-
-          {reactionOpen ? (
-            <Animated.View
-              style={[
-                styles.reactionPicker,
-                message.isMine && styles.reactionPickerMine,
-                reactionStyle
-              ]}
-            >
-              {QUICK_REACTIONS.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Réagir avec ${emoji}`}
-                  accessibilityState={{ selected: currentReaction === emoji }}
-                  onPress={() => chooseReaction(emoji)}
-                  style={styles.reactionChoiceTarget}
-                >
-                  <View
+            {showDetachedReactionButton || reactionOpen ? (
+              <View style={styles.reactionAnchor} pointerEvents="box-none">
+                {reactionOpen ? (
+                  <Animated.View
                     style={[
-                      styles.reactionChoiceVisual,
-                      currentReaction === emoji && styles.reactionChoiceActive
+                      styles.reactionPicker,
+                      message.isMine
+                        ? styles.reactionPickerLeft
+                        : styles.reactionPickerRight,
+                      reactionStyle
                     ]}
                   >
-                    <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
-                  </View>
-                </Pressable>
-              ))}
-            </Animated.View>
-          ) : null}
+                    {QUICK_REACTIONS.map((emoji) => (
+                      <Pressable
+                        key={emoji}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Réagir avec ${emoji}`}
+                        accessibilityState={{ selected: currentReaction === emoji }}
+                        onPress={() => chooseReaction(emoji)}
+                        style={styles.reactionChoiceTarget}
+                      >
+                        <View
+                          style={[
+                            styles.reactionChoiceVisual,
+                            currentReaction === emoji && styles.reactionChoiceActive
+                          ]}
+                        >
+                          <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </Animated.View>
+                ) : null}
+                {showDetachedReactionButton ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Ajouter une réaction"
+                    onPress={() => setReactionOpen((value) => !value)}
+                    style={styles.reactionAdd}
+                  >
+                    <View style={styles.reactionAddVisual}>
+                      <Ionicons name="add" size={10} color={colors.textMuted} />
+                    </View>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
 
           {reactions.length > 0 ? (
             <View
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlignVertical: "center"
   },
-  bubbleStage: { maxWidth: "100%", position: "relative" },
+  bubbleStage: { maxWidth: "100%", position: "relative", overflow: "visible" },
   bubble: {
     maxWidth: "100%",
     borderRadius: 17,
@@ -518,11 +518,19 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: "right"
   },
+  reactionAnchor: {
+    position: "absolute",
+    right: -8,
+    bottom: -22,
+    width: 44,
+    height: 44,
+    zIndex: 40,
+    elevation: 18,
+    overflow: "visible"
+  },
   reactionPicker: {
     position: "absolute",
-    left: 0,
-    bottom: "100%",
-    marginBottom: 7,
+    top: 1,
     height: 42,
     paddingHorizontal: 4,
     borderRadius: 999,
@@ -539,7 +547,8 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 }
   },
-  reactionPickerMine: { left: undefined, right: 0 },
+  reactionPickerLeft: { right: 38 },
+  reactionPickerRight: { left: 38 },
   reactionChoiceTarget: {
     width: 36,
     height: 40,
@@ -592,9 +601,6 @@ const styles = StyleSheet.create({
   reactionEmoji: { fontSize: 12 },
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   reactionAdd: {
-    position: "absolute",
-    right: -8,
-    bottom: -22,
     width: 44,
     height: 44,
     alignItems: "center",
@@ -602,8 +608,6 @@ const styles = StyleSheet.create({
     zIndex: 12,
     elevation: 9
   },
-  reactionAddMine: { right: -8 },
-  reactionAddOther: { right: -8 },
   reactionAddVisual: {
     width: 18,
     height: 18,
@@ -617,7 +621,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.24,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
-    transform: [{ translateX: 6 }]
   },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
