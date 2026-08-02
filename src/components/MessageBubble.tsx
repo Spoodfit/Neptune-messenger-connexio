@@ -274,9 +274,8 @@ export function MessageBubble({
 
           <View style={styles.bubbleStage}>
             <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Message. Maintenir pour réagir."
-              onLongPress={() => setReactionOpen(true)}
+    accessible={false}
+    onLongPress={() => setReactionOpen(true)}
               delayLongPress={320}
             >
               {message.isMine ? (
@@ -594,17 +593,17 @@ const styles = StyleSheet.create({
   reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   reactionAdd: {
     position: "absolute",
-    right: -7,
-    bottom: -15,
-    width: 32,
-    height: 32,
+    right: -16,
+    bottom: -22,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 12,
     elevation: 9
   },
-  reactionAddMine: { right: -7 },
-  reactionAddOther: { right: -7 },
+  reactionAddMine: { right: -16 },
+  reactionAddOther: { right: -16 },
   reactionAddVisual: {
     width: 18,
     height: 18,
@@ -617,7 +616,8 @@ const styles = StyleSheet.create({
     shadowColor: "#000000",
     shadowOpacity: 0.24,
     shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 }
+    shadowOffset: { width: 0, height: 3 },
+    transform: [{ translateX: 6 }]
   },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
