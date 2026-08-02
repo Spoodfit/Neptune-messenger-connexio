@@ -1,0 +1,30 @@
+name: Fix highlight targets
+
+on:
+  push:
+    branches:
+      - feat/v14-ux-calls-moderation
+    paths:
+      - .github/workflows/fix-highlight-targets.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v14-ux-calls-moderation
+          fetch-depth: 0
+      - name: Apply correction
+        run: python scripts/tmp_fix_highlight_targets.py
+      - name: Commit
+        run: |
+          git config user.name "neptunebusinessclub"
+          git config user.email "261424492+neptunebusinessclub@users.noreply.github.com"
+          git rm .github/workflows/fix-highlight-targets.yml scripts/tmp_fix_highlight_targets.py
+          git add app/new-highlight.tsx
+          git commit -m "fix: preserve 44px highlight touch targets"
+          git push origin HEAD:feat/v14-ux-calls-moderation
