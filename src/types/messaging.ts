@@ -114,6 +114,8 @@ export interface MessageAttachment {
   accuracyRadiusMeters?: number;
   uploadProgress?: number;
   status?: "local" | "uploading" | "ready" | "failed";
+  transcript?: string;
+  transcriptStatus?: "pending" | "ready" | "failed";
 }
 
 export interface MessageReactionSummary {
@@ -129,11 +131,20 @@ export interface ReplyPreview {
   body: string;
 }
 
+export interface PollVoter {
+  id: string;
+  name: string;
+  initials: string;
+  avatarUrl?: string;
+}
+
 export interface PollOption {
   id: string;
   label: string;
   voteCount: number;
   votedByCurrentUser: boolean;
+  voterIds?: string[];
+  voters?: PollVoter[];
 }
 
 export interface MessagePoll {
@@ -143,6 +154,7 @@ export interface MessagePoll {
   allowMultiple: boolean;
   anonymous: boolean;
   totalVotes: number;
+  totalVoters?: number;
   closesAt?: string;
   closedAt?: string;
   eventVoteId?: string;
@@ -155,6 +167,33 @@ export interface CreatePollInput {
   allowMultiple: boolean;
   anonymous: boolean;
   closesAt?: string;
+}
+
+export type ModerationCategory =
+  | "insult"
+  | "harassment"
+  | "forced_commercial"
+  | "repeated_advertising"
+  | "spam"
+  | "unsafe";
+
+export interface ModerationDecision {
+  allowed: boolean;
+  category?: ModerationCategory;
+  reason?: string;
+  warningLevel?: 1 | 2 | 3;
+  suspendedUntil?: string;
+  requiresManualReview?: boolean;
+}
+
+export interface ScheduledMessage {
+  id: string;
+  conversationId: string;
+  body: string;
+  attachments?: MessageAttachment[];
+  scheduledFor: string;
+  createdByUserId: string;
+  status: "scheduled" | "sending" | "sent" | "cancelled" | "failed";
 }
 
 export interface ChatMessage {
@@ -179,6 +218,8 @@ export interface ChatMessage {
   retryCount?: number;
   errorCode?: string;
   deletedAt?: string;
+  moderation?: ModerationDecision;
+  scheduledFor?: string;
 }
 
 export interface PushTokenRegistration {
