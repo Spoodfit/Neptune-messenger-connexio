@@ -8,7 +8,8 @@ import type { CallSurfaceProps } from "./CallSurface.types";
 export default function CallSurface({
   session,
   displayName,
-  onClose
+  onClose,
+  onUnanswered
 }: CallSurfaceProps) {
   const html = useMemo(
     () => buildIntegratedCallHtml(session, displayName),
@@ -22,6 +23,18 @@ export default function CallSurface({
         const payload =
           typeof event.data === "string" ? JSON.parse(event.data) : event.data;
         if (payload?.type === "ended") onClose();
+        if (
+          payload?.type === "unanswered" &&
+          typeof payload.callId === "string" &&
+          typeof payload.conversationId === "string"
+        ) {
+          onUnanswered?.({
+            callId: payload.callId,
+            conversationId: payload.conversationId,
+            reason:
+              typeof payload.reason === "string" ? payload.reason : undefined
+          });
+        }
       } catch {
         // Les messages externes qui ne concernent pas l’appel sont ignorés.
       }
@@ -29,7 +42,7 @@ export default function CallSurface({
     globalThis.addEventListener?.("message", listener as EventListener);
     return () =>
       globalThis.removeEventListener?.("message", listener as EventListener);
-  }, [onClose]);
+  }, [onClose, onUnanswered]);
 
   return (
     <View style={styles.screen}>
