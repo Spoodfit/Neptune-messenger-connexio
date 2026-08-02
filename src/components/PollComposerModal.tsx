@@ -30,7 +30,7 @@ export function PollComposerModal({
 }: PollComposerModalProps) {
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState<string[]>(EMPTY_OPTIONS);
-  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [allowMultiple, setAllowMultiple] = useState(true);
   const [anonymous, setAnonymous] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -38,7 +38,7 @@ export function PollComposerModal({
     if (!visible) return;
     setQuestion("");
     setOptions(EMPTY_OPTIONS);
-    setAllowMultiple(false);
+    setAllowMultiple(true);
     setAnonymous(false);
     setCreating(false);
   }, [visible]);
@@ -63,7 +63,10 @@ export function PollComposerModal({
       Alert.alert("Réponses requises", "Ajoutez au moins deux choix.");
       return;
     }
-    if (new Set(cleanOptions.map((item) => item.toLocaleLowerCase("fr"))).size !== cleanOptions.length) {
+    if (
+      new Set(cleanOptions.map((item) => item.toLocaleLowerCase("fr"))).size !==
+      cleanOptions.length
+    ) {
       Alert.alert("Choix en double", "Chaque réponse doit être différente.");
       return;
     }
@@ -149,7 +152,11 @@ export function PollComposerModal({
                     }
                     style={styles.remove}
                   >
-                    <Ionicons name="remove-circle-outline" size={21} color={colors.danger} />
+                    <Ionicons
+                      name="remove-circle-outline"
+                      size={21}
+                      color={colors.danger}
+                    />
                   </Pressable>
                 ) : null}
               </View>
@@ -168,13 +175,14 @@ export function PollComposerModal({
 
             <View style={styles.settingRow}>
               <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Choix multiples</Text>
+                <Text style={styles.settingTitle}>Plusieurs réponses possibles</Text>
                 <Text style={styles.settingSubtitle}>
-                  Un membre peut voter pour plusieurs réponses.
+                  Activé par défaut pour laisser chaque membre sélectionner tous les
+                  choix pertinents.
                 </Text>
               </View>
               <Switch
-                accessibilityLabel="Autoriser les choix multiples"
+                accessibilityLabel="Autoriser plusieurs réponses"
                 value={allowMultiple}
                 onValueChange={setAllowMultiple}
                 trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
@@ -219,7 +227,11 @@ export function PollComposerModal({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.68)" },
+  backdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.68)"
+  },
   sheet: {
     width: "100%",
     maxWidth: 680,
@@ -234,28 +246,111 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface
   },
-  handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", backgroundColor: colors.textMuted, marginBottom: 10 },
-  header: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  handle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    backgroundColor: colors.textMuted,
+    marginBottom: 10
+  },
+  header: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
   headerText: { flex: 1, minWidth: 0 },
   title: { ...typography.heading3, color: colors.text },
   subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3 },
-  close: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceStrong },
+  close: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceStrong
+  },
   content: { paddingBottom: spacing.md },
-  label: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 12, marginBottom: 6 },
-  input: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, paddingHorizontal: 12, paddingVertical: 10 },
+  label: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    fontWeight: "900",
+    marginTop: 12,
+    marginBottom: 6
+  },
+  input: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong,
+    color: colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
   question: { minHeight: 72, textAlignVertical: "top" },
-  optionRow: { minHeight: 50, marginBottom: 7, flexDirection: "row", alignItems: "center", gap: 8 },
-  optionNumber: { width: 31, height: 31, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
+  optionRow: {
+    minHeight: 50,
+    marginBottom: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  optionNumber: {
+    width: 31,
+    height: 31,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primarySoft
+  },
   optionNumberText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  optionInput: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 15, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, paddingHorizontal: 12 },
+  optionInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong,
+    color: colors.text,
+    paddingHorizontal: 12
+  },
   remove: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  addOption: { minHeight: 46, borderRadius: 15, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  addOption: {
+    minHeight: 46,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.border,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
   addOptionText: { color: colors.orange, fontSize: 11, fontWeight: "800" },
-  settingRow: { minHeight: 66, marginTop: 8, paddingHorizontal: 10, borderRadius: 17, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 12 },
+  settingRow: {
+    minHeight: 66,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    borderRadius: 17,
+    backgroundColor: colors.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
   settingText: { flex: 1, minWidth: 0 },
   settingTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
   settingSubtitle: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
-  submit: { minHeight: 52, borderRadius: 18, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  submit: {
+    minHeight: 52,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
   submitText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   disabled: { opacity: 0.5 }
 });
