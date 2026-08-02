@@ -66,6 +66,15 @@ export interface HighlightComment {
   reactions: HighlightReactionSummary[];
 }
 
+export interface HighlightLocation {
+  label: string;
+  placeId?: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  accuracyRadiusMeters: number;
+}
+
 export interface HighlightPost {
   id: string;
   author: AppUser;
@@ -82,8 +91,18 @@ export interface HighlightPost {
     longitude: number;
     accuracyRadiusMeters: number;
   };
+  location?: HighlightLocation;
   syncedWithBusinessApp?: boolean;
+  syncedWithAdvantagesCommittee?: boolean;
   syncState?: "local" | "queued" | "synced" | "failed";
+}
+
+export interface PlaceSuggestion {
+  id: string;
+  label: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
 }
 
 export interface MapMemberMoment {
