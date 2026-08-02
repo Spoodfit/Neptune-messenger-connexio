@@ -3,7 +3,7 @@ import { apiRequest } from "./httpClient";
 import {
   normalizeAppUser,
   normalizeSessionPayload
-} from "./wire";
+} from "./wireExtensions";
 import type { AppUser, SessionPayload } from "../../types/messaging";
 
 function unwrapUser(payload: unknown): unknown {
