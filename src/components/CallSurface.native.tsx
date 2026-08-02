@@ -1,68 +1,48 @@
-import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { WebView } from "react-native-webview";
+import { useMemo } from "react";
+import { StyleSheet, View } from "react-native";
+import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
-import { env } from "../config/env";
-import { buildCallUrl } from "../services/calls/callRoom";
+import { buildIntegratedCallHtml } from "../services/calls/callRoom";
 import { colors } from "../theme";
 import type { CallSurfaceProps } from "./CallSurface.types";
 
 export default function CallSurface({
-  conversationId,
-  mode,
+  session,
   displayName,
   onClose
 }: CallSurfaceProps) {
-  const url = buildCallUrl(env.callBaseUrl, conversationId, mode, displayName);
+  const html = useMemo(
+    () => buildIntegratedCallHtml(session, displayName),
+    [displayName, session]
+  );
+
+  const handleMessage = (event: WebViewMessageEvent) => {
+    try {
+      const payload = JSON.parse(event.nativeEvent.data) as { type?: string };
+      if (payload.type === "ended") onClose();
+    } catch {
+      // Les messages invalides sont ignorés sans interrompre l’appel.
+    }
+  };
 
   return (
     <View style={styles.screen}>
       <WebView
-        source={{ uri: url }}
+        source={{ html, baseUrl: new URL(session.socketUrl).origin }}
         javaScriptEnabled
         domStorageEnabled
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback
         allowsFullscreenVideo
-        originWhitelist={["https://*"]}
-        startInLoadingState
-        renderLoading={() => (
-          <View style={styles.loader}>
-            <ActivityIndicator size="large" color={colors.violet} />
-          </View>
-        )}
+        originWhitelist={["https://*", "http://localhost*"]}
+        onMessage={handleMessage}
         style={styles.webView}
       />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Quitter l’appel"
-        onPress={onClose}
-        style={styles.closeButton}
-      >
-        <Ionicons name="close" size={24} color={colors.white} />
-      </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  webView: { flex: 1, backgroundColor: colors.background },
-  loader: {
-    ...StyleSheet.absoluteFill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.background
-  },
-  closeButton: {
-    position: "absolute",
-    top: 18,
-    right: 18,
-    width: 48,
-    height: 48,
-    borderRadius: 18,
-    backgroundColor: "rgba(175,35,57,0.94)",
-    alignItems: "center",
-    justifyContent: "center"
-  }
+  webView: { flex: 1, backgroundColor: colors.background }
 });
