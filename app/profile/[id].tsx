@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ActionSheet, type ActionSheetOption } from "@/components/ActionSheet";
 import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
@@ -31,7 +32,8 @@ export default function MemberProfileScreen() {
     getMember,
     posts,
     localConversations,
-    createPrivateConversation
+    createPrivateConversation,
+    toggleConversationMuted
   } = useExperience();
   const { visibleConversations, refreshConversations } = useMessaging();
   const api = useMemo(
@@ -39,6 +41,7 @@ export default function MemberProfileScreen() {
     [accessToken]
   );
   const [opening, setOpening] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const member = getMember(id);
 
   if (!member) {
@@ -119,52 +122,130 @@ export default function MemberProfileScreen() {
     void Linking.openURL(`tel:${member.phone}`);
   };
 
-  const openSecurityActions = () => {
-    Alert.alert("Actions de sécurité", `Que souhaitez-vous faire avec ${member.name} ?`, [
-      { text: "Annuler", style: "cancel" },
-      {
-        text: "Signaler",
-        onPress: () => {
-          if (!api) {
-            Alert.alert("Signalement enregistré", "Mode démonstration.");
-            return;
-          }
-          void api
-            .reportContent("profile", member.id, "Profil signalé depuis Connexio")
-            .then(() => Alert.alert("Signalement transmis"))
-            .catch((error: unknown) =>
-              Alert.alert(
-                "Signalement impossible",
-                error instanceof Error ? error.message : "Réessayez ultérieurement."
-              )
-            );
-        }
-      },
-      {
-        text: "Bloquer",
-        style: "destructive",
-        onPress: () => {
-          if (!api) {
-            Alert.alert("Membre bloqué", "Mode démonstration.");
-            router.back();
-            return;
-          }
-          void api
-            .blockMember(member.id)
-            .then(() => {
-              Alert.alert("Membre bloqué");
-              router.replace("/(tabs)/messages");
-            })
-            .catch((error: unknown) =>
-              Alert.alert(
-                "Blocage impossible",
-                error instanceof Error ? error.message : "Réessayez ultérieurement."
-              )
-            );
-        }
-      }
-    ]);
+  const reportMember = async () => {
+    if (!api) {
+      Alert.alert(
+        "Signalement enregistré",
+        "Le mode démonstration a simulé l’envoi à la modération."
+      );
+      return;
+    }
+    try {
+      await api.reportContent(
+        "profile",
+        member.id,
+        "Profil signalé depuis Connexio"
+      );
+      Alert.alert(
+        "Signalement transmis",
+        "La modération Neptune va examiner ce profil."
+      );
+    } catch (error) {
+      Alert.alert(
+        "Signalement impossible",
+        error instanceof Error ? error.message : "Réessayez ultérieurement."
+      );
+    }
   };
+
+  const blockMember = () => {
+    Alert.alert(
+      `Bloquer ${member.name} ?`,
+      "Vous ne recevrez plus ses messages et il ne pourra plus vous appeler dans Connexio.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Bloquer",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                if (api) await api.blockMember(member.id);
+                Alert.alert("Membre bloqué");
+                router.replace("/(tabs)/messages");
+              } catch (error) {
+                Alert.alert(
+                  "Blocage impossible",
+                  error instanceof Error ? error.message : "Réessayez ultérieurement."
+                );
+              }
+            })();
+          }
+        }
+      ]
+    );
+  };
+
+  const muteMember = async () => {
+    try {
+      const conversation = await ensureConversation();
+      const nextMuted = !conversation.muted;
+      if (api && !conversation.id.startsWith("local-")) {
+        await api.setConversationMuted(conversation.id, nextMuted);
+        await refreshConversations();
+      } else {
+        toggleConversationMuted(conversation.id);
+      }
+      Alert.alert(
+        nextMuted ? "Messages mis en sourdine" : "Notifications réactivées",
+        nextMuted
+          ? `Les nouveaux messages de ${member.name} resteront visibles sans notification.`
+          : `Vous recevrez de nouveau les notifications de ${member.name}.`
+      );
+    } catch (error) {
+      Alert.alert(
+        "Action impossible",
+        error instanceof Error ? error.message : "Réessayez ultérieurement."
+      );
+    }
+  };
+
+  const openBusinessProfile = async () => {
+    const url =
+      member.webProfileUrl ??
+      `${env.businessWebBaseUrl.replace(/\/$/, "")}/profile/${encodeURIComponent(member.id)}`;
+    const supported = await Linking.canOpenURL(url);
+    if (!supported) {
+      Alert.alert(
+        "Profil indisponible",
+        "Le profil Neptune Business ne peut pas être ouvert."
+      );
+      return;
+    }
+    await Linking.openURL(url);
+  };
+
+  const menuOptions: ActionSheetOption[] = [
+    {
+      id: "business-profile",
+      label: "Voir le profil Neptune Business",
+      icon: "open-outline",
+      onPress: openBusinessProfile
+    },
+    {
+      id: "mute",
+      label: existingConversation?.muted
+        ? "Réactiver ses notifications"
+        : "Mettre ses messages en sourdine",
+      icon: existingConversation?.muted
+        ? "notifications-outline"
+        : "notifications-off-outline",
+      onPress: muteMember
+    },
+    {
+      id: "report",
+      label: "Signaler ce membre",
+      icon: "flag-outline",
+      onPress: reportMember
+    },
+    {
+      id: "block",
+      label: "Bloquer ce membre",
+      icon: "person-remove-outline",
+      destructive: true,
+      onPress: blockMember
+    }
+  ];
 
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
@@ -192,7 +273,7 @@ export default function MemberProfileScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Plus d’options"
-          onPress={openSecurityActions}
+          onPress={() => setMenuOpen(true)}
           style={styles.headerButton}
         >
           <Ionicons name="ellipsis-horizontal" size={23} color={colors.text} />
@@ -328,6 +409,14 @@ export default function MemberProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      <ActionSheet
+        visible={menuOpen}
+        title={member.name}
+        subtitle={member.company}
+        options={menuOptions}
+        onClose={() => setMenuOpen(false)}
+      />
     </LinearGradient>
   );
 }
@@ -367,18 +456,18 @@ const styles = StyleSheet.create({
   posts: { gap: 9 },
   postCard: { padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
   pressed: { opacity: 0.8, transform: [{ scale: 0.992 }] },
-  postTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  kindBadge: { minHeight: 24, paddingHorizontal: 8, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  kindText: { color: colors.orange, fontSize: 9, fontWeight: "900" },
-  postDate: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
-  postBody: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 10 },
-  postStats: { flexDirection: "row", gap: 12, marginTop: 10 },
-  statText: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
-  emptyPosts: { minHeight: 110, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 8 },
-  emptyText: { ...typography.bodySmall, color: colors.textMuted },
+  postTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  kindBadge: { minHeight: 24, paddingHorizontal: 8, borderRadius: 12, backgroundColor: "rgba(244,177,131,0.12)", alignItems: "center", justifyContent: "center" },
+  kindText: { color: colors.orange, fontSize: 8, fontWeight: "900" },
+  postDate: { color: colors.textMuted, fontSize: 9, fontWeight: "700" },
+  postBody: { ...typography.bodySmall, color: colors.textSecondary, lineHeight: 18, marginTop: 9 },
+  postStats: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 },
+  statText: { color: colors.textMuted, fontSize: 9, fontWeight: "700" },
+  emptyPosts: { minHeight: 120, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 8, padding: spacing.md },
+  emptyText: { ...typography.bodySmall, color: colors.textMuted, textAlign: "center" },
   missing: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
   title: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  mutedText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
-  primaryButton: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  mutedText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
+  primaryButton: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 17, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   primaryText: { color: colors.white, fontWeight: "900" }
 });
