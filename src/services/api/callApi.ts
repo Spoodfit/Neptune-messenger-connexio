@@ -28,24 +28,23 @@ function requiredString(value: unknown, label: string): string {
 
 function normalizeIceServers(value: unknown): RTCIceServer[] {
   if (!Array.isArray(value)) return [{ urls: "stun:stun.l.google.com:19302" }];
-  const servers = value
-    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
-    .map((item) => {
-      const urls = item.urls;
-      if (
-        typeof urls !== "string" &&
-        !(Array.isArray(urls) && urls.every((url) => typeof url === "string"))
-      ) {
-        return null;
-      }
-      return {
-        urls,
-        username: typeof item.username === "string" ? item.username : undefined,
-        credential: typeof item.credential === "string" ? item.credential : undefined
-      } satisfies RTCIceServer;
-    })
-    .filter((item): item is RTCIceServer => Boolean(item));
-  return servers.length > 0 ? servers : [{ urls: "stun:stun.l.google.com:19302" }];
+  const servers: RTCIceServer[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Record<string, unknown>;
+    const urls = item.urls;
+    const validUrls =
+      typeof urls === "string" ||
+      (Array.isArray(urls) && urls.every((url) => typeof url === "string"));
+    if (!validUrls) continue;
+    const server: RTCIceServer = { urls: urls as string | string[] };
+    if (typeof item.username === "string") server.username = item.username;
+    if (typeof item.credential === "string") server.credential = item.credential;
+    servers.push(server);
+  }
+  return servers.length > 0
+    ? servers
+    : [{ urls: "stun:stun.l.google.com:19302" }];
 }
 
 export class NeptuneCallApi {
