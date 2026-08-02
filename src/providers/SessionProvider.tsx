@@ -53,6 +53,7 @@ interface SessionContextValue {
   sessionReady: boolean;
   getAccessToken: () => Promise<string | null>;
   refreshAccessToken: () => Promise<string | null>;
+  loginWithNeptune: (email: string, password: string) => Promise<void>;
   exchangeOneTimeCode: (code: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -101,6 +102,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   );
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [cookieAuthenticated, setCookieAuthenticated] = useState(false);
   const [sessionReady, setSessionReady] = useState(env.mockMode);
   const [mockAuthenticated, setMockAuthenticated] = useState(
     initialMockAuthentication
@@ -129,6 +131,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     setAccessToken(session.accessToken);
     setRefreshToken(session.refreshToken);
     setCurrentUser(session.user);
+    setCookieAuthenticated(true);
   }, []);
 
   const clearSession = useCallback(async () => {
@@ -141,6 +144,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     mockSessionAuthenticated = false;
     setAccessToken(null);
     setRefreshToken(null);
+    setCookieAuthenticated(false);
     setCurrentUser(signedOutUser);
     setMockAuthenticated(false);
   }, []);
@@ -204,6 +208,19 @@ export function SessionProvider({ children }: PropsWithChildren) {
     let cancelled = false;
     void (async () => {
       try {
+        try {
+          const user = await sessionApi.getCurrentUser();
+          if (!cancelled) {
+            setCurrentUser(user);
+            setCookieAuthenticated(true);
+          }
+          return;
+        } catch (error) {
+          if (!(error instanceof ApiError) || error.status !== 401) {
+            throw error;
+          }
+        }
+
         const [storedRefreshToken, storedUser] = await Promise.all([
           secureGet(REFRESH_TOKEN_KEY),
           secureGet(USER_KEY)
@@ -239,7 +256,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, [invalidateSession, persistSession]);
 
   useEffect(() => {
-    if (env.mockMode || accessToken || !refreshToken) return;
+    if (env.mockMode || cookieAuthenticated || accessToken || !refreshToken) return;
     const retryTimer = setTimeout(() => void refreshAccessToken(), 5_000);
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void refreshAccessToken();
@@ -248,7 +265,30 @@ export function SessionProvider({ children }: PropsWithChildren) {
       clearTimeout(retryTimer);
       subscription.remove();
     };
-  }, [accessToken, refreshAccessToken, refreshToken]);
+  }, [
+    accessToken,
+    cookieAuthenticated,
+    refreshAccessToken,
+    refreshToken
+  ]);
+
+  const loginWithNeptune = useCallback(async (email: string, password: string) => {
+    const cleanEmail = email.trim().toLocaleLowerCase("fr");
+    if (!cleanEmail || !password) {
+      throw new Error("Adresse email et mot de passe requis.");
+    }
+    if (env.mockMode) {
+      mockSessionAuthenticated = true;
+      setCurrentUser(demoUser);
+      setMockAuthenticated(true);
+      setSessionReady(true);
+      return;
+    }
+    const user = await sessionApi.loginWithCredentials(cleanEmail, password);
+    setCurrentUser(user);
+    setCookieAuthenticated(true);
+    setSessionReady(true);
+  }, []);
 
   const exchangeOneTimeCode = useCallback(
     async (code: string) => {
@@ -280,6 +320,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
       mockSessionAuthenticated = false;
       setAccessToken(null);
       setRefreshToken(null);
+      setCookieAuthenticated(false);
       setCurrentUser(signedOutUser);
       setMockAuthenticated(false);
       return;
@@ -297,7 +338,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
     await invalidateSession();
 
     const revocations: Promise<unknown>[] = [
-      unregisterDeviceFromPushNotifications()
+      unregisterDeviceFromPushNotifications(),
+      sessionApi.logoutCookieSession()
     ];
     if (registeredPushToken && accessTokenToRevoke) {
       revocations.push(
@@ -316,18 +358,23 @@ export function SessionProvider({ children }: PropsWithChildren) {
     () => ({
       currentUser,
       accessToken,
-      isAuthenticated: env.mockMode ? mockAuthenticated : Boolean(accessToken),
+      isAuthenticated: env.mockMode
+        ? mockAuthenticated
+        : cookieAuthenticated || Boolean(accessToken),
       sessionReady,
       getAccessToken,
       refreshAccessToken,
+      loginWithNeptune,
       exchangeOneTimeCode,
       signOut
     }),
     [
       accessToken,
+      cookieAuthenticated,
       currentUser,
       exchangeOneTimeCode,
       getAccessToken,
+      loginWithNeptune,
       mockAuthenticated,
       refreshAccessToken,
       sessionReady,
