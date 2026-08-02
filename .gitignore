@@ -16,3 +16,5 @@ GoogleService-Info.plist
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+.test-dist/
