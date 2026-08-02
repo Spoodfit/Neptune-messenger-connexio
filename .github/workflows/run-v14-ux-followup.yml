@@ -1,0 +1,65 @@
+name: Run requested V14 interaction polish
+
+on:
+  pull_request:
+    branches:
+      - feat/production-hardening
+    types:
+      - synchronize
+      - opened
+      - reopened
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v14-ux-calls-moderation
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Execute product patch
+        shell: bash
+        run: |
+          python <<'RUNNER'
+          from pathlib import Path
+          from textwrap import dedent
+
+          workflow = Path('.github/workflows/apply-v14-ux-followup.yml').read_text()
+          marker_start = "          python <<'PY'\n"
+          marker_end = "\n          PY\n"
+          if marker_start not in workflow or marker_end not in workflow:
+              raise SystemExit('Embedded product patch was not found.')
+          script = workflow.split(marker_start, 1)[1].split(marker_end, 1)[0]
+          exec(dedent(script), {'__name__': '__main__'})
+          RUNNER
+
+      - name: Install compatible audio and speech modules
+        run: |
+          npm install expo-speech-recognition@56.0.1
+          npx expo install expo-audio expo-speech
+
+      - name: Verify TypeScript and domain tests
+        run: npm run verify
+
+      - name: Commit verified changes
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-v14-ux-followup.yml
+          rm -f .github/workflows/run-v14-ux-followup.yml
+          git config user.name "Neptune Product Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: polish reactions, smart replies and voice UX"
+          git push origin HEAD:feat/v14-ux-calls-moderation
