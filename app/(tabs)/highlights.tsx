@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
   View
 } from "react-native";
 
+import { AdvantageAdCard } from "@/components/AdvantageAdCard";
 import { BrandHeader } from "@/components/BrandHeader";
 import { HighlightCard } from "@/components/HighlightCard";
 import NeptuneMap from "@/components/NeptuneMap";
@@ -22,15 +23,59 @@ import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { NeptuneExperienceApi } from "@/services/api/experienceApi";
 import { colors, gradients, typography } from "@/theme";
+import type { HighlightPost } from "@/types/experience";
+
+type FeedBlock =
+  | { id: string; type: "wide"; post: HighlightPost }
+  | { id: string; type: "pair"; posts: [HighlightPost, HighlightPost?] };
+
+function isCompactEligible(post: HighlightPost): boolean {
+  if (post.kind === "besoin") return false;
+  if (post.media?.kind === "video") return false;
+  if (post.body.length > 220) return false;
+  if (post.comments.length > 8) return false;
+  return true;
+}
+
+function buildFeedBlocks(posts: HighlightPost[]): FeedBlock[] {
+  const blocks: FeedBlock[] = [];
+  let index = 0;
+  while (index < posts.length) {
+    const post = posts[index]!;
+    if (!isCompactEligible(post)) {
+      blocks.push({ id: `wide-${post.id}`, type: "wide", post });
+      index += 1;
+      continue;
+    }
+    const next = posts[index + 1];
+    if (next && isCompactEligible(next)) {
+      blocks.push({
+        id: `pair-${post.id}-${next.id}`,
+        type: "pair",
+        posts: [post, next]
+      });
+      index += 2;
+      continue;
+    }
+    blocks.push({ id: `pair-${post.id}-ad`, type: "pair", posts: [post] });
+    index += 1;
+  }
+  return blocks;
+}
 
 export default function HighlightsScreen() {
+  const params = useLocalSearchParams<{ published?: string }>();
+  const publishedId = Array.isArray(params.published)
+    ? params.published[0]
+    : params.published;
   const { accessToken } = useSession();
   const {
     posts,
     mapMoments,
     localConversations,
     togglePostReaction,
-    createPrivateConversation
+    createPrivateConversation,
+    refreshExperience
   } = useExperience();
   const { visibleConversations, refreshConversations } = useMessaging();
   const api = useMemo(
@@ -41,7 +86,9 @@ export default function HighlightsScreen() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [openingAction, setOpeningAction] = useState(false);
   const overlayProgress = useRef(new Animated.Value(0)).current;
+  const publishProgress = useRef(new Animated.Value(publishedId ? 0 : 1)).current;
 
+  const feedBlocks = useMemo(() => buildFeedBlocks(posts), [posts]);
   const selectedMoment = useMemo(
     () => mapMoments.find((moment) => moment.member.id === selectedMemberId),
     [mapMoments, selectedMemberId]
@@ -63,6 +110,18 @@ export default function HighlightsScreen() {
       mass: 0.75
     }).start();
   }, [overlayProgress, selectedMemberId]);
+
+  useEffect(() => {
+    if (!publishedId) return;
+    setMode("feed");
+    void refreshExperience();
+    publishProgress.setValue(0);
+    Animated.timing(publishProgress, {
+      toValue: 1,
+      duration: 460,
+      useNativeDriver: true
+    }).start();
+  }, [publishProgress, publishedId, refreshExperience]);
 
   const ensureSelectedConversation = async () => {
     if (!selectedMoment) throw new Error("Membre introuvable.");
@@ -100,11 +159,46 @@ export default function HighlightsScreen() {
     }
   };
 
+  const renderPost = (post: HighlightPost, compact: boolean) => {
+    const card = (
+      <HighlightCard
+        post={post}
+        compact={compact}
+        onReact={(emoji) => togglePostReaction(post.id, emoji)}
+      />
+    );
+    if (post.id !== publishedId) return card;
+    return (
+      <Animated.View
+        accessibilityLabel="Nouveau Temps fort publié"
+        style={{
+          opacity: publishProgress,
+          transform: [
+            {
+              translateY: publishProgress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [36, 0]
+              })
+            },
+            {
+              scale: publishProgress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.94, 1]
+              })
+            }
+          ]
+        }}
+      >
+        {card}
+      </Animated.View>
+    );
+  };
+
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
       <BrandHeader
         title="Temps forts"
-        subtitle="Publications, besoins et proximité Neptune."
+        subtitle="Publications, besoins, offres et proximité Neptune."
       />
 
       <View style={styles.toolbar}>
@@ -157,26 +251,26 @@ export default function HighlightsScreen() {
           contentContainerStyle={styles.feed}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.feedGrid}>
-            {posts.map((post, index) => {
-              const wide = post.kind === "besoin" || index % 4 === 0;
-              return (
-                <View key={post.id} style={wide ? styles.postWide : styles.postHalf}>
-                  <HighlightCard
-                    post={post}
-                    compact={!wide}
-                    onReact={(emoji) => togglePostReaction(post.id, emoji)}
-                  />
-                </View>
-              );
-            })}
-            {posts.length === 0 ? (
-              <View style={styles.emptyFeed}>
-                <Ionicons name="sparkles-outline" size={28} color={colors.textMuted} />
-                <Text style={styles.emptyText}>Aucun Temps fort visible.</Text>
+          {feedBlocks.map((block) =>
+            block.type === "wide" ? (
+              <View key={block.id} style={styles.wideRow}>
+                {renderPost(block.post, false)}
               </View>
-            ) : null}
-          </View>
+            ) : (
+              <View key={block.id} style={styles.pairRow}>
+                <View style={styles.halfColumn}>{renderPost(block.posts[0], true)}</View>
+                <View style={styles.halfColumn}>
+                  {block.posts[1] ? renderPost(block.posts[1], true) : <AdvantageAdCard />}
+                </View>
+              </View>
+            )
+          )}
+          {posts.length === 0 ? (
+            <View style={styles.emptyFeed}>
+              <Ionicons name="sparkles-outline" size={28} color={colors.textMuted} />
+              <Text style={styles.emptyText}>Aucun Temps fort visible.</Text>
+            </View>
+          ) : null}
         </ScrollView>
       ) : (
         <View style={styles.mapStage}>
@@ -330,33 +424,25 @@ export default function HighlightsScreen() {
                     <ActivityIndicator size="small" color={colors.violet} />
                   </View>
                 ) : null}
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={openingAction}
-                  onPress={() => void openSelectedAction("message")}
-                  style={styles.quickAction}
-                >
-                  <Ionicons name="chatbubble" size={19} color={colors.text} />
-                  <Text style={styles.quickText}>Message</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={openingAction}
-                  onPress={() => void openSelectedAction("audio")}
-                  style={styles.quickAction}
-                >
-                  <Ionicons name="call" size={19} color={colors.text} />
-                  <Text style={styles.quickText}>Appeler</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={openingAction}
-                  onPress={() => void openSelectedAction("video")}
-                  style={styles.quickAction}
-                >
-                  <Ionicons name="videocam" size={20} color={colors.text} />
-                  <Text style={styles.quickText}>Visio</Text>
-                </Pressable>
+                {(
+                  [
+                    ["message", "chatbubble", "Message"],
+                    ["audio", "call", "Appeler"],
+                    ["video", "videocam", "Visio"]
+                  ] as const
+                ).map(([action, icon, label]) => (
+                  <Pressable
+                    key={action}
+                    accessibilityRole="button"
+                    accessibilityLabel={label}
+                    disabled={openingAction}
+                    onPress={() => void openSelectedAction(action)}
+                    style={styles.quickAction}
+                  >
+                    <Ionicons name={icon} size={20} color={colors.text} />
+                    <Text style={styles.quickText}>{label}</Text>
+                  </Pressable>
+                ))}
               </View>
             </Animated.View>
           ) : (
@@ -382,10 +468,10 @@ const styles = StyleSheet.create({
   modeLabelActive: { color: colors.text },
   createButton: { width: 44, height: 44, borderRadius: 15, overflow: "hidden" },
   createGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
-  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24 },
-  feedGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 9 },
-  postWide: { width: "100%" },
-  postHalf: { width: "48.5%" },
+  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24, gap: 9 },
+  wideRow: { width: "100%" },
+  pairRow: { width: "100%", flexDirection: "row", alignItems: "stretch", gap: 9 },
+  halfColumn: { flex: 1, minWidth: 0 },
   emptyFeed: { width: "100%", minHeight: 180, alignItems: "center", justifyContent: "center", gap: 8 },
   emptyText: { ...typography.bodySmall, color: colors.textMuted },
   mapStage: { flex: 1, width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 12, position: "relative" },
@@ -402,20 +488,20 @@ const styles = StyleSheet.create({
   memberName: { color: colors.text, fontSize: 13, fontWeight: "900" },
   memberMeta: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
   closeButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  momentScroll: { maxHeight: 320 },
-  floatingMoments: { gap: 7, paddingVertical: 6 },
-  momentBubble: { padding: 11, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
-  momentTop: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
-  momentKind: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
+  momentScroll: { maxHeight: 330 },
+  floatingMoments: { gap: 8, paddingVertical: 7 },
+  momentBubble: { padding: 11, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
+  momentTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  momentKind: { color: colors.orange, fontSize: 8, fontWeight: "900" },
   momentDate: { color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
-  momentBody: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 6 },
-  bubbleActions: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 7 },
-  bubbleReaction: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  bubbleEmoji: { fontSize: 17 },
-  bubbleComment: { minWidth: 54, height: 44, paddingHorizontal: 8, borderRadius: 15, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
-  momentStat: { color: colors.textMuted, fontSize: 9, fontWeight: "700" },
-  quickActions: { marginTop: 5, flexDirection: "row", gap: 7, position: "relative" },
-  quickAction: { flex: 1, minHeight: 48, borderRadius: 16, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  quickText: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
-  actionLoader: { position: "absolute", zIndex: 3, inset: 0, borderRadius: 16, backgroundColor: "rgba(5,11,28,0.72)", alignItems: "center", justifyContent: "center" }
+  momentBody: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 6 },
+  bubbleActions: { minHeight: 44, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 2 },
+  bubbleReaction: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  bubbleEmoji: { fontSize: 18 },
+  bubbleComment: { minWidth: 52, height: 44, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  momentStat: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  quickActions: { minHeight: 58, borderTopWidth: 1, borderTopColor: colors.borderSoft, flexDirection: "row", alignItems: "center", position: "relative" },
+  actionLoader: { position: "absolute", top: -30, left: 0, right: 0, alignItems: "center" },
+  quickAction: { flex: 1, minHeight: 50, alignItems: "center", justifyContent: "center", gap: 3 },
+  quickText: { color: colors.textSecondary, fontSize: 9, fontWeight: "800" }
 });
