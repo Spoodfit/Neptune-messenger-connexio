@@ -12,11 +12,13 @@ import {
 } from "react-native";
 
 import { colors, gradients, radii, spacing, typography } from "../theme";
-import type { Conversation } from "../types/messaging";
+import type { AppUser, Conversation } from "../types/messaging";
 import { formatConversationTime } from "../utils/date";
+import { MemberAvatarStack } from "./MemberAvatarStack";
 
 interface ConversationRowProps {
   conversation: Conversation;
+  members?: readonly AppUser[];
   mentioned?: boolean;
   muted?: boolean;
   onPress?: () => void;
@@ -25,6 +27,7 @@ interface ConversationRowProps {
 
 export function ConversationRow({
   conversation,
+  members = [],
   mentioned = false,
   muted = false,
   onPress,
@@ -35,6 +38,13 @@ export function ConversationRow({
   const unreadLabel = conversation.unreadCount
     ? `${conversation.unreadCount} message${conversation.unreadCount > 1 ? "s" : ""} non lu${conversation.unreadCount > 1 ? "s" : ""}`
     : "Aucun message non lu";
+  const privateConversation =
+    conversation.type === "direct" || conversation.type === "small_group";
+  const activeMemberIds =
+    conversation.activeMemberIds?.length
+      ? conversation.activeMemberIds
+      : conversation.memberIds ?? [];
+  const exactMemberCount = conversation.memberIds?.length ?? conversation.memberCount;
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -129,9 +139,7 @@ export function ConversationRow({
                         ? "construct"
                         : conversation.type === "direct"
                           ? "person"
-                          : conversation.type === "small_group"
-                            ? "people"
-                            : "chatbubbles"
+                          : "people"
                   }
                   size={21}
                   color={colors.text}
@@ -187,6 +195,20 @@ export function ConversationRow({
                 />
               ) : null}
             </View>
+            {!privateConversation ? (
+              <View style={styles.memberLine}>
+                <MemberAvatarStack
+                  memberIds={activeMemberIds}
+                  members={members}
+                  memberCount={exactMemberCount}
+                  maxVisible={4}
+                  size={22}
+                />
+                <Text style={styles.memberActivity} numberOfLines={1}>
+                  membres actifs récemment
+                </Text>
+              </View>
+            ) : null}
           </View>
         </Pressable>
       </LinearGradient>
@@ -212,7 +234,7 @@ const styles = StyleSheet.create({
   },
   row: {
     width: "100%",
-    minHeight: 78,
+    minHeight: 82,
     padding: 12,
     borderRadius: radii.xl - 1,
     backgroundColor: colors.surface,
@@ -261,7 +283,7 @@ const styles = StyleSheet.create({
   },
   bottomLine: {
     minWidth: 0,
-    marginTop: 5,
+    marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm
@@ -273,6 +295,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
     fontSize: 12
   },
+  memberLine: {
+    minHeight: 25,
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  memberActivity: { flex: 1, color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
   mentionPill: {
     width: 20,
     height: 20,
