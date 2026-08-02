@@ -1,47 +1,39 @@
 # Connexio V14 — contrat de remise backend
 
-## Architecture
+## Architecture cible
 
-Connexio est un second client de Neptune Business. Le frontend Expo/React Native consomme le backend existant : **Express 5**, **Prisma 7**, **PostgreSQL 16**, **Redis**, JWT en cookies httpOnly et **Socket.IO**.
+Connexio est le client de messagerie de Neptune Business. Le frontend Expo/React Native consomme le backend existant : **Node.js / Express 5**, **Prisma 7**, **PostgreSQL 16**, **Redis**, authentification Neptune et **Socket.IO**.
 
-`EXPO_PUBLIC_API_BASE_URL` doit pointer vers la racine qui précède `/v1`. Avec une API exposée sous `/api/v1`, la valeur attendue est par exemple `https://neptunebusiness.com/api`.
+`EXPO_PUBLIC_API_BASE_URL` pointe vers la racine précédant `/v1`. Pour une API publique sous `/api/v1`, utiliser par exemple :
+
+```text
+EXPO_PUBLIC_API_BASE_URL=https://neptunebusiness.com/api
+EXPO_PUBLIC_REALTIME_URL=https://neptunebusiness.com
+EXPO_PUBLIC_BUSINESS_WEB_BASE_URL=https://neptunebusiness.com
+EXPO_PUBLIC_MOCK_MODE=false
+```
 
 ## Authentification Neptune
 
 | Méthode | Route | Usage |
 |---|---|---|
-| `POST` | `/v1/auth/login` | email/mot de passe et cookie JWT httpOnly |
-| `GET` | `/v1/auth/me` | restauration de la session |
+| `POST` | `/v1/auth/login` | email et mot de passe Neptune |
+| `GET` | `/v1/auth/me` | restauration de la session cookie |
 | `POST` | `/v1/auth/logout` | révocation de la session |
 
-Toutes les requêtes utilisent `credentials: include`. Le mot de passe n’est jamais persisté dans Connexio.
+Les requêtes d’authentification utilisent `credentials: include`. Le mot de passe n’est jamais persisté dans Connexio. Le backend normalise `role`, `special_role` et `statut`.
 
-Le backend normalise `role`, `special_role` et `statut`. La création et l’administration des groupes officiels sont autorisées **uniquement aux Visionnaires ou aux administrateurs serveur**. L’interface applique la même règle, mais le backend reste l’autorité.
+## Droits des groupes officiels
 
-## Conversations et messages
+L’interface de création et d’administration des groupes officiels est réservée aux **Visionnaires**. Les routes serveur doivent appliquer la même règle en utilisant les champs de rôle Neptune et ne jamais se fier uniquement au client.
 
-Routes utilisées :
-
-- `GET /v1/conversations` ;
-- `POST /v1/conversations/private` ;
-- `POST /v1/groups` ;
-- `PATCH /v1/groups/:threadId` ;
-- `POST /v1/groups/:threadId/leave` ;
-- `POST /v1/conversations/:threadId/mute` ;
-- `GET /v1/conversations/:threadId/messages?cursor=` ;
-- `POST /v1/conversations/:threadId/messages` ;
-- `POST /v1/conversations/:threadId/read` ;
-- `PUT` et `DELETE /v1/messages/:messageId/reactions/:emoji`.
-
-Le serveur déduplique une conversation privée par ensemble exact de participants. Si elle existe, il la renvoie au lieu d’en créer une nouvelle.
-
-Les threads renvoient notamment :
+Un thread renvoie au minimum :
 
 ```json
 {
   "id": "thread-id",
   "type": "group",
-  "name": "Carcassonne",
+  "name": "Club Carcassonne",
   "member_ids": ["user-1", "user-2"],
   "member_count": 2,
   "active_member_ids": ["user-2", "user-1"],
@@ -51,29 +43,48 @@ Les threads renvoient notamment :
 }
 ```
 
-`member_count` correspond toujours au nombre réel de participants. `active_member_ids` est ordonné par activité récente afin d’afficher les avatars superposés.
+`member_count` est le nombre réel de participants. `active_member_ids` est ordonné par activité récente.
 
-## Pièces jointes
+## Conversations et messages
 
-Le client autorise au maximum **10 contenus et 120 Mo cumulés par message** : 15 Mo par photo, 80 Mo par vidéo et 50 Mo par document ou fichier.
+Routes consommées par le client :
 
-Flux attendu :
+- `GET /v1/conversations` ;
+- `POST /v1/conversations/direct` ;
+- `POST /v1/conversations/private-group` ;
+- `POST /v1/groups` ;
+- `PATCH /v1/groups/:threadId` ;
+- `POST /v1/groups/:threadId/leave` ;
+- `POST` et `DELETE /v1/conversations/:threadId/mute` ;
+- `GET /v1/conversations/:threadId/messages?cursor=` ;
+- `POST /v1/conversations/:threadId/messages` ;
+- `POST /v1/conversations/:threadId/read` ;
+- `POST /v1/messages/:messageId/reactions` ;
+- `DELETE /v1/messages/:messageId/reactions/:emoji`.
 
-1. `POST /v1/files/presign` ;
-2. upload vers le stockage privé ;
-3. `POST /v1/files/complete` ;
-4. envoi du message avec l’identifiant fichier ;
-5. génération de `download_url` et `thumbnail_url` temporaires.
+Le serveur déduplique les conversations privées par ensemble exact de participants. Une demande identique renvoie le thread existant.
 
-Le backend revérifie le nombre, la taille, le MIME réel, les droits d’accès et l’analyse antivirus. Les médias sont regroupés dans une grille compacte, puis restent ouvrables et téléchargeables.
+## Médias et fichiers
 
-## Sondages
+Le client autorise au maximum **10 contenus** et **120 Mo cumulés** par message :
+
+- photo : 15 Mo maximum ;
+- vidéo : 80 Mo maximum ;
+- document ou fichier : 50 Mo maximum.
+
+Flux attendu : préparation d’upload, URL pré-signée, envoi vers le stockage privé, finalisation, puis message contenant les identifiants de fichiers. La réponse doit fournir `download_url` et, pour les médias, `thumbnail_url` temporaires.
+
+Le serveur revérifie nombre, taille, MIME réel, droits d’accès et antivirus.
+
+## Sondages et votes d’évènements
+
+Routes :
 
 - `POST /v1/conversations/:threadId/polls` ;
 - `POST /v1/messages/:messageId/poll-votes` ;
 - `DELETE /v1/messages/:messageId/poll-votes/:optionId`.
 
-Exemple de message :
+Exemple :
 
 ```json
 {
@@ -84,7 +95,7 @@ Exemple de message :
     "anonymous": false,
     "total_votes": 31,
     "closes_at": "2026-08-08T21:59:00.000Z",
-    "event_vote_id": "optional-event-id",
+    "event_vote_id": "event-id",
     "event_vote_url": "https://neptunebusiness.com/events/votes/...",
     "options": [
       {
@@ -98,9 +109,7 @@ Exemple de message :
 }
 ```
 
-### Votes d’évènements
-
-Lorsqu’un vote concerne un club, le thread officiel de sa ville reçoit :
+Le groupe officiel de la ville reçoit également :
 
 ```json
 {
@@ -116,23 +125,47 @@ Lorsqu’un vote concerne un club, le thread officiel de sa ville reçoit :
 }
 ```
 
-La création, la modification et la clôture d’un vote dans Neptune Business mettent à jour le sondage et l’alerte dans une transaction Prisma. Le web et Connexio utilisent le même identifiant canonique et une contrainte unique de vote.
+Les votes web et Connexio partagent le même identifiant canonique et une contrainte d’unicité Prisma.
 
-## Appels intégrés
+## Temps réel Socket.IO
 
-Connexio n’utilise pas Jitsi. L’appel est intégré à l’application avec `getUserMedia`, `RTCPeerConnection` et une signalisation Socket.IO.
+Le client utilise Engine.IO 4 / Socket.IO avec ticket éphémère :
+
+- `POST /v1/realtime/ticket` ;
+- handshake Socket.IO avec `ticket` ;
+- heartbeat, reconnexion exponentielle et déduplication côté client.
+
+Évènements minimum :
+
+- `message.created`, `message.updated`, `message.deleted` ;
+- `message.reaction.updated` ;
+- `poll.updated`, `poll.vote.updated` ;
+- `thread.updated`, `thread.member.updated` ;
+- `event.vote.updated` ;
+- `highlight.created`, `highlight.updated`, `highlight.deleted` ;
+- `highlight.reaction.updated`, `highlight.comment.created` ;
+- `presence.updated` ;
+- évènements d’appel listés ci-dessous.
+
+Chaque évènement doit contenir un `event_id` unique et un `updated_at` serveur.
+
+## Appels audio et vidéo intégrés
+
+Connexio **n’utilise pas Jitsi**. L’appel utilise `getUserMedia`, `RTCPeerConnection`, ICE/STUN/TURN et une signalisation Socket.IO dans l’écran Connexio.
+
+Routes :
 
 - `POST /v1/calls` ;
 - `POST /v1/calls/:callId/end`.
 
-Réponse de création :
+Réponse attendue :
 
 ```json
 {
   "call_id": "call-id",
   "thread_id": "thread-id",
   "type": "video",
-  "socket_url": "https://api.neptunebusiness.com",
+  "socket_url": "https://neptunebusiness.com",
   "socket_path": "/socket.io",
   "call_token": "jwt-court",
   "initiator": true,
@@ -148,73 +181,54 @@ Réponse de création :
 }
 ```
 
-Évènements Socket.IO :
+Évènements : `call:join`, `call:signal`, `call:end`, `call:participant-joined`, `call:participant-left`, `call:ended`, `call:incoming`.
 
-- client → serveur : `call:join`, `call:signal`, `call:end` ;
-- serveur → client : `call:participant-joined`, `call:signal`, `call:participant-left`, `call:ended`, `call:incoming`.
-
-Le serveur vérifie l’appartenance au thread, émet l’appel entrant et délivre un token court. Un serveur TURN est obligatoire pour la fiabilité mobile.
+Le serveur contrôle l’appartenance au thread et génère des identifiants TURN temporaires.
 
 ## Profils et modération
 
-- `GET /v1/members` ;
-- `POST` et `DELETE /v1/members/:memberId/block` ;
-- `POST /v1/moderation/reports`.
+Le profil membre renvoie `web_profile_url`, téléphone, présence, autorisation visio et règles de visibilité.
 
-Le profil renvoie `web_profile_url`, `phone`, `video_call_enabled`, présence et règles de visibilité. Le menu `…` permet d’ouvrir le profil web, mettre la discussion en sourdine, signaler ou bloquer.
+Routes nécessaires :
 
-## Temps forts, besoins et offres
+- `GET /v1/members?visible=true&query=` ;
+- `PUT /v1/me/blocked-users/:memberId` ;
+- `DELETE /v1/me/blocked-users/:memberId` ;
+- `POST /v1/reports`.
+
+Le menu `…` permet d’ouvrir le profil Neptune Business, mettre la conversation en sourdine, signaler ou bloquer.
+
+## Temps forts, Besoins et Offres
 
 Routes :
 
 - `GET` et `POST /v1/highlights` ;
-- `GET /v1/highlights/:postId` ;
-- `PUT` et `DELETE /v1/highlights/:postId/reactions/:emoji` ;
-- `POST /v1/highlights/:postId/comments` ;
-- `POST /v1/highlights/:postId/share` ;
+- réactions, commentaires, réponses et partage sous `/v1/highlights` et `/v1/comments` ;
 - `GET /v1/places/search?query=`.
 
-Un `BESOIN` envoie :
+Cibles de synchronisation envoyées par le client :
 
 ```json
-"sync_targets": ["connexio", "business"]
+{ "kind": "besoin", "sync_targets": ["connexio", "business-needs"] }
 ```
-
-Une `OFFRE` envoie :
 
 ```json
-"sync_targets": ["connexio", "advantage_committee"]
+{ "kind": "offre", "sync_targets": ["connexio", "advantages-committee"] }
 ```
 
-Le backend utilise un identifiant canonique, une clé d’idempotence et une table de liaison pour synchroniser sans boucle : besoin ↔ application web, offre ↔ Comité Avantage. Un avantage publié sur le web crée ou met à jour son Temps fort Connexio.
+Le backend utilise un identifiant canonique et une clé d’idempotence pour synchroniser sans boucle. Un avantage créé ou modifié dans le Comité Avantage crée ou met à jour le Temps fort `offre` correspondant.
 
-La recherche de lieu s’effectue côté backend afin de ne jamais exposer la clé Google Places. Chaque résultat contient `id`, `label`, `address`, `city`, `latitude`, `longitude`.
-
-## Socket.IO général
-
-Évènements minimum :
-
-- `message.created`, `message.updated`, `message.deleted` ;
-- `message.reaction.updated` ;
-- `poll.updated`, `poll.vote.updated` ;
-- `thread.updated`, `thread.member.updated` ;
-- `event.vote.updated` ;
-- `highlight.created`, `highlight.updated`, `highlight.deleted` ;
-- `highlight.reaction.updated`, `highlight.comment.created` ;
-- `presence.updated` ;
-- les évènements d’appel listés plus haut.
-
-Chaque payload contient un `event_id` unique et un `updated_at` serveur.
+La recherche de lieu est exécutée côté backend afin de ne jamais exposer la clé Google Places. Chaque résultat fournit `id`, `label`, `address`, `latitude` et `longitude`.
 
 ## Gates de production
 
 1. HTTPS et WSS ;
-2. cookies CORS `Secure`, `HttpOnly` et `SameSite` ;
+2. CORS et cookies `Secure`, `HttpOnly`, `SameSite` adaptés aux clients ;
 3. Socket.IO avec adaptateur Redis ;
-4. stockage privé et antivirus ;
+4. stockage privé, miniatures et antivirus ;
 5. serveur TURN ;
 6. APNs/FCM ;
 7. migrations Prisma et contraintes d’unicité ;
-8. tests de droits par rôle ;
+8. tests d’autorisation par statut ;
 9. tests sur au moins deux Android et un iPhone ;
-10. appels testés entre Wi-Fi, 4G/5G et NAT restrictifs.
+10. appels entre Wi-Fi, 4G/5G et NAT restrictifs.
