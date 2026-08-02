@@ -1,80 +1,81 @@
-# Connexio V13 — matrice d’acceptation fonctionnelle
+# Connexio V14 — matrice d’acceptation fonctionnelle
 
-Cette matrice reprend les exigences produit ayant conduit à la V13. Une fonction marquée **opérationnelle** possède son interaction frontend réelle. Lorsqu’elle dépend de données partagées, le client appelle un contrat backend explicite ; aucun écran n’est à reconstruire.
+Cette matrice reprend les exigences produit validées pour la remise frontend. **Opérationnelle côté client** signifie que l’écran, l’interaction, les états de chargement/erreur et le contrat API existent. Les fonctions multi-utilisateurs exigent naturellement le déploiement des routes Express, modèles Prisma, stockage et évènements Socket.IO documentés dans `FRONTEND_HANDOFF.md`.
 
 ## Messagerie
 
 | Exigence | Statut | Implémentation |
 |---|---|---|
-| Séparer groupes et conversations privées | Opérationnelle | Onglets accessibles Groupes / Privées dans la liste des messages. |
-| Maintien long sur un groupe | Opérationnelle | Feuille d’actions : sourdine, paramètres, administration, quitter. |
-| Visibilité par statut Neptune | Opérationnelle | Filtrage client et contrats serveur pour Visionnaire, Amiral, Capitaine, Légende, Moussaillon, Triton et Free. |
-| Création et modification selon les droits | Opérationnelle | Création, nom, description, image, icône, rôles visibles et droit de publication. |
-| Signal visuel d’une mention | Opérationnelle | Détection par prénom, nom complet ou entreprise et contour animé dans la liste. |
-| Conversation privée individuelle | Opérationnelle | Création ou réutilisation d’une conversation directe existante. |
-| Mini-groupe privé limité à quatre personnes | Opérationnelle | Trois contacts maximum plus le créateur, contrôle client et contrat serveur. |
-| Photos de profil et fallback initiales | Opérationnelle | Avatars distants avec repli automatique sur les initiales. |
-| Photo, vidéo, document, fichier et localisation | Opérationnelle | Pickers système, limites de taille, upload privé, progression, affichage et ouverture. |
-| Réactions emoji aux messages | Opérationnelle | Ajout et retrait optimistes, persistance API. |
-| Réponse par glissement | Opérationnelle | Swipe vers la droite, aperçu et `reply_to_message_id`. |
-| Profil depuis un message | Opérationnelle | Avatar/nom cliquable vers le profil membre. |
-| Actions message, téléphone, audio et visio | Opérationnelle | Conversation serveur, lien téléphonique et salles Jitsi. |
-| Membres et paramètres depuis le nom du groupe | Opérationnelle | En-tête cliquable vers l’écran du groupe. |
-| Hors-ligne et reprise | Opérationnelle | Outbox chiffrée, idempotence, retry, pagination et réconciliation temps réel. |
+| Onglets Groupes / Privées | Opérationnelle | Segmentation accessible et listes indépendantes. |
+| Maintien long sur un groupe | Opérationnelle | Sourdine, informations, administration et départ. |
+| Visibilité par statuts Neptune | Opérationnelle | Visionnaire, Amiral, Capitaine, Légende, Moussaillon, Triton et Free. Le backend reste l’autorité. |
+| Création et administration des groupes officiels | Opérationnelle | Interface exposée uniquement aux Visionnaires. Nom, description, image, icône, rôles et droit de publier. |
+| Image de groupe recadrée | Opérationnelle | Picker système avec recadrage carré, agrandissement/rognage, upload privé et fallback icône. |
+| Bouton Enregistrer du groupe | Opérationnelle | Validation, état occupé, `PATCH`, rafraîchissement et message d’erreur. |
+| Mentions visibles | Opérationnelle | Prénom, nom ou entreprise, compteur et contour animé. |
+| Conversation individuelle | Opérationnelle | Création ou réutilisation automatique du thread existant. |
+| Mini-groupe privé | Opérationnelle | Quatre participants maximum au total. |
+| Avatars et membres actifs | Opérationnelle | Photos avec fallback initiales, nombre serveur exact et pile des membres les plus actifs. |
+| Pièces jointes | Opérationnelle | Photos, vidéos, documents, fichiers et localisation. Jusqu’à 10 contenus et 120 Mo cumulés. |
+| Prévisualisation multiple | Opérationnelle | Grille compacte de médias, compteur `+N`, lecteur vidéo, documents lisibles et téléchargement/ouverture. |
+| Réactions aux messages | Opérationnelle | Barre animée attachée au message, maintien long, bouton `+`, réaction actuelle visible et changement possible. |
+| Réponse par glissement | Opérationnelle | Swipe droite, aperçu et identifiant de réponse. |
+| Sondages | Opérationnelle | Création, choix simple/multiple, anonymat, vote, retrait et totaux. |
+| Votes d’évènements | Opérationnelle côté client | Alerte dans le groupe de ville, sondage synchronisé et bouton vers les votes Neptune Business. |
+| Profil membre `…` | Opérationnelle | Profil Neptune Business, sourdine, signalement et blocage. |
+| Appels audio/vidéo | Opérationnelle côté client | WebRTC intégré à Connexio, contrôles internes et signalisation Socket.IO. Aucun Jitsi. |
+| Temps réel | Opérationnelle côté client | Engine.IO/Socket.IO, ticket éphémère, heartbeat, reconnexion et compatibilité JSON direct. |
+| Hors-ligne | Opérationnelle | Outbox chiffrée, idempotence, retry et réconciliation REST/Socket.IO. |
 
 ## Temps forts
 
 | Exigence | Statut | Implémentation |
 |---|---|---|
-| Publication texte | Opérationnelle | Éditeur limité et création API. |
-| Publication photo | Opérationnelle | Sélection appareil, upload privé et rendu réel. |
-| Vidéo courte de moins d’une minute | Opérationnelle | Sélection vidéo, contrôle 60 secondes, upload et lecture native. |
-| Mentions | Opérationnelle | Suggestions et résolution prénom, nom ou entreprise. |
-| Réactions | Opérationnelle | Ajout/retrait API et état optimiste. |
-| Commentaires et réponses | Opérationnelle | Commentaire, réponse imbriquée et réactions. |
-| Partage | Opérationnelle | Lien serveur et feuille de partage native. |
-| Tag `BESOIN` synchronisé avec Neptune Business | Opérationnelle côté client | Création avec identifiant/idempotence et `sync_targets=[connexio,business]`. Le backend propage les événements entre les deux applications. |
-| Signalement et modération | Opérationnelle | Création d’un signalement serveur depuis la publication ou le profil. |
+| Publication texte/photo/vidéo | Opérationnelle | Upload privé, vidéo de 60 secondes maximum et aperçu réel. |
+| Mentions | Opérationnelle | Suggestions par prénom, nom ou entreprise. |
+| Localisation | Opérationnelle côté client | Position approximative ou recherche de lieu via backend, sans exposer la clé Google Places. |
+| Réactions compactes | Opérationnelle | Rectangles discrets, cibles tactiles de 44 px et état sélectionné. |
+| Menu `…` | Opérationnelle | Profil, partage et signalement. |
+| Commentaires et réponses | Opérationnelle | Commentaires, réponses imbriquées et réactions. |
+| Partage | Opérationnelle | URL serveur et feuille de partage native. |
+| Synchronisation Besoin | Opérationnelle côté client | Cibles Connexio + besoins Neptune Business, identifiant canonique et idempotence côté serveur. |
+| Synchronisation Offre | Opérationnelle côté client | Cibles Connexio + Comité Avantage ; création inverse attendue depuis le web. |
+| Animation après publication | Opérationnelle | Retour immédiat au Feed, apparition avec translation, fondu et ressort. |
+| Feed deux colonnes | Opérationnelle | Seuls les contenus compacts sont appariés ; actions par icônes ; absence de trou. |
+| Publicité Comité Avantage | Opérationnelle | Remplace la deuxième case lorsqu’un contenu compact reste isolé. |
 
-## Map
+## Map et appels
 
 | Exigence | Statut | Implémentation |
 |---|---|---|
-| Vraie carte web et mobile | Opérationnelle | Leaflet dans le navigateur et WebView native. |
-| Géolocalisation | Opérationnelle | Permission Expo, centrage, précision et rayon de confidentialité. |
-| Zoom et déplacement | Opérationnelle | Contrôles Leaflet tactiles. |
-| Éviter les chevauchements | Opérationnelle | MarkerCluster et spiderfy au zoom maximal. |
-| Avatar des membres | Opérationnelle | Photo de profil ou initiales. |
-| Contour pulsant après publication | Opérationnelle | Anneau animé sur les marqueurs concernés. |
-| Bulles flottantes des publications | Opérationnelle | Jusqu’à trois Temps forts avec réactions et accès au détail. |
+| Vraie carte web/mobile | Opérationnelle | Leaflet web et WebView native. |
+| Géolocalisation, zoom et déplacement | Opérationnelle | Permissions Expo et contrôles tactiles. |
+| Anti-chevauchement | Opérationnelle | Cluster et spiderfy. |
+| Avatars pulsants | Opérationnelle | Photo/initiales et contour animé pour publication récente. |
+| Bulles flottantes | Opérationnelle | Publications récentes, réactions et accès au détail. |
 | Actions rapides | Opérationnelle | Message, appel audio, visio et profil. |
-| Mode fantôme | Opérationnelle | Préférence serveur et suppression de la position connue. |
+| Appel intégré | Opérationnelle côté client | `getUserMedia`, `RTCPeerConnection`, ICE/TURN, Socket.IO et écran Connexio. |
 
-## Compte, sécurité et écrans indispensables
+## Authentification, compte et sécurité
 
 | Exigence | Statut | Implémentation |
 |---|---|---|
-| Déconnexion vers la connexion | Opérationnelle | Purge de session, providers protégés et redirection `/sign-in`. |
-| Connexion par code | Opérationnelle | Échange du code, refresh token et session sécurisée. |
-| Sessions et appareils | Opérationnelle | Liste et révocation des sessions. |
-| Export des données | Opérationnelle | Génération serveur et ouverture du téléchargement sécurisé. |
-| Suppression du compte | Opérationnelle | Demande serveur, révocation et déconnexion. |
-| Notifications | Opérationnelle | Messages, mentions, groupes, Temps forts, appels et aperçu confidentiel. |
-| Confidentialité | Opérationnelle | Map, profil, présence, téléphone et position approximative. |
-| Blocage et déblocage | Opérationnelle | Blocage depuis le profil, liste et déblocage. |
-| Route introuvable et contenu supprimé | Opérationnelle | États d’erreur et retour vers un écran sûr. |
-| Responsive et accessibilité | Opérationnelle | Cibles tactiles, libellés, petits écrans, tablette, paysage et zoom 140 %. |
+| Se connecter avec Neptune | Opérationnelle | Email/mot de passe Neptune, cookie httpOnly et restauration `/auth/me`. |
+| Créer un compte | Opérationnelle | Redirection vers `neptunebusiness.com/register`. |
+| Déconnexion | Opérationnelle | Révocation serveur, purge locale et retour à `/sign-in`; texte centré. |
+| Sessions et appareils | Opérationnelle côté client | Liste et révocation. |
+| Export et suppression | Opérationnelle côté client | Demandes serveur et états de confirmation. |
+| Notifications et confidentialité | Opérationnelle côté client | Préférences synchronisées. |
+| Blocage et signalement | Opérationnelle côté client | Membres, groupes, messages, commentaires et Temps forts. |
+| Responsive/accessibilité | Opérationnelle | Petits écrans, tablette, paysage, zoom 140 %, cibles tactiles et libellés. |
 
 ## Critères de fermeture
 
-La livraison frontend est acceptée lorsque les contrôles suivants réussissent sur le même commit :
+Le frontend est accepté lorsque ces contrôles passent sur le même commit :
 
-- `CI / verify` ;
-- `CI / responsive-audit` ;
-- `Product Audit` ;
-- `npm audit --omit=dev --audit-level=high` ;
-- `npx expo install --check` ;
-- gate de configuration production HTTPS/WSS ;
-- aucun workflow temporaire avec permission d’écriture.
+- `CI / verify` : TypeScript, tests métier, audit de dépendances, Expo et configuration production ;
+- `CI / responsive-audit` : 280×568 à tablette/paysage, zoom 140 %, chat faible hauteur et navigation ;
+- `Product Audit` : parcours Groupes/Privées, chat, Feed, Map, appels, profil et authentification ;
+- aucun placeholder Jitsi ou bouton sans action dans les parcours livrés.
 
-La publication publique reste conditionnée au déploiement des endpoints documentés, aux clés EAS, à APNs/FCM, au stockage privé, à l’infrastructure d’appel et aux tests sur appareils physiques. Ces travaux sont des branchements backend/infrastructure ; ils ne requièrent pas de reprise fonctionnelle du frontend.
+La publication multi-utilisateur reste conditionnée aux routes Express/Prisma, à Socket.IO/Redis, au stockage privé, à TURN, APNs/FCM et aux essais sur appareils physiques. Ces éléments sont des branchements backend/infrastructure ; les écrans et interactions frontend sont fournis.
