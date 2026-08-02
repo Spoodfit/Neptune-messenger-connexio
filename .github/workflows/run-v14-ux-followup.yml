@@ -45,6 +45,35 @@ jobs:
               line[10:] if line.startswith("          ") else line
               for line in embedded.splitlines()
           )
+          strict_helper = '''    if old not in text:
+              raise SystemExit(f"Missing patch anchor in {path}: {old[:120]!r}")
+          file.write_text(text.replace(old, new, count))'''
+          tolerant_helper = '''    if old in text:
+              file.write_text(text.replace(old, new, count))
+              return
+          import re
+          parts = []
+          for line in old.splitlines():
+              stripped = line.strip()
+              if not stripped:
+                  parts.append(r"[ \\t]*")
+                  continue
+              tokens = re.split(r"([ \\t]+)", stripped)
+              body = "".join(
+                  r"[ \\t]+" if token and token.isspace() else re.escape(token)
+                  for token in tokens
+              )
+              parts.append(r"[ \\t]*" + body)
+          pattern = r"\\n".join(parts)
+          if old.endswith("\\n"):
+              pattern += r"\\n"
+          updated, substitutions = re.subn(pattern, lambda _: new, text, count=count)
+          if substitutions == 0:
+              raise SystemExit(f"Missing patch anchor in {path}: {old[:120]!r}")
+          file.write_text(updated)'''
+          if strict_helper not in script:
+              raise SystemExit('Patch helper signature changed unexpectedly.')
+          script = script.replace(strict_helper, tolerant_helper, 1)
           exec(compile(script, '<v14-product-patch>', 'exec'), {'__name__': '__main__'})
           RUNNER
 
