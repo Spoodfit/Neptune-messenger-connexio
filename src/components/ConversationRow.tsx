@@ -45,6 +45,7 @@ export function ConversationRow({
       ? conversation.activeMemberIds
       : conversation.memberIds ?? [];
   const exactMemberCount = conversation.memberIds?.length ?? conversation.memberCount;
+  const canSchedule = Boolean(conversation.canManage && !privateConversation);
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -205,11 +206,31 @@ export function ConversationRow({
                   size={22}
                 />
                 <Text style={styles.memberActivity} numberOfLines={1}>
-                  membres actifs récemment
+                  actifs récemment
                 </Text>
               </View>
             ) : null}
           </View>
+
+          {canSchedule ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Programmer un message dans ${conversation.name}`}
+              accessibilityHint="Ouvre la programmation des messages automatiques de ce groupe."
+              onPress={(event) => {
+                event.stopPropagation();
+                router.push(
+                  `/schedule-message/${encodeURIComponent(conversation.id)}`
+                );
+              }}
+              style={({ pressed }) => [
+                styles.scheduleButton,
+                pressed && styles.schedulePressed
+              ]}
+            >
+              <Ionicons name="calendar-outline" size={18} color={colors.orange} />
+            </Pressable>
+          ) : null}
         </Pressable>
       </LinearGradient>
     </Animated.View>
@@ -327,5 +348,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0
   },
-  unreadText: { color: colors.white, fontSize: 10, fontWeight: "900" }
+  unreadText: { color: colors.white, fontSize: 10, fontWeight: "900" },
+  scheduleButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "rgba(244,177,131,0.24)",
+    backgroundColor: "rgba(244,177,131,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  schedulePressed: { opacity: 0.72, transform: [{ scale: 0.96 }] }
 });
