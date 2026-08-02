@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   optionInput: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 15, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, paddingHorizontal: 12 },
   remove: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   addOption: { minHeight: 46, borderRadius: 15, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  addOptionText: { color: colors.orange, fontSize: 11, fontWeight: "850" },
+  addOptionText: { color: colors.orange, fontSize: 11, fontWeight: "800" },
   settingRow: { minHeight: 66, marginTop: 8, paddingHorizontal: 10, borderRadius: 17, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 12 },
   settingText: { flex: 1, minWidth: 0 },
   settingTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
