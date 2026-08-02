@@ -28,6 +28,10 @@ import { colors, gradients, spacing, typography } from "@/theme";
 
 type DeclineResponse = "callback_10m" | "message_available";
 
+function first(value?: string | string[]): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default function CallRoomScreen() {
   const params = useLocalSearchParams<{
     id: string;
@@ -39,24 +43,12 @@ export default function CallRoomScreen() {
   }>();
   const { accessToken } = useSession();
   const { getConversation, sendMessage } = useMessaging();
-  const conversationId = useMemo(
-    () =>
-      Array.isArray(params.id)
-        ? (params.id[0] ?? "")
-        : (params.id ?? ""),
-    [params.id]
-  );
-  const mode: CallMode = params.mode === "audio" ? "audio" : "video";
-  const incoming = params.direction === "incoming";
-  const incomingCallId = Array.isArray(params.callId)
-    ? params.callId[0]
-    : params.callId;
-  const callerName =
-    (Array.isArray(params.callerName)
-      ? params.callerName[0]
-      : params.callerName) ?? "Un membre Neptune";
-  const initialReason =
-    (Array.isArray(params.reason) ? params.reason[0] : params.reason) ?? "";
+  const conversationId = first(params.id) ?? "";
+  const mode: CallMode = first(params.mode) === "audio" ? "audio" : "video";
+  const incoming = first(params.direction) === "incoming";
+  const incomingCallId = first(params.callId);
+  const callerName = first(params.callerName) ?? "Un membre Neptune";
+  const initialReason = first(params.reason) ?? "";
   const conversation = getConversation(conversationId);
   const remoteDisplayName = incoming
     ? callerName
@@ -74,10 +66,10 @@ export default function CallRoomScreen() {
   );
 
   const close = async () => {
-    const currentSession = session;
+    const activeSession = session;
     setSession(null);
-    if (api && currentSession && !currentSession.mock) {
-      await api.endCall(currentSession.id).catch(() => undefined);
+    if (api && activeSession && !activeSession.mock) {
+      await api.endCall(activeSession.id).catch(() => undefined);
     }
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/calls");
@@ -89,7 +81,7 @@ export default function CallRoomScreen() {
     if (cleanReason.length < 3) {
       Alert.alert(
         "Objet de l’appel requis",
-        "Expliquez en quelques mots pourquoi vous appelez. Le destinataire verra cette information avant de répondre."
+        "Expliquez brièvement pourquoi vous appelez. Le destinataire verra cette information avant de répondre."
       );
       return;
     }
@@ -127,7 +119,7 @@ export default function CallRoomScreen() {
             );
       setSession({
         ...nextSession,
-        reason: nextSession.reason ?? initialReason || "Appel Neptune",
+        reason: (nextSession.reason ?? initialReason) || "Appel Neptune",
         initiator: false
       });
     } catch (callError) {
@@ -148,18 +140,17 @@ export default function CallRoomScreen() {
       if (api && incomingCallId) {
         await api.declineCall(incomingCallId, response);
       }
+      const topic = initialReason || "votre appel";
       const body =
         response === "callback_10m"
-          ? `Je suis indisponible pour le moment. Je vous rappelle dans 10 minutes au sujet de « ${initialReason || "votre appel"} ».`
-          : `Je ne peux pas répondre à l’appel pour le moment, mais nous pouvons échanger par message au sujet de « ${initialReason || "votre demande"} ».`;
-      await sendMessage(conversationId, body);
+          ? `Je suis indisponible pour le moment. Je vous rappelle dans 10 minutes au sujet de « ${topic} ».`
+          : `Je ne peux pas répondre pour le moment, mais nous pouvons échanger par message au sujet de « ${topic} ».`;
+      const sent = await sendMessage(conversationId, body);
+      if (!sent) throw new Error("Le message automatique n’a pas pu être envoyé.");
 
       if (response === "callback_10m") {
-        const reminderScheduled = await scheduleCallBackReminder(
-          conversationId,
-          callerName
-        );
-        if (!reminderScheduled) {
+        const scheduled = await scheduleCallBackReminder(conversationId, callerName);
+        if (!scheduled) {
           Alert.alert(
             "Rappel non programmé",
             "Le message a été envoyé, mais les notifications ne sont pas autorisées sur cet appareil."
@@ -180,11 +171,11 @@ export default function CallRoomScreen() {
   };
 
   const handleUnanswered = async (event: CallUnansweredEvent) => {
+    const activeSession = session;
     setUnanswered(event);
-    const currentSession = session;
     setSession(null);
-    if (api && currentSession && !currentSession.mock) {
-      await api.endCall(currentSession.id).catch(() => undefined);
+    if (api && activeSession && !activeSession.mock) {
+      await api.endCall(activeSession.id).catch(() => undefined);
     }
   };
 
@@ -201,146 +192,70 @@ export default function CallRoomScreen() {
 
   if (unanswered) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.center}>
-        <View style={styles.statusIcon}>
-          <Ionicons name="mic-outline" size={31} color={colors.orange} />
-        </View>
-        <Text accessibilityRole="header" style={styles.title}>
-          Aucune réponse
-        </Text>
-        <Text style={styles.message}>
-          L’appel n’a pas été décroché. Ouvrez la conversation pour laisser un
-          message vocal ou écrire un message.
-        </Text>
-        <View style={styles.reasonReadOnly}>
-          <Text style={styles.reasonLabel}>Objet de l’appel</Text>
-          <Text style={styles.reasonValue}>{unanswered.reason || reason}</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Ouvrir la conversation pour laisser un message"
+      <CallShell
+        icon="mic-outline"
+        title="Aucune réponse"
+        description="Ouvrez la conversation pour laisser un message vocal ou écrire un message."
+      >
+        <ReasonCard value={unanswered.reason || reason || "Appel Neptune"} />
+        <PrimaryButton
+          icon="chatbubble-ellipses-outline"
+          label="Laisser un message"
           onPress={() =>
             router.replace(`/chat/${encodeURIComponent(conversationId)}`)
           }
-          style={styles.primaryButton}
-        >
-          <Ionicons name="chatbubble-ellipses-outline" size={20} color={colors.white} />
-          <Text style={styles.primaryButtonText}>Laisser un message</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Fermer"
-          onPress={() => void close()}
-          style={styles.secondaryButton}
-        >
-          <Text style={styles.secondaryButtonText}>Fermer</Text>
-        </Pressable>
-      </LinearGradient>
+        />
+        <SecondaryButton label="Fermer" onPress={() => void close()} />
+      </CallShell>
     );
   }
 
   if (incoming) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.center}>
-        <View style={styles.incomingHalo}>
-          <LinearGradient colors={gradients.primaryWarm} style={styles.callerAvatar}>
-            <Text style={styles.callerInitials}>
-              {callerName
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((part) => part[0] ?? "")
-                .join("")
-                .toLocaleUpperCase("fr")}
-            </Text>
-          </LinearGradient>
-        </View>
-        <Text style={styles.incomingEyebrow}>
-          {mode === "audio" ? "APPEL AUDIO ENTRANT" : "APPEL VIDÉO ENTRANT"}
-        </Text>
-        <Text accessibilityRole="header" style={styles.title}>
-          {callerName}
-        </Text>
-        <View style={styles.reasonReadOnly}>
-          <Text style={styles.reasonLabel}>Objet de l’appel</Text>
-          <Text style={styles.reasonValue}>
-            {initialReason || "Aucun objet précisé"}
-          </Text>
-        </View>
-        {error ? (
-          <Text accessibilityRole="alert" style={styles.errorText}>
-            {error}
-          </Text>
-        ) : null}
-        <View style={styles.incomingActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Décliner et rappeler dans dix minutes"
-            disabled={Boolean(declining) || preparing}
+      <CallShell
+        icon={mode === "audio" ? "call-outline" : "videocam-outline"}
+        title={callerName}
+        eyebrow={mode === "audio" ? "APPEL AUDIO ENTRANT" : "APPEL VIDÉO ENTRANT"}
+        description="Consultez l’objet de l’appel avant de répondre."
+      >
+        <ReasonCard value={initialReason || "Aucun objet précisé"} />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.declineGrid}>
+          <ChoiceButton
+            icon="time-outline"
+            label="Je rappelle dans 10 min"
+            busy={declining === "callback_10m"}
+            disabled={preparing || Boolean(declining)}
             onPress={() => void declineIncomingCall("callback_10m")}
-            style={styles.declineOption}
-          >
-            {declining === "callback_10m" ? (
-              <ActivityIndicator color={colors.orange} />
-            ) : (
-              <Ionicons name="time-outline" size={21} color={colors.orange} />
-            )}
-            <Text style={styles.declineOptionTitle}>Je rappelle dans 10 min</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Décliner et proposer un échange par message"
-            disabled={Boolean(declining) || preparing}
+          />
+          <ChoiceButton
+            icon="chatbubble-ellipses-outline"
+            label="Échanger par message"
+            busy={declining === "message_available"}
+            disabled={preparing || Boolean(declining)}
             onPress={() => void declineIncomingCall("message_available")}
-            style={styles.declineOption}
-          >
-            {declining === "message_available" ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={21}
-                color={colors.text}
-              />
-            )}
-            <Text style={styles.declineOptionTitle}>Échanger par message</Text>
-          </Pressable>
+          />
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Accepter l’appel"
-          disabled={preparing || Boolean(declining)}
+        <PrimaryButton
+          icon="call"
+          label="Accepter l’appel"
+          busy={preparing}
+          disabled={Boolean(declining)}
+          success
           onPress={() => void acceptIncomingCall()}
-          style={[styles.acceptButton, preparing && styles.disabled]}
-        >
-          {preparing ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Ionicons name="call" size={23} color={colors.white} />
-          )}
-          <Text style={styles.acceptButtonText}>Accepter l’appel</Text>
-        </Pressable>
-      </LinearGradient>
+        />
+      </CallShell>
     );
   }
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.center}>
-      <View style={styles.statusIcon}>
-        <Ionicons
-          name={mode === "audio" ? "call-outline" : "videocam-outline"}
-          size={31}
-          color={colors.orange}
-        />
-      </View>
-      <Text accessibilityRole="header" style={styles.title}>
-        {mode === "audio" ? "Préparer l’appel audio" : "Préparer l’appel vidéo"}
-      </Text>
-      <Text style={styles.message}>
-        Indiquez la raison de l’appel. Elle sera affichée au destinataire avant
-        qu’il accepte ou décline.
-      </Text>
-      <View style={styles.reasonField}>
-        <Text style={styles.reasonLabel}>Objet de l’appel</Text>
+    <CallShell
+      icon={mode === "audio" ? "call-outline" : "videocam-outline"}
+      title={mode === "audio" ? "Préparer l’appel audio" : "Préparer l’appel vidéo"}
+      description="Indiquez la raison de l’appel. Elle sera affichée avant que le destinataire accepte ou décline."
+    >
+      <View style={styles.reasonEditor}>
+        <Text style={styles.label}>Objet de l’appel</Text>
         <TextInput
           value={reason}
           onChangeText={setReason}
@@ -349,73 +264,163 @@ export default function CallRoomScreen() {
           maxLength={160}
           multiline
           textAlignVertical="top"
-          style={styles.reasonInput}
+          style={styles.input}
         />
         <Text style={styles.counter}>{reason.length}/160</Text>
       </View>
-      {error ? (
-        <Text accessibilityRole="alert" style={styles.errorText}>
-          {error}
-        </Text>
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Lancer l’appel"
-        disabled={preparing}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <PrimaryButton
+        icon={mode === "audio" ? "call" : "videocam"}
+        label={preparing ? "Préparation…" : "Lancer l’appel"}
+        busy={preparing}
         onPress={() => void startOutgoingCall()}
-        style={[styles.primaryButton, preparing && styles.disabled]}
-      >
-        {preparing ? (
-          <ActivityIndicator color={colors.white} />
-        ) : (
-          <Ionicons
-            name={mode === "audio" ? "call" : "videocam"}
-            size={21}
-            color={colors.white}
-          />
-        )}
-        <Text style={styles.primaryButtonText}>
-          {preparing ? "Préparation…" : "Lancer l’appel"}
-        </Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Annuler"
-        onPress={() => void close()}
-        style={styles.secondaryButton}
-      >
-        <Text style={styles.secondaryButtonText}>Annuler</Text>
-      </Pressable>
+      />
+      <SecondaryButton label="Annuler" onPress={() => void close()} />
+    </CallShell>
+  );
+}
+
+interface CallShellProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  eyebrow?: string;
+  children: React.ReactNode;
+}
+
+function CallShell({ icon, title, description, eyebrow, children }: CallShellProps) {
+  return (
+    <LinearGradient colors={gradients.screen} style={styles.screen}>
+      <View style={styles.iconShell}>
+        <Ionicons name={icon} size={31} color={colors.orange} />
+      </View>
+      {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+      <Text accessibilityRole="header" style={styles.title}>
+        {title}
+      </Text>
+      <Text style={styles.description}>{description}</Text>
+      {children}
     </LinearGradient>
   );
 }
 
+function ReasonCard({ value }: { value: string }) {
+  return (
+    <View style={styles.reasonCard}>
+      <Text style={styles.label}>Objet de l’appel</Text>
+      <Text style={styles.reasonValue}>{value}</Text>
+    </View>
+  );
+}
+
+interface PrimaryButtonProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  busy?: boolean;
+  disabled?: boolean;
+  success?: boolean;
+}
+
+function PrimaryButton({
+  icon,
+  label,
+  onPress,
+  busy = false,
+  disabled = false,
+  success = false
+}: PrimaryButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ busy, disabled: disabled || busy }}
+      disabled={disabled || busy}
+      onPress={onPress}
+      style={[
+        styles.primary,
+        success && styles.primarySuccess,
+        (disabled || busy) && styles.disabled
+      ]}
+    >
+      {busy ? (
+        <ActivityIndicator color={colors.white} />
+      ) : (
+        <Ionicons name={icon} size={21} color={colors.white} />
+      )}
+      <Text style={styles.primaryText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.secondary}>
+      <Text style={styles.secondaryText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+interface ChoiceButtonProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}
+
+function ChoiceButton({ icon, label, busy, disabled, onPress }: ChoiceButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ busy, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.choice, disabled && styles.disabled]}
+    >
+      {busy ? (
+        <ActivityIndicator color={colors.orange} />
+      ) : (
+        <Ionicons name={icon} size={21} color={colors.orange} />
+      )}
+      <Text style={styles.choiceText}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  center: {
+  screen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.xl,
     gap: spacing.md
   },
-  statusIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 23,
+  iconShell: {
+    width: 70,
+    height: 70,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(244,177,131,0.12)",
     borderWidth: 1,
     borderColor: "rgba(244,177,131,0.28)"
   },
+  eyebrow: {
+    color: colors.orange,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1
+  },
   title: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  message: {
+  description: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
-    maxWidth: 480
+    maxWidth: 500
   },
-  reasonField: {
+  reasonEditor: {
     width: "100%",
     maxWidth: 520,
     padding: spacing.md,
@@ -424,15 +429,24 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface
   },
-  reasonLabel: {
+  reasonCard: {
+    width: "100%",
+    maxWidth: 520,
+    padding: spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface
+  },
+  label: {
     color: colors.orange,
     fontSize: 10,
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.6
   },
-  reasonInput: {
-    minHeight: 94,
+  input: {
+    minHeight: 92,
     marginTop: 8,
     padding: 12,
     borderRadius: 16,
@@ -443,21 +457,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20
   },
-  counter: {
-    marginTop: 6,
-    color: colors.textMuted,
-    fontSize: 9,
-    textAlign: "right"
-  },
-  reasonReadOnly: {
-    width: "100%",
-    maxWidth: 520,
-    padding: spacing.md,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface
-  },
+  counter: { marginTop: 6, color: colors.textMuted, fontSize: 9, textAlign: "right" },
   reasonValue: {
     marginTop: 7,
     color: colors.text,
@@ -466,69 +466,40 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "center"
   },
-  primaryButton: {
-    minWidth: 220,
-    minHeight: 52,
+  error: {
+    width: "100%",
+    maxWidth: 520,
+    padding: 10,
+    borderRadius: 14,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    textAlign: "center",
+    fontSize: 11
+  },
+  primary: {
+    minWidth: 230,
+    minHeight: 54,
     paddingHorizontal: spacing.lg,
-    borderRadius: 18,
+    borderRadius: 19,
     backgroundColor: colors.primary,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8
   },
-  primaryButtonText: { color: colors.white, fontSize: 13, fontWeight: "900" },
-  secondaryButton: {
+  primarySuccess: { backgroundColor: colors.success },
+  primaryText: { color: colors.white, fontSize: 13, fontWeight: "900" },
+  secondary: {
     minWidth: 130,
     minHeight: 44,
-    paddingHorizontal: spacing.md,
     alignItems: "center",
     justifyContent: "center"
   },
-  secondaryButtonText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
-  errorText: {
-    maxWidth: 520,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
-    padding: 10,
-    borderRadius: 14,
-    textAlign: "center",
-    fontSize: 11,
-    lineHeight: 16
-  },
-  incomingHalo: {
-    width: 126,
-    height: 126,
-    borderRadius: 63,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(107,79,234,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(107,79,234,0.28)"
-  },
-  callerAvatar: {
-    width: 98,
-    height: 98,
-    borderRadius: 34,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  callerInitials: { color: colors.white, fontSize: 28, fontWeight: "900" },
-  incomingEyebrow: {
-    color: colors.orange,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.1
-  },
-  incomingActions: {
-    width: "100%",
-    maxWidth: 520,
-    flexDirection: "row",
-    gap: 9
-  },
-  declineOption: {
+  secondaryText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
+  declineGrid: { width: "100%", maxWidth: 520, flexDirection: "row", gap: 9 },
+  choice: {
     flex: 1,
-    minHeight: 86,
+    minHeight: 88,
     padding: 10,
     borderRadius: 18,
     borderWidth: 1,
@@ -538,24 +509,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 7
   },
-  declineOptionTitle: {
+  choiceText: {
     color: colors.textSecondary,
     fontSize: 10,
     lineHeight: 14,
     fontWeight: "900",
     textAlign: "center"
   },
-  acceptButton: {
-    minWidth: 240,
-    minHeight: 58,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 21,
-    backgroundColor: colors.success,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9
-  },
-  acceptButtonText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   disabled: { opacity: 0.55 }
 });
