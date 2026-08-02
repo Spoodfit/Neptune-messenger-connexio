@@ -73,7 +73,7 @@ jobs:
               file.write_text(updated)'''
           script, substitutions = re.subn(
               r'def replace\(path: str, old: str, new: str, count: int = 1\) -> None:\n.*?\n\ndef write',
-              tolerant_function + '\n\ndef write',
+              lambda _: tolerant_function + '\n\ndef write',
               script,
               count=1,
               flags=re.S
