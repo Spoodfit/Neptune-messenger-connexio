@@ -10,7 +10,8 @@ interface PollMessageCardProps {
 }
 
 export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
-  const closed = Boolean(poll.closedAt) ||
+  const closed =
+    Boolean(poll.closedAt) ||
     (poll.closesAt ? new Date(poll.closesAt).getTime() <= Date.now() : false);
   const maximum = Math.max(1, ...poll.options.map((option) => option.voteCount));
 
@@ -53,7 +54,12 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
                 pointerEvents="none"
                 style={[
                   styles.progress,
-                  { width: `${Math.max(option.voteCount > 0 ? 8 : 0, ratio * 100)}%` }
+                  {
+                    width: `${Math.max(
+                      option.voteCount > 0 ? 8 : 0,
+                      ratio * 100
+                    )}%`
+                  }
                 ]}
               />
               <View style={styles.choiceMark}>
@@ -89,22 +95,121 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
 }
 
 const styles = StyleSheet.create({
-  card: { minWidth: 230, maxWidth: 420, gap: 9 },
-  titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 9 },
-  icon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(244,177,131,0.14)" },
+  card: { width: "100%", minWidth: 0, maxWidth: 420, gap: 9 },
+  titleRow: {
+    width: "100%",
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 7
+  },
+  icon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(244,177,131,0.14)"
+  },
   titleContent: { flex: 1, minWidth: 0 },
-  question: { color: colors.text, fontSize: 13, lineHeight: 18, fontWeight: "900" },
-  meta: { color: colors.textMuted, fontSize: 9, marginTop: 3, fontWeight: "700" },
-  options: { gap: 6 },
-  option: { minHeight: 46, overflow: "hidden", paddingHorizontal: 10, borderRadius: 14, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: "rgba(2,7,19,0.22)", flexDirection: "row", alignItems: "center", gap: 8 },
+  question: {
+    flexShrink: 1,
+    color: colors.text,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "900"
+  },
+  meta: {
+    flexShrink: 1,
+    color: colors.textMuted,
+    fontSize: 8.5,
+    lineHeight: 12,
+    marginTop: 3,
+    fontWeight: "700"
+  },
+  options: { width: "100%", minWidth: 0, gap: 6 },
+  option: {
+    width: "100%",
+    minWidth: 0,
+    minHeight: 46,
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: "rgba(2,7,19,0.22)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
   optionActive: { borderColor: colors.violet },
-  progress: { position: "absolute", top: 0, bottom: 0, left: 0, backgroundColor: "rgba(107,79,234,0.18)" },
-  choiceMark: { width: 22, height: 22, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  optionLabel: { flex: 1, minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
-  optionCount: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  footer: { minHeight: 26, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  footerText: { flex: 1, color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
-  eventLink: { minHeight: 30, flexDirection: "row", alignItems: "center", gap: 4 },
-  eventLinkText: { color: colors.orange, fontSize: 9, fontWeight: "900" },
+  progress: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(107,79,234,0.18)"
+  },
+  choiceMark: {
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  optionLabel: {
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
+    color: colors.textSecondary,
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontWeight: "800"
+  },
+  optionCount: {
+    flexShrink: 0,
+    color: colors.text,
+    fontSize: 10.5,
+    fontWeight: "900"
+  },
+  footer: {
+    width: "100%",
+    minWidth: 0,
+    minHeight: 30,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    columnGap: 8,
+    rowGap: 2
+  },
+  footerText: {
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 90,
+    color: colors.textMuted,
+    fontSize: 8.5,
+    fontWeight: "700"
+  },
+  eventLink: {
+    minHeight: 44,
+    maxWidth: "100%",
+    paddingHorizontal: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4
+  },
+  eventLinkText: {
+    flexShrink: 1,
+    color: colors.orange,
+    fontSize: 9,
+    fontWeight: "900"
+  },
   pressed: { opacity: 0.76, transform: [{ scale: 0.993 }] }
 });
