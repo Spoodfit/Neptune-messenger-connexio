@@ -17,6 +17,7 @@ import {
 import type {
   ChatMessage,
   Conversation,
+  CreatePollInput,
   PushTokenRegistration,
   RealtimeTicket
 } from "../../types/messaging";
@@ -33,15 +34,21 @@ export class NeptuneMessagingApi implements MessagingApi {
     options: AuthenticatedRequestOptions = {}
   ): Promise<T> {
     const token = await resolveSessionAccessToken(this.fallbackAccessToken);
-    if (!token) throw new ApiError("Session Neptune absente.", 401);
-
     try {
-      return await apiRequest<T>(path, { ...options, token });
+      return await apiRequest<T>(path, {
+        ...options,
+        token,
+        credentials: "include"
+      });
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401) throw error;
       const refreshedToken = await refreshSessionAccessToken();
       if (!refreshedToken) throw error;
-      return apiRequest<T>(path, { ...options, token: refreshedToken });
+      return apiRequest<T>(path, {
+        ...options,
+        token: refreshedToken,
+        credentials: "include"
+      });
     }
   }
 
@@ -80,13 +87,60 @@ export class NeptuneMessagingApi implements MessagingApi {
             kind: attachment.kind,
             name: attachment.name,
             uri: attachment.uri ?? null,
+            download_url: attachment.downloadUrl ?? null,
+            thumbnail_url: attachment.thumbnailUrl ?? null,
             mime_type: attachment.mimeType ?? null,
             size_bytes: attachment.sizeBytes ?? null,
             duration_seconds: attachment.durationSeconds ?? null,
             width: attachment.width ?? null,
-            height: attachment.height ?? null
+            height: attachment.height ?? null,
+            latitude: attachment.latitude ?? null,
+            longitude: attachment.longitude ?? null,
+            accuracy_radius_meters: attachment.accuracyRadiusMeters ?? null
           }))
         })
+      }
+    );
+    return normalizeChatMessage(payload);
+  }
+
+  async createPoll(
+    conversationId: string,
+    input: CreatePollInput
+  ): Promise<ChatMessage> {
+    const payload = await this.request<unknown>(
+      `/v1/conversations/${encodeURIComponent(conversationId)}/polls`,
+      {
+        method: "POST",
+        headers: {
+          "Idempotency-Key": `poll-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}`
+        },
+        body: JSON.stringify({
+          question: input.question,
+          options: input.options,
+          allow_multiple: input.allowMultiple,
+          anonymous: input.anonymous,
+          closes_at: input.closesAt ?? null
+        })
+      }
+    );
+    return normalizeChatMessage(payload);
+  }
+
+  async votePoll(
+    messageId: string,
+    optionId: string,
+    active: boolean
+  ): Promise<ChatMessage> {
+    const payload = await this.request<unknown>(
+      active
+        ? `/v1/messages/${encodeURIComponent(messageId)}/poll-votes`
+        : `/v1/messages/${encodeURIComponent(messageId)}/poll-votes/${encodeURIComponent(optionId)}`,
+      {
+        method: active ? "POST" : "DELETE",
+        body: active ? JSON.stringify({ option_id: optionId }) : undefined
       }
     );
     return normalizeChatMessage(payload);
