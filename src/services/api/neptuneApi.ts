@@ -9,7 +9,7 @@ import {
   normalizeChatMessage,
   normalizeConversationList,
   normalizeMessagePage
-} from "./wire";
+} from "./wireExtensions";
 import {
   refreshSessionAccessToken,
   resolveSessionAccessToken
