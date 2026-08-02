@@ -91,13 +91,10 @@ export interface HighlightPost {
     longitude: number;
     accuracyRadiusMeters: number;
   };
-  location?: HighlightLocation;
   locationLabel?: string;
-  locationPlaceId?: string;
+  location?: HighlightLocation;
   syncedWithBusinessApp?: boolean;
   syncedWithAdvantagesCommittee?: boolean;
-  syncTargets?: Array<"connexio" | "business" | "advantage_committee">;
-  advantageId?: string;
   syncState?: "local" | "queued" | "synced" | "failed";
 }
 
@@ -105,10 +102,8 @@ export interface PlaceSuggestion {
   id: string;
   label: string;
   address?: string;
-  city?: string;
   latitude: number;
   longitude: number;
-  source?: "neptune" | "google" | "manual" | "device";
 }
 
 export interface MapMemberMoment {
