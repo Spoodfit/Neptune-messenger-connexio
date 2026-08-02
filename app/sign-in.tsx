@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { router } from "expo-router";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -24,7 +25,7 @@ import { colors, gradients, radii, spacing, typography } from "../src/theme";
 
 function getSignInErrorMessage(error: unknown): string {
   if (error instanceof WireValidationError) {
-    return "La réponse du serveur Neptune est invalide. Connexion refusée par sécurité.";
+    return "Le profil retourné par Neptune est invalide. Connexion refusée par sécurité.";
   }
   if (error instanceof ApiError) {
     if (error.status === 0 || error.status >= 500) {
@@ -37,50 +38,60 @@ function getSignInErrorMessage(error: unknown): string {
       return "Trop de tentatives. Patientez avant de réessayer.";
     }
     if (error.status === 400 || error.status === 401 || error.status === 403) {
-      return "Code invalide, expiré ou déjà utilisé.";
+      return "Adresse email ou mot de passe Neptune incorrect.";
     }
   }
-  return "Connexion impossible. Réessayez sans réutiliser un ancien code.";
+  return error instanceof Error
+    ? error.message
+    : "Connexion impossible. Réessayez avec vos identifiants Neptune.";
 }
 
 export default function SignInScreen() {
-  const params = useLocalSearchParams<{ code?: string }>();
-  const { exchangeOneTimeCode } = useSession();
-  const [code, setCode] = useState(params.code ?? "");
+  const { loginWithNeptune, exchangeOneTimeCode } = useSession();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submittingRef = useRef(false);
-  const processedDeepLinkCodeRef = useRef<string | null>(null);
 
-  const submit = useCallback(
-    async (value: string) => {
-      const cleanCode = value.trim();
-      if (submittingRef.current || !cleanCode) return;
-      submittingRef.current = true;
-      setLoading(true);
-      setError(null);
-      try {
-        await exchangeOneTimeCode(cleanCode);
-        router.replace("/(tabs)/messages");
-      } catch (caught) {
-        setError(getSignInErrorMessage(caught));
-      } finally {
-        submittingRef.current = false;
-        setLoading(false);
-      }
-    },
-    [exchangeOneTimeCode]
-  );
+  const submit = async () => {
+    const cleanEmail = email.trim();
+    if (submittingRef.current || !cleanEmail || !password) return;
+    submittingRef.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      await loginWithNeptune(cleanEmail, password);
+      router.replace("/(tabs)/messages");
+    } catch (caught) {
+      setError(getSignInErrorMessage(caught));
+    } finally {
+      submittingRef.current = false;
+      setLoading(false);
+    }
+  };
 
-  useEffect(() => {
-    const deepLinkCode = params.code?.trim();
-    if (!deepLinkCode || processedDeepLinkCodeRef.current === deepLinkCode) return;
-    processedDeepLinkCodeRef.current = deepLinkCode;
-    setCode(deepLinkCode);
-    void submit(deepLinkCode);
-  }, [params.code, submit]);
+  const enterDemo = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setLoading(true);
+    setError(null);
+    try {
+      await exchangeOneTimeCode("DEMO-CONNEXIO");
+      router.replace("/(tabs)/messages");
+    } catch (caught) {
+      setError(getSignInErrorMessage(caught));
+    } finally {
+      submittingRef.current = false;
+      setLoading(false);
+    }
+  };
 
-  const enterDemo = () => void submit("DEMO-CONNEXIO");
+  const openRegistration = () =>
+    void Linking.openURL(
+      `${env.businessWebBaseUrl.replace(/\/$/, "")}/register`
+    );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -104,63 +115,67 @@ export default function SignInScreen() {
             </View>
 
             <Text accessibilityRole="header" style={styles.title}>
-              Retrouver votre réseau
+              Se connecter avec Neptune
             </Text>
             <Text style={styles.description}>
-              Connectez-vous avec le code à usage unique généré depuis votre compte Neptune Business.
+              Utilisez la même adresse email et le même mot de passe que sur Neptune Business.
             </Text>
 
-            {env.mockMode ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Entrer dans la démonstration Connexio"
-                disabled={loading}
-                onPress={enterDemo}
-                style={({ pressed }) => [
-                  styles.demoButton,
-                  pressed && styles.pressed,
-                  loading && styles.disabled
-                ]}
-              >
-                <LinearGradient colors={gradients.primary} style={styles.demoGradient}>
-                  {loading ? (
-                    <ActivityIndicator color={colors.white} />
-                  ) : (
-                    <>
-                      <Ionicons name="sparkles" size={20} color={colors.white} />
-                      <Text style={styles.demoText}>Entrer en démonstration</Text>
-                    </>
-                  )}
-                </LinearGradient>
-              </Pressable>
-            ) : null}
-
-            <View style={styles.separator}>
-              <View style={styles.separatorLine} />
-              <Text style={styles.separatorText}>
-                {env.mockMode ? "ou tester le parcours code" : "code Neptune"}
-              </Text>
-              <View style={styles.separatorLine} />
-            </View>
-
+            <Text style={styles.label}>Adresse email Neptune</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="key-outline" size={19} color={colors.textMuted} />
+              <Ionicons name="mail-outline" size={19} color={colors.textMuted} />
               <TextInput
-                value={code}
-                onChangeText={setCode}
+                value={email}
+                onChangeText={setEmail}
                 autoCapitalize="none"
                 autoCorrect={false}
-                autoComplete="one-time-code"
-                textContentType="oneTimeCode"
-                accessibilityLabel="Code de connexion Neptune"
-                accessibilityHint="Ce code est à usage unique et expire rapidement"
-                placeholder="Code de connexion"
+                autoComplete="email"
+                textContentType="emailAddress"
+                keyboardType="email-address"
+                accessibilityLabel="Adresse email Neptune"
+                placeholder="vous@entreprise.fr"
+                placeholderTextColor={colors.textMuted}
+                style={styles.input}
+                returnKeyType="next"
+              />
+            </View>
+
+            <Text style={styles.label}>Mot de passe Neptune</Text>
+            <View style={styles.inputWrap}>
+              <Ionicons name="lock-closed-outline" size={19} color={colors.textMuted} />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                textContentType="password"
+                secureTextEntry={!passwordVisible}
+                accessibilityLabel="Mot de passe Neptune"
+                placeholder="Votre mot de passe"
                 placeholderTextColor={colors.textMuted}
                 style={styles.input}
                 returnKeyType="go"
-                onSubmitEditing={() => void submit(code)}
+                onSubmitEditing={() => void submit()}
               />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  passwordVisible
+                    ? "Masquer le mot de passe"
+                    : "Afficher le mot de passe"
+                }
+                onPress={() => setPasswordVisible((value) => !value)}
+                style={styles.eyeButton}
+              >
+                <Ionicons
+                  name={passwordVisible ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </Pressable>
             </View>
+
             {error ? (
               <Text
                 accessibilityRole="alert"
@@ -170,46 +185,82 @@ export default function SignInScreen() {
                 {error}
               </Text>
             ) : null}
+
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Se connecter à Connexio"
-              accessibilityState={{ disabled: loading || !code.trim(), busy: loading }}
-              disabled={loading || !code.trim()}
-              onPress={() => void submit(code)}
+              accessibilityLabel="Se connecter avec Neptune"
+              accessibilityState={{
+                disabled: loading || !email.trim() || !password,
+                busy: loading
+              }}
+              disabled={loading || !email.trim() || !password}
+              onPress={() => void submit()}
               style={({ pressed }) => [
                 styles.button,
                 pressed && styles.pressed,
-                (loading || !code.trim()) && styles.disabled
+                (loading || !email.trim() || !password) && styles.disabled
               ]}
             >
-              {loading ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.buttonText}>Se connecter</Text>
-              )}
+              <LinearGradient colors={gradients.primary} style={styles.buttonGradient}>
+                {loading ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <>
+                    <Ionicons name="log-in-outline" size={21} color={colors.white} />
+                    <Text style={styles.buttonText}>Se connecter avec Neptune</Text>
+                  </>
+                )}
+              </LinearGradient>
             </Pressable>
 
-            <View style={styles.links}>
+            <View style={styles.registerCard}>
+              <View style={styles.registerIcon}>
+                <Ionicons name="person-add-outline" size={21} color={colors.orange} />
+              </View>
+              <View style={styles.registerContent}>
+                <Text style={styles.registerTitle}>Pas encore de compte Neptune ?</Text>
+                <Text style={styles.registerText}>
+                  Créez votre compte sur Neptune Business, puis revenez vous connecter ici.
+                </Text>
+              </View>
               <Pressable
                 accessibilityRole="link"
-                onPress={() => router.push("/access-help")}
-                style={styles.linkButton}
+                accessibilityLabel="Créer un compte Neptune"
+                onPress={openRegistration}
+                style={styles.registerButton}
               >
-                <Text style={styles.linkText}>Je n’ai pas de code</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                onPress={() => router.push("/privacy")}
-                style={styles.linkButton}
-              >
-                <Text style={styles.linkText}>Confidentialité</Text>
+                <Text style={styles.registerButtonText}>Créer</Text>
               </Pressable>
             </View>
+
+            {env.mockMode ? (
+              <>
+                <View style={styles.separator}>
+                  <View style={styles.separatorLine} />
+                  <Text style={styles.separatorText}>prévisualisation</Text>
+                  <View style={styles.separatorLine} />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Entrer dans la démonstration Connexio"
+                  disabled={loading}
+                  onPress={() => void enterDemo()}
+                  style={({ pressed }) => [
+                    styles.demoButton,
+                    pressed && styles.pressed,
+                    loading && styles.disabled
+                  ]}
+                >
+                  <Ionicons name="sparkles" size={19} color={colors.text} />
+                  <Text style={styles.demoText}>Entrer en démonstration</Text>
+                </Pressable>
+              </>
+            ) : null}
 
             <View style={styles.securityNote}>
               <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
               <Text style={styles.securityText}>
-                Aucun mot de passe Neptune n’est saisi dans Connexio. Le code doit être court, à usage unique et lié à l’appareil.
+                La session est protégée par un cookie httpOnly Neptune. Le mot de passe n’est jamais conservé dans Connexio.
               </Text>
             </View>
           </View>
@@ -230,22 +281,28 @@ const styles = StyleSheet.create({
   brandSignature: { color: colors.orange, fontSize: 11, fontWeight: "800", marginTop: 1 },
   title: { ...typography.display, color: colors.white },
   description: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.lg },
-  demoButton: { minHeight: 54, borderRadius: 18, overflow: "hidden" },
-  demoGradient: { minHeight: 54, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  demoText: { color: colors.white, fontSize: 15, fontWeight: "900" },
+  label: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginBottom: 6, marginTop: 9 },
+  inputWrap: { minHeight: 54, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, paddingLeft: spacing.md, flexDirection: "row", alignItems: "center", gap: 8 },
+  input: { flex: 1, minWidth: 0, minHeight: 52, color: colors.text, ...typography.body },
+  eyeButton: { width: 48, height: 52, alignItems: "center", justifyContent: "center" },
+  error: { color: colors.danger, marginTop: spacing.sm, ...typography.bodySmall },
+  button: { minHeight: 54, marginTop: spacing.lg, borderRadius: radii.lg, overflow: "hidden" },
+  buttonGradient: { minHeight: 54, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  buttonText: { color: colors.white, fontWeight: "900", fontSize: 15, textAlign: "center" },
+  pressed: { transform: [{ scale: 0.985 }], opacity: 0.9 },
+  disabled: { opacity: 0.48 },
+  registerCard: { minHeight: 78, marginTop: spacing.md, padding: 11, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 10 },
+  registerIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: "rgba(244,177,131,0.12)", alignItems: "center", justifyContent: "center" },
+  registerContent: { flex: 1, minWidth: 0 },
+  registerTitle: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  registerText: { color: colors.textMuted, fontSize: 9, lineHeight: 13, marginTop: 3 },
+  registerButton: { minWidth: 58, minHeight: 44, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  registerButtonText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
   separator: { marginVertical: spacing.md, flexDirection: "row", alignItems: "center", gap: 10 },
   separatorLine: { flex: 1, height: 1, backgroundColor: colors.borderSoft },
   separatorText: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
-  inputWrap: { minHeight: 54, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: 8 },
-  input: { flex: 1, minWidth: 0, minHeight: 52, color: colors.text, ...typography.body },
-  error: { color: colors.danger, marginTop: spacing.sm, ...typography.bodySmall },
-  button: { minHeight: 52, marginTop: spacing.md, borderRadius: radii.lg, alignItems: "center", justifyContent: "center", backgroundColor: colors.primary },
-  buttonText: { color: colors.white, fontWeight: "900", fontSize: 16 },
-  pressed: { transform: [{ scale: 0.985 }], opacity: 0.9 },
-  disabled: { opacity: 0.48 },
-  links: { marginTop: spacing.md, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 14 },
-  linkButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 6 },
-  linkText: { color: colors.orange, fontSize: 11, fontWeight: "800" },
+  demoButton: { minHeight: 50, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  demoText: { color: colors.text, fontSize: 12, fontWeight: "900" },
   securityNote: { marginTop: spacing.lg, padding: 12, borderRadius: 16, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 9 },
   securityText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 }
 });
