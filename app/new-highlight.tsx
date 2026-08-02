@@ -8,7 +8,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View
@@ -28,8 +27,9 @@ import {
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 import type {
   HighlightKind,
+  HighlightLocation,
   HighlightMedia,
-  HighlightPost
+  PlaceSuggestion
 } from "@/types/experience";
 
 const KINDS: Array<{
@@ -43,6 +43,36 @@ const KINDS: Array<{
   { value: "offre", label: "Offre", icon: "pricetag-outline" }
 ];
 
+const DEMO_PLACES: PlaceSuggestion[] = [
+  {
+    id: "demo-teleski-bram",
+    label: "Téléski Nautique de Bram",
+    address: "Lac de Buzerens, Bram",
+    city: "Bram",
+    latitude: 43.242,
+    longitude: 2.116,
+    source: "google"
+  },
+  {
+    id: "demo-carcassonne",
+    label: "Cité de Carcassonne",
+    address: "1 rue Viollet-le-Duc, Carcassonne",
+    city: "Carcassonne",
+    latitude: 43.206,
+    longitude: 2.364,
+    source: "google"
+  },
+  {
+    id: "demo-narbonne",
+    label: "Les Barques",
+    address: "Cours Mirabeau, Narbonne",
+    city: "Narbonne",
+    latitude: 43.183,
+    longitude: 3.004,
+    source: "google"
+  }
+];
+
 export default function NewHighlightScreen() {
   const insets = useSafeAreaInsets();
   const { accessToken } = useSession();
@@ -54,7 +84,11 @@ export default function NewHighlightScreen() {
   const [kind, setKind] = useState<HighlightKind>("standard");
   const [body, setBody] = useState("");
   const [media, setMedia] = useState<HighlightMedia | undefined>();
-  const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationMode, setLocationMode] = useState<"none" | "current" | "place">("none");
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeResults, setPlaceResults] = useState<PlaceSuggestion[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceSuggestion | null>(null);
+  const [searchingPlace, setSearchingPlace] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   const mentionQuery = useMemo(() => {
@@ -110,6 +144,61 @@ export default function NewHighlightScreen() {
     }
   };
 
+  const searchPlaces = async () => {
+    const query = placeQuery.trim();
+    if (query.length < 2 || searchingPlace) return;
+    setSearchingPlace(true);
+    try {
+      const results = api
+        ? await api.searchPlaces(query)
+        : DEMO_PLACES.filter((place) =>
+            [place.label, place.address, place.city]
+              .filter(Boolean)
+              .join(" ")
+              .toLocaleLowerCase("fr")
+              .includes(query.toLocaleLowerCase("fr"))
+          );
+      setPlaceResults(results);
+      if (results.length === 0) {
+        Alert.alert(
+          "Aucun lieu trouvé",
+          "Essayez le nom de l’établissement suivi de la ville."
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Recherche indisponible",
+        error instanceof Error ? error.message : "Le lieu n’a pas pu être recherché."
+      );
+    } finally {
+      setSearchingPlace(false);
+    }
+  };
+
+  const resolveLocation = async (): Promise<HighlightLocation | undefined> => {
+    if (locationMode === "none") return undefined;
+    if (locationMode === "place") {
+      if (!selectedPlace) {
+        throw new Error("Sélectionnez un lieu dans les résultats de recherche.");
+      }
+      return {
+        label: selectedPlace.label,
+        placeId: selectedPlace.id,
+        address: selectedPlace.address,
+        latitude: selectedPlace.latitude,
+        longitude: selectedPlace.longitude,
+        accuracyRadiusMeters: 120
+      };
+    }
+    const coordinates = await pickApproximateLocation();
+    return {
+      label: "Position actuelle approximative",
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      accuracyRadiusMeters: coordinates.accuracyRadiusMeters
+    };
+  };
+
   const publish = async () => {
     if (publishing) return;
     const cleanBody = body.trim();
@@ -142,16 +231,13 @@ export default function NewHighlightScreen() {
         setMedia(readyMedia);
       }
 
-      let coordinates: HighlightPost["coordinates"];
-      if (locationEnabled) {
-        coordinates = await pickApproximateLocation();
-        if (api) {
-          await api.updateLocation(
-            coordinates.latitude,
-            coordinates.longitude,
-            coordinates.accuracyRadiusMeters
-          );
-        }
+      const location = await resolveLocation();
+      if (location && api && locationMode === "current") {
+        await api.updateLocation(
+          location.latitude,
+          location.longitude,
+          location.accuracyRadiusMeters
+        );
       }
 
       const post = api
@@ -160,7 +246,14 @@ export default function NewHighlightScreen() {
             body: cleanBody,
             media: readyMedia,
             mentionedUserIds,
-            coordinates
+            coordinates: location
+              ? {
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                  accuracyRadiusMeters: location.accuracyRadiusMeters
+                }
+              : undefined,
+            location
           })
         : createPost({
             kind,
@@ -169,10 +262,19 @@ export default function NewHighlightScreen() {
               ? { ...readyMedia, status: "ready", uploadProgress: 1 }
               : undefined,
             mentionedUserIds,
-            coordinates
+            coordinates: location
+              ? {
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                  accuracyRadiusMeters: location.accuracyRadiusMeters
+                }
+              : undefined
           });
 
-      router.replace(`/highlight/${encodeURIComponent(post.id)}`);
+      router.replace({
+        pathname: "/(tabs)/highlights",
+        params: { published: post.id }
+      });
     } catch (error) {
       setMedia((current) =>
         current ? { ...current, status: "failed" } : current
@@ -256,12 +358,7 @@ export default function NewHighlightScreen() {
                   size={18}
                   color={selected ? colors.orange : colors.textMuted}
                 />
-                <Text
-                  style={[
-                    styles.kindLabel,
-                    selected && styles.kindLabelSelected
-                  ]}
-                >
+                <Text style={[styles.kindLabel, selected && styles.kindLabelSelected]}>
                   {item.label}
                 </Text>
               </Pressable>
@@ -269,13 +366,13 @@ export default function NewHighlightScreen() {
           })}
         </View>
 
-        {kind === "besoin" ? (
+        {kind === "besoin" || kind === "offre" ? (
           <View style={styles.syncNote}>
             <Ionicons name="sync" size={19} color={colors.success} />
             <Text style={styles.syncNoteText}>
-              Cette publication sera créée avec les cibles Connexio et Neptune
-              Business. Le serveur applique l’idempotence et la synchronisation
-              bidirectionnelle.
+              {kind === "besoin"
+                ? "Ce besoin sera aussi publié dans Neptune Business. Toute modification y sera répercutée dans Connexio, et inversement."
+                : "Cette offre sera aussi publiée dans le Comité Avantage. Un avantage créé sur Neptune Business générera également son Temps fort Connexio."}
             </Text>
           </View>
         ) : null}
@@ -284,7 +381,7 @@ export default function NewHighlightScreen() {
         <TextInput
           value={body}
           onChangeText={setBody}
-          placeholder="Partagez une réussite, un besoin ou les coulisses de votre activité… Utilisez @ pour mentionner."
+          placeholder="Partagez une réussite, un besoin ou une offre… Utilisez @ pour mentionner."
           placeholderTextColor={colors.textMuted}
           multiline
           maxLength={2_000}
@@ -316,17 +413,11 @@ export default function NewHighlightScreen() {
         ) : null}
 
         <View style={styles.mediaActions}>
-          <Pressable
-            onPress={() => void selectMedia("photo")}
-            style={styles.mediaButton}
-          >
+          <Pressable onPress={() => void selectMedia("photo")} style={styles.mediaButton}>
             <Ionicons name="image-outline" size={21} color={colors.text} />
             <Text style={styles.mediaLabel}>Photo</Text>
           </Pressable>
-          <Pressable
-            onPress={() => void selectMedia("video")}
-            style={styles.mediaButton}
-          >
+          <Pressable onPress={() => void selectMedia("video")} style={styles.mediaButton}>
             <Ionicons name="videocam-outline" size={22} color={colors.text} />
             <Text style={styles.mediaLabel}>Vidéo − 1 min</Text>
           </Pressable>
@@ -356,23 +447,99 @@ export default function NewHighlightScreen() {
           </View>
         ) : null}
 
-        <View style={styles.locationRow}>
-          <View style={styles.locationContent}>
-            <Text style={styles.locationTitle}>Position approximative sur la Map</Text>
-            <Text style={styles.locationSubtitle}>
-              La position est obtenue au moment de publier et protégée par un rayon
-              de confidentialité compris entre 1 et 3 km.
+        <Text style={styles.sectionTitle}>Localisation</Text>
+        <View style={styles.locationModes}>
+          {(
+            [
+              ["none", "Aucune", "location-outline"],
+              ["current", "Ma position", "navigate-outline"],
+              ["place", "Choisir un lieu", "search-outline"]
+            ] as const
+          ).map(([value, label, icon]) => {
+            const selected = locationMode === value;
+            return (
+              <Pressable
+                key={value}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  setLocationMode(value);
+                  if (value !== "place") setSelectedPlace(null);
+                }}
+                style={[styles.locationMode, selected && styles.locationModeSelected]}
+              >
+                <Ionicons name={icon} size={18} color={selected ? colors.orange : colors.textMuted} />
+                <Text style={[styles.locationModeText, selected && styles.locationModeTextSelected]}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {locationMode === "current" ? (
+          <View style={styles.locationInfo}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
+            <Text style={styles.locationInfoText}>
+              La position sera obtenue lors de la publication et protégée par un rayon de confidentialité de 1 à 3 km.
             </Text>
           </View>
-          <Switch
-            accessibilityLabel="Activer la position approximative"
-            style={styles.switchControl}
-            value={locationEnabled}
-            onValueChange={setLocationEnabled}
-            trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
-            thumbColor={colors.white}
-          />
-        </View>
+        ) : null}
+
+        {locationMode === "place" ? (
+          <View style={styles.placePanel}>
+            <View style={styles.placeSearchRow}>
+              <TextInput
+                value={placeQuery}
+                onChangeText={(value) => {
+                  setPlaceQuery(value);
+                  setSelectedPlace(null);
+                }}
+                placeholder="Ex. Téléski nautique de Bram"
+                placeholderTextColor={colors.textMuted}
+                returnKeyType="search"
+                onSubmitEditing={() => void searchPlaces()}
+                style={styles.placeInput}
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Rechercher ce lieu"
+                disabled={searchingPlace || placeQuery.trim().length < 2}
+                onPress={() => void searchPlaces()}
+                style={styles.searchButton}
+              >
+                {searchingPlace ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Ionicons name="search" size={20} color={colors.white} />
+                )}
+              </Pressable>
+            </View>
+            {placeResults.map((place) => {
+              const selected = selectedPlace?.id === place.id;
+              return (
+                <Pressable
+                  key={place.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => setSelectedPlace(place)}
+                  style={[styles.placeResult, selected && styles.placeResultSelected]}
+                >
+                  <View style={styles.placeIcon}>
+                    <Ionicons name="location" size={18} color={selected ? colors.orange : colors.textMuted} />
+                  </View>
+                  <View style={styles.placeText}>
+                    <Text style={styles.placeName}>{place.label}</Text>
+                    <Text style={styles.placeAddress} numberOfLines={2}>
+                      {[place.address, place.city].filter(Boolean).join(" · ")}
+                    </Text>
+                  </View>
+                  {selected ? <Ionicons name="checkmark-circle" size={22} color={colors.success} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </ScrollView>
     </LinearGradient>
   );
@@ -380,174 +547,51 @@ export default function NewHighlightScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: {
-    minHeight: 58,
-    paddingBottom: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  headerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  headerTitle: {
-    ...typography.heading3,
-    color: colors.text,
-    flex: 1,
-    textAlign: "center"
-  },
-  publishButton: {
-    minWidth: 68,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center"
-  },
+  header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
+  headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, textAlign: "center" },
+  publishButton: { minWidth: 68, minHeight: 44, alignItems: "center", justifyContent: "center" },
   publishText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
   content: { width: "100%", maxWidth: 680, alignSelf: "center" },
-  sectionTitle: {
-    ...typography.heading3,
-    color: colors.text,
-    marginTop: spacing.md,
-    marginBottom: 8
-  },
+  sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.md, marginBottom: 8 },
   kindGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  kindButton: {
-    minHeight: 44,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6
-  },
-  kindButtonSelected: {
-    borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.22)"
-  },
+  kindButton: { minHeight: 44, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 6 },
+  kindButtonSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
   kindLabel: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   kindLabelSelected: { color: colors.text },
-  syncNote: {
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 16,
-    backgroundColor: colors.successSoft,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9
-  },
+  syncNote: { marginTop: 10, padding: 12, borderRadius: 16, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 9 },
   syncNoteText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
-  editor: {
-    minHeight: 168,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    ...typography.body
-  },
-  counter: {
-    color: colors.textMuted,
-    fontSize: 9,
-    textAlign: "right",
-    marginTop: 4
-  },
-  suggestions: {
-    marginTop: 7,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
-    overflow: "hidden"
-  },
-  suggestionRow: {
-    minHeight: 52,
-    paddingHorizontal: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10
-  },
-  suggestionAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    backgroundColor: colors.primarySoft,
-    alignItems: "center",
-    justifyContent: "center"
-  },
+  editor: { minHeight: 168, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, color: colors.text, ...typography.body },
+  counter: { color: colors.textMuted, fontSize: 9, textAlign: "right", marginTop: 4 },
+  suggestions: { marginTop: 7, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, overflow: "hidden" },
+  suggestionRow: { minHeight: 52, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  suggestionAvatar: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
   suggestionInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
   suggestionContent: { flex: 1, minWidth: 0 },
   suggestionName: { color: colors.text, fontSize: 12, fontWeight: "900" },
   suggestionCompany: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
   mediaActions: { flexDirection: "row", gap: 8, marginTop: spacing.md },
-  mediaButton: {
-    flex: 1,
-    minHeight: 52,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7
-  },
+  mediaButton: { flex: 1, minHeight: 52, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   mediaLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
-  mediaPreview: {
-    marginTop: 10,
-    borderRadius: 20,
-    overflow: "hidden",
-    position: "relative"
-  },
-  mediaPreviewTop: {
-    position: "absolute",
-    top: 9,
-    left: 9,
-    right: 9,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between"
-  },
-  mediaPreviewLabel: {
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: "900",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
-    backgroundColor: "rgba(2,7,19,0.72)"
-  },
-  removeMedia: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "rgba(2,7,19,0.72)",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  locationRow: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md
-  },
-  locationContent: { flex: 1, minWidth: 0 },
-  switchControl: { width: 48, height: 44 },
-  locationTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  locationSubtitle: {
-    color: colors.textMuted,
-    fontSize: 10,
-    lineHeight: 14,
-    marginTop: 3
-  }
+  mediaPreview: { marginTop: 10, borderRadius: 20, overflow: "hidden", position: "relative" },
+  mediaPreviewTop: { position: "absolute", top: 9, left: 9, right: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  mediaPreviewLabel: { color: colors.white, fontSize: 10, fontWeight: "900", paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.72)" },
+  removeMedia: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(2,7,19,0.72)", alignItems: "center", justifyContent: "center" },
+  locationModes: { flexDirection: "row", gap: 7 },
+  locationMode: { flex: 1, minHeight: 56, paddingHorizontal: 6, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 4 },
+  locationModeSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.18)" },
+  locationModeText: { color: colors.textMuted, fontSize: 9, fontWeight: "800", textAlign: "center" },
+  locationModeTextSelected: { color: colors.text },
+  locationInfo: { marginTop: 8, minHeight: 58, padding: 11, borderRadius: 17, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", gap: 9 },
+  locationInfoText: { flex: 1, color: colors.textSecondary, fontSize: 9.5, lineHeight: 14 },
+  placePanel: { marginTop: 8, gap: 7 },
+  placeSearchRow: { flexDirection: "row", gap: 7 },
+  placeInput: { flex: 1, minWidth: 0, minHeight: 50, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, color: colors.text },
+  searchButton: { width: 50, height: 50, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  placeResult: { minHeight: 64, padding: 9, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 9 },
+  placeResultSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.16)" },
+  placeIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  placeText: { flex: 1, minWidth: 0 },
+  placeName: { color: colors.text, fontSize: 11.5, fontWeight: "900" },
+  placeAddress: { color: colors.textMuted, fontSize: 9, lineHeight: 13, marginTop: 3 }
 });
