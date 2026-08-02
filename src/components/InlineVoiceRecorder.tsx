@@ -9,7 +9,14 @@ import {
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 
 import { colors, gradients } from "../theme";
 import type { MessageAttachment } from "../types/messaging";
@@ -19,6 +26,11 @@ interface InlineVoiceRecorderProps {
   onRecorded: (attachment: MessageAttachment) => void | Promise<void>;
   maxDurationSeconds?: number;
 }
+
+const RECORDING_OPTIONS = {
+  ...RecordingPresets.HIGH_QUALITY,
+  isMeteringEnabled: true
+};
 
 function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
@@ -30,20 +42,37 @@ export function InlineVoiceRecorder({
   onRecorded,
   maxDurationSeconds = 300
 }: InlineVoiceRecorderProps) {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder(RECORDING_OPTIONS);
   const recorderState = useAudioRecorderState(recorder, 90);
   const [preparing, setPreparing] = useState(true);
   const [finishing, setFinishing] = useState(false);
   const mountedRef = useRef(true);
+  const onCancelRef = useRef(onCancel);
+  const onRecordedRef = useRef(onRecorded);
   const elapsedSeconds = recorderState.durationMillis / 1000;
+  const meteringLevel = Math.max(
+    0,
+    Math.min(1, ((recorderState.metering ?? -60) + 60) / 60)
+  );
   const waveform = useMemo(
     () =>
       Array.from({ length: 24 }, (_, index) => {
         const phase = elapsedSeconds * 7 + index * 0.9;
-        return 7 + Math.round(Math.abs(Math.sin(phase)) * 22);
+        const fallbackLevel = 0.18 + Math.abs(Math.sin(phase)) * 0.42;
+        const liveLevel = recorderState.metering == null ? fallbackLevel : meteringLevel;
+        const barVariation = 0.58 + Math.abs(Math.sin(index * 1.17)) * 0.42;
+        return 6 + Math.round(liveLevel * barVariation * 25);
       }),
-    [elapsedSeconds]
+    [elapsedSeconds, meteringLevel, recorderState.metering]
   );
+
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
+
+  useEffect(() => {
+    onRecordedRef.current = onRecorded;
+  }, [onRecorded]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -63,9 +92,11 @@ export function InlineVoiceRecorder({
       } catch (error) {
         Alert.alert(
           "Microphone indisponible",
-          error instanceof Error ? error.message : "L’enregistrement vocal n’a pas pu démarrer."
+          error instanceof Error
+            ? error.message
+            : "L’enregistrement vocal n’a pas pu démarrer."
         );
-        onCancel();
+        onCancelRef.current();
       }
     })();
 
@@ -74,14 +105,14 @@ export function InlineVoiceRecorder({
       if (recorder.isRecording) void recorder.stop().catch(() => undefined);
       void setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
     };
-  }, [maxDurationSeconds, onCancel, recorder]);
+  }, [maxDurationSeconds, recorder]);
 
   const cancel = async () => {
     if (finishing) return;
     setFinishing(true);
     if (recorder.isRecording) await recorder.stop().catch(() => undefined);
     await setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
-    onCancel();
+    onCancelRef.current();
   };
 
   const send = async () => {
@@ -92,7 +123,7 @@ export function InlineVoiceRecorder({
       await setAudioModeAsync({ allowsRecording: false });
       const uri = recorder.uri;
       if (!uri) throw new Error("Le fichier vocal n’a pas été créé.");
-      await onRecorded({
+      await onRecordedRef.current({
         id: `local-voice-${Crypto.randomUUID()}`,
         kind: "audio",
         name: `vocal-${Date.now()}.m4a`,
@@ -126,7 +157,9 @@ export function InlineVoiceRecorder({
         <View style={styles.recordingHeader}>
           <View style={styles.liveDot} />
           <Text style={styles.timer}>{formatDuration(elapsedSeconds)}</Text>
-          <Text style={styles.status}>{preparing ? "Microphone…" : "Enregistrement"}</Text>
+          <Text style={styles.status}>
+            {preparing ? "Microphone…" : "Enregistrement"}
+          </Text>
         </View>
         <View style={styles.waveform} accessibilityElementsHidden>
           {waveform.map((height, index) => (
@@ -167,14 +200,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     overflow: "hidden"
   },
-  action: { width: 44, height: 48, alignItems: "center", justifyContent: "center" },
+  action: {
+    width: 44,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   recordingContent: { flex: 1, minWidth: 0 },
   recordingHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.danger },
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.danger
+  },
   timer: { color: colors.text, fontSize: 11, fontWeight: "900" },
   status: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
-  waveform: { height: 31, flexDirection: "row", alignItems: "center", gap: 2, overflow: "hidden" },
+  waveform: {
+    height: 31,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    overflow: "hidden"
+  },
   waveBar: { width: 2.5, borderRadius: 2, backgroundColor: colors.orange },
-  sendTarget: { width: 50, height: 50, alignItems: "center", justifyContent: "center" },
-  sendButton: { width: 42, height: 42, borderRadius: 15, alignItems: "center", justifyContent: "center" }
+  sendTarget: {
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  sendButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center"
+  }
 });
