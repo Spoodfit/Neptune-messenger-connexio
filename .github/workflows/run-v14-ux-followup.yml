@@ -81,12 +81,19 @@ jobs:
           if substitutions != 1:
               raise SystemExit('Patch helper could not be replaced safely.')
           exec(compile(script, '<v14-product-patch>', 'exec'), {'__name__': '__main__', 're': re})
+
+          config_path = Path('app.config.ts')
+          config = config_path.read_text()
+          if '      "expo-audio",\n' not in config:
+              anchor = '      "expo-router",\n'
+              if anchor not in config:
+                  raise SystemExit('Expo plugin anchor not found.')
+              config = config.replace(anchor, anchor + '      "expo-audio",\n', 1)
+              config_path.write_text(config)
           RUNNER
 
       - name: Install compatible audio and speech modules
-        run: |
-          npm install expo-speech-recognition@56.0.1
-          npx expo install expo-audio expo-speech
+        run: npm install expo-speech-recognition@56.0.1 expo-audio@~57.0.2 expo-speech@~57.0.1
 
       - name: Verify TypeScript and domain tests
         run: npm run verify
