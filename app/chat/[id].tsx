@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,37 +19,77 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { EventVoteBanner } from "../../src/components/EventVoteBanner";
+import { MemberAvatarStack } from "../../src/components/MemberAvatarStack";
+import { MessageAttachmentsGrid } from "../../src/components/MessageAttachmentsGrid";
 import { MessageBubble } from "../../src/components/MessageBubble";
+import { PollComposerModal } from "../../src/components/PollComposerModal";
 import { env } from "../../src/config/env";
 import { isPrivateConversation } from "../../src/domain/conversationFilter";
 import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
 import { useMessaging } from "../../src/providers/MessagingProvider";
 import { useSession } from "../../src/providers/SessionProvider";
+import { NeptuneMessagingApi } from "../../src/services/api/neptuneApi";
 import { uploadMessageAttachment } from "../../src/services/api/uploadApi";
-import { pickMessageAttachment } from "../../src/services/media/mediaPicker";
+import {
+  assertAttachmentBatch,
+  MAX_MESSAGE_ATTACHMENTS,
+  MAX_MESSAGE_BATCH_BYTES,
+  pickMessageAttachments
+} from "../../src/services/media/mediaPicker";
 import { colors, gradients, radii, spacing, typography } from "../../src/theme";
 import type {
   AttachmentKind,
   ChatMessage,
-  Conversation,
-  MessageAttachment
+  CreatePollInput,
+  MessageAttachment,
+  MessagePoll
 } from "../../src/types/messaging";
 
-const QUICK_REACTIONS = ["❤️", "🔥", "👏", "💡", "🤝", "😂"];
 const SUBMIT_LOCK_MS = 800;
-
 const ATTACHMENTS: Array<{
   kind: AttachmentKind;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }> = [
-  { kind: "photo", label: "Photo", icon: "image-outline" },
-  { kind: "video", label: "Vidéo", icon: "videocam-outline" },
-  { kind: "document", label: "Document", icon: "document-text-outline" },
-  { kind: "file", label: "Fichier", icon: "folder-open-outline" },
+  { kind: "photo", label: "Photos", icon: "images-outline" },
+  { kind: "video", label: "Vidéos", icon: "videocam-outline" },
+  { kind: "document", label: "Documents", icon: "document-text-outline" },
+  { kind: "file", label: "Fichiers", icon: "folder-open-outline" },
   { kind: "location", label: "Localisation", icon: "location-outline" }
 ];
+
+function updateLocalPoll(
+  poll: MessagePoll,
+  optionId: string
+): MessagePoll {
+  const target = poll.options.find((option) => option.id === optionId);
+  if (!target) return poll;
+  const activating = !target.votedByCurrentUser;
+  const options = poll.options.map((option) => {
+    if (option.id === optionId) {
+      return {
+        ...option,
+        votedByCurrentUser: activating,
+        voteCount: Math.max(0, option.voteCount + (activating ? 1 : -1))
+      };
+    }
+    if (!poll.allowMultiple && activating && option.votedByCurrentUser) {
+      return {
+        ...option,
+        votedByCurrentUser: false,
+        voteCount: Math.max(0, option.voteCount - 1)
+      };
+    }
+    return option;
+  });
+  return {
+    ...poll,
+    options,
+    totalVotes: options.reduce((sum, option) => sum + option.voteCount, 0)
+  };
+}
 
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -56,7 +97,7 @@ export default function ChatScreen() {
   const conversationId = Array.isArray(params.id)
     ? (params.id[0] ?? "")
     : (params.id ?? "");
-  const { currentUser } = useSession();
+  const { currentUser, accessToken } = useSession();
   const {
     getConversation: getServerConversation,
     getMessages: getServerMessages,
@@ -96,32 +137,67 @@ export default function ChatScreen() {
       ? "private"
       : "server";
   const localOnly = source !== "server";
-  const messages =
+  const baseMessages =
     source === "admin"
       ? getCreatedGroupMessages(conversationId)
       : source === "private"
         ? getConversationMessages(conversationId)
         : getServerMessages(conversationId);
+  const messagingApi = useMemo(
+    () =>
+      env.mockMode || localOnly
+        ? null
+        : new NeptuneMessagingApi(accessToken),
+    [accessToken, localOnly]
+  );
   const loading = loadingConversationIds.has(conversationId);
   const loadingMore = loadingMoreConversationIds.has(conversationId);
   const hasMore = hasMoreMessages(conversationId);
-  const latestMessageId = messages[0]?.id;
   const directMemberId = conversation?.memberIds?.find(
     (memberId) => memberId !== currentUser.id
   );
 
   const [draft, setDraft] = useState("");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-  const [reactionMessage, setReactionMessage] = useState<ChatMessage | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [pollComposerOpen, setPollComposerOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<
     MessageAttachment[]
   >([]);
+  const [ephemeralMessages, setEphemeralMessages] = useState<ChatMessage[]>([]);
+  const [pollOverrides, setPollOverrides] = useState<Record<string, MessagePoll>>(
+    {}
+  );
   const [submitting, setSubmitting] = useState(false);
   const submitLockRef = useRef(false);
   const mountedRef = useRef(true);
   const submitUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedReadMessageId = useRef<string | null>(null);
+
+  const messages = useMemo(() => {
+    const byId = new Map<string, ChatMessage>();
+    for (const message of [...ephemeralMessages, ...baseMessages]) {
+      byId.set(message.id, {
+        ...message,
+        poll: pollOverrides[message.id] ?? message.poll
+      });
+    }
+    return [...byId.values()].sort(
+      (first, second) =>
+        Date.parse(second.createdAt) - Date.parse(first.createdAt)
+    );
+  }, [baseMessages, ephemeralMessages, pollOverrides]);
+  const latestMessageId = messages[0]?.id;
+  const memberCount =
+    conversation?.memberIds?.length ?? conversation?.memberCount ?? 0;
+  const activeMemberIds =
+    conversation?.activeMemberIds?.length
+      ? conversation.activeMemberIds
+      : conversation?.memberIds ?? [];
+  const pendingBytes = pendingAttachments.reduce(
+    (sum, attachment) => sum + (attachment.sizeBytes ?? 0),
+    0
+  );
 
   const mentionQuery = useMemo(() => {
     const match = draft.match(/(?:^|\s)@([^\s@]*)$/u);
@@ -223,19 +299,19 @@ export default function ChatScreen() {
   const addAttachment = async (kind: AttachmentKind) => {
     setAttachmentMenuOpen(false);
     try {
-      const picked = await pickMessageAttachment(kind);
-      if (!picked) return;
-      setPendingAttachments((previous) => {
-        const maxAttachments = 10;
-        if (previous.length >= maxAttachments) {
-          Alert.alert(
-            "Limite atteinte",
-            `Un message accepte au maximum ${maxAttachments} pièces jointes.`
-          );
-          return previous;
-        }
-        return [...previous, picked];
-      });
+      const remaining = MAX_MESSAGE_ATTACHMENTS - pendingAttachments.length;
+      if (remaining <= 0) {
+        Alert.alert(
+          "Limite atteinte",
+          `${MAX_MESSAGE_ATTACHMENTS} contenus maximum par message.`
+        );
+        return;
+      }
+      const picked = await pickMessageAttachments(kind, remaining);
+      if (picked.length === 0) return;
+      const next = [...pendingAttachments, ...picked];
+      assertAttachmentBatch(next);
+      setPendingAttachments(next);
     } catch (error) {
       Alert.alert(
         "Pièce jointe indisponible",
@@ -277,8 +353,7 @@ export default function ChatScreen() {
     void (async () => {
       try {
         const readyAttachments: MessageAttachment[] = [];
-        for (let index = 0; index < originalAttachments.length; index += 1) {
-          const attachment = originalAttachments[index]!;
+        for (const attachment of originalAttachments) {
           if (env.mockMode || localOnly || attachment.status === "ready") {
             readyAttachments.push({
               ...attachment,
@@ -361,14 +436,92 @@ export default function ChatScreen() {
       } finally {
         submitLockRef.current = false;
         if (mountedRef.current) setSubmitting(false);
+        submitUnlockTimerRef.current = setTimeout(() => {
+          submitLockRef.current = false;
+        }, SUBMIT_LOCK_MS);
       }
     })();
   };
 
+  const createPoll = async (input: CreatePollInput) => {
+    try {
+      let message: ChatMessage;
+      if (messagingApi) {
+        message = await messagingApi.createPoll(conversation.id, input);
+      } else {
+        const pollId = `local-poll-${Crypto.randomUUID()}`;
+        message = {
+          id: `local-poll-message-${Crypto.randomUUID()}`,
+          conversationId: conversation.id,
+          senderId: currentUser.id,
+          senderName: currentUser.name,
+          senderInitials: currentUser.initials,
+          senderAvatarUrl: currentUser.avatarUrl,
+          body: "",
+          createdAt: new Date().toISOString(),
+          status: "sent",
+          isMine: true,
+          poll: {
+            id: pollId,
+            question: input.question,
+            options: input.options.map((label) => ({
+              id: `${pollId}-${Crypto.randomUUID()}`,
+              label,
+              voteCount: 0,
+              votedByCurrentUser: false
+            })),
+            allowMultiple: input.allowMultiple,
+            anonymous: input.anonymous,
+            totalVotes: 0,
+            closesAt: input.closesAt
+          }
+        };
+      }
+      setEphemeralMessages((previous) => [message, ...previous]);
+      if (!localOnly && !env.mockMode) void loadMessages(conversation.id);
+    } catch (error) {
+      Alert.alert(
+        "Sondage impossible",
+        error instanceof Error ? error.message : "Le sondage n’a pas été publié."
+      );
+      throw error;
+    }
+  };
+
+  const votePoll = async (message: ChatMessage, optionId: string) => {
+    if (!message.poll) return;
+    const currentPoll = pollOverrides[message.id] ?? message.poll;
+    const active = !currentPoll.options.find((option) => option.id === optionId)
+      ?.votedByCurrentUser;
+    if (!messagingApi || message.id.startsWith("local-")) {
+      const updated = updateLocalPoll(currentPoll, optionId);
+      setPollOverrides((previous) => ({ ...previous, [message.id]: updated }));
+      return;
+    }
+    try {
+      const updatedMessage = await messagingApi.votePoll(
+        message.id,
+        optionId,
+        active
+      );
+      if (updatedMessage.poll) {
+        setPollOverrides((previous) => ({
+          ...previous,
+          [message.id]: updatedMessage.poll!
+        }));
+      }
+    } catch (error) {
+      Alert.alert(
+        "Vote impossible",
+        error instanceof Error ? error.message : "Le vote n’a pas été enregistré."
+      );
+    }
+  };
+
   const connectionLabel = localOnly
-    ? `${conversation.memberCount} membre${conversation.memberCount > 1 ? "s" : ""}`
+    ? `${memberCount} membre${memberCount > 1 ? "s" : ""}`
     : connectionState === "online"
-      ? `${conversation.memberCount} membre${conversation.memberCount > 1 ? "s" : ""}`
+      ? `${memberCount} membre${memberCount > 1 ? "s" : ""}`
       : connectionState === "connecting"
         ? "Connexion…"
         : conversation.canPost
@@ -414,13 +567,26 @@ export default function ChatScreen() {
           >
             {conversation.name}
           </Text>
-          <Text
-            accessibilityLiveRegion="polite"
-            numberOfLines={2}
-            style={styles.headerSubtitle}
-          >
-            {connectionLabel}
-          </Text>
+          {conversation.type === "direct" ? (
+            <Text numberOfLines={1} style={styles.headerSubtitle}>
+              {connectionLabel}
+            </Text>
+          ) : (
+            <View style={styles.headerMembers}>
+              <MemberAvatarStack
+                memberIds={activeMemberIds}
+                members={members}
+                memberCount={memberCount}
+                maxVisible={4}
+                size={20}
+              />
+              {connectionState !== "online" && !localOnly ? (
+                <Text numberOfLines={1} style={styles.headerSubtitle}>
+                  {connectionLabel}
+                </Text>
+              ) : null}
+            </View>
+          )}
         </Pressable>
         {conversation.type === "direct" ? (
           <View style={styles.callActions}>
@@ -467,6 +633,10 @@ export default function ChatScreen() {
         )}
       </LinearGradient>
 
+      {conversation.eventVoteAlert ? (
+        <EventVoteBanner alert={conversation.eventVoteAlert} />
+      ) : null}
+
       {conversation.pinnedMessage ? (
         <View
           style={styles.pinned}
@@ -503,11 +673,13 @@ export default function ChatScreen() {
               message={item}
               reactions={getMessageReactions(item)}
               onRetry={(clientMessageId) => void retryMessage(clientMessageId)}
-              onReactionRequest={setReactionMessage}
+              onReact={(message, emoji) => toggleMessageReaction(message, emoji)}
               onReply={setReplyingTo}
               onOpenProfile={openMemberProfile}
+              onVotePoll={votePoll}
             />
           )}
+          style={styles.messageList}
           contentContainerStyle={styles.messages}
           inverted
           keyboardShouldPersistTaps="handled"
@@ -592,52 +764,66 @@ export default function ChatScreen() {
           ) : null}
 
           {pendingAttachments.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.pendingAttachments}
-            >
-              {pendingAttachments.map((attachment, index) => (
-                <View key={`${attachment.kind}-${index}`} style={styles.pendingChip}>
-                  <Ionicons
-                    name={
-                      ATTACHMENTS.find(
-                        (item) => item.kind === attachment.kind
-                      )?.icon ?? "attach"
-                    }
-                    size={16}
-                    color={colors.orange}
-                  />
-                  <Text style={styles.pendingText} numberOfLines={1}>
-                    {attachment.name}
-                    {attachment.status === "uploading"
-                      ? ` · ${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
-                      : ""}
-                  </Text>
+            <View style={styles.pendingPreview}>
+              <MessageAttachmentsGrid
+                attachments={pendingAttachments}
+                isMine
+              />
+              <View style={styles.pendingHeader}>
+                <Text style={styles.pendingSummary}>
+                  {pendingAttachments.length}/{MAX_MESSAGE_ATTACHMENTS} · {(
+                    pendingBytes /
+                    1024 /
+                    1024
+                  ).toFixed(1)} Mo / {Math.round(MAX_MESSAGE_BATCH_BYTES / 1024 / 1024)} Mo
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Retirer toutes les pièces jointes"
+                  onPress={() => setPendingAttachments([])}
+                  style={styles.clearAttachments}
+                >
+                  <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                </Pressable>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.pendingAttachments}
+              >
+                {pendingAttachments.map((attachment) => (
                   <Pressable
+                    key={attachment.id}
                     accessibilityRole="button"
                     accessibilityLabel={`Retirer ${attachment.name}`}
                     onPress={() =>
                       setPendingAttachments((previous) =>
-                        previous.filter((_, itemIndex) => itemIndex !== index)
+                        previous.filter((item) => item.id !== attachment.id)
                       )
                     }
+                    style={styles.pendingChip}
                   >
+                    <Text style={styles.pendingText} numberOfLines={1}>
+                      {attachment.name}
+                      {attachment.status === "uploading"
+                        ? ` · ${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
+                        : ""}
+                    </Text>
                     <Ionicons
                       name="close-circle"
                       size={17}
                       color={colors.textMuted}
                     />
                   </Pressable>
-                </View>
-              ))}
-            </ScrollView>
+                ))}
+              </ScrollView>
+            </View>
           ) : null}
 
           <View style={styles.composer}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Ajouter une pièce jointe"
+              accessibilityLabel="Ajouter une pièce jointe ou un sondage"
               onPress={() => setAttachmentMenuOpen(true)}
               style={styles.attachButton}
             >
@@ -700,7 +886,7 @@ export default function ChatScreen() {
       <Modal
         transparent
         visible={attachmentMenuOpen}
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setAttachmentMenuOpen(false)}
       >
         <Pressable
@@ -731,45 +917,37 @@ export default function ChatScreen() {
                   <Text style={styles.attachmentChoiceText}>{attachment.label}</Text>
                 </Pressable>
               ))}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Créer un sondage"
+                onPress={() => {
+                  setAttachmentMenuOpen(false);
+                  setPollComposerOpen(true);
+                }}
+                style={styles.attachmentChoice}
+              >
+                <LinearGradient
+                  colors={gradients.activeTab}
+                  style={styles.attachmentChoiceIcon}
+                >
+                  <Ionicons name="stats-chart" size={23} color={colors.text} />
+                </LinearGradient>
+                <Text style={styles.attachmentChoiceText}>Sondage</Text>
+              </Pressable>
             </View>
             <Text style={styles.backendHint}>
-              Les contenus sont sélectionnés depuis l’appareil puis envoyés vers le
-              stockage privé Neptune avec progression et reprise en cas d’échec.
+              Jusqu’à 10 contenus et 120 Mo par message. Les médias sont regroupés
+              dans une grille compacte et restent téléchargeables.
             </Text>
           </Pressable>
         </Pressable>
       </Modal>
 
-      <Modal
-        transparent
-        visible={Boolean(reactionMessage)}
-        animationType="fade"
-        onRequestClose={() => setReactionMessage(null)}
-      >
-        <Pressable
-          style={styles.reactionBackdrop}
-          onPress={() => setReactionMessage(null)}
-        >
-          <Pressable style={styles.reactionBar} onPress={() => undefined}>
-            {QUICK_REACTIONS.map((emoji) => (
-              <Pressable
-                key={emoji}
-                accessibilityRole="button"
-                accessibilityLabel={`Réagir avec ${emoji}`}
-                onPress={() => {
-                  if (reactionMessage) {
-                    toggleMessageReaction(reactionMessage, emoji);
-                  }
-                  setReactionMessage(null);
-                }}
-                style={styles.reactionButton}
-              >
-                <Text style={styles.reactionEmoji}>{emoji}</Text>
-              </Pressable>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <PollComposerModal
+        visible={pollComposerOpen}
+        onClose={() => setPollComposerOpen(false)}
+        onCreate={createPoll}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -800,6 +978,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...typography.heading3, color: colors.text },
   headerSubtitle: { color: colors.textMuted, fontSize: 9.5, marginTop: 2 },
+  headerMembers: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 6 },
   callActions: { flexDirection: "row", gap: 3 },
   callButton: {
     width: 44,
@@ -833,10 +1012,12 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
+  messageList: { flex: 1 },
   messages: {
     flexGrow: 1,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.md
+    paddingVertical: spacing.md,
+    gap: 3
   },
   historyLoader: { minHeight: 52, alignItems: "center", justifyContent: "center" },
   empty: {
@@ -897,18 +1078,36 @@ const styles = StyleSheet.create({
   replyComposerTitle: { color: colors.orange, fontSize: 10, fontWeight: "900" },
   replyComposerText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
   smallButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  pendingAttachments: { gap: 7, paddingBottom: 6 },
-  pendingChip: {
-    maxWidth: 250,
-    minHeight: 40,
-    paddingHorizontal: 10,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceStrong,
+  pendingPreview: {
+    maxHeight: 270,
+    marginBottom: 7,
+    padding: 7,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong
+  },
+  pendingHeader: {
+    minHeight: 34,
+    marginTop: 5,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7
+    gap: 8
   },
-  pendingText: { color: colors.textSecondary, fontSize: 10, flexShrink: 1 },
+  pendingSummary: { flex: 1, color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  clearAttachments: { width: 36, height: 34, alignItems: "center", justifyContent: "center" },
+  pendingAttachments: { gap: 7, paddingTop: 4 },
+  pendingChip: {
+    maxWidth: 230,
+    minHeight: 34,
+    paddingHorizontal: 9,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  pendingText: { color: colors.textSecondary, fontSize: 9, flexShrink: 1 },
   composer: { flexDirection: "row", alignItems: "flex-end", gap: 7 },
   attachButton: {
     width: 46,
@@ -1002,26 +1201,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: spacing.md
   },
-  reactionBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.md
-  },
-  reactionBar: {
-    minHeight: 58,
-    paddingHorizontal: 7,
-    borderRadius: 29,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  reactionButton: { width: 46, height: 46, alignItems: "center", justifyContent: "center" },
-  reactionEmoji: { fontSize: 23 },
   missing: {
     flex: 1,
     alignItems: "center",
