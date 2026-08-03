@@ -37,7 +37,7 @@ export interface AttachmentAction {
 
 export interface HighlightMedia {
   id: string;
-  kind: "photo" | "video";
+  kind: "photo" | "video" | "audio";
   uri?: string;
   name?: string;
   mimeType?: string;
@@ -47,6 +47,8 @@ export interface HighlightMedia {
   durationSeconds?: number;
   uploadProgress?: number;
   status?: "local" | "uploading" | "ready" | "failed";
+  transcript?: string;
+  transcriptStatus?: "pending" | "ready" | "failed";
 }
 
 export interface HighlightReactionSummary {

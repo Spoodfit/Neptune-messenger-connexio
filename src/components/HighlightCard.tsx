@@ -335,6 +335,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
 const styles = StyleSheet.create({
   card: {
     width: "100%",
+    flexGrow: 1,
     padding: 12,
     borderRadius: 22,
     borderWidth: 1,
@@ -344,7 +345,7 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 }
   },
-  compactCard: { minHeight: 205, padding: 10 },
+  compactCard: { minHeight: 205, padding: 10, flex: 1, alignSelf: "stretch" },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   authorPressable: {
     flex: 1,
@@ -371,7 +372,13 @@ const styles = StyleSheet.create({
   authorName: { color: colors.text, fontSize: 12, fontWeight: "900" },
   meta: { color: colors.textMuted, fontSize: 8.5, marginTop: 2 },
   moreButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  kindRow: { marginTop: 8, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
+  kindRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6
+  },
   kindBadge: {
     minHeight: 24,
     paddingHorizontal: 8,
@@ -382,15 +389,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  needBadge: { backgroundColor: "rgba(255,123,134,0.13)", borderColor: "rgba(255,123,134,0.35)" },
-  offerBadge: { backgroundColor: "rgba(66,211,146,0.12)", borderColor: "rgba(66,211,146,0.35)" },
+  needBadge: {
+    backgroundColor: "rgba(255,123,134,0.13)",
+    borderColor: "rgba(255,123,134,0.35)"
+  },
+  offerBadge: {
+    backgroundColor: "rgba(66,211,146,0.12)",
+    borderColor: "rgba(66,211,146,0.35)"
+  },
   kindText: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
   needText: { color: colors.danger },
   offerText: { color: colors.success },
   syncBadge: {
     minHeight: 24,
     paddingHorizontal: 7,
-    borderRadius: 7,
+    borderRadius: 999,
     backgroundColor: colors.successSoft,
     flexDirection: "row",
     alignItems: "center",
@@ -404,14 +417,30 @@ const styles = StyleSheet.create({
     bottom: 8,
     paddingHorizontal: 7,
     paddingVertical: 4,
-    borderRadius: 7,
+    borderRadius: 999,
     backgroundColor: "rgba(2,7,19,0.78)"
   },
   durationText: { color: colors.white, fontSize: 9, fontWeight: "900" },
-  body: { ...typography.bodySmall, color: colors.textSecondary, lineHeight: 19, marginTop: 9 },
+  body: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    lineHeight: 19,
+    marginTop: 9
+  },
   compactBody: { fontSize: 11, lineHeight: 16 },
-  locationLine: { minHeight: 26, marginTop: 6, flexDirection: "row", alignItems: "center", gap: 4 },
-  locationText: { flex: 1, color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
+  locationLine: {
+    minHeight: 26,
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4
+  },
+  locationText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: 8.5,
+    fontWeight: "700"
+  },
   metrics: {
     minHeight: 28,
     marginTop: 6,
@@ -424,7 +453,7 @@ const styles = StyleSheet.create({
   reactionPicker: {
     minHeight: 48,
     marginTop: 4,
-    borderRadius: 14,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceStrong,
@@ -432,16 +461,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexWrap: "wrap"
   },
-  reactionTarget: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  reactionVisual: { width: 34, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  reactionActive: { borderWidth: 1, borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
+  reactionTarget: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionVisual: {
+    width: 34,
+    height: 28,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  reactionActive: {
+    borderWidth: 1,
+    borderColor: colors.violet,
+    backgroundColor: "rgba(107,79,234,0.22)"
+  },
   reactionEmoji: { fontSize: 19 },
-  reactionSummary: { minHeight: 44, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 2 },
-  reactionSummaryTarget: { minWidth: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  reactionSummary: {
+    minHeight: 44,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 2
+  },
+  reactionSummaryTarget: {
+    minWidth: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   reactionSummaryVisual: {
     minHeight: 27,
-    paddingHorizontal: 7,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,

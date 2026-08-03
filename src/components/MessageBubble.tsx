@@ -73,6 +73,7 @@ export function MessageBubble({
   const currentReaction = reactions.find(
     (reaction) => reaction.reactedByCurrentUser
   )?.emoji;
+  const showDetachedReactionButton = Boolean(onReact);
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -271,67 +272,89 @@ export function MessageBubble({
             </Pressable>
           ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Message. Maintenir pour réagir."
-            onLongPress={() => setReactionOpen(true)}
-            delayLongPress={320}
-          >
-            {message.isMine ? (
-              <LinearGradient
-                colors={[colors.primary, colors.violet]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.bubble, styles.mine]}
-              >
-                {bubbleContent}
-              </LinearGradient>
-            ) : (
-              <LinearGradient
-                colors={gradients.glass}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0.85, y: 1 }}
-                style={[styles.bubble, styles.other]}
-              >
-                {bubbleContent}
-              </LinearGradient>
-            )}
-          </Pressable>
-
-          {reactionOpen ? (
-            <Animated.View style={[styles.reactionPicker, reactionStyle]}>
-              {QUICK_REACTIONS.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Réagir avec ${emoji}`}
-                  accessibilityState={{ selected: currentReaction === emoji }}
-                  onPress={() => chooseReaction(emoji)}
-                  style={styles.reactionChoiceTarget}
+          <View style={styles.bubbleStage}>
+            <Pressable
+              accessible={false}
+              onLongPress={() => setReactionOpen(true)}
+              delayLongPress={320}
+            >
+              {message.isMine ? (
+                <LinearGradient
+                  colors={[colors.primary, colors.violet]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.bubble, styles.mine]}
                 >
-                  <View
+                  {bubbleContent}
+                </LinearGradient>
+              ) : (
+                <LinearGradient
+                  colors={gradients.glass}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0.85, y: 1 }}
+                  style={[styles.bubble, styles.other]}
+                >
+                  {bubbleContent}
+                </LinearGradient>
+              )}
+            </Pressable>
+
+            {showDetachedReactionButton || reactionOpen ? (
+              <View style={styles.reactionAnchor} pointerEvents="box-none">
+                {reactionOpen ? (
+                  <Animated.View
                     style={[
-                      styles.reactionChoiceVisual,
-                      currentReaction === emoji && styles.reactionChoiceActive
+                      styles.reactionPicker,
+                      message.isMine
+                        ? styles.reactionPickerLeft
+                        : styles.reactionPickerRight,
+                      reactionStyle
                     ]}
                   >
-                    <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
-                  </View>
-                </Pressable>
-              ))}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Fermer les réactions"
-                onPress={() => setReactionOpen(false)}
-                style={styles.reactionClose}
-              >
-                <Ionicons name="close" size={17} color={colors.textMuted} />
-              </Pressable>
-            </Animated.View>
-          ) : null}
+                    {QUICK_REACTIONS.map((emoji) => (
+                      <Pressable
+                        key={emoji}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Réagir avec ${emoji}`}
+                        accessibilityState={{ selected: currentReaction === emoji }}
+                        onPress={() => chooseReaction(emoji)}
+                        style={styles.reactionChoiceTarget}
+                      >
+                        <View
+                          style={[
+                            styles.reactionChoiceVisual,
+                            currentReaction === emoji && styles.reactionChoiceActive
+                          ]}
+                        >
+                          <Text style={styles.reactionChoiceEmoji}>{emoji}</Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </Animated.View>
+                ) : null}
+                {showDetachedReactionButton ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Ajouter une réaction"
+                    onPress={() => setReactionOpen((value) => !value)}
+                    style={styles.reactionAdd}
+                  >
+                    <View style={styles.reactionAddVisual}>
+                      <Ionicons name="add" size={10} color={colors.textMuted} />
+                    </View>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
 
-          <View style={styles.reactionLine}>
-            {reactions.length > 0 ? (
+          {reactions.length > 0 ? (
+            <View
+              style={[
+                styles.reactionLine,
+                message.isMine ? styles.reactionLineMine : styles.reactionLineOther
+              ]}
+            >
               <View style={styles.reactions}>
                 {reactions.map((reaction) => (
                   <Pressable
@@ -354,27 +377,8 @@ export function MessageBubble({
                   </Pressable>
                 ))}
               </View>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajouter ou modifier une réaction"
-              onPress={() => setReactionOpen((value) => !value)}
-              style={styles.reactionAdd}
-            >
-              <View
-                style={[
-                  styles.reactionAddVisual,
-                  currentReaction && styles.reactionAddActive
-                ]}
-              >
-                {currentReaction ? (
-                  <Text style={styles.reactionAddEmoji}>{currentReaction}</Text>
-                ) : (
-                  <Ionicons name="add" size={17} color={colors.textMuted} />
-                )}
-              </View>
-            </Pressable>
-          </View>
+            </View>
+          ) : null}
 
           {retryable ? (
             <Pressable
@@ -416,7 +420,11 @@ const styles = StyleSheet.create({
   },
   mineRow: { justifyContent: "flex-end" },
   otherRow: { justifyContent: "flex-start" },
-  avatarPressable: { width: AVATAR_SIZE, minHeight: 44, justifyContent: "flex-end" },
+  avatarPressable: {
+    width: AVATAR_SIZE,
+    minHeight: 44,
+    justifyContent: "flex-end"
+  },
   avatarShell: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
@@ -440,7 +448,7 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: "100%", height: "100%" },
   avatarText: { color: colors.text, fontSize: 10, fontWeight: "900" },
-  wrapper: { minWidth: 0, flexShrink: 1 },
+  wrapper: { minWidth: 0, flexShrink: 1, position: "relative", overflow: "visible" },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
   senderPressable: { minWidth: 44, minHeight: 44, justifyContent: "flex-end" },
@@ -454,6 +462,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlignVertical: "center"
   },
+  bubbleStage: { maxWidth: "100%", position: "relative", overflow: "visible" },
   bubble: {
     maxWidth: "100%",
     borderRadius: 17,
@@ -509,32 +518,47 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: "right"
   },
-  reactionPicker: {
-    marginTop: 4,
-    minHeight: 48,
-    paddingHorizontal: 3,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    shadowColor: "#000000",
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 }
-  },
-  reactionChoiceTarget: {
+  reactionAnchor: {
+    position: "absolute",
+    right: -8,
+    bottom: -22,
     width: 44,
     height: 44,
+    zIndex: 40,
+    elevation: 18,
+    overflow: "visible"
+  },
+  reactionPicker: {
+    position: "absolute",
+    top: 1,
+    height: 42,
+    paddingHorizontal: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "rgba(8,18,38,0.98)",
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    alignItems: "center",
+    zIndex: 40,
+    elevation: 18,
+    shadowColor: "#000000",
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 }
+  },
+  reactionPickerLeft: { right: 38 },
+  reactionPickerRight: { left: 38 },
+  reactionChoiceTarget: {
+    width: 36,
+    height: 40,
     alignItems: "center",
     justifyContent: "center"
   },
   reactionChoiceVisual: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
+    width: 30,
+    height: 28,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -543,32 +567,26 @@ const styles = StyleSheet.create({
     borderColor: colors.violet,
     backgroundColor: "rgba(107,79,234,0.22)"
   },
-  reactionChoiceEmoji: { fontSize: 20 },
-  reactionClose: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center"
-  },
+  reactionChoiceEmoji: { fontSize: 19 },
   reactionLine: {
-    minHeight: 44,
-    marginTop: -4,
-    paddingHorizontal: 2,
+    minHeight: 29,
+    marginTop: 2,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 2
+    alignItems: "center"
   },
-  reactions: { flexDirection: "row", flexWrap: "wrap", gap: 2, flexShrink: 1 },
+  reactionLineMine: { justifyContent: "flex-end" },
+  reactionLineOther: { justifyContent: "flex-start" },
+  reactions: { flexDirection: "row", flexWrap: "wrap", gap: 3, flexShrink: 1 },
   reactionPillTarget: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: 34,
+    minHeight: 29,
     alignItems: "center",
     justifyContent: "center"
   },
   reactionPillVisual: {
-    minHeight: 28,
-    paddingHorizontal: 7,
-    borderRadius: 10,
+    minHeight: 24,
+    paddingHorizontal: 8,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
@@ -587,20 +605,23 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0
+    zIndex: 12,
+    elevation: 9
   },
   reactionAddVisual: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surfaceStrong,
+    borderColor: "rgba(174,184,210,0.32)",
+    backgroundColor: "rgba(8,18,38,0.96)",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    shadowColor: "#000000",
+    shadowOpacity: 0.24,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
   },
-  reactionAddActive: { borderColor: colors.violet },
-  reactionAddEmoji: { fontSize: 14 },
   retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
   retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
 });

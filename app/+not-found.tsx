@@ -1,14 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect } from "react";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NeptuneMark } from "@/components/NeptuneMark";
+import { useSession } from "@/providers/SessionProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
+
+const GITHUB_PAGES_ROOT = "/Neptune-messenger-connexio";
 
 export default function NotFoundScreen() {
   const insets = useSafeAreaInsets();
+  const { isAuthenticated, sessionReady } = useSession();
+
+  useEffect(() => {
+    if (
+      Platform.OS !== "web" ||
+      !sessionReady ||
+      typeof window === "undefined"
+    ) {
+      return;
+    }
+
+    const normalizedPath = window.location.pathname.replace(/\/+$/, "");
+    if (normalizedPath !== GITHUB_PAGES_ROOT) return;
+
+    const target = isAuthenticated ? "/(tabs)/messages" : "/sign-in";
+    const redirectTimer = window.setTimeout(() => router.replace(target), 0);
+    return () => window.clearTimeout(redirectTimer);
+  }, [isAuthenticated, sessionReady]);
+
   return (
     <LinearGradient
       colors={gradients.screen}
@@ -34,10 +57,14 @@ export default function NotFoundScreen() {
       </Text>
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.replace("/(tabs)/messages")}
+        onPress={() =>
+          router.replace(isAuthenticated ? "/(tabs)/messages" : "/sign-in")
+        }
         style={styles.primaryButton}
       >
-        <Text style={styles.primaryText}>Revenir aux messages</Text>
+        <Text style={styles.primaryText}>
+          {isAuthenticated ? "Revenir aux messages" : "Ouvrir Connexio"}
+        </Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"

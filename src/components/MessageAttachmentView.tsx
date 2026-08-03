@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import { useState } from "react";
 import {
   Alert,
   Image,
@@ -51,6 +53,13 @@ function locationUrl(attachment: MessageAttachment): string | undefined {
   return attachment.uri;
 }
 
+function formatDuration(durationSeconds?: number): string {
+  const total = Math.max(0, Math.round(durationSeconds ?? 0));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 async function openAttachment(attachment: MessageAttachment): Promise<void> {
   const uri =
     attachment.kind === "location" ? locationUrl(attachment) : attachment.uri;
@@ -64,6 +73,183 @@ async function openAttachment(attachment: MessageAttachment): Promise<void> {
     return;
   }
   await Linking.openURL(uri);
+}
+
+function VoiceAttachment({
+  attachment,
+  isMine
+}: MessageAttachmentViewProps) {
+  const [transcriptVisible, setTranscriptVisible] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const sourceUri = attachment.downloadUrl ?? attachment.uri ?? null;
+  const player = useAudioPlayer(sourceUri, { updateInterval: 180 });
+  const playerStatus = useAudioPlayerStatus(player);
+  const transcriptReady = Boolean(attachment.transcript?.trim());
+  const waveform = [7, 13, 19, 10, 23, 15, 8, 18, 25, 12, 20, 9, 16, 22, 11, 17, 7];
+
+  const togglePlayback = () => {
+    if (!sourceUri) {
+      Alert.alert("Vocal indisponible", "Ce message vocal n’est plus accessible.");
+      return;
+    }
+    if (playerStatus.playing) {
+      player.pause();
+      return;
+    }
+    if (playerStatus.didJustFinish || (playerStatus.duration > 0 && playerStatus.currentTime >= playerStatus.duration)) {
+      void player.seekTo(0);
+    }
+    player.setPlaybackRate(playbackRate);
+    player.play();
+  };
+
+  const cyclePlaybackRate = () => {
+    const next = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+    setPlaybackRate(next);
+    player.setPlaybackRate(next);
+  };
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Message vocal de ${formatDuration(
+        attachment.durationSeconds
+      )}${transcriptReady ? ". Transcription disponible." : ""}`}
+      style={[
+        styles.voiceCard,
+        isMine ? styles.voiceMine : styles.voiceOther
+      ]}
+    >
+      <View style={styles.voiceMain}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={playerStatus.playing ? "Mettre le vocal en pause" : "Lire le message vocal"}
+onPress={togglePlayback}
+          style={[
+            styles.voicePlay,
+            isMine ? styles.voicePlayMine : styles.voicePlayOther
+          ]}
+        >
+          <Ionicons
+            name={playerStatus.playing ? "pause" : "play"}
+  size={19}
+            color={isMine ? colors.primary : colors.white}
+          />
+        </Pressable>
+        <View style={styles.voiceContent}>
+          <View style={styles.waveform} accessibilityElementsHidden>
+            {waveform.map((height, index) => (
+              <View
+                key={`${attachment.id}-wave-${index}`}
+                style={[
+                  styles.waveBar,
+                  { height },
+                  isMine ? styles.waveBarMine : styles.waveBarOther
+                ]}
+              />
+            ))}
+          </View>
+          <View style={styles.voiceMetaRow}>
+            <Text
+              style={[
+                styles.voiceDuration,
+                isMine ? styles.mineMeta : styles.otherMeta
+              ]}
+            >
+              {attachment.status === "uploading"
+      ? `${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
+      : playerStatus.playing
+        ? `${formatDuration(playerStatus.currentTime)} / ${formatDuration(playerStatus.duration || attachment.durationSeconds)}`
+        : formatDuration(attachment.durationSeconds)}
+            </Text>
+            <Pressable
+    accessibilityRole="button"
+    accessibilityLabel={`Vitesse de lecture ${playbackRate} fois`}
+    onPress={cyclePlaybackRate}
+    style={styles.speedButton}
+  >
+    <Text style={[styles.speedText, isMine ? styles.mineText : styles.otherText]}>
+      {playbackRate}×
+    </Text>
+  </Pressable>
+  <Text
+    numberOfLines={1}
+    style={[
+      styles.voiceName,
+      isMine ? styles.mineMeta : styles.otherMeta
+    ]}
+  >
+    Vocal Neptune
+  </Text>
+          </View>
+        </View>
+      </View>
+
+      {attachment.transcriptStatus === "pending" ? (
+        <View style={styles.transcriptPending}>
+          <Ionicons
+            name="sparkles-outline"
+            size={14}
+            color={isMine ? colors.whiteMuted : colors.orange}
+          />
+          <Text
+            style={[
+              styles.transcriptPendingText,
+              isMine ? styles.mineMeta : styles.otherMeta
+            ]}
+          >
+            Transcription en cours…
+          </Text>
+        </View>
+      ) : transcriptReady ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              transcriptVisible
+                ? "Masquer la transcription"
+                : "Afficher la transcription"
+            }
+            accessibilityState={{ expanded: transcriptVisible }}
+            onPress={() => setTranscriptVisible((current) => !current)}
+            style={styles.transcriptToggle}
+          >
+            <Ionicons
+              name="document-text-outline"
+              size={15}
+              color={isMine ? colors.white : colors.orange}
+            />
+            <Text
+              style={[
+                styles.transcriptToggleText,
+                isMine ? styles.mineText : styles.otherText
+              ]}
+            >
+              {transcriptVisible
+                ? "Masquer la transcription"
+                : "Afficher la transcription"}
+            </Text>
+            <Ionicons
+              name={transcriptVisible ? "chevron-up" : "chevron-down"}
+              size={15}
+              color={isMine ? colors.whiteMuted : colors.textMuted}
+            />
+          </Pressable>
+          {transcriptVisible ? (
+            <Text
+              selectable
+              style={[
+                styles.transcript,
+                isMine ? styles.transcriptMine : styles.transcriptOther
+              ]}
+            >
+              {attachment.transcript}
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+    </View>
+  );
 }
 
 export function MessageAttachmentView({
@@ -118,6 +304,10 @@ export function MessageAttachmentView({
         </View>
       </View>
     );
+  }
+
+  if (attachment.kind === "audio") {
+    return <VoiceAttachment attachment={attachment} isMine={isMine} />;
   }
 
   return (
@@ -190,6 +380,96 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   visualLabelText: { color: colors.white, fontSize: 9, fontWeight: "800" },
+  voiceCard: {
+    minWidth: 224,
+    maxWidth: "100%",
+    padding: 9,
+    borderRadius: 16,
+    borderWidth: 1
+  },
+  voiceMine: {
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(2,7,19,0.16)"
+  },
+  voiceOther: {
+    borderColor: colors.borderSoft,
+    backgroundColor: "rgba(2,7,19,0.24)"
+  },
+  voiceMain: { flexDirection: "row", alignItems: "center", gap: 9 },
+  voicePlay: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  voicePlayMine: { backgroundColor: colors.white },
+  voicePlayOther: { backgroundColor: colors.primary },
+  voiceContent: { flex: 1, minWidth: 0 },
+  waveform: {
+    height: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    overflow: "hidden"
+  },
+  waveBar: { width: 2.5, borderRadius: 2 },
+  waveBarMine: { backgroundColor: colors.whiteMuted },
+  waveBarOther: { backgroundColor: colors.orange },
+  voiceMetaRow: {
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8
+  },
+  voiceDuration: { fontSize: 9, fontWeight: "900" },
+  speedButton: {
+    minWidth: 34,
+    minHeight: 26,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  speedText: { fontSize: 9, fontWeight: "900" },
+  voiceName: { flex: 1, fontSize: 8.5, textAlign: "right", fontWeight: "700" },
+  transcriptPending: {
+    minHeight: 34,
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.10)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
+  transcriptPendingText: { fontSize: 9, fontWeight: "800" },
+  transcriptToggle: {
+    minHeight: 44,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.10)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7
+  },
+  transcriptToggleText: { flex: 1, fontSize: 9.5, fontWeight: "900" },
+  transcript: {
+    padding: 9,
+    borderRadius: 12,
+    fontSize: 11,
+    lineHeight: 16
+  },
+  transcriptMine: {
+    color: colors.white,
+    backgroundColor: "rgba(2,7,19,0.20)"
+  },
+  transcriptOther: {
+    color: colors.textSecondary,
+    backgroundColor: colors.surfaceStrong
+  },
   attachment: {
     minWidth: 190,
     maxWidth: "100%",

@@ -9,6 +9,15 @@ interface MemberAvatarStackProps {
   memberCount: number;
   maxVisible?: number;
   size?: number;
+  showCount?: boolean;
+}
+
+function resolveVisibleLimit(memberCount: number, requested: number): number {
+  if (memberCount >= 30) return Math.max(requested, 9);
+  if (memberCount >= 18) return Math.max(requested, 8);
+  if (memberCount >= 10) return Math.max(requested, 7);
+  if (memberCount >= 6) return Math.max(requested, 6);
+  return requested;
 }
 
 export function MemberAvatarStack({
@@ -16,13 +25,18 @@ export function MemberAvatarStack({
   members,
   memberCount,
   maxVisible = 4,
-  size = 25
+  size = 25,
+  showCount = true
 }: MemberAvatarStackProps) {
+  const visibleLimit = resolveVisibleLimit(memberCount, maxVisible);
   const resolvedMembers = memberIds
     .map((id) => members.find((member) => member.id === id))
     .filter((member): member is AppUser => Boolean(member))
-    .slice(0, maxVisible);
+    .slice(0, visibleLimit);
   const missing = Math.max(0, memberCount - resolvedMembers.length);
+  const overlap = Math.round(
+    size * (resolvedMembers.length >= 8 ? 0.48 : resolvedMembers.length >= 6 ? 0.4 : 0.3)
+  );
 
   return (
     <View
@@ -40,8 +54,9 @@ export function MemberAvatarStack({
                 width: size,
                 height: size,
                 borderRadius: Math.round(size * 0.38),
-                marginLeft: index === 0 ? 0 : -Math.round(size * 0.3),
-                zIndex: maxVisible - index
+                marginLeft: index === 0 ? 0 : -overlap,
+                zIndex: visibleLimit - index,
+                transform: [{ translateY: index % 2 === 0 ? 0 : 1 }]
               }
             ]}
           >
@@ -59,24 +74,44 @@ export function MemberAvatarStack({
             style={[
               styles.avatar,
               styles.emptyAvatar,
-              { width: size, height: size, borderRadius: Math.round(size * 0.38) }
+              {
+                width: size,
+                height: size,
+                borderRadius: Math.round(size * 0.38)
+              }
             ]}
           >
             <Text style={[styles.initials, { fontSize: Math.max(7, size * 0.31) }]}>N</Text>
           </View>
         ) : null}
+        {missing > 0 && resolvedMembers.length > 0 ? (
+          <View
+            style={[
+              styles.avatar,
+              styles.overflowAvatar,
+              {
+                width: size,
+                height: size,
+                borderRadius: Math.round(size * 0.38),
+                marginLeft: -overlap,
+                zIndex: 0
+              }
+            ]}
+          >
+            <Text style={[styles.overflowText, { fontSize: Math.max(6.5, size * 0.27) }]}>
+              +{missing}
+            </Text>
+          </View>
+        ) : null}
       </View>
-      <Text style={styles.count}>
-        {memberCount}
-        {missing > 0 && memberCount > maxVisible ? " membres" : ""}
-      </Text>
+      {showCount ? <Text style={styles.count}>{memberCount}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", minHeight: 28 },
-  stack: { flexDirection: "row", alignItems: "center" },
+  row: { flexDirection: "row", alignItems: "center", minHeight: 28, minWidth: 0 },
+  stack: { flexDirection: "row", alignItems: "center", minWidth: 0, flexShrink: 1 },
   avatar: {
     overflow: "hidden",
     borderWidth: 2,
@@ -86,7 +121,15 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   emptyAvatar: { backgroundColor: colors.surfaceStrong },
+  overflowAvatar: { backgroundColor: colors.surfaceStrong },
   image: { width: "100%", height: "100%" },
   initials: { color: colors.text, fontWeight: "900" },
-  count: { marginLeft: 5, color: colors.textMuted, fontSize: 9.5, fontWeight: "800" }
+  overflowText: { color: colors.textSecondary, fontWeight: "900" },
+  count: {
+    marginLeft: 5,
+    color: colors.textMuted,
+    fontSize: 9.5,
+    fontWeight: "800",
+    flexShrink: 0
+  }
 });

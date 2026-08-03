@@ -14,10 +14,12 @@ import {
   refreshSessionAccessToken,
   resolveSessionAccessToken
 } from "../auth/sessionRuntime";
+import { evaluateModeration } from "../../domain/moderation";
 import type {
   ChatMessage,
   Conversation,
   CreatePollInput,
+  ModerationDecision,
   PushTokenRegistration,
   RealtimeTicket
 } from "../../types/messaging";
@@ -26,7 +28,57 @@ interface AuthenticatedRequestOptions extends RequestInit {
   timeoutMs?: number;
 }
 
+interface ModerationWire {
+  allowed?: unknown;
+  category?: unknown;
+  reason?: unknown;
+  warning_level?: unknown;
+  suspended_until?: unknown;
+  requires_manual_review?: unknown;
+}
+
+function normalizeModeration(payload: ModerationWire): ModerationDecision {
+  return {
+    allowed: payload.allowed === true,
+    category:
+      typeof payload.category === "string"
+        ? (payload.category as ModerationDecision["category"])
+        : undefined,
+    reason: typeof payload.reason === "string" ? payload.reason : undefined,
+    warningLevel:
+      payload.warning_level === 1 ||
+      payload.warning_level === 2 ||
+      payload.warning_level === 3
+        ? payload.warning_level
+        : undefined,
+    suspendedUntil:
+      typeof payload.suspended_until === "string"
+        ? payload.suspended_until
+        : undefined,
+    requiresManualReview: payload.requires_manual_review === true
+  };
+}
+
+function moderationMessage(decision: ModerationDecision): string {
+  const reason = decision.reason ?? "Ce contenu ne respecte pas les règles Neptune.";
+  if (decision.warningLevel === 1) {
+    return `${reason} Premier avertissement enregistré.`;
+  }
+  if (decision.warningLevel === 2) {
+    return `${reason} Deuxième avertissement : le compte est suspendu pendant 24 heures.`;
+  }
+  if (decision.warningLevel === 3 || decision.requiresManualReview) {
+    return `${reason} Troisième avertissement : le compte reste suspendu jusqu’à validation par un Capitaine, un Amiral ou un Visionnaire.`;
+  }
+  return reason;
+}
+
 export class NeptuneMessagingApi implements MessagingApi {
+  private localWarningCount = 0;
+  private localSuspendedUntil: number | null = null;
+  private localManualSuspension = false;
+  private recentSentBodies: string[] = [];
+
   constructor(private readonly fallbackAccessToken?: string | null) {}
 
   private async request<T>(
@@ -52,6 +104,99 @@ export class NeptuneMessagingApi implements MessagingApi {
     }
   }
 
+  private assertLocalModeration(body: string): void {
+    const now = Date.now();
+    if (this.localManualSuspension) {
+      throw new ApiError(
+        "Compte suspendu jusqu’à validation par un Capitaine, un Amiral ou un Visionnaire.",
+        403,
+        { code: "moderation_manual_suspension" }
+      );
+    }
+    if (this.localSuspendedUntil && this.localSuspendedUntil > now) {
+      const remainingMinutes = Math.max(
+        1,
+        Math.ceil((this.localSuspendedUntil - now) / 60_000)
+      );
+      throw new ApiError(
+        `Compte temporairement suspendu. Réessayez dans environ ${remainingMinutes} minute${remainingMinutes > 1 ? "s" : ""}.`,
+        403,
+        { code: "moderation_temporary_suspension" }
+      );
+    }
+    if (this.localSuspendedUntil && this.localSuspendedUntil <= now) {
+      this.localSuspendedUntil = null;
+    }
+
+    const decision = evaluateModeration({
+      body,
+      recentBodies: this.recentSentBodies,
+      warningCount: this.localWarningCount
+    });
+    if (decision.allowed) return;
+
+    this.localWarningCount = Math.max(
+      this.localWarningCount,
+      decision.warningLevel ?? this.localWarningCount + 1
+    );
+    if (decision.suspendedUntil) {
+      this.localSuspendedUntil = Date.parse(decision.suspendedUntil);
+    }
+    if (decision.requiresManualReview || decision.warningLevel === 3) {
+      this.localManualSuspension = true;
+    }
+    throw new ApiError(moderationMessage(decision), 422, {
+      code: "moderation_rejected",
+      decision
+    });
+  }
+
+  private async assertServerModeration(
+    conversationId: string,
+    input: SendMessageInput
+  ): Promise<void> {
+    try {
+      const payload = await this.request<ModerationWire>(
+        "/v1/moderation/evaluate",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            body: input.body,
+            attachment_names: (input.attachments ?? []).map(
+              (attachment) => attachment.name
+            )
+          })
+        }
+      );
+      const decision = normalizeModeration(payload);
+      if (decision.allowed) return;
+
+      this.localWarningCount = Math.max(
+        this.localWarningCount,
+        decision.warningLevel ?? this.localWarningCount
+      );
+      if (decision.suspendedUntil) {
+        this.localSuspendedUntil = Date.parse(decision.suspendedUntil);
+      }
+      if (decision.requiresManualReview || decision.warningLevel === 3) {
+        this.localManualSuspension = true;
+      }
+      throw new ApiError(moderationMessage(decision), 422, {
+        code: "moderation_rejected",
+        decision
+      });
+    } catch (error) {
+      if (
+        error instanceof ApiError &&
+        (error.status === 404 || error.status === 405 || error.status === 501)
+      ) {
+        return;
+      }
+      throw error;
+    }
+  }
+
   async listConversations(): Promise<Conversation[]> {
     const payload = await this.request<unknown>("/v1/conversations");
     return normalizeConversationList(payload);
@@ -72,6 +217,9 @@ export class NeptuneMessagingApi implements MessagingApi {
     conversationId: string,
     input: SendMessageInput
   ): Promise<ChatMessage> {
+    this.assertLocalModeration(input.body);
+    await this.assertServerModeration(conversationId, input);
+
     const payload = await this.request<unknown>(
       `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
       {
@@ -96,11 +244,14 @@ export class NeptuneMessagingApi implements MessagingApi {
             height: attachment.height ?? null,
             latitude: attachment.latitude ?? null,
             longitude: attachment.longitude ?? null,
-            accuracy_radius_meters: attachment.accuracyRadiusMeters ?? null
+            accuracy_radius_meters: attachment.accuracyRadiusMeters ?? null,
+            transcript: attachment.transcript ?? null,
+            transcript_status: attachment.transcriptStatus ?? null
           }))
         })
       }
     );
+    this.recentSentBodies = [...this.recentSentBodies, input.body].slice(-20);
     return normalizeChatMessage(payload);
   }
 

@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo } from "react";
+import { createElement, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
 import type { NeptuneMapProps } from "./NeptuneMap.types";
@@ -8,6 +8,8 @@ export default function NeptuneMap({
   selectedMemberId,
   onSelectMember
 }: NeptuneMapProps) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (event.data?.source !== "connexio-map") return;
@@ -19,6 +21,17 @@ export default function NeptuneMap({
     return () => window.removeEventListener("message", listener);
   }, [onSelectMember]);
 
+  useEffect(() => {
+    iframeRef.current?.contentWindow?.postMessage(
+      {
+        source: "connexio-map-parent",
+        type: "selected-member",
+        memberId: selectedMemberId
+      },
+      "*"
+    );
+  }, [selectedMemberId]);
+
   const html = useMemo(() => {
     const markerData = moments.map((moment) => ({
       id: moment.member.id,
@@ -26,8 +39,7 @@ export default function NeptuneMap({
       initials: moment.member.initials,
       latitude: moment.latitude,
       longitude: moment.longitude,
-      pulse: moment.recentPostIds.length > 0,
-      selected: moment.member.id === selectedMemberId
+      pulse: moment.recentPostIds.length > 0
     }));
     const serialized = JSON.stringify(markerData).replaceAll("<", "\\u003c");
     return `<!doctype html>
@@ -43,8 +55,8 @@ html,body,#map{height:100%;margin:0;background:#020713;font-family:Arial,sans-se
 .leaflet-control-attribution{background:rgba(2,7,19,.78)!important;color:#aeb8d2!important;font-size:8px!important}
 .leaflet-control-attribution a{color:#86b8ff!important}
 .leaflet-bar a{background:#081226!important;color:#fff!important;border-color:rgba(255,255,255,.12)!important}
-.member-marker{width:56px;height:56px;position:relative;display:grid;place-items:center}
-.member-core{width:44px;height:44px;border-radius:17px;padding:2px;background:linear-gradient(135deg,#0048ba,#6b4fea,#f4b183);box-shadow:0 0 22px rgba(107,79,234,.45);position:relative;z-index:2}
+.member-marker{width:56px;height:56px;position:relative;display:grid;place-items:center;will-change:transform}
+.member-core{width:44px;height:44px;border-radius:17px;padding:2px;background:linear-gradient(135deg,#0048ba,#6b4fea,#f4b183);box-shadow:0 0 22px rgba(107,79,234,.45);position:relative;z-index:2;transition:transform .18s ease,box-shadow .18s ease}
 .member-inner{height:100%;border-radius:15px;border:2px solid #081226;background:#101a31;color:#fff;display:grid;place-items:center;font-weight:900;font-size:11px}
 .member-marker.pulse:before,.member-marker.pulse:after{content:"";position:absolute;inset:3px;border-radius:50%;border:2px solid rgba(0,114,255,.55);animation:pulse 4.8s ease-out infinite}
 .member-marker.pulse:after{inset:-4px;border-color:rgba(244,177,131,.38);animation-delay:.2s}
@@ -61,20 +73,24 @@ html,body,#map{height:100%;margin:0;background:#020713;font-family:Arial,sans-se
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const members=${serialized};
+const markerNodes=new Map();
 const escapeText=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
 const map=L.map('map',{zoomControl:true,minZoom:5,maxZoom:16,zoomSnap:.25});
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
 const cluster=L.markerClusterGroup({maxClusterRadius:56,spiderfyOnMaxZoom:true,showCoverageOnHover:false,iconCreateFunction:c=>L.divIcon({className:'custom-cluster',html:'<div class="cluster-core">'+c.getChildCount()+'</div>',iconSize:[48,48]})});
 const bounds=[];
 members.forEach(member=>{
- const html='<div class="member-marker '+(member.pulse?'pulse ':'')+(member.selected?'selected':'')+'"><div class="member-core"><div class="member-inner">'+escapeText(member.initials)+'</div></div></div>';
+ const html='<div class="member-marker '+(member.pulse?'pulse':'')+'" data-member-id="'+escapeText(member.id)+'"><div class="member-core"><div class="member-inner">'+escapeText(member.initials)+'</div></div></div>';
  const marker=L.marker([member.latitude,member.longitude],{icon:L.divIcon({className:'',html,iconSize:[56,56],iconAnchor:[28,28]}),title:member.name});
+ marker.on('add',()=>{const node=marker.getElement()?.querySelector('.member-marker');if(node)markerNodes.set(member.id,node)});
  marker.on('click',()=>window.parent.postMessage({source:'connexio-map',type:'member-selected',memberId:member.id},'*'));
  marker.bindTooltip(escapeText(member.name),{direction:'bottom',offset:[0,22],opacity:.92});
  cluster.addLayer(marker);bounds.push([member.latitude,member.longitude]);
 });
 map.addLayer(cluster);
 if(bounds.length){map.fitBounds(bounds,{padding:[54,54],maxZoom:9})}else{map.setView([43.45,2.6],7)}
+const updateSelection=memberId=>{markerNodes.forEach((node,id)=>node.classList.toggle('selected',Boolean(memberId)&&id===memberId))};
+window.addEventListener('message',event=>{const data=event.data;if(data?.source==='connexio-map-parent'&&data?.type==='selected-member')updateSelection(data.memberId||null)});
 document.querySelector('.geo-btn').addEventListener('click',()=>{
  if(!navigator.geolocation)return;
  navigator.geolocation.getCurrentPosition(position=>{
@@ -85,13 +101,25 @@ document.querySelector('.geo-btn').addEventListener('click',()=>{
 });
 </script>
 </body></html>`;
-  }, [moments, selectedMemberId]);
+  }, [moments]);
 
   return (
     <View style={styles.wrap}>
       {createElement("iframe", {
+        ref: (node: HTMLIFrameElement | null) => {
+          iframeRef.current = node;
+        },
         title: "Carte Neptune",
         srcDoc: html,
+        onLoad: () =>
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              source: "connexio-map-parent",
+              type: "selected-member",
+              memberId: selectedMemberId
+            },
+            "*"
+          ),
         style: {
           width: "100%",
           height: "100%",

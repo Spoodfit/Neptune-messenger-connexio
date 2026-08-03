@@ -61,6 +61,50 @@ export async function unregisterDeviceFromPushNotifications(): Promise<void> {
   }
 }
 
+export async function scheduleCallBackReminder(
+  conversationId: string,
+  callerName: string,
+  delaySeconds = 10 * 60
+): Promise<boolean> {
+  if (Platform.OS === "web") return false;
+  const current = await Notifications.getPermissionsAsync();
+  const status =
+    current.status === "granted"
+      ? current.status
+      : (await Notifications.requestPermissionsAsync()).status;
+  if (status !== "granted") return false;
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("calls", {
+      name: "Rappels d’appels",
+      description: "Rappels demandés après un appel décliné",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 180, 100, 180],
+      sound: "default",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
+    });
+  }
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: `Rappeler ${callerName}`,
+      body: "Les 10 minutes sont écoulées. Ouvrez Connexio pour rappeler cette personne.",
+      sound: "default",
+      data: {
+        type: "call-back-reminder",
+        conversationId
+      }
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.round(delaySeconds)),
+      repeats: false,
+      channelId: Platform.OS === "android" ? "calls" : undefined
+    }
+  });
+  return true;
+}
+
 export async function registrationFromDevicePushToken(
   devicePushToken: Notifications.DevicePushToken
 ): Promise<PushTokenRegistration | null> {

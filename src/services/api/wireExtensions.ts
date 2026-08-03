@@ -70,7 +70,7 @@ function normalizePoll(value: unknown): MessagePoll | undefined {
     id: optionalString(first(value, "id", "poll_id")) ?? "poll",
     question,
     options,
-    allowMultiple: first(value, "allowMultiple", "allow_multiple", "multiple") === true,
+    allowMultiple: first(value, "allowMultiple", "allow_multiple", "multiple") !== false,
     anonymous: first(value, "anonymous", "is_anonymous") === true,
     totalVotes: Math.max(0, Math.trunc(optionalNumber(first(value, "totalVotes", "total_votes")) ?? calculatedVotes)),
     closesAt,

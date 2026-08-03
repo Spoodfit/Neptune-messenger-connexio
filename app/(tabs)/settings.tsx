@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -126,7 +127,11 @@ export default function SettingsScreen() {
                   </View>
                   {currentUser.city ? (
                     <View style={styles.cityChip}>
-                      <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+                      <Ionicons
+                        name="location-outline"
+                        size={12}
+                        color={colors.textMuted}
+                      />
                       <Text style={styles.cityText}>{currentUser.city}</Text>
                     </View>
                   ) : null}
@@ -216,7 +221,9 @@ export default function SettingsScreen() {
             style={styles.systemSettings}
           >
             <Ionicons name="settings-outline" size={17} color={colors.textMuted} />
-            <Text style={styles.systemSettingsText}>Réglages système de l’application</Text>
+            <Text style={styles.systemSettingsText}>
+              Réglages système de l’application
+            </Text>
           </Pressable>
 
           <Text style={styles.version}>
@@ -232,33 +239,154 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   scrollContent: { width: "100%", paddingBottom: 28 },
-  contentColumn: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" },
-  profile: { margin: spacing.md, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", gap: spacing.md, shadowColor: "#000000", shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 12 } },
-  avatarShell: { width: 62, height: 62, padding: 3, borderRadius: 22, flexShrink: 0 },
-  avatar: { flex: 1, borderRadius: 19, overflow: "hidden", borderWidth: 2, borderColor: colors.surface, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  contentColumn: {
+    width: "100%",
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center"
+  },
+  profile: {
+    margin: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    shadowColor: "#000000",
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 }
+  },
+  avatarShell: {
+    width: 62,
+    height: 62,
+    padding: 3,
+    borderRadius: 22,
+    flexShrink: 0
+  },
+  avatar: {
+    flex: 1,
+    borderRadius: 19,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: colors.surface,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   avatarImage: { width: "100%", height: "100%" },
   initials: { color: colors.white, fontSize: 18, fontWeight: "900" },
   profileContent: { flex: 1, minWidth: 0 },
   name: { ...typography.heading2, color: colors.text, flexShrink: 1 },
-  role: { ...typography.bodySmall, color: colors.textMuted, marginTop: 3, flexShrink: 1 },
+  role: {
+    ...typography.bodySmall,
+    color: colors.textMuted,
+    marginTop: 3,
+    flexShrink: 1
+  },
   profileMeta: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  roleChip: { minHeight: 26, paddingHorizontal: 8, borderRadius: 13, backgroundColor: "rgba(107,79,234,0.20)", flexDirection: "row", alignItems: "center", gap: 5 },
+  roleChip: {
+    minHeight: 26,
+    paddingHorizontal: 8,
+    borderRadius: 13,
+    backgroundColor: "rgba(107,79,234,0.20)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5
+  },
   roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
   roleChipText: { color: colors.textSecondary, fontSize: 9, fontWeight: "900" },
-  cityChip: { minHeight: 26, paddingHorizontal: 8, borderRadius: 13, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 4 },
+  cityChip: {
+    minHeight: 26,
+    paddingHorizontal: 8,
+    borderRadius: 13,
+    backgroundColor: colors.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4
+  },
   cityText: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
   list: { marginHorizontal: spacing.md, gap: spacing.sm },
-  row: { width: "100%", minHeight: 72, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  row: {
+    width: "100%",
+    minHeight: 72,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md
+  },
   rowPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
-  iconShell: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  iconShell: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
   rowContent: { flex: 1, minWidth: 0 },
   rowTitle: { ...typography.heading3, color: colors.text, flexShrink: 1 },
-  rowSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3, flexShrink: 1 },
-  signOutError: { ...typography.bodySmall, color: colors.danger, backgroundColor: colors.dangerSoft, borderRadius: radii.md, padding: spacing.sm },
-  signOutButton: { minHeight: 52, marginTop: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.dangerSoft, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: spacing.sm },
-  signOutText: { color: colors.danger, fontWeight: "900", fontSize: 15, textAlign: "center" },
+  rowSubtitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 3,
+    flexShrink: 1
+  },
+  signOutError: {
+    ...typography.bodySmall,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radii.md,
+    padding: spacing.sm
+  },
+  signOutButton: {
+    height: 54,
+    minHeight: 54,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 0,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    overflow: "hidden"
+  },
+  signOutText: {
+    color: colors.danger,
+    fontWeight: "900",
+    fontSize: 15,
+    lineHeight: 20,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: Platform.OS === "android" ? false : undefined
+  },
   disabled: { opacity: 0.5 },
-  systemSettings: { minHeight: 48, marginHorizontal: spacing.md, marginTop: spacing.sm, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  systemSettings: {
+    minHeight: 48,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
   systemSettingsText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
-  version: { ...typography.caption, color: colors.textMuted, textAlign: "center", marginTop: spacing.md, paddingHorizontal: spacing.md }
+  version: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md
+  }
 });

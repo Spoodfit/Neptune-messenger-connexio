@@ -1,12 +1,60 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 
 import { colors } from "../theme";
-import type { MessagePoll } from "../types/messaging";
+import type { MessagePoll, PollVoter } from "../types/messaging";
 
 interface PollMessageCardProps {
   poll: MessagePoll;
   onVote: (optionId: string) => void | Promise<void>;
+}
+
+const MAX_VISIBLE_VOTERS = 6;
+
+function VoterStack({ voters }: { voters: readonly PollVoter[] }) {
+  const visible = voters.slice(0, MAX_VISIBLE_VOTERS);
+  const remaining = Math.max(0, voters.length - visible.length);
+
+  if (voters.length === 0) return null;
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${voters.length} personne${voters.length > 1 ? "s" : ""} a voté pour cette réponse`}
+      style={styles.voterStack}
+    >
+      {visible.map((voter, index) => (
+        <View
+          key={voter.id}
+          style={[
+            styles.voterAvatar,
+            {
+              marginLeft: index === 0 ? 0 : -7,
+              zIndex: visible.length - index
+            }
+          ]}
+        >
+          {voter.avatarUrl ? (
+            <Image source={{ uri: voter.avatarUrl }} style={styles.voterImage} />
+          ) : (
+            <Text style={styles.voterInitials}>{voter.initials}</Text>
+          )}
+        </View>
+      ))}
+      {remaining > 0 ? (
+        <View style={[styles.voterAvatar, styles.remainingAvatar, { marginLeft: -7 }]}>
+          <Text style={styles.remainingText}>+{remaining}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
@@ -14,6 +62,9 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
     Boolean(poll.closedAt) ||
     (poll.closesAt ? new Date(poll.closesAt).getTime() <= Date.now() : false);
   const maximum = Math.max(1, ...poll.options.map((option) => option.voteCount));
+  const totalVoters =
+    poll.totalVoters ??
+    new Set(poll.options.flatMap((option) => option.voterIds ?? [])).size;
 
   return (
     <View style={styles.card}>
@@ -24,8 +75,10 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
         <View style={styles.titleContent}>
           <Text style={styles.question}>{poll.question}</Text>
           <Text style={styles.meta}>
-            {poll.totalVotes} vote{poll.totalVotes > 1 ? "s" : ""}
-            {poll.allowMultiple ? " · choix multiples" : ""}
+            {totalVoters > 0
+              ? `${totalVoters} participant${totalVoters > 1 ? "s" : ""}`
+              : `${poll.totalVotes} vote${poll.totalVotes > 1 ? "s" : ""}`}
+            {poll.allowMultiple ? " · plusieurs réponses possibles" : ""}
             {poll.anonymous ? " · anonyme" : ""}
           </Text>
         </View>
@@ -34,6 +87,7 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
       <View style={styles.options}>
         {poll.options.map((option) => {
           const ratio = option.voteCount / maximum;
+          const voters = poll.anonymous ? [] : option.voters ?? [];
           return (
             <Pressable
               key={option.id}
@@ -62,13 +116,25 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
                   }
                 ]}
               />
-              <View style={styles.choiceMark}>
-                {option.votedByCurrentUser ? (
-                  <Ionicons name="checkmark" size={15} color={colors.white} />
-                ) : null}
+              <View style={styles.optionMain}>
+                <View
+                  style={[
+                    styles.choiceMark,
+                    poll.allowMultiple && styles.multipleChoiceMark
+                  ]}
+                >
+                  {option.votedByCurrentUser ? (
+                    <Ionicons name="checkmark" size={15} color={colors.white} />
+                  ) : null}
+                </View>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+                <Text style={styles.optionCount}>{option.voteCount}</Text>
               </View>
-              <Text style={styles.optionLabel}>{option.label}</Text>
-              <Text style={styles.optionCount}>{option.voteCount}</Text>
+              {voters.length > 0 ? (
+                <View style={styles.voterLine}>
+                  <VoterStack voters={voters} />
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -76,7 +142,11 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          {closed ? "Sondage terminé" : "Touchez une réponse pour voter"}
+          {closed
+            ? "Sondage terminé"
+            : poll.allowMultiple
+              ? "Sélectionnez toutes les réponses qui vous conviennent"
+              : "Sélectionnez une réponse"}
         </Text>
         {poll.eventVoteUrl ? (
           <Pressable
@@ -132,16 +202,16 @@ const styles = StyleSheet.create({
   option: {
     width: "100%",
     minWidth: 0,
-    minHeight: 46,
+    minHeight: 48,
     overflow: "hidden",
     paddingHorizontal: 8,
+    paddingVertical: 7,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: "rgba(2,7,19,0.22)",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6
+    justifyContent: "center",
+    gap: 4
   },
   optionActive: { borderColor: colors.violet },
   progress: {
@@ -151,10 +221,17 @@ const styles = StyleSheet.create({
     left: 0,
     backgroundColor: "rgba(107,79,234,0.18)"
   },
+  optionMain: {
+    width: "100%",
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6
+  },
   choiceMark: {
     width: 22,
     height: 22,
-    borderRadius: 8,
+    borderRadius: 11,
     flexShrink: 0,
     borderWidth: 1,
     borderColor: colors.border,
@@ -162,6 +239,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  multipleChoiceMark: { borderRadius: 7 },
   optionLabel: {
     flex: 1,
     minWidth: 0,
@@ -177,6 +255,29 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: "900"
   },
+  voterLine: {
+    minHeight: 20,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingRight: 1
+  },
+  voterStack: { flexDirection: "row", alignItems: "center" },
+  voterAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 1.5,
+    borderColor: colors.navyLight,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  voterImage: { width: "100%", height: "100%" },
+  voterInitials: { color: colors.text, fontSize: 6.5, fontWeight: "900" },
+  remainingAvatar: { backgroundColor: colors.surfaceStrong },
+  remainingText: { color: colors.textSecondary, fontSize: 6.5, fontWeight: "900" },
   footer: {
     width: "100%",
     minWidth: 0,

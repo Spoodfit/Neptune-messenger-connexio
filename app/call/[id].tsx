@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -11,7 +13,10 @@ import {
 } from "react-native";
 
 import CallSurface from "@/components/CallSurface";
+import { VoicePromptInput } from "@/components/VoicePromptInput";
+import type { CallUnansweredEvent } from "@/components/CallSurface.types";
 import { env } from "@/config/env";
+import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { NeptuneCallApi } from "@/services/api/callApi";
 import {
@@ -19,139 +24,516 @@ import {
   type CallMode,
   type IntegratedCallSession
 } from "@/services/calls/callRoom";
+import { scheduleCallBackReminder } from "@/services/notifications/pushNotifications";
 import { colors, gradients, spacing, typography } from "@/theme";
 
+type DeclineResponse = "callback_10m" | "message_available";
+
+function first(value?: string | string[]): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default function CallRoomScreen() {
-  const params = useLocalSearchParams<{ id: string; mode?: string }>();
-  const { currentUser, accessToken } = useSession();
-  const conversationId = useMemo(
-    () =>
-      Array.isArray(params.id)
-        ? (params.id[0] ?? "")
-        : (params.id ?? ""),
-    [params.id]
-  );
-  const mode: CallMode = params.mode === "audio" ? "audio" : "video";
+  const params = useLocalSearchParams<{
+    id: string;
+    mode?: string;
+    direction?: string;
+    callId?: string;
+    callerName?: string;
+    reason?: string;
+  }>();
+  const { accessToken } = useSession();
+  const { getConversation, sendMessage } = useMessaging();
+  const conversationId = first(params.id) ?? "";
+  const mode: CallMode = first(params.mode) === "audio" ? "audio" : "video";
+  const incoming = first(params.direction) === "incoming";
+  const incomingCallId = first(params.callId);
+  const callerName = first(params.callerName) ?? "Un membre Neptune";
+  const initialReason = first(params.reason) ?? "";
+  const conversation = getConversation(conversationId);
+  const remoteDisplayName = incoming
+    ? callerName
+    : conversation?.name ?? "Membre Neptune";
+
+  const [reason, setReason] = useState(initialReason);
   const [session, setSession] = useState<IntegratedCallSession | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [declining, setDeclining] = useState<DeclineResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unanswered, setUnanswered] = useState<CallUnansweredEvent | null>(null);
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneCallApi(accessToken)),
     [accessToken]
   );
+  const ringtonePlayer = useAudioPlayer(
+    require("../../assets/audio/connexio-ringtone.mp3")
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    setSession(null);
-    setError(null);
-    void (async () => {
-      try {
-        const nextSession = api
-          ? await api.createSession(conversationId, mode)
-          : createMockCallSession(conversationId, mode);
-        if (!cancelled) setSession(nextSession);
-      } catch (callError) {
-        if (!cancelled) {
-          setError(
-            callError instanceof Error
-              ? callError.message
-              : "L’appel n’a pas pu être créé."
-          );
-        }
-      }
-    })();
+    const shouldRing =
+      incoming && !session && !unanswered && !declining && !preparing;
+    ringtonePlayer.loop = true;
+    ringtonePlayer.volume = 0.68;
+    if (shouldRing) {
+      ringtonePlayer.play();
+    } else {
+      ringtonePlayer.pause();
+      void ringtonePlayer.seekTo(0);
+    }
     return () => {
-      cancelled = true;
+      ringtonePlayer.pause();
+      void ringtonePlayer.seekTo(0);
     };
-  }, [api, conversationId, mode]);
+  }, [declining, incoming, preparing, ringtonePlayer, session, unanswered]);
 
   const close = async () => {
-    const currentSession = session;
+    const activeSession = session;
     setSession(null);
-    if (api && currentSession && !currentSession.mock) {
-      await api.endCall(currentSession.id).catch(() => undefined);
+    if (api && activeSession && !activeSession.mock) {
+      await api.endCall(activeSession.id).catch(() => undefined);
     }
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)/calls");
   };
 
-  if (error) {
+  const startOutgoingCall = async () => {
+    if (preparing) return;
+    const cleanReason = reason.trim();
+    if (cleanReason.length < 3) {
+      Alert.alert(
+        "Objet de l’appel requis",
+        "Expliquez brièvement pourquoi vous appelez. Le destinataire verra cette information avant de répondre."
+      );
+      return;
+    }
+    setPreparing(true);
+    setError(null);
+    try {
+      const nextSession = api
+        ? await api.createSession(conversationId, mode, cleanReason)
+        : createMockCallSession(conversationId, mode, cleanReason, true);
+      setSession(nextSession);
+    } catch (callError) {
+      setError(
+        callError instanceof Error
+          ? callError.message
+          : "L’appel n’a pas pu être créé."
+      );
+    } finally {
+      setPreparing(false);
+    }
+  };
+
+  const acceptIncomingCall = async () => {
+    if (preparing) return;
+    setPreparing(true);
+    setError(null);
+    try {
+      const nextSession =
+        api && incomingCallId
+          ? await api.joinSession(incomingCallId, conversationId, mode)
+          : createMockCallSession(
+              conversationId,
+              mode,
+              initialReason || "Appel Neptune",
+              false
+            );
+      setSession({
+        ...nextSession,
+        reason: (nextSession.reason ?? initialReason) || "Appel Neptune",
+        initiator: false
+      });
+    } catch (callError) {
+      setError(
+        callError instanceof Error
+          ? callError.message
+          : "Impossible d’accepter l’appel."
+      );
+    } finally {
+      setPreparing(false);
+    }
+  };
+
+  const declineIncomingCall = async (response: DeclineResponse) => {
+    if (declining) return;
+    setDeclining(response);
+    try {
+      if (api && incomingCallId) {
+        await api.declineCall(incomingCallId, response);
+      }
+      const topic = initialReason || "votre appel";
+      const body =
+        response === "callback_10m"
+          ? `Je suis indisponible pour le moment. Je vous rappelle dans 10 minutes au sujet de « ${topic} ».`
+          : `Je ne peux pas répondre pour le moment, mais nous pouvons échanger par message au sujet de « ${topic} ».`;
+      const sent = await sendMessage(conversationId, body);
+      if (!sent) throw new Error("Le message automatique n’a pas pu être envoyé.");
+
+      if (response === "callback_10m") {
+        const scheduled = await scheduleCallBackReminder(conversationId, callerName);
+        if (!scheduled) {
+          Alert.alert(
+            "Rappel non programmé",
+            "Le message a été envoyé, mais les notifications ne sont pas autorisées sur cet appareil."
+          );
+        }
+      }
+      router.replace(`/chat/${encodeURIComponent(conversationId)}`);
+    } catch (declineError) {
+      Alert.alert(
+        "Action impossible",
+        declineError instanceof Error
+          ? declineError.message
+          : "La réponse n’a pas pu être envoyée."
+      );
+    } finally {
+      setDeclining(null);
+    }
+  };
+
+  const handleUnanswered = async (event: CallUnansweredEvent) => {
+    const activeSession = session;
+    setUnanswered(event);
+    setSession(null);
+    if (api && activeSession && !activeSession.mock) {
+      await api.endCall(activeSession.id).catch(() => undefined);
+    }
+  };
+
+  if (session) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.center}>
-        <View style={styles.errorIcon}>
-          <Ionicons name="call-outline" size={30} color={colors.danger} />
-        </View>
-        <Text accessibilityRole="header" style={styles.title}>
-          Appel indisponible
-        </Text>
-        <Text accessibilityRole="alert" style={styles.message}>
-          {error}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Revenir aux conversations"
-          onPress={() => void close()}
-          style={styles.button}
-        >
-          <Text style={styles.buttonText}>Retour</Text>
-        </Pressable>
-      </LinearGradient>
+      <CallSurface
+        session={session}
+        displayName={remoteDisplayName}
+        onClose={() => void close()}
+        onUnanswered={(event) => void handleUnanswered(event)}
+      />
     );
   }
 
-  if (!session) {
+  if (unanswered) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.center}>
-        <ActivityIndicator size="large" color={colors.violet} />
-        <Text style={styles.title}>
-          {mode === "audio" ? "Préparation de l’appel audio" : "Préparation de la visio"}
-        </Text>
-        <Text style={styles.message}>
-          Connexio sécurise la session et initialise la caméra et le microphone.
-        </Text>
-      </LinearGradient>
+      <CallShell
+        icon="mic-outline"
+        title="Aucune réponse"
+        description="Ouvrez la conversation pour laisser un message vocal ou écrire un message."
+      >
+        <ReasonCard value={unanswered.reason || reason || "Appel Neptune"} />
+        <PrimaryButton
+          icon="chatbubble-ellipses-outline"
+          label="Laisser un message"
+          onPress={() =>
+            router.replace(`/chat/${encodeURIComponent(conversationId)}`)
+          }
+        />
+        <SecondaryButton label="Fermer" onPress={() => void close()} />
+      </CallShell>
+    );
+  }
+
+  if (incoming) {
+    return (
+      <CallShell
+        icon={mode === "audio" ? "call-outline" : "videocam-outline"}
+        title={callerName}
+        eyebrow={mode === "audio" ? "APPEL AUDIO ENTRANT" : "APPEL VIDÉO ENTRANT"}
+        description="Consultez l’objet de l’appel avant de répondre."
+      >
+        <ReasonCard value={initialReason || "Aucun objet précisé"} />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.declineGrid}>
+          <ChoiceButton
+            icon="time-outline"
+            label="Je rappelle dans 10 min"
+            busy={declining === "callback_10m"}
+            disabled={preparing || Boolean(declining)}
+            onPress={() => void declineIncomingCall("callback_10m")}
+          />
+          <ChoiceButton
+            icon="chatbubble-ellipses-outline"
+            label="Échanger par message"
+            busy={declining === "message_available"}
+            disabled={preparing || Boolean(declining)}
+            onPress={() => void declineIncomingCall("message_available")}
+          />
+        </View>
+        <PrimaryButton
+          icon="call"
+          label="Accepter l’appel"
+          busy={preparing}
+          disabled={Boolean(declining)}
+          success
+          onPress={() => void acceptIncomingCall()}
+        />
+      </CallShell>
     );
   }
 
   return (
-    <CallSurface
-      session={session}
-      displayName={currentUser.name}
-      onClose={() => void close()}
-    />
+    <CallShell
+      icon={mode === "audio" ? "call-outline" : "videocam-outline"}
+      title="Pourquoi appelez-vous ?"
+      description="Une phrase suffit. Elle s’affichera avant que le destinataire décroche."
+    >
+      <View style={styles.reasonEditor}>
+        <Text style={styles.label}>Objet de l’appel</Text>
+        <VoicePromptInput
+          value={reason}
+          onChangeText={setReason}
+          onSubmit={() => void startOutgoingCall()}
+          placeholder="Ex. Valider le lieu de l’afterwork de vendredi"
+          maxLength={160}
+        />
+        <Text style={styles.counter}>{reason.length}/160</Text>
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <PrimaryButton
+        icon={mode === "audio" ? "call" : "videocam"}
+        label={preparing ? "Préparation…" : "Lancer l’appel"}
+        busy={preparing}
+        disabled={reason.trim().length < 3}
+        onPress={() => void startOutgoingCall()}
+      />
+      <SecondaryButton label="Annuler" onPress={() => void close()} />
+    </CallShell>
+  );
+}
+
+interface CallShellProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  description: string;
+  eyebrow?: string;
+  children: React.ReactNode;
+}
+
+function CallShell({ icon, title, description, eyebrow, children }: CallShellProps) {
+  return (
+    <LinearGradient colors={gradients.screen} style={styles.screen}>
+      <View style={styles.iconShell}>
+        <Ionicons name={icon} size={31} color={colors.orange} />
+      </View>
+      {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+      <Text accessibilityRole="header" style={styles.title}>
+        {title}
+      </Text>
+      <Text style={styles.description}>{description}</Text>
+      {children}
+    </LinearGradient>
+  );
+}
+
+function ReasonCard({ value }: { value: string }) {
+  return (
+    <View style={styles.reasonCard}>
+      <Text style={styles.label}>Objet de l’appel</Text>
+      <Text style={styles.reasonValue}>{value}</Text>
+    </View>
+  );
+}
+
+interface PrimaryButtonProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  busy?: boolean;
+  disabled?: boolean;
+  success?: boolean;
+}
+
+function PrimaryButton({
+  icon,
+  label,
+  onPress,
+  busy = false,
+  disabled = false,
+  success = false
+}: PrimaryButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ busy, disabled: disabled || busy }}
+      disabled={disabled || busy}
+      onPress={onPress}
+      style={[
+        styles.primary,
+        success && styles.primarySuccess,
+        (disabled || busy) && styles.disabled
+      ]}
+    >
+      {busy ? (
+        <ActivityIndicator color={colors.white} />
+      ) : (
+        <Ionicons name={icon} size={21} color={colors.white} />
+      )}
+      <Text style={styles.primaryText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.secondary}>
+      <Text style={styles.secondaryText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+interface ChoiceButtonProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}
+
+function ChoiceButton({ icon, label, busy, disabled, onPress }: ChoiceButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ busy, disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.choice, disabled && styles.disabled]}
+    >
+      {busy ? (
+        <ActivityIndicator color={colors.orange} />
+      ) : (
+        <Ionicons name={icon} size={21} color={colors.orange} />
+      )}
+      <Text style={styles.choiceText}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  center: {
+  screen: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.xl,
     gap: spacing.md
   },
-  errorIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 22,
+  iconShell: {
+    width: 70,
+    height: 70,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.dangerSoft
+    backgroundColor: "rgba(244,177,131,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(244,177,131,0.28)"
+  },
+  eyebrow: {
+    color: colors.orange,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1
   },
   title: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  message: {
+  description: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
-    maxWidth: 430
+    maxWidth: 500
   },
-  button: {
-    minWidth: 130,
-    minHeight: 48,
+  reasonEditor: {
+    width: "100%",
+    maxWidth: 520,
+    padding: spacing.md,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface
+  },
+  reasonCard: {
+    width: "100%",
+    maxWidth: 520,
+    padding: spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface
+  },
+  label: {
+    color: colors.orange,
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    letterSpacing: 0.6
+  },
+  input: {
+    minHeight: 92,
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong,
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  counter: { marginTop: 6, color: colors.textMuted, fontSize: 9, textAlign: "right" },
+  reasonValue: {
+    marginTop: 7,
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  error: {
+    width: "100%",
+    maxWidth: 520,
+    padding: 10,
+    borderRadius: 14,
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
+    textAlign: "center",
+    fontSize: 11
+  },
+  primary: {
+    minWidth: 230,
+    minHeight: 54,
     paddingHorizontal: spacing.lg,
-    borderRadius: 17,
+    borderRadius: 19,
     backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  primarySuccess: { backgroundColor: colors.success },
+  primaryText: { color: colors.white, fontSize: 13, fontWeight: "900" },
+  secondary: {
+    minWidth: 130,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center"
   },
-  buttonText: { color: colors.white, fontSize: 13, fontWeight: "900" }
+  secondaryText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
+  declineGrid: { width: "100%", maxWidth: 520, flexDirection: "row", gap: 9 },
+  choice: {
+    flex: 1,
+    minHeight: 88,
+    padding: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7
+  },
+  choiceText: {
+    color: colors.textSecondary,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  disabled: { opacity: 0.55 }
 });

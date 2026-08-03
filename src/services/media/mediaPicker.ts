@@ -8,13 +8,23 @@ import type { AttachmentKind, MessageAttachment } from "../../types/messaging";
 
 export const MAX_MESSAGE_ATTACHMENTS = 10;
 export const MAX_MESSAGE_BATCH_BYTES = 120 * 1024 * 1024;
-const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
-const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
-const MAX_HIGHLIGHT_VIDEO_SECONDS = 60;
+export const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
+export const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
+export const MAX_HIGHLIGHT_VIDEO_SECONDS = 60;
+
+export type MediaSelectionErrorCode =
+  | "too-large"
+  | "too-long"
+  | "permission"
+  | "unsupported"
+  | "batch-limit";
 
 export class MediaSelectionError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code: MediaSelectionErrorCode = "unsupported"
+  ) {
     super(message);
     this.name = "MediaSelectionError";
   }
@@ -26,8 +36,11 @@ function assertFileSize(
   label: string
 ) {
   if (typeof sizeBytes === "number" && sizeBytes > maximum) {
+    const selectedSize = Math.ceil(sizeBytes / 1024 / 1024);
+    const maximumSize = Math.round(maximum / 1024 / 1024);
     throw new MediaSelectionError(
-      `${label} dépasse la taille maximale de ${Math.round(maximum / 1024 / 1024)} Mo.`
+      `Import bloqué : ${label.toLocaleLowerCase("fr")} pèse ${selectedSize} Mo, alors que la limite autorisée est de ${maximumSize} Mo. Compressez le fichier ou choisissez une version plus légère.`,
+      "too-large"
     );
   }
 }
@@ -37,7 +50,8 @@ export function assertAttachmentBatch(
 ): void {
   if (attachments.length > MAX_MESSAGE_ATTACHMENTS) {
     throw new MediaSelectionError(
-      `Un message accepte ${MAX_MESSAGE_ATTACHMENTS} contenus maximum.`
+      `Import bloqué : un message accepte ${MAX_MESSAGE_ATTACHMENTS} contenus maximum.`,
+      "batch-limit"
     );
   }
   const total = attachments.reduce(
@@ -46,9 +60,10 @@ export function assertAttachmentBatch(
   );
   if (total > MAX_MESSAGE_BATCH_BYTES) {
     throw new MediaSelectionError(
-      `La sélection dépasse ${Math.round(
+      `Import bloqué : la sélection dépasse ${Math.round(
         MAX_MESSAGE_BATCH_BYTES / 1024 / 1024
-      )} Mo. Retirez un fichier ou envoyez-la en plusieurs messages.`
+      )} Mo. Retirez un fichier ou envoyez la sélection en plusieurs messages.`,
+      "batch-limit"
     );
   }
 }
@@ -59,7 +74,8 @@ async function ensureMediaLibraryPermission(): Promise<void> {
   const requested = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!requested.granted) {
     throw new MediaSelectionError(
-      "L’accès à la photothèque est nécessaire pour choisir ce média."
+      "L’accès à la photothèque est nécessaire pour choisir ce média.",
+      "permission"
     );
   }
 }
@@ -176,7 +192,8 @@ export async function pickMessageAttachments(
   }
 
   throw new MediaSelectionError(
-    "Ce type de pièce jointe n’est pas autorisé sur cet appareil."
+    "Ce type de pièce jointe n’est pas autorisé sur cet appareil.",
+    "unsupported"
   );
 }
 
@@ -197,7 +214,10 @@ export async function pickHighlightMedia(
     typeof asset.durationSeconds === "number" &&
     asset.durationSeconds > MAX_HIGHLIGHT_VIDEO_SECONDS
   ) {
-    throw new MediaSelectionError("La vidéo doit durer 60 secondes maximum.");
+    throw new MediaSelectionError(
+      "Import bloqué : la vidéo dépasse 60 secondes. Raccourcissez-la avant de la publier.",
+      "too-long"
+    );
   }
   return {
     id: `local-highlight-media-${Crypto.randomUUID()}`,
@@ -235,7 +255,8 @@ export async function pickApproximateLocation(): Promise<
   const permission = await Location.requestForegroundPermissionsAsync();
   if (!permission.granted) {
     throw new MediaSelectionError(
-      "La localisation doit être autorisée pour partager une position approximative."
+      "La localisation doit être autorisée pour partager une position approximative.",
+      "permission"
     );
   }
   const location = await Location.getCurrentPositionAsync({

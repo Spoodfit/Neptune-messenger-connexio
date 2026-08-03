@@ -22,10 +22,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventVoteBanner } from "../../src/components/EventVoteBanner";
 import { MemberAvatarStack } from "../../src/components/MemberAvatarStack";
 import { MessageAttachmentsGrid } from "../../src/components/MessageAttachmentsGrid";
+import { InlineVoiceRecorder } from "../../src/components/InlineVoiceRecorder";
 import { MessageBubble } from "../../src/components/MessageBubble";
 import { PollComposerModal } from "../../src/components/PollComposerModal";
 import { env } from "../../src/config/env";
 import { isPrivateConversation } from "../../src/domain/conversationFilter";
+import { buildSmartReplySuggestions } from "../../src/domain/smartReplies";
 import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
 import { useMessaging } from "../../src/providers/MessagingProvider";
@@ -161,6 +163,7 @@ export default function ChatScreen() {
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
+  const [voiceRecorderOpen, setVoiceRecorderOpen] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<
     MessageAttachment[]
   >([]);
@@ -170,6 +173,7 @@ export default function ChatScreen() {
   );
   const [submitting, setSubmitting] = useState(false);
   const submitLockRef = useRef(false);
+  const composerInputRef = useRef<TextInput>(null);
   const mountedRef = useRef(true);
   const submitUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedReadMessageId = useRef<string | null>(null);
@@ -215,10 +219,18 @@ export default function ChatScreen() {
       )
       .slice(0, 5);
   }, [currentUser.id, members, mentionQuery]);
+  const latestIncomingMessage = messages.find((message) => !message.isMine);
+  const smartReplies = useMemo(
+    () => buildSmartReplySuggestions(latestIncomingMessage, currentUser),
+    [currentUser, latestIncomingMessage]
+  );
   const canSubmit = Boolean(
     conversation?.canPost &&
       !submitting &&
       (draft.trim() || pendingAttachments.length > 0)
+  );
+  const showSendButton = Boolean(
+    submitting || draft.trim() || pendingAttachments.length > 0
   );
 
   const goBackToDiscussions = () => {
@@ -294,6 +306,72 @@ export default function ChatScreen() {
     setDraft((current) =>
       current.replace(/@[^\s@]*$/u, `@${name.split(" ")[0]} `)
     );
+  };
+
+  const useSmartReply = (reply: string) => {
+    setDraft(reply);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  };
+
+  const appendPendingAttachment = (attachment: MessageAttachment) => {
+    try {
+      const next = [...pendingAttachments, attachment];
+      assertAttachmentBatch(next);
+      setPendingAttachments(next);
+    } catch (error) {
+      Alert.alert(
+        "Vocal indisponible",
+        error instanceof Error
+          ? error.message
+          : "Le message vocal ne peut pas être ajouté à cet envoi."
+      );
+    }
+  };
+
+  const sendRecordedVoice = async (attachment: MessageAttachment) => {
+    setVoiceRecorderOpen(false);
+    setSubmitting(true);
+    const originalReply = replyingTo;
+    try {
+      const readyAttachment =
+        env.mockMode || localOnly
+? { ...attachment, status: "ready" as const, uploadProgress: 1 }
+: await uploadMessageAttachment(attachment);
+      const accepted =
+        source === "admin"
+? await sendCreatedGroupMessage(
+    conversation.id,
+    "🎙️ Message vocal",
+    originalReply ?? undefined,
+    [readyAttachment],
+    []
+  )
+: source === "private"
+  ? await sendLocalMessage(
+      conversation.id,
+      "🎙️ Message vocal",
+      originalReply ?? undefined,
+      [readyAttachment],
+      []
+    )
+  : await sendMessage(
+      conversation.id,
+      "🎙️ Message vocal",
+      originalReply?.id,
+      [readyAttachment],
+      []
+    );
+      if (!accepted) throw new Error("Le vocal a été refusé.");
+      setReplyingTo(null);
+    } catch (error) {
+      appendPendingAttachment({ ...attachment, status: "failed" });
+      Alert.alert(
+        "Envoi du vocal impossible",
+        `${error instanceof Error ? error.message : "Le vocal n’a pas été envoyé."} Il reste disponible dans le brouillon.`
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const addAttachment = async (kind: AttachmentKind) => {
@@ -387,7 +465,9 @@ export default function ChatScreen() {
         const fallbackBody =
           body ||
           (readyAttachments.length === 1
-            ? `📎 ${readyAttachments[0]?.name ?? "Pièce jointe"}`
+            ? readyAttachments[0]?.kind === "audio"
+              ? "🎙️ Message vocal"
+              : `📎 ${readyAttachments[0]?.name ?? "Pièce jointe"}`
             : `📎 ${readyAttachments.length} pièces jointes`);
         const accepted =
           source === "admin"
@@ -491,29 +571,71 @@ export default function ChatScreen() {
   const votePoll = async (message: ChatMessage, optionId: string) => {
     if (!message.poll) return;
     const currentPoll = pollOverrides[message.id] ?? message.poll;
-    const active = !currentPoll.options.find((option) => option.id === optionId)
-      ?.votedByCurrentUser;
-    if (!messagingApi || message.id.startsWith("local-")) {
-      const updated = updateLocalPoll(currentPoll, optionId);
-      setPollOverrides((previous) => ({ ...previous, [message.id]: updated }));
-      return;
-    }
+    const optimisticPoll = updateLocalPoll(currentPoll, optionId);
+    const active = Boolean(
+      optimisticPoll.options.find((option) => option.id === optionId)
+        ?.votedByCurrentUser
+    );
+
+    setPollOverrides((previous) => ({
+      ...previous,
+      [message.id]: optimisticPoll
+    }));
+
+    if (!messagingApi || message.id.startsWith("local-")) return;
+
     try {
       const updatedMessage = await messagingApi.votePoll(
         message.id,
         optionId,
         active
       );
-      if (updatedMessage.poll) {
-        setPollOverrides((previous) => ({
-          ...previous,
-          [message.id]: updatedMessage.poll!
-        }));
-      }
+      if (!updatedMessage.poll) return;
+
+      setPollOverrides((previous) => {
+        if (previous[message.id] !== optimisticPoll) return previous;
+        const serverPoll = updatedMessage.poll!;
+        const optimisticById = new Map(
+          optimisticPoll.options.map((option) => [option.id, option])
+        );
+        const options = serverPoll.options.map((serverOption) => {
+          const optimisticOption = optimisticById.get(serverOption.id);
+          if (!optimisticOption) return serverOption;
+          const selected = optimisticOption.votedByCurrentUser;
+          const serverSelected = serverOption.votedByCurrentUser;
+          return {
+            ...serverOption,
+            votedByCurrentUser: selected,
+            voteCount: Math.max(
+              0,
+              serverOption.voteCount +
+                (selected && !serverSelected
+                  ? 1
+                  : !selected && serverSelected
+                    ? -1
+                    : 0)
+            )
+          };
+        });
+        const mergedPoll: MessagePoll = {
+          ...serverPoll,
+          allowMultiple: currentPoll.allowMultiple,
+          options,
+          totalVotes: options.reduce((sum, option) => sum + option.voteCount, 0)
+        };
+        return { ...previous, [message.id]: mergedPoll };
+      });
     } catch (error) {
+      setPollOverrides((previous) =>
+        previous[message.id] === optimisticPoll
+          ? { ...previous, [message.id]: currentPoll }
+          : previous
+      );
       Alert.alert(
         "Vote impossible",
-        error instanceof Error ? error.message : "Le vote n’a pas été enregistré."
+        error instanceof Error
+          ? error.message
+          : "Le vote n’a pas été enregistré."
       );
     }
   };
@@ -741,8 +863,35 @@ export default function ChatScreen() {
             </View>
           ) : null}
 
-          {replyingTo ? (
-            <View style={styles.replyComposer}>
+          {smartReplies.length > 0 && !draft.trim() && !voiceRecorderOpen ? (
+  <View style={styles.smartReplyPanel}>
+    <View style={styles.smartReplyHeading}>
+      <Ionicons name="sparkles" size={14} color={colors.orange} />
+      <Text style={styles.smartReplyLabel}>Réponses suggérées</Text>
+    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.smartReplyRow}
+    >
+      {smartReplies.map((reply) => (
+        <Pressable
+          key={reply}
+          accessibilityRole="button"
+          accessibilityLabel={`Insérer la réponse : ${reply}`}
+          onPress={() => useSmartReply(reply)}
+          style={styles.smartReplyChip}
+        >
+          <Text style={styles.smartReplyText}>{reply}</Text>
+        </Pressable>
+      ))}
+    </ScrollView>
+  </View>
+) : null}
+
+{replyingTo ? (
+  <View style={styles.replyComposer}>
               <View style={styles.replyComposerAccent} />
               <View style={styles.replyComposerContent}>
                 <Text style={styles.replyComposerTitle}>
@@ -804,7 +953,7 @@ export default function ChatScreen() {
                     style={styles.pendingChip}
                   >
                     <Text style={styles.pendingText} numberOfLines={1}>
-                      {attachment.name}
+                      {attachment.kind === "audio" ? "Message vocal" : attachment.name}
                       {attachment.status === "uploading"
                         ? ` · ${Math.round((attachment.uploadProgress ?? 0) * 100)} %`
                         : ""}
@@ -820,48 +969,69 @@ export default function ChatScreen() {
             </View>
           ) : null}
 
-          <View style={styles.composer}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ajouter une pièce jointe ou un sondage"
-              onPress={() => setAttachmentMenuOpen(true)}
-              style={styles.attachButton}
-            >
-              <Ionicons name="add" size={24} color={colors.text} />
-            </Pressable>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              accessibilityLabel="Écrire un message"
-              accessibilityHint="Utilisez arobase pour mentionner un membre"
-              placeholder="Écrire un message…"
-              placeholderTextColor={colors.textMuted}
-              multiline
-              style={styles.input}
-              maxLength={4_000}
-              returnKeyType="default"
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Envoyer le message"
-              accessibilityState={{ disabled: !canSubmit, busy: submitting }}
-              onPress={submit}
-              style={({ pressed }) => [
-                styles.sendButton,
-                pressed && canSubmit && styles.sendPressed,
-                !canSubmit && styles.sendDisabled
-              ]}
-              disabled={!canSubmit}
-            >
-              <LinearGradient colors={gradients.primary} style={styles.sendGradient}>
-                {submitting ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <Ionicons name="send" size={19} color={colors.white} />
-                )}
-              </LinearGradient>
-            </Pressable>
-          </View>
+          {voiceRecorderOpen ? (
+  <InlineVoiceRecorder
+    onCancel={() => setVoiceRecorderOpen(false)}
+    onRecorded={sendRecordedVoice}
+  />
+) : (
+  <View style={styles.composer}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Ajouter une pièce jointe ou un sondage"
+      onPress={() => setAttachmentMenuOpen(true)}
+      style={styles.attachButton}
+    >
+      <Ionicons name="add" size={24} color={colors.text} />
+    </Pressable>
+    <TextInput
+      ref={composerInputRef}
+      value={draft}
+      onChangeText={setDraft}
+      accessibilityLabel="Écrire un message"
+      accessibilityHint="Utilisez arobase pour mentionner un membre"
+      placeholder="Écrire un message…"
+      placeholderTextColor={colors.textMuted}
+      multiline
+      style={styles.input}
+      maxLength={4_000}
+      returnKeyType="default"
+    />
+    {showSendButton ? (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Envoyer le message"
+        accessibilityState={{ disabled: !canSubmit, busy: submitting }}
+        onPress={submit}
+        style={({ pressed }) => [
+          styles.sendButton,
+          pressed && canSubmit && styles.sendPressed,
+          !canSubmit && styles.sendDisabled
+        ]}
+        disabled={!canSubmit}
+      >
+        <LinearGradient colors={gradients.primary} style={styles.sendGradient}>
+          {submitting ? (
+            <ActivityIndicator size="small" color={colors.white} />
+          ) : (
+            <Ionicons name="send" size={19} color={colors.white} />
+          )}
+        </LinearGradient>
+      </Pressable>
+    ) : (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Enregistrer un message vocal"
+        onPress={() => setVoiceRecorderOpen(true)}
+        style={styles.voiceButton}
+      >
+        <LinearGradient colors={gradients.activeTab} style={styles.sendGradient}>
+          <Ionicons name="mic" size={21} color={colors.text} />
+        </LinearGradient>
+      </Pressable>
+    )}
+  </View>
+)}
         </View>
       ) : (
         <View
@@ -919,6 +1089,23 @@ export default function ChatScreen() {
               ))}
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Enregistrer un message vocal"
+                onPress={() => {
+                  setAttachmentMenuOpen(false);
+                  setVoiceRecorderOpen(true);
+                }}
+                style={styles.attachmentChoice}
+              >
+                <LinearGradient
+                  colors={gradients.activeTab}
+                  style={styles.attachmentChoiceIcon}
+                >
+                  <Ionicons name="mic-outline" size={23} color={colors.text} />
+                </LinearGradient>
+                <Text style={styles.attachmentChoiceText}>Vocal</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel="Créer un sondage"
                 onPress={() => {
                   setAttachmentMenuOpen(false);
@@ -948,6 +1135,7 @@ export default function ChatScreen() {
         onClose={() => setPollComposerOpen(false)}
         onCreate={createPoll}
       />
+
     </KeyboardAvoidingView>
   );
 }
@@ -1032,6 +1220,22 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft
   },
+  smartReplyPanel: { marginBottom: 7 },
+  smartReplyHeading: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 6 },
+  smartReplyLabel: { color: colors.textSecondary, fontSize: 9.5, fontWeight: "900" },
+  smartReplyRow: { gap: 7, paddingRight: 10 },
+  smartReplyChip: {
+    minHeight: 38,
+    maxWidth: 260,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(107,79,234,0.34)",
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  smartReplyText: { color: colors.text, fontSize: 10.5, fontWeight: "800" },
   mentionSuggestions: {
     marginBottom: 6,
     borderRadius: 16,
@@ -1134,6 +1338,14 @@ const styles = StyleSheet.create({
     ...typography.bodySmall
   },
   sendButton: { width: 46, height: 46, borderRadius: 17, overflow: "hidden" },
+  voiceButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 17,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.borderSoft
+  },
   sendGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
   sendDisabled: { opacity: 0.4 },
   sendPressed: { transform: [{ scale: 0.95 }] },
