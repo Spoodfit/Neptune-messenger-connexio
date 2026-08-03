@@ -1,0 +1,83 @@
+name: Deploy V14 preview to GitHub Pages
+
+on:
+  push:
+    branches:
+      - feat/v14-ux-calls-moderation
+    paths:
+      - .github/workflows/deploy-v14-preview-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: connexio-v14-pages-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout V14
+        uses: actions/checkout@v4
+        with:
+          ref: feat/v14-ux-calls-moderation
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web preview
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.com
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.com/v1/realtime
+        run: npm run web:build
+
+      - name: Adapt build for project Pages URL
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          root = Path('dist')
+          prefix = '/Neptune-messenger-connexio'
+          text_extensions = {'.html', '.js', '.css', '.json', '.map'}
+
+          for path in root.rglob('*'):
+              if not path.is_file() or path.suffix.lower() not in text_extensions:
+                  continue
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except UnicodeDecodeError:
+                  continue
+              text = text.replace('"/_expo/', f'"{prefix}/_expo/')
+              text = text.replace("'/_expo/", f"'{prefix}/_expo/")
+              text = text.replace('"/assets/', f'"{prefix}/assets/')
+              text = text.replace("'/assets/", f"'{prefix}/assets/")
+              text = text.replace('url(/assets/', f'url({prefix}/assets/')
+              path.write_text(text, encoding='utf-8')
+
+          index = root / 'index.html'
+          (root / '404.html').write_text(index.read_text(encoding='utf-8'), encoding='utf-8')
+          (root / '.nojekyll').write_text('', encoding='utf-8')
+          PY
+
+      - name: Publish preview
+        run: |
+          cd dist
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Deploy Connexio V14 preview ${GITHUB_SHA}"
+          git branch -M gh-pages
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
