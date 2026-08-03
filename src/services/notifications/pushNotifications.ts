@@ -8,6 +8,7 @@ import { env } from "../../config/env";
 import type { PushTokenRegistration } from "../../types/messaging";
 
 const REGISTERED_PUSH_TOKEN_KEY = "connexio.push.registered-token";
+const NOTIFICATION_SOUND = "connexio-notification.mp3";
 
 function getProjectId(): string | undefined {
   return env.easProjectId || Constants.easConfig?.projectId || undefined;
@@ -61,6 +62,28 @@ export async function unregisterDeviceFromPushNotifications(): Promise<void> {
   }
 }
 
+async function ensureAndroidChannels(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  await Promise.all([
+    Notifications.setNotificationChannelAsync("messages", {
+      name: "Messages",
+      description: "Nouveaux messages et mentions Connexio",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 180, 120, 180],
+      sound: NOTIFICATION_SOUND,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
+    }),
+    Notifications.setNotificationChannelAsync("calls", {
+      name: "Appels et rappels",
+      description: "Appels entrants et rappels demandés dans Connexio",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 220, 100, 220],
+      sound: NOTIFICATION_SOUND,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
+    })
+  ]);
+}
+
 export async function scheduleCallBackReminder(
   conversationId: string,
   callerName: string,
@@ -74,22 +97,13 @@ export async function scheduleCallBackReminder(
       : (await Notifications.requestPermissionsAsync()).status;
   if (status !== "granted") return false;
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("calls", {
-      name: "Rappels d’appels",
-      description: "Rappels demandés après un appel décliné",
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 180, 100, 180],
-      sound: "default",
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
-    });
-  }
+  await ensureAndroidChannels();
 
   await Notifications.scheduleNotificationAsync({
     content: {
       title: `Rappeler ${callerName}`,
       body: "Les 10 minutes sont écoulées. Ouvrez Connexio pour rappeler cette personne.",
-      sound: "default",
+      sound: NOTIFICATION_SOUND,
       data: {
         type: "call-back-reminder",
         conversationId
@@ -121,16 +135,7 @@ export async function registrationFromDevicePushToken(
 export async function registerForPushNotifications(): Promise<PushTokenRegistration | null> {
   if (Platform.OS === "web" || !Device.isDevice) return null;
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("messages", {
-      name: "Messages",
-      description: "Nouveaux messages et mentions Connexio",
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 180, 120, 180],
-      sound: "default",
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
-    });
-  }
+  await ensureAndroidChannels();
 
   const existing = await Notifications.getPermissionsAsync();
   let status = existing.status;
