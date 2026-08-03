@@ -6,6 +6,11 @@ on:
       - release/connexio-rc1
     paths:
       - .github/workflows/rc1-hardening.yml
+  pull_request:
+    branches:
+      - feat/v14-ux-calls-moderation
+    paths:
+      - .github/workflows/rc1-hardening.yml
 
 permissions:
   contents: write
