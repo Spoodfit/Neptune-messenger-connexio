@@ -130,7 +130,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#020713"
       },
-      edgeToEdgeEnabled: true,
       softwareKeyboardLayoutMode: "resize",
       permissions: [
         "POST_NOTIFICATIONS",
