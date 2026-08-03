@@ -1,57 +1,80 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
+const APP_VERSION = "1.0.0";
+const NOTIFICATION_SOUND = "./assets/audio/connexio-notification.mp3";
+
+function requireHttps(name: string, value: string): void {
+  if (!value.startsWith("https://")) {
+    throw new Error(`${name} doit utiliser HTTPS en production.`);
+  }
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+  const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? "";
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   const realtimeUrl = process.env.EXPO_PUBLIC_REALTIME_URL ?? "";
   const businessWebBaseUrl =
     process.env.EXPO_PUBLIC_BUSINESS_WEB_BASE_URL ??
     "https://neptunebusiness.com";
+  const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "";
+  const accountDeletionUrl =
+    process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ?? "";
+  const supportUrl =
+    process.env.EXPO_PUBLIC_SUPPORT_URL ??
+    "mailto:contact@neptunebusiness.com";
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
+  const isProduction = buildProfile === "production";
+  const isReleaseCandidate = buildProfile === "release-candidate";
+  const isStoreBuild = isProduction || isReleaseCandidate;
   const isGithubPages = process.env.EXPO_PUBLIC_GITHUB_PAGES === "true";
 
-  if (buildProfile === "production") {
+  if (isStoreBuild) {
     const missing = [
       !apiBaseUrl && "EXPO_PUBLIC_API_BASE_URL",
       !realtimeUrl && "EXPO_PUBLIC_REALTIME_URL",
-      !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID"
+      !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID",
+      !privacyPolicyUrl && "EXPO_PUBLIC_PRIVACY_POLICY_URL",
+      !accountDeletionUrl && "EXPO_PUBLIC_ACCOUNT_DELETION_URL"
     ].filter(Boolean);
     if (mockMode) {
-      throw new Error("EXPO_PUBLIC_MOCK_MODE doit être false en production.");
+      throw new Error("EXPO_PUBLIC_MOCK_MODE doit être false pour une build store.");
     }
     if (missing.length > 0) {
       throw new Error(
-        `Configuration Connexio production incomplète : ${missing.join(", ")}`
+        `Configuration Connexio store incomplète : ${missing.join(", ")}`
       );
     }
-    if (!apiBaseUrl.startsWith("https://")) {
-      throw new Error("EXPO_PUBLIC_API_BASE_URL doit utiliser HTTPS en production.");
-    }
+    requireHttps("EXPO_PUBLIC_API_BASE_URL", apiBaseUrl);
     if (!realtimeUrl.startsWith("wss://") && !realtimeUrl.startsWith("https://")) {
       throw new Error(
-        "EXPO_PUBLIC_REALTIME_URL doit utiliser WSS ou HTTPS en production."
+        "EXPO_PUBLIC_REALTIME_URL doit utiliser WSS ou HTTPS pour une build store."
       );
     }
-    if (!businessWebBaseUrl.startsWith("https://")) {
-      throw new Error(
-        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL doit utiliser HTTPS en production."
-      );
-    }
+    requireHttps("EXPO_PUBLIC_BUSINESS_WEB_BASE_URL", businessWebBaseUrl);
+    requireHttps("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);
+    requireHttps("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);
   }
 
   return {
     ...config,
     name: "Connexio by Neptune",
     slug: "neptune-messenger-connexio",
-    version: "0.4.0",
-    orientation: "portrait",
+    version: APP_VERSION,
+    orientation: "default",
     scheme: "neptuneconnexio",
     userInterfaceStyle: "dark",
     backgroundColor: "#020713",
+    icon: "./assets/icon.png",
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#020713"
+    },
     web: {
       bundler: "metro",
-      output: "single"
+      output: "single",
+      favicon: "./assets/favicon.png"
     },
     experiments: isGithubPages
       ? {
@@ -61,24 +84,54 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.neptunebusiness.connexio",
+      icon: "./assets/icon.png",
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription:
-          "Connexio utilise la caméra pour envoyer des photos, publier des vidéos et participer aux appels vidéo.",
+          "Connexio utilise la caméra lorsque vous choisissez de prendre une photo, publier une vidéo ou participer à un appel vidéo.",
         NSMicrophoneUsageDescription:
-          "Connexio utilise le microphone pour les messages audio et les appels.",
+          "Connexio utilise le microphone lorsque vous enregistrez un message vocal, dictez l’objet d’un appel ou participez à un appel.",
         NSSpeechRecognitionUsageDescription:
-          "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
+          "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.",
         NSPhotoLibraryUsageDescription:
-          "Connexio accède à vos médias uniquement lorsque vous choisissez un contenu à partager.",
+          "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.",
         NSLocationWhenInUseUsageDescription:
-          "Connexio utilise votre position pour vous localiser sur la carte et partager un lieu à votre demande."
+          "Connexio utilise votre position uniquement à votre demande pour la carte ou le partage d’un lieu."
+      },
+      privacyManifests: {
+        NSPrivacyAccessedAPITypes: [
+          {
+            NSPrivacyAccessedAPIType:
+              "NSPrivacyAccessedAPICategoryUserDefaults",
+            NSPrivacyAccessedAPITypeReasons: ["CA92.1"]
+          },
+          {
+            NSPrivacyAccessedAPIType:
+              "NSPrivacyAccessedAPICategorySystemBootTime",
+            NSPrivacyAccessedAPITypeReasons: ["35F9.1"]
+          },
+          {
+            NSPrivacyAccessedAPIType:
+              "NSPrivacyAccessedAPICategoryFileTimestamp",
+            NSPrivacyAccessedAPITypeReasons: ["C617.1"]
+          },
+          {
+            NSPrivacyAccessedAPIType:
+              "NSPrivacyAccessedAPICategoryDiskSpace",
+            NSPrivacyAccessedAPITypeReasons: ["E174.1"]
+          }
+        ]
       }
     },
     android: {
       package: "com.neptunebusiness.connexio",
+      icon: "./assets/icon.png",
       adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#020713"
       },
+      edgeToEdgeEnabled: true,
+      softwareKeyboardLayoutMode: "resize",
       permissions: [
         "POST_NOTIFICATIONS",
         "CAMERA",
@@ -94,9 +147,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "expo-speech-recognition",
         {
           microphonePermission:
-            "Connexio utilise le microphone pour dicter l’objet d’un appel.",
+            "Connexio utilise le microphone uniquement lorsque vous choisissez de dicter l’objet d’un appel.",
           speechRecognitionPermission:
-            "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
+            "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.",
           androidSpeechServicePackages: [
             "com.google.android.googlequicksearchbox",
             "com.google.android.as"
@@ -113,18 +166,21 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       [
         "expo-notifications",
         {
-          defaultChannel: "messages"
+          defaultChannel: "messages",
+          icon: "./assets/notification-icon.png",
+          color: "#0048BA",
+          sounds: [NOTIFICATION_SOUND]
         }
       ],
       [
         "expo-image-picker",
         {
           photosPermission:
-            "Connexio accède aux photos et vidéos que vous choisissez de partager.",
+            "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.",
           cameraPermission:
-            "Connexio utilise la caméra pour créer un contenu à partager.",
+            "Connexio utilise la caméra lorsque vous choisissez de créer un contenu.",
           microphonePermission:
-            "Connexio utilise le microphone lors de l’enregistrement vidéo."
+            "Connexio utilise le microphone uniquement lors d’un enregistrement vidéo choisi."
         }
       ],
       [
@@ -140,8 +196,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       apiBaseUrl,
       realtimeUrl,
       businessWebBaseUrl,
+      privacyPolicyUrl,
+      accountDeletionUrl,
+      supportUrl,
       mockMode,
       buildProfile,
+      releaseStage: isProduction
+        ? "production"
+        : isReleaseCandidate
+          ? "release-candidate"
+          : buildProfile === "preview"
+            ? "preview"
+            : "development",
       ...(easProjectId
         ? {
             eas: {
