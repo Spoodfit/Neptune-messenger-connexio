@@ -1,7 +1,4 @@
-import type {
-  CanonicalUserRole,
-  UserRole
-} from "../types/messaging";
+import type { CanonicalUserRole, UserRole } from "../types/messaging";
 
 const ROLE_ALIASES: Record<UserRole, CanonicalUserRole> = {
   visionnaire: "visionnaire",
@@ -14,6 +11,8 @@ const ROLE_ALIASES: Record<UserRole, CanonicalUserRole> = {
   moussaillon: "moussaillon",
   triton: "triton",
   member: "triton",
+  allie: "allie",
+  ally: "allie",
   free: "free",
   admin: "admin"
 };
@@ -25,18 +24,20 @@ export const ROLE_LABELS: Record<CanonicalUserRole, string> = {
   legende: "Légende",
   moussaillon: "Moussaillon",
   triton: "Triton",
+  allie: "Allié",
   free: "Free",
   admin: "Administration"
 };
 
 export const GROUP_VISIBILITY_ROLES: CanonicalUserRole[] = [
-  "visionnaire",
-  "amiral",
-  "capitaine",
-  "legende",
-  "moussaillon",
+  "free",
   "triton",
-  "free"
+  "moussaillon",
+  "legende",
+  "capitaine",
+  "amiral",
+  "allie",
+  "visionnaire"
 ];
 
 export function normalizeUserRole(role: UserRole): CanonicalUserRole {
@@ -54,17 +55,16 @@ export function canAccessAllowedRoles(
   );
 }
 
-/** Capacité produit de création et d’administration des groupes officiels. */
 export function isVisionnaireRole(role: UserRole): boolean {
-  return normalizeUserRole(role) === "visionnaire";
+  const normalized = normalizeUserRole(role);
+  return normalized === "visionnaire" || normalized === "admin";
 }
 
-/**
- * Dans l’interface membre Connexio, la gouvernance des groupes officiels est
- * volontairement réservée aux Visionnaires. Le rôle technique `admin` reste
- * utilisable par le backend via ses routes protégées, mais n’expose pas ces
- * commandes dans l’application membre.
- */
+export function isGroupResponsibleRole(role: UserRole): boolean {
+  const normalized = normalizeUserRole(role);
+  return normalized === "amiral" || normalized === "capitaine";
+}
+
 export function isGovernanceRole(role: UserRole): boolean {
   return isVisionnaireRole(role);
 }
