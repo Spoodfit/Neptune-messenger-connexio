@@ -35,7 +35,7 @@ jobs:
       - name: Install native asset tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y imagemagick file >/dev/null
+          sudo apt-get install -y imagemagick file python3-pil >/dev/null
 
       - name: Restore and verify user-provided sounds
         run: |
@@ -88,20 +88,28 @@ jobs:
         run: |
           python - <<'PY'
           import base64
+          import io
           import re
           from pathlib import Path
+          from PIL import Image, ImageFile
+
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
           source = Path("src/assets/neptuneLogo.ts").read_text(encoding="utf-8")
           match = re.search(r"base64,([A-Za-z0-9+/=]+)", source)
           if not match:
               raise SystemExit("Logo Neptune base64 introuvable")
-          Path("/tmp/neptune-logo.png").write_bytes(base64.b64decode(match.group(1)))
+          raw = base64.b64decode(match.group(1))
+          image = Image.open(io.BytesIO(raw))
+          image.load()
+          image.convert("RGBA").save("/tmp/neptune-logo-repaired.png", format="PNG", optimize=True)
+          print("Logo réparé:", image.size, image.mode)
           PY
           mkdir -p assets
-          convert /tmp/neptune-logo.png -resize 720x720 -gravity center -background '#020713' -extent 1024x1024 assets/icon.png
-          convert /tmp/neptune-logo.png -resize 640x640 -gravity center -background none -extent 1024x1024 assets/adaptive-icon.png
-          convert /tmp/neptune-logo.png -resize 520x520 -gravity center -background none -extent 1024x1024 assets/splash-icon.png
-          convert /tmp/neptune-logo.png -resize 48x48 assets/favicon.png
-          convert /tmp/neptune-logo.png -resize 72x72 -gravity center -background none -extent 96x96 -colorspace Gray -threshold 25% -fill white -colorize 100 assets/notification-icon.png
+          convert /tmp/neptune-logo-repaired.png -resize 720x720 -gravity center -background '#020713' -extent 1024x1024 assets/icon.png
+          convert /tmp/neptune-logo-repaired.png -resize 640x640 -gravity center -background none -extent 1024x1024 assets/adaptive-icon.png
+          convert /tmp/neptune-logo-repaired.png -resize 520x520 -gravity center -background none -extent 1024x1024 assets/splash-icon.png
+          convert /tmp/neptune-logo-repaired.png -resize 48x48 assets/favicon.png
+          convert /tmp/neptune-logo-repaired.png -resize 72x72 -gravity center -background none -extent 96x96 -colorspace Gray -threshold 25% -fill white -colorize 100 assets/notification-icon.png
           identify assets/icon.png assets/adaptive-icon.png assets/splash-icon.png assets/favicon.png assets/notification-icon.png
           test "$(identify -format '%wx%h' assets/icon.png)" = "1024x1024"
           test "$(identify -format '%wx%h' assets/adaptive-icon.png)" = "1024x1024"
