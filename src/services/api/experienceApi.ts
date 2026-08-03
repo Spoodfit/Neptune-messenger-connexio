@@ -24,6 +24,20 @@ export interface CreateHighlightInput {
   location?: HighlightLocation;
 }
 
+function groupPayload(draft: GroupDraft) {
+  return {
+    name: draft.name.trim(),
+    description: draft.description.trim(),
+    avatar_url: draft.avatarUrl ?? null,
+    icon_name: draft.iconName ?? "people",
+    allowed_roles: draft.allowedRoles,
+    members_can_post: draft.canMembersPost,
+    responsible_ids: draft.adminIds ?? [],
+    announcement_publisher_ids: draft.announcementPublisherIds ?? [],
+    allow_free_discovery: draft.allowFreeDiscovery ?? false
+  };
+}
+
 export class NeptuneExperienceApi {
   constructor(private readonly fallbackAccessToken?: string | null) {}
 
@@ -60,14 +74,7 @@ export class NeptuneExperienceApi {
       "/v1/groups",
       {
         method: "POST",
-        body: JSON.stringify({
-          name: draft.name.trim(),
-          description: draft.description.trim(),
-          avatar_url: draft.avatarUrl ?? null,
-          icon_name: draft.iconName ?? "people",
-          allowed_roles: draft.allowedRoles,
-          members_can_post: draft.canMembersPost
-        })
+        body: JSON.stringify(groupPayload(draft))
       },
       this.fallbackAccessToken
     );
@@ -78,15 +85,51 @@ export class NeptuneExperienceApi {
       `/v1/groups/${encodeURIComponent(conversationId)}`,
       {
         method: "PATCH",
-        body: JSON.stringify({
-          name: draft.name.trim(),
-          description: draft.description.trim(),
-          avatar_url: draft.avatarUrl ?? null,
-          icon_name: draft.iconName ?? "people",
-          allowed_roles: draft.allowedRoles,
-          members_can_post: draft.canMembersPost
-        })
+        body: JSON.stringify(groupPayload(draft))
       },
+      this.fallbackAccessToken
+    );
+  }
+
+  async joinGroup(conversationId: string): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/join`,
+      { method: "POST" },
+      this.fallbackAccessToken
+    );
+  }
+
+  async setGroupResponsible(
+    conversationId: string,
+    memberId: string,
+    responsible: boolean
+  ): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/responsibles/${encodeURIComponent(memberId)}`,
+      { method: responsible ? "PUT" : "DELETE" },
+      this.fallbackAccessToken
+    );
+  }
+
+  async removeGroupMember(
+    conversationId: string,
+    memberId: string
+  ): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/members/${encodeURIComponent(memberId)}`,
+      { method: "DELETE" },
+      this.fallbackAccessToken
+    );
+  }
+
+  async setAnnouncementPublisher(
+    conversationId: string,
+    memberId: string,
+    allowed: boolean
+  ): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/announcement-publishers/${encodeURIComponent(memberId)}`,
+      { method: allowed ? "PUT" : "DELETE" },
       this.fallbackAccessToken
     );
   }
