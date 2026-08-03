@@ -17,12 +17,21 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MemberAvatarStack } from "@/components/MemberAvatarStack";
+import { MemberStatusBadge } from "@/components/MemberStatusBadge";
+import { SwipeableMemberRow } from "@/components/SwipeableMemberRow";
 import { env } from "@/config/env";
+import {
+  canBeGroupResponsible,
+  canManageGroup,
+  canScheduleMessages
+} from "@/domain/accessPolicy";
 import {
   GROUP_VISIBILITY_ROLES,
   isVisionnaireRole,
+  normalizeUserRole,
   ROLE_LABELS
 } from "@/domain/roles";
+import { getRoleAppearance } from "@/domain/roleAppearance";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useGroupAdmin } from "@/providers/GroupAdminProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
@@ -31,7 +40,7 @@ import { NeptuneExperienceApi } from "@/services/api/experienceApi";
 import { uploadGroupAvatar } from "@/services/api/uploadApi";
 import { pickGroupAvatar } from "@/services/media/mediaPicker";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
-import type { CanonicalUserRole } from "@/types/messaging";
+import type { AppUser, CanonicalUserRole } from "@/types/messaging";
 
 const GROUP_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   "people",
@@ -46,13 +55,16 @@ const GROUP_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   "construct"
 ];
 
+function first(value?: string | string[]): string {
+  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
 export default function GroupSettingsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
-  const id = Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "");
+  const id = first(params.id);
   const { currentUser, accessToken } = useSession();
-  const { getConversation: getServerConversation, refreshConversations } =
-    useMessaging();
+  const { getConversation: getServerConversation, refreshConversations } = useMessaging();
   const {
     members,
     getConversation: getLocalConversation,
@@ -61,8 +73,7 @@ export default function GroupSettingsScreen() {
     leaveConversation,
     updateGroup
   } = useExperience();
-  const { getCreatedGroup, updateCreatedGroup, removeCreatedGroup } =
-    useGroupAdmin();
+  const { getCreatedGroup, updateCreatedGroup, removeCreatedGroup } = useGroupAdmin();
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
     [accessToken]
@@ -70,10 +81,11 @@ export default function GroupSettingsScreen() {
 
   const rawConversation =
     getServerConversation(id) ?? getLocalConversation(id) ?? getCreatedGroup(id);
-  const conversation = rawConversation
-    ? decorateConversation(rawConversation)
-    : undefined;
-  const canManage = isVisionnaireRole(currentUser.role);
+  const conversation = rawConversation ? decorateConversation(rawConversation) : undefined;
+  const canEditSettings = isVisionnaireRole(currentUser.role);
+  const canManageMembers = canManageGroup(currentUser, conversation);
+  const canUseAutomations = canScheduleMessages(currentUser, conversation);
+  const isAnnouncement = conversation?.type === "announcement";
 
   const [name, setName] = useState(conversation?.name ?? "");
   const [description, setDescription] = useState(conversation?.description ?? "");
@@ -81,23 +93,18 @@ export default function GroupSettingsScreen() {
   const [iconName, setIconName] = useState<keyof typeof Ionicons.glyphMap>(
     (conversation?.iconName as keyof typeof Ionicons.glyphMap) ?? "people"
   );
-  const [membersCanPost, setMembersCanPost] = useState(
-    conversation?.canPost ?? true
+  const [membersCanPost, setMembersCanPost] = useState(conversation?.canPost ?? true);
+  const [allowedRoles, setAllowedRoles] = useState<CanonicalUserRole[]>([]);
+  const [responsibleIds, setResponsibleIds] = useState<string[]>(conversation?.adminIds ?? []);
+  const [publisherIds, setPublisherIds] = useState<string[]>(
+    conversation?.announcementPublisherIds ?? []
   );
-  const [allowedRoles, setAllowedRoles] = useState<CanonicalUserRole[]>(
-    (conversation?.allowedRoles?.map((role) =>
-      role === "visionary"
-        ? "visionnaire"
-        : role === "admiral"
-          ? "amiral"
-          : role === "captain"
-            ? "capitaine"
-            : role === "member"
-              ? "triton"
-              : (role as CanonicalUserRole)
-    ) ?? GROUP_VISIBILITY_ROLES) as CanonicalUserRole[]
+  const [allowFreeDiscovery, setAllowFreeDiscovery] = useState(
+    conversation?.allowFreeDiscovery ?? false
   );
+  const [removedMemberIds, setRemovedMemberIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [busyMemberId, setBusyMemberId] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -105,25 +112,52 @@ export default function GroupSettingsScreen() {
     setName(conversation.name);
     setDescription(conversation.description ?? "");
     setAvatarUrl(conversation.avatarUrl ?? "");
-    setIconName(
-      (conversation.iconName as keyof typeof Ionicons.glyphMap) ?? "people"
-    );
+    setIconName((conversation.iconName as keyof typeof Ionicons.glyphMap) ?? "people");
     setMembersCanPost(conversation.canPost ?? true);
+    setAllowedRoles(
+      (conversation.allowedRoles ?? GROUP_VISIBILITY_ROLES).map((role) =>
+        normalizeUserRole(role)
+      )
+    );
+    setResponsibleIds(conversation.adminIds ?? []);
+    setPublisherIds(conversation.announcementPublisherIds ?? []);
+    setAllowFreeDiscovery(conversation.allowFreeDiscovery ?? false);
+    setRemovedMemberIds([]);
   }, [conversation?.id]);
 
   const groupMembers = useMemo(() => {
     if (!conversation) return [];
-    if (conversation.memberIds?.length) {
-      return conversation.memberIds
-        .map((memberId) => members.find((member) => member.id === memberId))
-        .filter((member): member is (typeof members)[number] => Boolean(member));
-    }
-    return members.slice(0, conversation.memberCount || members.length);
-  }, [conversation, members]);
-  const exactMemberCount = conversation?.memberIds?.length ?? conversation?.memberCount ?? 0;
-  const activeMemberIds = conversation?.activeMemberIds?.length
-    ? conversation.activeMemberIds
-    : conversation?.memberIds ?? [];
+    const source = conversation.memberIds?.length
+      ? conversation.memberIds
+          .map((memberId) => members.find((member) => member.id === memberId))
+          .filter((member): member is AppUser => Boolean(member))
+      : members.slice(0, conversation.memberCount || members.length);
+    return source.filter((member) => !removedMemberIds.includes(member.id));
+  }, [conversation, members, removedMemberIds]);
+
+  const eligiblePublishers = groupMembers.filter((member) => {
+    const role = normalizeUserRole(member.role);
+    return role === "amiral" || role === "capitaine";
+  });
+  const exactMemberCount = groupMembers.length || conversation?.memberCount || 0;
+  const activeMemberIds = (conversation?.activeMemberIds ?? []).filter(
+    (memberId) => !removedMemberIds.includes(memberId)
+  );
+
+  const buildDraft = (overrides?: {
+    nextResponsibleIds?: string[];
+    nextPublisherIds?: string[];
+  }) => ({
+    name: name.trim(),
+    description: description.trim(),
+    avatarUrl: avatarUrl.trim() || undefined,
+    iconName,
+    allowedRoles,
+    canMembersPost: isAnnouncement ? false : membersCanPost,
+    adminIds: overrides?.nextResponsibleIds ?? responsibleIds,
+    announcementPublisherIds: overrides?.nextPublisherIds ?? publisherIds,
+    allowFreeDiscovery
+  });
 
   const hasChanges = Boolean(
     conversation &&
@@ -131,30 +165,42 @@ export default function GroupSettingsScreen() {
         description.trim() !== (conversation.description ?? "") ||
         avatarUrl !== (conversation.avatarUrl ?? "") ||
         iconName !== ((conversation.iconName as keyof typeof Ionicons.glyphMap) ?? "people") ||
-        membersCanPost !== (conversation.canPost ?? true) ||
+        (!isAnnouncement && membersCanPost !== (conversation.canPost ?? true)) ||
         JSON.stringify([...allowedRoles].sort()) !==
-          JSON.stringify([...(conversation.allowedRoles ?? GROUP_VISIBILITY_ROLES)].sort()))
+          JSON.stringify(
+            [...(conversation.allowedRoles ?? GROUP_VISIBILITY_ROLES)]
+              .map((role) => normalizeUserRole(role))
+              .sort()
+          ) ||
+        JSON.stringify([...responsibleIds].sort()) !==
+          JSON.stringify([...(conversation.adminIds ?? [])].sort()) ||
+        JSON.stringify([...publisherIds].sort()) !==
+          JSON.stringify([...(conversation.announcementPublisherIds ?? [])].sort()) ||
+        allowFreeDiscovery !== (conversation.allowFreeDiscovery ?? false))
   );
 
   if (!conversation) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.missing}>
+      <LinearGradient colors={gradients.screen} style={styles.center}>
+        <Ionicons name="people-outline" size={42} color={colors.textMuted} />
         <Text style={styles.title}>Groupe introuvable</Text>
         <Text style={styles.mutedText}>
           Le groupe est supprimé, masqué ou votre statut ne permet plus d’y accéder.
         </Text>
-        <Pressable
-          onPress={() => router.replace("/(tabs)/messages")}
-          style={styles.primaryAction}
-        >
+        <Pressable onPress={() => router.replace("/(tabs)/messages")} style={styles.primaryAction}>
           <Text style={styles.primaryActionText}>Retour aux messages</Text>
         </Pressable>
       </LinearGradient>
     );
   }
 
+  const persistLocalDraft = (draft = buildDraft()) => {
+    if (getCreatedGroup(id)) updateCreatedGroup(id, draft);
+    else updateGroup(id, draft);
+  };
+
   const toggleRole = (role: CanonicalUserRole) => {
-    if (!canManage) return;
+    if (!canEditSettings) return;
     setAllowedRoles((previous) =>
       previous.includes(role)
         ? previous.filter((item) => item !== role)
@@ -164,7 +210,7 @@ export default function GroupSettingsScreen() {
   };
 
   const selectAvatar = async () => {
-    if (!canManage) return;
+    if (!canEditSettings) return;
     try {
       const selected = await pickGroupAvatar();
       if (selected) {
@@ -174,15 +220,13 @@ export default function GroupSettingsScreen() {
     } catch (error) {
       Alert.alert(
         "Image indisponible",
-        error instanceof Error
-          ? error.message
-          : "L’image n’a pas pu être sélectionnée."
+        error instanceof Error ? error.message : "L’image n’a pas pu être sélectionnée."
       );
     }
   };
 
   const save = async () => {
-    if (!canManage || saving) return;
+    if (!canEditSettings || saving) return;
     if (!name.trim()) {
       Alert.alert("Nom requis", "Le groupe doit conserver un nom.");
       return;
@@ -198,28 +242,17 @@ export default function GroupSettingsScreen() {
       if (api && readyAvatar?.startsWith("file:")) {
         readyAvatar = await uploadGroupAvatar(readyAvatar, accessToken);
       }
-      const draft = {
-        name: name.trim(),
-        description: description.trim(),
-        avatarUrl: readyAvatar,
-        iconName,
-        allowedRoles,
-        canMembersPost: membersCanPost
-      };
+      const draft = { ...buildDraft(), avatarUrl: readyAvatar };
       if (api && !id.startsWith("local-")) {
         await api.updateGroup(id, draft);
         await refreshConversations();
-      } else if (getCreatedGroup(id)) {
-        updateCreatedGroup(id, draft);
       } else {
-        updateGroup(id, draft);
+        persistLocalDraft(draft);
       }
       setAvatarUrl(readyAvatar ?? "");
-      const timestamp = new Date().toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-      setSavedAt(timestamp);
+      setSavedAt(
+        new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+      );
       Alert.alert("Paramètres enregistrés", "Les règles du groupe sont actives.");
     } catch (error) {
       Alert.alert(
@@ -231,38 +264,127 @@ export default function GroupSettingsScreen() {
     }
   };
 
-  const leave = () => {
+  const toggleResponsible = async (member: AppUser) => {
+    if (!canManageMembers || busyMemberId) return;
+    if (!canBeGroupResponsible(member.role)) {
+      Alert.alert(
+        "Statut non éligible",
+        "Un responsable de groupe doit être Amiral ou Capitaine."
+      );
+      return;
+    }
+    const active = responsibleIds.includes(member.id);
+    const next = active
+      ? responsibleIds.filter((memberId) => memberId !== member.id)
+      : [...responsibleIds, member.id];
+    setBusyMemberId(member.id);
+    setResponsibleIds(next);
+    try {
+      if (api && !id.startsWith("local-")) {
+        await api.setGroupResponsible(id, member.id, !active);
+        await refreshConversations();
+      } else {
+        persistLocalDraft(buildDraft({ nextResponsibleIds: next }));
+      }
+    } catch (error) {
+      setResponsibleIds(responsibleIds);
+      Alert.alert(
+        "Gestion impossible",
+        error instanceof Error ? error.message : "Le responsable n’a pas été modifié."
+      );
+    } finally {
+      setBusyMemberId(null);
+    }
+  };
+
+  const removeMember = (member: AppUser) => {
+    if (!canManageMembers || busyMemberId || member.id === currentUser.id) return;
     Alert.alert(
-      "Quitter le groupe ?",
-      "Le groupe disparaîtra de vos discussions.",
+      `Retirer ${member.name} ?`,
+      "Cette personne perdra immédiatement l’accès au groupe.",
       [
         { text: "Annuler", style: "cancel" },
         {
-          text: "Quitter",
+          text: "Retirer",
           style: "destructive",
           onPress: () => {
+            setBusyMemberId(member.id);
+            setRemovedMemberIds((previous) => [...previous, member.id]);
+            setResponsibleIds((previous) => previous.filter((idValue) => idValue !== member.id));
+            setPublisherIds((previous) => previous.filter((idValue) => idValue !== member.id));
             void (async () => {
               try {
                 if (api && !id.startsWith("local-")) {
-                  await api.leaveGroup(id);
+                  await api.removeGroupMember(id, member.id);
                   await refreshConversations();
-                } else if (getCreatedGroup(id)) {
-                  removeCreatedGroup(id);
-                } else {
-                  leaveConversation(id);
                 }
-                router.replace("/(tabs)/messages");
               } catch (error) {
+                setRemovedMemberIds((previous) => previous.filter((value) => value !== member.id));
                 Alert.alert(
-                  "Départ impossible",
-                  error instanceof Error ? error.message : "Réessayez ultérieurement."
+                  "Retrait impossible",
+                  error instanceof Error ? error.message : "Le membre n’a pas été retiré."
                 );
+              } finally {
+                setBusyMemberId(null);
               }
             })();
           }
         }
       ]
     );
+  };
+
+  const toggleAnnouncementPublisher = async (member: AppUser) => {
+    if (!canEditSettings || !isAnnouncement || busyMemberId) return;
+    const active = publisherIds.includes(member.id);
+    const next = active
+      ? publisherIds.filter((memberId) => memberId !== member.id)
+      : [...publisherIds, member.id];
+    setBusyMemberId(member.id);
+    setPublisherIds(next);
+    try {
+      if (api && !id.startsWith("local-")) {
+        await api.setAnnouncementPublisher(id, member.id, !active);
+        await refreshConversations();
+      } else {
+        persistLocalDraft(buildDraft({ nextPublisherIds: next }));
+      }
+    } catch (error) {
+      setPublisherIds(publisherIds);
+      Alert.alert(
+        "Autorisation impossible",
+        error instanceof Error ? error.message : "L’autorisation n’a pas été modifiée."
+      );
+    } finally {
+      setBusyMemberId(null);
+    }
+  };
+
+  const leave = () => {
+    Alert.alert("Quitter le groupe ?", "Le groupe disparaîtra de vos discussions.", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Quitter",
+        style: "destructive",
+        onPress: () => {
+          void (async () => {
+            try {
+              if (api && !id.startsWith("local-")) {
+                await api.leaveGroup(id);
+                await refreshConversations();
+              } else if (getCreatedGroup(id)) removeCreatedGroup(id);
+              else leaveConversation(id);
+              router.replace("/(tabs)/messages");
+            } catch (error) {
+              Alert.alert(
+                "Départ impossible",
+                error instanceof Error ? error.message : "Réessayez ultérieurement."
+              );
+            }
+          })();
+        }
+      }
+    ]);
   };
 
   const reportGroup = () => {
@@ -302,18 +424,11 @@ export default function GroupSettingsScreen() {
           }
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-          style={styles.headerButton}
-        >
+        <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={() => router.back()} style={styles.headerButton}>
           <Ionicons name="chevron-back" size={25} color={colors.text} />
         </Pressable>
-        <Text accessibilityRole="header" style={styles.headerTitle}>
-          Informations du groupe
-        </Text>
-        {canManage ? (
+        <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>Informations du groupe</Text>
+        {canEditSettings ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Enregistrer les paramètres"
@@ -322,21 +437,10 @@ export default function GroupSettingsScreen() {
             onPress={() => void save()}
             style={[styles.saveButton, !hasChanges && styles.saveDisabled]}
           >
-            {saving ? (
-              <ActivityIndicator size="small" color={colors.orange} />
-            ) : savedAt && !hasChanges ? (
-              <Ionicons name="checkmark-circle" size={23} color={colors.success} />
-            ) : (
-              <Text style={styles.saveText}>Enregistrer</Text>
-            )}
+            {saving ? <ActivityIndicator size="small" color={colors.orange} /> : <Text style={styles.saveText}>Enregistrer</Text>}
           </Pressable>
         ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Signaler le groupe"
-            onPress={reportGroup}
-            style={styles.headerButton}
-          >
+          <Pressable accessibilityRole="button" accessibilityLabel="Signaler le groupe" onPress={reportGroup} style={styles.headerButton}>
             <Ionicons name="flag-outline" size={21} color={colors.textMuted} />
           </Pressable>
         )}
@@ -363,175 +467,144 @@ export default function GroupSettingsScreen() {
         <View style={styles.identityCard}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={canManage ? "Modifier et recadrer l’image du groupe" : "Image du groupe"}
-            disabled={!canManage}
+            accessibilityLabel={canEditSettings ? "Modifier l’image du groupe" : "Image du groupe"}
+            disabled={!canEditSettings}
             onPress={() => void selectAvatar()}
           >
             <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
               <View style={styles.avatarInner}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                ) : (
-                  <Ionicons name={iconName} size={34} color={colors.text} />
-                )}
-                {canManage ? (
-                  <View style={styles.cropBadge}>
-                    <Ionicons name="crop-outline" size={14} color={colors.white} />
-                  </View>
-                ) : null}
+                {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <Ionicons name={isAnnouncement ? "megaphone" : iconName} size={34} color={colors.text} />}
+                {canEditSettings ? <View style={styles.cropBadge}><Ionicons name="crop-outline" size={14} color={colors.white} /></View> : null}
               </View>
             </LinearGradient>
           </Pressable>
           <Text style={styles.groupName}>{conversation.name}</Text>
-          <MemberAvatarStack
-            memberIds={activeMemberIds}
-            members={members}
-            memberCount={exactMemberCount}
-            maxVisible={5}
-            size={28}
-          />
-          <Text style={styles.groupMeta}>
-            {exactMemberCount} membre{exactMemberCount > 1 ? "s" : ""} · {conversation.categoryLabel}
-          </Text>
-          {conversation.description ? (
-            <Text style={styles.description}>{conversation.description}</Text>
-          ) : null}
+          {isAnnouncement ? <View style={styles.announcementBadge}><Ionicons name="megaphone" size={14} color={colors.orange} /><Text style={styles.announcementText}>Annonces officielles · réactions autorisées</Text></View> : null}
+          <MemberAvatarStack memberIds={activeMemberIds} members={members} memberCount={exactMemberCount} maxVisible={7} size={28} />
+          <Text style={styles.groupMeta}>{exactMemberCount} membre{exactMemberCount > 1 ? "s" : ""} · {conversation.categoryLabel}</Text>
+          {conversation.description ? <Text style={styles.description}>{conversation.description}</Text> : null}
         </View>
 
         <View style={styles.quickActions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => toggleConversationMuted(id)}
-            style={styles.quickAction}
-          >
-            <Ionicons
-              name={conversation.muted ? "notifications" : "notifications-off"}
-              size={21}
-              color={colors.text}
-            />
-            <Text style={styles.quickLabel}>
-              {conversation.muted ? "Réactiver" : "Sourdine"}
-            </Text>
+          <Pressable accessibilityRole="button" onPress={() => toggleConversationMuted(id)} style={styles.quickAction}>
+            <Ionicons name={conversation.muted ? "notifications" : "notifications-off"} size={21} color={colors.text} />
+            <Text style={styles.quickLabel}>{conversation.muted ? "Réactiver" : "Sourdine"}</Text>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.replace(`/chat/${encodeURIComponent(id)}`)}
-            style={styles.quickAction}
-          >
+          <Pressable accessibilityRole="button" onPress={() => router.replace(`/chat/${encodeURIComponent(id)}`)} style={styles.quickAction}>
             <Ionicons name="chatbubble-outline" size={21} color={colors.text} />
             <Text style={styles.quickLabel}>Messages</Text>
           </Pressable>
+          {canUseAutomations ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les automatisations du groupe" onPress={() => router.push(`/schedule-message/${encodeURIComponent(id)}`)} style={styles.quickAction}>
+              <Ionicons name="repeat-outline" size={21} color={colors.orange} />
+              <Text style={styles.quickLabel}>Automatisations</Text>
+            </Pressable>
+          ) : null}
           <Pressable accessibilityRole="button" onPress={leave} style={styles.quickAction}>
             <Ionicons name="exit-outline" size={21} color={colors.danger} />
             <Text style={[styles.quickLabel, styles.dangerText]}>Quitter</Text>
           </Pressable>
         </View>
 
+        <View style={styles.governanceNote}>
+          <Ionicons name="shield-checkmark" size={18} color={colors.orange} />
+          <Text style={styles.governanceText}>
+            Les Visionnaires administrent tous les groupes. Les Amiraux et Capitaines nommés responsables peuvent gérer les membres et les automatisations de ce groupe.
+          </Text>
+        </View>
+
         <Text style={styles.sectionTitle}>Membres</Text>
         <View style={styles.panel}>
           {groupMembers.map((member, index) => (
-            <Pressable
+            <SwipeableMemberRow
               key={member.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Ouvrir le profil de ${member.name}`}
-              onPress={() => router.push(`/profile/${encodeURIComponent(member.id)}`)}
-              style={[
-                styles.memberRow,
-                index < groupMembers.length - 1 && styles.memberDivider
-              ]}
-            >
-              <View style={styles.memberAvatar}>
-                {member.avatarUrl ? (
-                  <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.memberInitials}>{member.initials}</Text>
-                )}
-              </View>
-              <View style={styles.memberContent}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <Text style={styles.memberRole} numberOfLines={1}>
-                  {member.company} · {member.roleLabel}
-                </Text>
-              </View>
-              {conversation.adminIds?.includes(member.id) ? (
-                <View style={styles.adminBadge}>
-                  <Text style={styles.adminText}>Admin</Text>
-                </View>
-              ) : null}
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </Pressable>
+              member={member}
+              isResponsible={responsibleIds.includes(member.id)}
+              canManage={canManageMembers && member.id !== currentUser.id && !busyMemberId}
+              isLast={index === groupMembers.length - 1}
+              onOpen={() => router.push(`/profile/${encodeURIComponent(member.id)}`)}
+              onToggleResponsible={() => void toggleResponsible(member)}
+              onRemove={() => removeMember(member)}
+            />
           ))}
-          {groupMembers.length === 0 ? (
-            <Text style={styles.emptyMembers}>Aucun membre visible.</Text>
-          ) : null}
+          {groupMembers.length === 0 ? <Text style={styles.emptyMembers}>Aucun membre visible.</Text> : null}
         </View>
 
-        {canManage ? (
+        {isAnnouncement && canEditSettings ? (
           <>
-            <View style={styles.visionnaireNote}>
-              <Ionicons name="diamond" size={18} color={colors.orange} />
-              <Text style={styles.visionnaireText}>
-                Administration réservée aux Visionnaires et vérifiée par le serveur.
-              </Text>
+            <Text style={styles.sectionTitle}>Personnes autorisées à publier</Text>
+            <Text style={styles.sectionHelp}>
+              Les Visionnaires publient toujours. Vous pouvez autoriser des Amiraux ou Capitaines individuellement.
+            </Text>
+            <View style={styles.panel}>
+              {eligiblePublishers.map((member, index) => {
+                const selected = publisherIds.includes(member.id);
+                const appearance = getRoleAppearance(member.role);
+                return (
+                  <Pressable
+                    key={member.id}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected, disabled: Boolean(busyMemberId) }}
+                    disabled={Boolean(busyMemberId)}
+                    onPress={() => void toggleAnnouncementPublisher(member)}
+                    style={[styles.publisherRow, index < eligiblePublishers.length - 1 && styles.divider]}
+                  >
+                    <View style={[styles.publisherAvatar, { borderColor: appearance.foreground, backgroundColor: appearance.background }]}>
+                      {member.avatarUrl ? <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} /> : <Text style={[styles.publisherInitials, { color: appearance.foreground }]}>{member.initials}</Text>}
+                    </View>
+                    <View style={styles.publisherContent}>
+                      <Text style={styles.publisherName}>{member.name}</Text>
+                      <MemberStatusBadge role={member.role} compact />
+                    </View>
+                    <View style={[styles.check, selected && styles.checkSelected]}>
+                      {selected ? <Ionicons name="checkmark" size={17} color={colors.white} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+              {eligiblePublishers.length === 0 ? <Text style={styles.emptyMembers}>Aucun Amiral ou Capitaine visible.</Text> : null}
             </View>
-            <Text style={styles.sectionTitle}>Administration</Text>
+          </>
+        ) : null}
+
+        {canEditSettings ? (
+          <>
+            <Text style={styles.sectionTitle}>Administration Visionnaire</Text>
             <View style={styles.panelForm}>
               <Text style={styles.fieldLabel}>Nom</Text>
-              <TextInput
-                value={name}
-                onChangeText={(value) => { setName(value); setSavedAt(null); }}
-                style={styles.input}
-                placeholderTextColor={colors.textMuted}
-                maxLength={70}
-              />
+              <TextInput value={name} onChangeText={(value) => { setName(value); setSavedAt(null); }} style={styles.input} placeholderTextColor={colors.textMuted} maxLength={70} />
               <Text style={styles.fieldLabel}>Description</Text>
-              <TextInput
-                value={description}
-                onChangeText={(value) => { setDescription(value); setSavedAt(null); }}
-                style={[styles.input, styles.multiline]}
-                placeholder="Description du groupe"
-                placeholderTextColor={colors.textMuted}
-                multiline
-                maxLength={240}
-              />
+              <TextInput value={description} onChangeText={(value) => { setDescription(value); setSavedAt(null); }} style={[styles.input, styles.multiline]} placeholder="Description du groupe" placeholderTextColor={colors.textMuted} multiline maxLength={240} />
 
               <Text style={styles.fieldLabel}>Icône de remplacement</Text>
               <View style={styles.iconGrid}>
                 {GROUP_ICONS.map((icon) => {
                   const selected = iconName === icon;
                   return (
-                    <Pressable
-                      key={icon}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected }}
-                      onPress={() => { setIconName(icon); setSavedAt(null); }}
-                      style={[styles.iconChoice, selected && styles.iconChoiceSelected]}
-                    >
-                      <Ionicons
-                        name={icon}
-                        size={22}
-                        color={selected ? colors.orange : colors.textMuted}
-                      />
+                    <Pressable key={icon} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => { setIconName(icon); setSavedAt(null); }} style={[styles.iconChoice, selected && styles.iconChoiceSelected]}>
+                      <Ionicons name={icon} size={22} color={selected ? colors.orange : colors.textMuted} />
                     </Pressable>
                   );
                 })}
               </View>
 
-              <Text style={styles.fieldLabel}>Statuts autorisés</Text>
+              <Text style={styles.fieldLabel}>Statuts autorisés à voir le groupe</Text>
               <View style={styles.roles}>
                 {GROUP_VISIBILITY_ROLES.map((role) => {
                   const selected = allowedRoles.includes(role);
+                  const appearance = getRoleAppearance(role);
                   return (
                     <Pressable
                       key={role}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: selected }}
                       onPress={() => toggleRole(role)}
-                      style={[styles.roleChip, selected && styles.roleChipSelected]}
+                      style={[
+                        styles.roleChip,
+                        { borderColor: appearance.border, backgroundColor: selected ? appearance.background : colors.surfaceStrong }
+                      ]}
                     >
-                      <Text style={[styles.roleText, selected && styles.roleTextSelected]}>
-                        {ROLE_LABELS[role]}
-                      </Text>
+                      <Text style={[styles.roleText, { color: selected ? appearance.foreground : colors.textMuted }]}>{ROLE_LABELS[role]}</Text>
                     </Pressable>
                   );
                 })}
@@ -539,20 +612,26 @@ export default function GroupSettingsScreen() {
 
               <View style={styles.switchRow}>
                 <View style={styles.switchContent}>
-                  <Text style={styles.switchTitle}>Les membres peuvent publier</Text>
-                  <Text style={styles.switchSubtitle}>
-                    Sinon, l’écriture est réservée aux Visionnaires autorisés.
-                  </Text>
+                  <Text style={styles.switchTitle}>Découverte par les comptes Free</Text>
+                  <Text style={styles.switchSubtitle}>Ils peuvent voir le groupe, mais doivent passer Triton pour le rejoindre.</Text>
                 </View>
-                <Switch
-                  accessibilityLabel="Autoriser les membres à publier"
-                  style={styles.switchControl}
-                  value={membersCanPost}
-                  onValueChange={(value) => { setMembersCanPost(value); setSavedAt(null); }}
-                  trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
-                  thumbColor={colors.white}
-                />
+                <Switch accessibilityLabel="Autoriser la découverte du groupe aux comptes Free" value={allowFreeDiscovery} onValueChange={(value) => { setAllowFreeDiscovery(value); setSavedAt(null); }} trackColor={{ false: colors.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
               </View>
+
+              {!isAnnouncement ? (
+                <View style={styles.switchRow}>
+                  <View style={styles.switchContent}>
+                    <Text style={styles.switchTitle}>Les membres peuvent publier</Text>
+                    <Text style={styles.switchSubtitle}>Sinon, l’écriture est limitée aux personnes autorisées par la gouvernance.</Text>
+                  </View>
+                  <Switch accessibilityLabel="Autoriser les membres à publier" value={membersCanPost} onValueChange={(value) => { setMembersCanPost(value); setSavedAt(null); }} trackColor={{ false: colors.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
+                </View>
+              ) : (
+                <View style={styles.lockedRule}>
+                  <Ionicons name="lock-closed" size={17} color={colors.orange} />
+                  <Text style={styles.lockedRuleText}>Les membres ne peuvent jamais répondre dans Annonces. Ils peuvent uniquement réagir.</Text>
+                </View>
+              )}
             </View>
           </>
         ) : null}
@@ -565,39 +644,46 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
   headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, textAlign: "center" },
+  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, minWidth: 0, textAlign: "center" },
   saveButton: { minWidth: 88, minHeight: 44, alignItems: "center", justifyContent: "center" },
-  saveDisabled: { opacity: 0.5 },
+  saveDisabled: { opacity: 0.45 },
   saveText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
-  content: { width: "100%", maxWidth: 720, alignSelf: "center" },
+  content: { width: "100%", maxWidth: 760, alignSelf: "center" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
+  title: { ...typography.heading2, color: colors.text, textAlign: "center" },
+  mutedText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
+  primaryAction: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  primaryActionText: { color: colors.white, fontWeight: "900" },
   savedBanner: { minHeight: 42, marginBottom: 6, paddingHorizontal: 12, borderRadius: 15, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   savedText: { color: colors.success, fontSize: 10, fontWeight: "900" },
-  identityCard: { padding: spacing.lg, alignItems: "center", gap: 6 },
+  identityCard: { paddingVertical: spacing.lg, alignItems: "center", gap: 6 },
   avatarShell: { width: 84, height: 84, borderRadius: 29, padding: 3 },
   avatarInner: { flex: 1, borderRadius: 26, overflow: "hidden", position: "relative", backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface },
   cropBadge: { position: "absolute", right: 4, bottom: 4, width: 28, height: 28, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.80)", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: "100%", height: "100%" },
   groupName: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 6 },
+  announcementBadge: { minHeight: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: "rgba(244,177,131,0.12)", borderWidth: 1, borderColor: "rgba(244,177,131,0.28)", flexDirection: "row", alignItems: "center", gap: 6 },
+  announcementText: { color: colors.orange, fontSize: 9, fontWeight: "900" },
   groupMeta: { ...typography.caption, color: colors.textMuted },
   description: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center", marginTop: 5, maxWidth: 440 },
-  quickActions: { flexDirection: "row", gap: 8, marginBottom: spacing.lg },
-  quickAction: { flex: 1, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 5 },
-  quickLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
+  quickAction: { flexGrow: 1, flexBasis: 145, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 5 },
+  quickLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
   dangerText: { color: colors.danger },
-  sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.sm, marginBottom: 8 },
-  panel: { borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, overflow: "hidden", marginBottom: spacing.lg },
-  memberRow: { minHeight: 68, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  memberDivider: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  memberAvatar: { width: 42, height: 42, borderRadius: 14, overflow: "hidden", backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  memberInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
-  memberContent: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  memberRole: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
-  adminBadge: { minHeight: 23, paddingHorizontal: 7, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  adminText: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
+  governanceNote: { minHeight: 58, padding: 12, borderRadius: 18, backgroundColor: "rgba(244,177,131,0.09)", borderWidth: 1, borderColor: "rgba(244,177,131,0.20)", flexDirection: "row", alignItems: "center", gap: 9 },
+  governanceText: { flex: 1, color: colors.textSecondary, fontSize: 9.5, lineHeight: 14, fontWeight: "700" },
+  sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.lg, marginBottom: 8 },
+  sectionHelp: { color: colors.textMuted, fontSize: 9.5, lineHeight: 14, marginTop: -3, marginBottom: 8 },
+  panel: { borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, overflow: "hidden" },
   emptyMembers: { color: colors.textMuted, textAlign: "center", padding: spacing.lg },
-  visionnaireNote: { minHeight: 52, padding: 11, borderRadius: 17, backgroundColor: "rgba(244,177,131,0.10)", flexDirection: "row", alignItems: "center", gap: 8 },
-  visionnaireText: { flex: 1, color: colors.textSecondary, fontSize: 10, lineHeight: 14, fontWeight: "800" },
+  publisherRow: { minHeight: 72, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  divider: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  publisherAvatar: { width: 44, height: 44, borderRadius: 15, borderWidth: 2, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  publisherInitials: { fontSize: 10, fontWeight: "900" },
+  publisherContent: { flex: 1, minWidth: 0, alignItems: "flex-start", gap: 5 },
+  publisherName: { color: colors.text, fontSize: 12, fontWeight: "900" },
+  check: { width: 30, height: 30, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  checkSelected: { borderColor: colors.violet, backgroundColor: colors.violet },
   panelForm: { padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, marginBottom: spacing.lg },
   fieldLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 10, marginBottom: 6 },
   input: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, ...typography.bodySmall },
@@ -606,18 +692,12 @@ const styles = StyleSheet.create({
   iconChoice: { width: 48, height: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
   iconChoiceSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.2)" },
   roles: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  roleChip: { minHeight: 44, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  roleChipSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
-  roleText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
-  roleTextSelected: { color: colors.text },
-  switchRow: { minHeight: 72, marginTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
+  roleChip: { minHeight: 44, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  roleText: { fontSize: 10, fontWeight: "900" },
+  switchRow: { minHeight: 76, marginTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   switchContent: { flex: 1, minWidth: 0 },
   switchTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
   switchSubtitle: { color: colors.textMuted, fontSize: 9.5, lineHeight: 14, marginTop: 3 },
-  switchControl: { width: 48, height: 44 },
-  missing: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
-  title: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  mutedText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
-  primaryAction: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
-  primaryActionText: { color: colors.white, fontWeight: "900" }
+  lockedRule: { minHeight: 56, marginTop: spacing.md, padding: 11, borderRadius: 16, backgroundColor: "rgba(244,177,131,0.09)", flexDirection: "row", alignItems: "center", gap: 8 },
+  lockedRuleText: { flex: 1, color: colors.textSecondary, fontSize: 9.5, lineHeight: 14 }
 });
