@@ -5,6 +5,7 @@ export type CanonicalUserRole =
   | "legende"
   | "moussaillon"
   | "triton"
+  | "allie"
   | "free"
   | "admin";
 
@@ -12,7 +13,8 @@ export type LegacyUserRole =
   | "member"
   | "captain"
   | "admiral"
-  | "visionary";
+  | "visionary"
+  | "ally";
 
 export type UserRole = CanonicalUserRole | LegacyUserRole;
 
@@ -90,7 +92,12 @@ export interface Conversation {
   /** Membres les plus actifs, ordonnés par activité récente côté serveur. */
   activeMemberIds?: string[];
   ownerId?: string;
+  /** Responsables opérationnels du groupe. Visionnaires implicites sur tous les groupes. */
   adminIds?: string[];
+  /** Amiraux ou Capitaines explicitement autorisés à publier dans Annonce. */
+  announcementPublisherIds?: string[];
+  /** Le groupe est visible aux Free, mais l’adhésion exige une montée Triton. */
+  allowFreeDiscovery?: boolean;
   muted?: boolean;
   archived?: boolean;
   left?: boolean;
@@ -186,14 +193,21 @@ export interface ModerationDecision {
   requiresManualReview?: boolean;
 }
 
+export type ScheduleFrequency = "once" | "daily" | "weekly" | "monthly";
+
 export interface ScheduledMessage {
   id: string;
   conversationId: string;
+  name: string;
   body: string;
   attachments?: MessageAttachment[];
   scheduledFor: string;
+  frequency: ScheduleFrequency;
+  enabled: boolean;
   createdByUserId: string;
-  status: "scheduled" | "sending" | "sent" | "cancelled" | "failed";
+  createdByName?: string;
+  updatedByUserId?: string;
+  status: "scheduled" | "paused" | "sending" | "sent" | "cancelled" | "failed";
 }
 
 export interface ChatMessage {
