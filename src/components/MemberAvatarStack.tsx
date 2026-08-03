@@ -1,5 +1,6 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 
+import { getRoleAppearance } from "../domain/roleAppearance";
 import { colors } from "../theme";
 import type { AppUser } from "../types/messaging";
 
@@ -41,34 +42,47 @@ export function MemberAvatarStack({
   return (
     <View
       accessible
-      accessibilityLabel={`${memberCount} membre${memberCount > 1 ? "s" : ""}`}
+      accessibilityLabel={`${memberCount} membre${memberCount > 1 ? "s" : ""}. Les contours indiquent les statuts Neptune.`}
       style={styles.row}
     >
       <View style={styles.stack}>
-        {resolvedMembers.map((member, index) => (
-          <View
-            key={member.id}
-            style={[
-              styles.avatar,
-              {
-                width: size,
-                height: size,
-                borderRadius: Math.round(size * 0.38),
-                marginLeft: index === 0 ? 0 : -overlap,
-                zIndex: visibleLimit - index,
-                transform: [{ translateY: index % 2 === 0 ? 0 : 1 }]
-              }
-            ]}
-          >
-            {member.avatarUrl ? (
-              <Image source={{ uri: member.avatarUrl }} style={styles.image} />
-            ) : (
-              <Text style={[styles.initials, { fontSize: Math.max(7, size * 0.31) }]}>
-                {member.initials}
-              </Text>
-            )}
-          </View>
-        ))}
+        {resolvedMembers.map((member, index) => {
+          const appearance = getRoleAppearance(member.role);
+          return (
+            <View
+              key={member.id}
+              style={[
+                styles.avatar,
+                {
+                  width: size,
+                  height: size,
+                  borderRadius: Math.round(size * 0.38),
+                  marginLeft: index === 0 ? 0 : -overlap,
+                  zIndex: visibleLimit - index,
+                  transform: [{ translateY: index % 2 === 0 ? 0 : 1 }],
+                  borderColor: appearance.foreground,
+                  backgroundColor: appearance.background
+                }
+              ]}
+            >
+              {member.avatarUrl ? (
+                <Image source={{ uri: member.avatarUrl }} style={styles.image} />
+              ) : (
+                <Text
+                  style={[
+                    styles.initials,
+                    {
+                      fontSize: Math.max(7, size * 0.31),
+                      color: appearance.foreground
+                    }
+                  ]}
+                >
+                  {member.initials}
+                </Text>
+              )}
+            </View>
+          );
+        })}
         {resolvedMembers.length === 0 ? (
           <View
             style={[
@@ -115,13 +129,12 @@ const styles = StyleSheet.create({
   avatar: {
     overflow: "hidden",
     borderWidth: 2,
-    borderColor: colors.navyLight,
     backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center"
   },
-  emptyAvatar: { backgroundColor: colors.surfaceStrong },
-  overflowAvatar: { backgroundColor: colors.surfaceStrong },
+  emptyAvatar: { backgroundColor: colors.surfaceStrong, borderColor: colors.navyLight },
+  overflowAvatar: { backgroundColor: colors.surfaceStrong, borderColor: colors.navyLight },
   image: { width: "100%", height: "100%" },
   initials: { color: colors.text, fontWeight: "900" },
   overflowText: { color: colors.textSecondary, fontWeight: "900" },
