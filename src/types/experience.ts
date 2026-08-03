@@ -16,6 +16,9 @@ export interface GroupDraft {
   iconName?: string;
   allowedRoles: UserRole[];
   canMembersPost: boolean;
+  adminIds?: string[];
+  announcementPublisherIds?: string[];
+  allowFreeDiscovery?: boolean;
 }
 
 export interface PrivateConversationDraft {
