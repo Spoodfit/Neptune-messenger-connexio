@@ -1,4 +1,5 @@
-import { Image, StyleSheet, View } from "react-native";
+import { createElement } from "react";
+import { Image, Platform, StyleSheet, View } from "react-native";
 
 import { NEPTUNE_LOGO_DATA_URI } from "../assets/neptuneLogo";
 
@@ -13,11 +14,28 @@ export function NeptuneMark({ size = 56 }: NeptuneMarkProps) {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <Image
-        source={{ uri: NEPTUNE_LOGO_DATA_URI }}
-        resizeMode="contain"
-        style={styles.logo}
-      />
+      {Platform.OS === "web"
+        ? createElement("img", {
+            src: NEPTUNE_LOGO_DATA_URI,
+            alt: "",
+            draggable: false,
+            "aria-hidden": true,
+            style: {
+              width: "100%",
+              height: "100%",
+              display: "block",
+              objectFit: "contain",
+              userSelect: "none",
+              pointerEvents: "none"
+            }
+          })
+        : (
+            <Image
+              source={{ uri: NEPTUNE_LOGO_DATA_URI }}
+              resizeMode="contain"
+              style={styles.logo}
+            />
+          )}
     </View>
   );
 }
