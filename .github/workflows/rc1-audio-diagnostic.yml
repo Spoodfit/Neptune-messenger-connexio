@@ -41,5 +41,15 @@ jobs:
                   print(label, "decoded", len(decoded), decoded[:12])
               except Exception as exc:
                   print(label, "ERROR", repr(exc))
-                  raise
           PY
+      - name: Package exact Git payloads
+        run: |
+          mkdir -p /tmp/rc1-audio-payloads
+          cp scripts/.rc1_ringtone.*.b64 scripts/.rc1_notification.*.b64 /tmp/rc1-audio-payloads/
+      - name: Upload exact Git payloads
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc1-audio-payloads
+          path: /tmp/rc1-audio-payloads
+          if-no-files-found: error
+          retention-days: 1
