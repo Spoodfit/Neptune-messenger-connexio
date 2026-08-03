@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - feat/v14-ux-calls-moderation
-    paths:
-      - .github/workflows/deploy-v14-preview-pages.yml
   workflow_dispatch:
 
 permissions:
