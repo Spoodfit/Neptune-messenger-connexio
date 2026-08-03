@@ -16,4 +16,10 @@ if start < 0 or end < 0:
 # one-time rewrite prevents the staging script from reapplying obsolete
 # string patches to an already hardened service.
 source = source[:start] + source[end:]
-exec(compile(source, str(script_path), "exec"), {"__name__": "__main__"})
+exec(
+    compile(source, str(script_path), "exec"),
+    {
+        "__name__": "__main__",
+        "__file__": str(script_path)
+    }
+)
