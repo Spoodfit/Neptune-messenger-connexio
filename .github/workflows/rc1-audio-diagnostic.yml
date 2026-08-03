@@ -1,0 +1,45 @@
+name: RC1 audio diagnostic
+
+on:
+  pull_request:
+    branches:
+      - feat/v14-ux-calls-moderation
+    paths:
+      - .github/workflows/rc1-audio-diagnostic.yml
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+      - name: Inspect payloads
+        run: |
+          python - <<'PY'
+          import base64
+          import re
+          from pathlib import Path
+          paths = [
+              ("scripts/.rc1_ringtone.00.b64", 8000),
+              ("scripts/.rc1_ringtone.01.b64", 8000),
+              ("scripts/.rc1_ringtone.02.b64", 6348),
+              ("scripts/.rc1_notification.00.b64", 6188),
+          ]
+          for path, expected in paths:
+              raw = Path(path).read_text(encoding="utf-8")
+              compact = "".join(raw.split())
+              bad = [(index, char) for index, char in enumerate(compact) if not re.fullmatch(r"[A-Za-z0-9+/=]", char)]
+              print(path, "raw", len(raw), "compact", len(compact), "expected", expected, "bad", bad[:8])
+          ring = "".join("".join(Path(path).read_text(encoding="utf-8").split()) for path, _ in paths[:3])
+          notif = "".join(Path(paths[3][0]).read_text(encoding="utf-8").split())
+          print("ring total", len(ring), "mod4", len(ring) % 4)
+          print("notif total", len(notif), "mod4", len(notif) % 4)
+          for label, payload in (("ring", ring), ("notif", notif)):
+              try:
+                  decoded = base64.b64decode(payload, validate=True)
+                  print(label, "decoded", len(decoded), decoded[:12])
+              except Exception as exc:
+                  print(label, "ERROR", repr(exc))
+                  raise
+          PY
