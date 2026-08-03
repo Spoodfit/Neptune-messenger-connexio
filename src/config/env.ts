@@ -4,7 +4,12 @@ interface AppExtra {
   apiBaseUrl?: string;
   realtimeUrl?: string;
   businessWebBaseUrl?: string;
+  privacyPolicyUrl?: string;
+  accountDeletionUrl?: string;
+  supportUrl?: string;
   mockMode?: boolean;
+  buildProfile?: string;
+  releaseStage?: "development" | "preview" | "release-candidate" | "production";
   eas?: {
     projectId?: string;
   };
@@ -17,6 +22,11 @@ export const env = {
   realtimeUrl: extra.realtimeUrl ?? "",
   businessWebBaseUrl:
     extra.businessWebBaseUrl ?? "https://neptunebusiness.com",
+  privacyPolicyUrl: extra.privacyPolicyUrl ?? "",
+  accountDeletionUrl: extra.accountDeletionUrl ?? "",
+  supportUrl: extra.supportUrl ?? "mailto:contact@neptunebusiness.com",
   mockMode: extra.mockMode === true,
+  buildProfile: extra.buildProfile ?? "development",
+  releaseStage: extra.releaseStage ?? "development",
   easProjectId: extra.eas?.projectId ?? Constants.easConfig?.projectId ?? ""
 } as const;
