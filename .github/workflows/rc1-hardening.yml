@@ -32,10 +32,12 @@ jobs:
           node-version: "22.13"
           cache: npm
 
-      - name: Install native asset tools
+      - name: Prepare native asset tools
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y imagemagick file python3-pil >/dev/null
+          command -v convert
+          command -v file
+          python -m pip install --user --disable-pip-version-check "pillow==11.3.0"
+          python -c "from PIL import Image; print('Pillow', Image.__version__)"
 
       - name: Restore and verify user-provided sounds
         run: |
