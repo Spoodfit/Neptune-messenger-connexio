@@ -117,8 +117,9 @@ jobs:
 
       - name: Apply RC product and architecture hardening
         run: |
-          python -m py_compile scripts/rc1_apply.py
-          python scripts/rc1_apply.py
+          python -m py_compile scripts/rc1_apply.py scripts/rc1_runner.py scripts/rc1_postfix.py
+          python scripts/rc1_runner.py
+          python scripts/rc1_postfix.py
 
       - name: Update locked dependency metadata
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
@@ -172,7 +173,8 @@ jobs:
           git rm -f --ignore-unmatch .github/workflows/v14-governance-pass.yml
           git rm -f --ignore-unmatch .github/workflows/rc1-hardening.yml
           git rm -f --ignore-unmatch .github/workflows/rc1-audio-diagnostic.yml
-          git rm -f --ignore-unmatch scripts/rc1_apply.py
+          git rm -f --ignore-unmatch .github/workflows/rc1-wire-runner.yml
+          git rm -f --ignore-unmatch scripts/rc1_apply.py scripts/rc1_runner.py scripts/rc1_postfix.py
           git rm -f --ignore-unmatch scripts/.rc1_*.b64
           git rm -f --ignore-unmatch scripts/.tmp_* scripts/.tmp* scripts/.native_* scripts/.native* || true
           rm -rf ios android dist .test-dist
