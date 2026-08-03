@@ -66,11 +66,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     userInterfaceStyle: "dark",
     backgroundColor: "#020713",
     icon: "./assets/icon.png",
-    splash: {
-      image: "./assets/splash-icon.png",
-      resizeMode: "contain",
-      backgroundColor: "#020713"
-    },
     web: {
       bundler: "metro",
       output: "single",
@@ -141,6 +136,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/splash-icon.png",
+          imageWidth: 220,
+          resizeMode: "contain",
+          backgroundColor: "#020713",
+          dark: {
+            image: "./assets/splash-icon.png",
+            backgroundColor: "#020713"
+          }
+        }
+      ],
       "expo-audio",
       [
         "expo-speech-recognition",
