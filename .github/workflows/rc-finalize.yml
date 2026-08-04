@@ -5,7 +5,7 @@ on:
     paths:
       - .github/workflows/rc-finalize.yml
       - scripts/rc-finalize.py
-      - assets/audio/connexio-notification.mp3.b64
+      - assets/audio/connexio-notification.*.b64
 
 permissions:
   contents: write
@@ -25,8 +25,10 @@ jobs:
           cache: npm
       - name: Restore and verify provided notification sound
         run: |
-          base64 --decode assets/audio/connexio-notification.mp3.b64 > assets/audio/connexio-notification.mp3
-          echo "053a2fe627916e048af1ce04b356988f3844754f370ea169f16bdf8f72eb0d07  assets/audio/connexio-notification.mp3" | sha256sum --check --strict
+          cat assets/audio/connexio-notification.0{0,1,2,3,4,5,6,7,8}.b64 \
+            | base64 --decode > assets/audio/connexio-notification.mp3
+          echo "053a2fe627916e048af1ce04b356988f3844754f370ea169f16bdf8f72eb0d07  assets/audio/connexio-notification.mp3" \
+            | sha256sum --check --strict
           file assets/audio/connexio-notification.mp3
       - name: Apply final functional and store pass
         run: |
@@ -39,7 +41,8 @@ jobs:
           rm -f scripts/rc-finalize.py \
                 .github/workflows/rc-finalize.yml \
                 docs/RC1_WORK_IN_PROGRESS.md \
-                assets/audio/connexio-notification.mp3.b64
+                assets/audio/connexio-notification.mp3.b64 \
+                assets/audio/connexio-notification.??.b64
       - name: Validate final source
         env:
           EAS_BUILD_PROFILE: release-candidate
