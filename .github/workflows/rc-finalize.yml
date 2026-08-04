@@ -26,6 +26,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check pillow==11.3.0
           cp scripts/rc-finalize.py /tmp/rc-finalize.py
+          sed -i 's#ROOT = Path(__file__).resolve().parents\[1\]#ROOT = Path.cwd()#' /tmp/rc-finalize.py
           python /tmp/rc-finalize.py
           rm -f scripts/rc-finalize.py .github/workflows/rc-finalize.yml docs/RC1_WORK_IN_PROGRESS.md
       - name: Validate final source
