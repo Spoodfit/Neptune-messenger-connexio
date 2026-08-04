@@ -1,0 +1,54 @@
+name: RC finalization
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/rc-finalize.yml
+      - scripts/rc-finalize.py
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+          cache: npm
+      - name: Apply final functional and store pass
+        run: |
+          python -m pip install --disable-pip-version-check pillow==11.3.0
+          cp scripts/rc-finalize.py /tmp/rc-finalize.py
+          python /tmp/rc-finalize.py
+          rm -f scripts/rc-finalize.py .github/workflows/rc-finalize.yml docs/RC1_WORK_IN_PROGRESS.md
+      - name: Validate final source
+        env:
+          EAS_BUILD_PROFILE: release-candidate
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusiness.com/suppression-compte
+          EXPO_PUBLIC_SUPPORT_URL: https://neptunebusiness.com/contact
+          EXPO_PUBLIC_MOCK_MODE: "false"
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify
+          npx expo install --check
+          npm run audit:rc
+          npx expo config --type public >/dev/null
+      - name: Commit validated RC finalization
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(rc): finalize access policies UI and store assets"
+          git push origin HEAD:release/connexio-rc1
