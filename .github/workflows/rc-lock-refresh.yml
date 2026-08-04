@@ -11,7 +11,7 @@ permissions:
 jobs:
   refresh-lockfile:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,11 +20,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22.13.1"
-          cache: npm
-      - name: Regenerate lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Rebuild lockfile from scratch
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Verify clean install and Expo compatibility
         run: |
+          rm -rf node_modules
           npm ci --ignore-scripts --no-audit --no-fund
           npx expo install --check
       - name: Commit lockfile and remove temporary workflow
@@ -33,5 +35,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           rm -f .github/workflows/rc-lock-refresh.yml
           git add package-lock.json .github/workflows/rc-lock-refresh.yml
-          git commit -m "chore(rc): synchronize Expo dependency lockfile"
+          git commit -m "chore(rc): rebuild Expo dependency lockfile"
           git push origin HEAD:release/connexio-rc1
