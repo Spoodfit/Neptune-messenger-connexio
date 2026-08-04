@@ -54,10 +54,13 @@ jobs:
           python /tmp/rc-finalize.py
           rm -f scripts/rc-finalize.py \
                 .github/workflows/rc-finalize.yml \
+                .github/workflows/v14-governance-pass.yml \
                 docs/RC1_WORK_IN_PROGRESS.md \
                 assets/audio/connexio-notification.mp3.b64 \
                 assets/audio/connexio-notification.??.b64 \
-                assets/audio/connexio-notification.08.gz.b64
+                assets/audio/connexio-notification.08.gz.b64 \
+                scripts/.tmp_* \
+                scripts/.native_*
       - name: Validate final source
         env:
           EAS_BUILD_PROFILE: release-candidate
