@@ -23,7 +23,7 @@ test("une automatisation valide est normalisée", () => {
     scheduledFor: "2026-08-03T08:00:00.000Z",
     createdByUserId: "captain-1",
     createdByName: "Capitaine Neptune",
-    recurrence: "daily",
+    frequency: "daily",
     role: "capitaine",
     canManageConversation: true,
     now: new Date("2026-08-02T08:00:00.000Z")
@@ -31,7 +31,7 @@ test("une automatisation valide est normalisée", () => {
   assert.equal(scheduled.name, "Rappel atelier");
   assert.equal(scheduled.body, "Rappel : atelier demain à 9 h.");
   assert.equal(scheduled.createdByName, "Capitaine Neptune");
-  assert.equal(scheduled.recurrence, "daily");
+  assert.equal(scheduled.frequency, "daily");
   assert.equal(scheduled.enabled, true);
   assert.equal(scheduled.status, "scheduled");
 });
