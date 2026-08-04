@@ -25,6 +25,18 @@ jobs:
           cache: npm
       - name: Restore and verify provided notification sound
         run: |
+          cat > /tmp/notif-chunks.sha256 <<'HASHES'
+          f9579508ada3863d0363b38644c7e465b7ae215a9b9f51085980a17ed074c020  assets/audio/connexio-notification.00.b64
+          905b8cdd22671cedc50021a55cada11854c3a9ebcf574c29a69ee8f7f8119f81  assets/audio/connexio-notification.01.b64
+          9f8307193b39f258b9558a3ba0ad3abeb2d459b41b21dc8d8f8dfd27c495d7d5  assets/audio/connexio-notification.02.b64
+          b3e37d9e71099d155ebf5c13b257d9e4348812d3f977708bf36da0477df2f455  assets/audio/connexio-notification.03.b64
+          ff3332a07a6dd7a7bf00031eed0266db6fda09ae58f04008a307cc2d99473e00  assets/audio/connexio-notification.04.b64
+          d01a6f5cb9911cfba43881a417383d247e39df42ba72e4a8035badddb888cd37  assets/audio/connexio-notification.05.b64
+          80e079297f2413bcbd1fff263e33e977cb2a163a3a7bf8e72d48cfc3cb5cecc2  assets/audio/connexio-notification.06.b64
+          15b1107341563c080f2ec9f672c77d359828223e68f13e6a03e0bdc19db97092  assets/audio/connexio-notification.07.b64
+          2d6c95dd438093fd78774472edecb8e014cc03a72994c1c7295544d32a87af05  assets/audio/connexio-notification.08.b64
+          HASHES
+          sha256sum --check --strict /tmp/notif-chunks.sha256
           cat assets/audio/connexio-notification.0{0,1,2,3,4,5,6,7,8}.b64 \
             | base64 --decode > assets/audio/connexio-notification.mp3
           echo "053a2fe627916e048af1ce04b356988f3844754f370ea169f16bdf8f72eb0d07  assets/audio/connexio-notification.mp3" \
