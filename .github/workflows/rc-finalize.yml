@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - name: Restore and verify provided notification sound
         run: |
+          base64 --decode assets/audio/connexio-notification.08.gz.b64 \
+            | gzip --decompress > assets/audio/connexio-notification.08.b64
           cat > /tmp/notif-chunks.sha256 <<'HASHES'
           f9579508ada3863d0363b38644c7e465b7ae215a9b9f51085980a17ed074c020  assets/audio/connexio-notification.00.b64
           905b8cdd22671cedc50021a55cada11854c3a9ebcf574c29a69ee8f7f8119f81  assets/audio/connexio-notification.01.b64
@@ -54,7 +56,8 @@ jobs:
                 .github/workflows/rc-finalize.yml \
                 docs/RC1_WORK_IN_PROGRESS.md \
                 assets/audio/connexio-notification.mp3.b64 \
-                assets/audio/connexio-notification.??.b64
+                assets/audio/connexio-notification.??.b64 \
+                assets/audio/connexio-notification.08.gz.b64
       - name: Validate final source
         env:
           EAS_BUILD_PROFILE: release-candidate
