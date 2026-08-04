@@ -35,5 +35,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           rm -f .github/workflows/rc-lock-refresh.yml
           git add package-lock.json .github/workflows/rc-lock-refresh.yml
-          git commit -m "chore(rc): rebuild Expo dependency lockfile"
+          git commit -m "chore(rc): lock Expo and worklets dependencies"
           git push origin HEAD:release/connexio-rc1
