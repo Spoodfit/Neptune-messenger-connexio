@@ -28,6 +28,7 @@ jobs:
           cp scripts/rc-finalize.py /tmp/rc-finalize.py
           sed -i 's#ROOT = Path(__file__).resolve().parents\[1\]#ROOT = Path.cwd()#' /tmp/rc-finalize.py
           sed -i '/from PIL import Image, ImageOps/a from PIL import ImageFile\nImageFile.LOAD_TRUNCATED_IMAGES = True' /tmp/rc-finalize.py
+          sed -i 's#<StatusAvatar member={member} size={104} borderWidth={4} />#<StatusAvatar user={member} size={104} showBadge />#' /tmp/rc-finalize.py
           python /tmp/rc-finalize.py
           rm -f scripts/rc-finalize.py .github/workflows/rc-finalize.yml docs/RC1_WORK_IN_PROGRESS.md
       - name: Validate final source
