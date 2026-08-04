@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22.13.1"
-      - name: Rebuild lockfile from scratch
+      - name: Rebuild canonical lockfile
         run: |
           rm -rf node_modules package-lock.json
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
@@ -35,5 +35,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           rm -f .github/workflows/rc-lock-refresh.yml
           git add package-lock.json .github/workflows/rc-lock-refresh.yml
-          git commit -m "chore(rc): lock Expo and worklets dependencies"
+          git commit -m "chore(rc): finalize Expo SDK 57 lockfile"
           git push origin HEAD:release/connexio-rc1
