@@ -31,12 +31,13 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
-      - name: Harden generated message status import
+      - name: Harden generated status and mention behavior
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path('scripts/rc1_finalize_status_sounds.sh')
           text = path.read_text(encoding='utf-8')
+
           old = "message_bubble.write_text(text, encoding='utf-8')"
           new = '''if 'getRoleAppearance(' in text and 'domain/roleAppearance' not in text:
               marker = 'import { colors, gradients, spacing, typography } from "../theme";\\n'
@@ -50,7 +51,50 @@ jobs:
           message_bubble.write_text(text, encoding='utf-8')'''
           if text.count(old) != 1:
               raise SystemExit('Point de durcissement MessageBubble ambigu.')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          text = text.replace(old, new, 1)
+
+          npm_anchor = '\nnpm ci --no-audit --no-fund\n'
+          provider_fix = r'''
+          python - <<'PY2'
+          from pathlib import Path
+          import re
+
+          path = Path('src/providers/MessagingProvider.tsx')
+          source = path.read_text(encoding='utf-8')
+
+          if 'void playMention();' not in source:
+              pattern = re.compile(r'import \{(?P<names>[^}]*)\} from "\.\./services/audio/actionSounds";', re.S)
+              match = pattern.search(source)
+              if match:
+                  names = [name.strip() for name in match.group('names').split(',') if name.strip()]
+                  if 'playMention' not in names:
+                      names.append('playMention')
+                  replacement = 'import { ' + ', '.join(sorted(set(names))) + ' } from "../services/audio/actionSounds";'
+                  source = source[:match.start()] + replacement + source[match.end():]
+              else:
+                  marker = 'import { NeptuneMessagingApi } from "../services/api/neptuneApi";\n'
+                  if marker not in source:
+                      raise SystemExit('Point d’insertion audio du provider introuvable.')
+                  source = source.replace(
+                      marker,
+                      marker + 'import { playMention } from "../services/audio/actionSounds";\n',
+                      1,
+                  )
+
+              event_anchor = '        const isNewMessage = !hasKnownMessage(knownMessageKeys, event.payload);\n'
+              if event_anchor not in source:
+                  raise SystemExit('Point de branchement de la mention temps réel introuvable.')
+              mention_logic = '''        if (\n          event.type === "message.created" &&\n          isNewMessage &&\n          event.payload.senderId !== currentUser.id &&\n          event.payload.mentionedUserIds?.includes(currentUser.id)\n        ) {\n          void playMention();\n        }\n'''
+              source = source.replace(event_anchor, event_anchor + mention_logic, 1)
+
+          path.write_text(source, encoding='utf-8')
+          PY2
+          '''
+          if text.count(npm_anchor) != 1:
+              raise SystemExit('Point d’insertion du correctif mention ambigu.')
+          text = text.replace(npm_anchor, '\n' + provider_fix + npm_anchor, 1)
+          text = text.replace("'playMention' in provider", "'void playMention();' in provider")
+          path.write_text(text, encoding='utf-8')
           PY
       - name: Apply, audit and publish validated RC1
         run: bash scripts/rc1_finalize_status_sounds.sh
