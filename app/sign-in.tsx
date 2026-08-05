@@ -51,13 +51,21 @@ export default function SignInScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submittingRef = useRef(false);
 
   const submit = async () => {
     const cleanEmail = email.trim();
-    if (submittingRef.current || !cleanEmail || !password) return;
+    if (
+      submittingRef.current ||
+      !cleanEmail ||
+      !password ||
+      !termsAccepted
+    ) {
+      return;
+    }
     submittingRef.current = true;
     setLoading(true);
     setError(null);
@@ -92,6 +100,11 @@ export default function SignInScreen() {
     void Linking.openURL(
       `${env.businessWebBaseUrl.replace(/\/$/, "")}/register`
     );
+
+  const openTerms = () => void Linking.openURL(env.termsUrl);
+
+  const loginDisabled =
+    loading || !email.trim() || !password || !termsAccepted;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -176,6 +189,42 @@ export default function SignInScreen() {
               </Pressable>
             </View>
 
+            <View style={styles.termsCard}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel="Accepter les conditions d’utilisation"
+                accessibilityState={{ checked: termsAccepted }}
+                onPress={() => setTermsAccepted((value) => !value)}
+                style={styles.termsCheckTarget}
+              >
+                <View
+                  style={[
+                    styles.termsCheck,
+                    termsAccepted && styles.termsCheckSelected
+                  ]}
+                >
+                  {termsAccepted ? (
+                    <Ionicons name="checkmark" size={20} color={colors.white} />
+                  ) : null}
+                </View>
+              </Pressable>
+              <View style={styles.termsCopy}>
+                <Text style={styles.termsText}>
+                  Je confirme avoir lu et j’accepte les règles d’utilisation de Connexio avant d’envoyer ou de publier du contenu.
+                </Text>
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel="Lire les conditions d’utilisation Neptune"
+                  onPress={openTerms}
+                  style={styles.termsLink}
+                >
+                  <Text style={styles.termsLinkText}>
+                    Lire les conditions d’utilisation
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
             {error ? (
               <Text
                 accessibilityRole="alert"
@@ -190,15 +239,15 @@ export default function SignInScreen() {
               accessibilityRole="button"
               accessibilityLabel="Se connecter avec Neptune"
               accessibilityState={{
-                disabled: loading || !email.trim() || !password,
+                disabled: loginDisabled,
                 busy: loading
               }}
-              disabled={loading || !email.trim() || !password}
+              disabled={loginDisabled}
               onPress={() => void submit()}
               style={({ pressed }) => [
                 styles.button,
                 pressed && styles.pressed,
-                (loading || !email.trim() || !password) && styles.disabled
+                loginDisabled && styles.disabled
               ]}
             >
               <LinearGradient colors={gradients.primary} style={styles.buttonGradient}>
@@ -275,34 +324,214 @@ const styles = StyleSheet.create({
   keyboard: { flex: 1 },
   content: { flexGrow: 1, justifyContent: "center", padding: spacing.lg },
   form: { width: "100%", maxWidth: 520, alignSelf: "center" },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: spacing.xl },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    marginBottom: spacing.xl
+  },
   brandText: { minWidth: 0 },
-  brandName: { color: colors.text, fontSize: 24, lineHeight: 27, fontWeight: "900", letterSpacing: 1.7 },
-  brandSignature: { color: colors.orange, fontSize: 11, fontWeight: "800", marginTop: 1 },
+  brandName: {
+    color: colors.text,
+    fontSize: 24,
+    lineHeight: 27,
+    fontWeight: "900",
+    letterSpacing: 1.7
+  },
+  brandSignature: {
+    color: colors.orange,
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 1
+  },
   title: { ...typography.display, color: colors.white },
-  description: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.lg },
-  label: { color: colors.textSecondary, fontSize: 11, fontWeight: "900", marginBottom: 6, marginTop: 9 },
-  inputWrap: { minHeight: 54, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, paddingLeft: spacing.md, flexDirection: "row", alignItems: "center", gap: 8 },
-  input: { flex: 1, minWidth: 0, minHeight: 52, color: colors.text, ...typography.body },
-  eyeButton: { width: 48, height: 52, alignItems: "center", justifyContent: "center" },
-  error: { color: colors.danger, marginTop: spacing.sm, ...typography.bodySmall },
-  button: { minHeight: 54, marginTop: spacing.lg, borderRadius: radii.lg, overflow: "hidden" },
-  buttonGradient: { minHeight: 54, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  buttonText: { color: colors.white, fontWeight: "900", fontSize: 16, textAlign: "center" },
+  description: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg
+  },
+  label: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "900",
+    marginBottom: 6,
+    marginTop: 9
+  },
+  inputWrap: {
+    minHeight: 54,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    paddingLeft: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  input: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 52,
+    color: colors.text,
+    ...typography.body
+  },
+  eyeButton: {
+    width: 48,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  termsCard: {
+    minHeight: 112,
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm
+  },
+  termsCheckTarget: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  termsCheck: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.textMuted,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  termsCheckSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  termsCopy: { flex: 1, minWidth: 0 },
+  termsText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20
+  },
+  termsLink: {
+    alignSelf: "flex-start",
+    minHeight: 48,
+    justifyContent: "center",
+    paddingRight: spacing.sm
+  },
+  termsLinkText: {
+    color: colors.orange,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "900",
+    textDecorationLine: "underline"
+  },
+  error: {
+    color: colors.danger,
+    marginTop: spacing.sm,
+    ...typography.bodySmall
+  },
+  button: {
+    minHeight: 54,
+    marginTop: spacing.lg,
+    borderRadius: radii.lg,
+    overflow: "hidden"
+  },
+  buttonGradient: {
+    minHeight: 54,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  buttonText: {
+    color: colors.white,
+    fontWeight: "900",
+    fontSize: 16,
+    textAlign: "center"
+  },
   pressed: { transform: [{ scale: 0.985 }], opacity: 0.9 },
   disabled: { opacity: 0.48 },
-  registerCard: { minHeight: 78, marginTop: spacing.md, padding: 11, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 10 },
-  registerIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: "rgba(244,177,131,0.12)", alignItems: "center", justifyContent: "center" },
+  registerCard: {
+    minHeight: 78,
+    marginTop: spacing.md,
+    padding: 11,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
+  registerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "rgba(244,177,131,0.12)",
+    alignItems: "center",
+    justifyContent: "center"
+  },
   registerContent: { flex: 1, minWidth: 0 },
   registerTitle: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  registerText: { color: colors.textMuted, fontSize: 11, lineHeight: 13, marginTop: 3 },
-  registerButton: { minWidth: 58, minHeight: 48, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  registerButtonText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  separator: { marginVertical: spacing.md, flexDirection: "row", alignItems: "center", gap: 10 },
+  registerText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    lineHeight: 13,
+    marginTop: 3
+  },
+  registerButton: {
+    minWidth: 58,
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  registerButtonText: {
+    color: colors.orange,
+    fontSize: 11,
+    fontWeight: "900"
+  },
+  separator: {
+    marginVertical: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
   separatorLine: { flex: 1, height: 1, backgroundColor: colors.borderSoft },
   separatorText: { color: colors.textMuted, fontSize: 11, fontWeight: "700" },
-  demoButton: { minHeight: 50, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  demoButton: {
+    minHeight: 50,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
   demoText: { color: colors.text, fontSize: 14, fontWeight: "900" },
-  securityNote: { marginTop: spacing.lg, padding: 12, borderRadius: 16, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 9 },
-  securityText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 }
+  securityNote: {
+    marginTop: spacing.lg,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: colors.successSoft,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 9
+  },
+  securityText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    flex: 1
+  }
 });
