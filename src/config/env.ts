@@ -5,6 +5,7 @@ interface AppExtra {
   realtimeUrl?: string;
   businessWebBaseUrl?: string;
   privacyPolicyUrl?: string;
+  termsUrl?: string;
   accountDeletionUrl?: string;
   supportUrl?: string;
   mockMode?: boolean;
@@ -23,6 +24,9 @@ export const env = {
   businessWebBaseUrl:
     extra.businessWebBaseUrl ?? "https://neptunebusiness.com",
   privacyPolicyUrl: extra.privacyPolicyUrl ?? "",
+  termsUrl:
+    extra.termsUrl ??
+    "https://www.neptunebusiness.com/condition-generale-utilisation",
   accountDeletionUrl: extra.accountDeletionUrl ?? "",
   supportUrl: extra.supportUrl ?? "mailto:contact@neptunebusiness.com",
   mockMode: extra.mockMode === true,
