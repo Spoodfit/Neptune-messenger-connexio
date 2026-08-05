@@ -1,0 +1,263 @@
+name: Finalize RC1 UGC terms compliance
+
+on:
+  push:
+    branches:
+      - release/connexio-rc1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: connexio-rc1-terms-compliance
+  cancel-in-progress: false
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout RC1
+        uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Apply explicit terms acceptance
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str, label: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Point de patch introuvable ({label}) dans {path}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Runtime configuration.
+          replace_once(
+              'src/config/env.ts',
+              '  privacyPolicyUrl?: string;\n  accountDeletionUrl?: string;',
+              '  privacyPolicyUrl?: string;\n  termsUrl?: string;\n  accountDeletionUrl?: string;',
+              'interface terms URL',
+          )
+          replace_once(
+              'src/config/env.ts',
+              '  privacyPolicyUrl: extra.privacyPolicyUrl ?? "",\n  accountDeletionUrl:',
+              '  privacyPolicyUrl: extra.privacyPolicyUrl ?? "",\n  termsUrl:\n    extra.termsUrl ??\n    "https://www.neptunebusiness.com/condition-generale-utilisation",\n  accountDeletionUrl:',
+              'runtime terms URL',
+          )
+
+          # Expo store configuration gate.
+          replace_once(
+              'app.config.ts',
+              '  const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "";\n  const accountDeletionUrl =',
+              '  const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "";\n  const termsUrl =\n    process.env.EXPO_PUBLIC_TERMS_URL ??\n    "https://www.neptunebusiness.com/condition-generale-utilisation";\n  const accountDeletionUrl =',
+              'config terms URL',
+          )
+          replace_once(
+              'app.config.ts',
+              '      !privacyPolicyUrl && "EXPO_PUBLIC_PRIVACY_POLICY_URL",\n      !accountDeletionUrl',
+              '      !privacyPolicyUrl && "EXPO_PUBLIC_PRIVACY_POLICY_URL",\n      !termsUrl && "EXPO_PUBLIC_TERMS_URL",\n      !accountDeletionUrl',
+              'missing terms URL',
+          )
+          replace_once(
+              'app.config.ts',
+              '    requireHttps("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);\n    requireHttps("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);',
+              '    requireHttps("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);\n    requireHttps("EXPO_PUBLIC_TERMS_URL", termsUrl);\n    requireHttps("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);',
+              'HTTPS terms URL',
+          )
+          replace_once(
+              'app.config.ts',
+              '      privacyPolicyUrl,\n      accountDeletionUrl,',
+              '      privacyPolicyUrl,\n      termsUrl,\n      accountDeletionUrl,',
+              'extra terms URL',
+          )
+
+          # Mandatory UGC terms acceptance on sign-in.
+          replace_once(
+              'app/sign-in.tsx',
+              '  const [passwordVisible, setPasswordVisible] = useState(false);\n  const [loading, setLoading] = useState(false);',
+              '  const [passwordVisible, setPasswordVisible] = useState(false);\n  const [termsAccepted, setTermsAccepted] = useState(false);\n  const [loading, setLoading] = useState(false);',
+              'terms state',
+          )
+          replace_once(
+              'app/sign-in.tsx',
+              '    if (submittingRef.current || !cleanEmail || !password) return;',
+              '    if (submittingRef.current || !cleanEmail || !password || !termsAccepted) return;',
+              'submit terms gate',
+          )
+          replace_once(
+              'app/sign-in.tsx',
+              '  const openRegistration = () =>\n    void Linking.openURL(\n      `${env.businessWebBaseUrl.replace(/\\/$/, "")}/register`\n    );\n\n  return (',
+              '  const openRegistration = () =>\n    void Linking.openURL(\n      `${env.businessWebBaseUrl.replace(/\\/$/, "")}/register`\n    );\n\n  const openTerms = () => void Linking.openURL(env.termsUrl);\n\n  return (',
+              'terms link handler',
+          )
+          replace_once(
+              'app/sign-in.tsx',
+              '            {error ? (',
+              '''            <View style={styles.termsCard}>
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityLabel="Accepter les conditions d’utilisation"
+                accessibilityState={{ checked: termsAccepted }}
+                onPress={() => setTermsAccepted((value) => !value)}
+                style={styles.termsCheckTarget}
+              >
+                <View
+                  style={[
+                    styles.termsCheck,
+                    termsAccepted && styles.termsCheckSelected
+                  ]}
+                >
+                  {termsAccepted ? (
+                    <Ionicons name="checkmark" size={20} color={colors.white} />
+                  ) : null}
+                </View>
+              </Pressable>
+              <View style={styles.termsCopy}>
+                <Text style={styles.termsText}>
+                  Je confirme avoir lu et j’accepte les règles d’utilisation de Connexio avant d’envoyer ou de publier du contenu.
+                </Text>
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel="Lire les conditions d’utilisation Neptune"
+                  onPress={openTerms}
+                  style={styles.termsLink}
+                >
+                  <Text style={styles.termsLinkText}>
+                    Lire les conditions d’utilisation
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {error ? (''',
+              'terms acceptance UI',
+          )
+          replace_once(
+              'app/sign-in.tsx',
+              '                disabled: loading || !email.trim() || !password,',
+              '                disabled:\n                  loading || !email.trim() || !password || !termsAccepted,',
+              'accessibility terms disabled',
+          )
+          replace_once(
+              'app/sign-in.tsx',
+              '              disabled={loading || !email.trim() || !password}',
+              '              disabled={\n                loading || !email.trim() || !password || !termsAccepted\n              }',
+              'button terms disabled',
+          )
+          replace_once(
+              'app/sign-in.tsx',
+              '                (loading || !email.trim() || !password) && styles.disabled',
+              '                (loading ||\n                  !email.trim() ||\n                  !password ||\n                  !termsAccepted) &&\n                  styles.disabled',
+              'style terms disabled',
+          )
+          replace_once(
+              'app/sign-in.tsx',
+              '  error: { color: colors.danger, marginTop: spacing.sm, ...typography.bodySmall },',
+              '''  termsCard: {
+    minHeight: 96,
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm
+  },
+  termsCheckTarget: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  termsCheck: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.textMuted,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  termsCheckSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary
+  },
+  termsCopy: { flex: 1, minWidth: 0 },
+  termsText: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  termsLink: {
+    alignSelf: "flex-start",
+    minHeight: 48,
+    justifyContent: "center",
+    paddingRight: spacing.sm
+  },
+  termsLinkText: {
+    color: colors.orange,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "900",
+    textDecorationLine: "underline"
+  },
+  error: { color: colors.danger, marginTop: spacing.sm, ...typography.bodySmall },''',
+              'terms styles',
+          )
+
+          # Document and CI environment.
+          env_path = Path('.env.example')
+          env_text = env_path.read_text(encoding='utf-8')
+          if 'EXPO_PUBLIC_TERMS_URL=' not in env_text:
+              env_text += 'EXPO_PUBLIC_BUSINESS_WEB_BASE_URL=https://www.neptunebusiness.com\nEXPO_PUBLIC_PRIVACY_POLICY_URL=https://www.neptunebusiness.com/confidentialite\nEXPO_PUBLIC_TERMS_URL=https://www.neptunebusiness.com/condition-generale-utilisation\nEXPO_PUBLIC_ACCOUNT_DELETION_URL=https://www.neptunebusiness.com/suppression-compte\nEXPO_PUBLIC_SUPPORT_URL=https://www.neptunebusiness.com/contact\n'
+          env_path.write_text(env_text, encoding='utf-8')
+
+          replace_once(
+              '.github/workflows/ci.yml',
+              '          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite\n          EXPO_PUBLIC_ACCOUNT_DELETION_URL:',
+              '          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite\n          EXPO_PUBLIC_TERMS_URL: https://www.neptunebusiness.com/condition-generale-utilisation\n          EXPO_PUBLIC_ACCOUNT_DELETION_URL:',
+              'CI terms URL',
+          )
+
+          checklist = Path('docs/STORE_RELEASE_CHECKLIST.md')
+          text = checklist.read_text(encoding='utf-8')
+          marker = '- Politique de confidentialité, assistance et suppression de compte obligatoires.\n'
+          addition = marker + '- Conditions d’utilisation HTTPS et acceptation explicite avant accès aux fonctions UGC.\n'
+          if 'acceptation explicite avant accès aux fonctions UGC' not in text:
+              if marker not in text:
+                  raise SystemExit('Point CGU introuvable dans la checklist store.')
+              text = text.replace(marker, addition, 1)
+          checklist.write_text(text, encoding='utf-8')
+          PY
+      - name: Verify policy and application gates
+        env:
+          EAS_BUILD_PROFILE: production
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://www.neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://www.neptunebusiness.com/confidentialite
+          EXPO_PUBLIC_TERMS_URL: https://www.neptunebusiness.com/condition-generale-utilisation
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://www.neptunebusiness.com/suppression-compte
+          EXPO_PUBLIC_SUPPORT_URL: https://www.neptunebusiness.com/contact
+          EXPO_PUBLIC_MOCK_MODE: "false"
+        run: |
+          npm ci --no-audit --no-fund
+          npm run verify:rc
+          npx expo install --check
+          npx expo config --type public >/dev/null
+      - name: Commit policy correction
+        run: |
+          rm -f .github/workflows/rc1-terms-compliance.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: require explicit UGC terms acceptance"
+          git push origin HEAD:release/connexio-rc1
