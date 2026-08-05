@@ -106,7 +106,7 @@ def patch_map_file(path: str, native: bool) -> None:
         text = text.replace(marker, insertion + marker, 1)
 
     marker_pattern = re.compile(
-        r"    const markerData = moments\.map\(\(moment\) => \(\{.*?    \}\)\);",
+        r"    const markerData = moments\.map\(\(moment\) => (?:\(\{.*?    \}\)|\{.*?    \})\);",
         re.S,
     )
     marker_replacement = """    const markerData = moments.map((moment) => {
@@ -136,7 +136,7 @@ def patch_map_file(path: str, native: bool) -> None:
  const avatarMarkup=member.avatarUrl?'<img src=\"'+escapeText(member.avatarUrl)+'\" alt=\"\" />':escapeText(member.initials);
  const roleColor=escapeText(member.roleColor||'#431E73');
  const roleBackground=escapeText(member.roleBackground||'#150D33');
- const html='<div class=\"member-marker '+(member.pulse?'pulse':'')+'\" data-member-id=\"'+escapeText(member.id)+'\"><div class=\"member-core\" style=\"background:'+roleColor+'\"><div class=\"member-inner\" style=\"background:'+roleBackground+'\">'+avatarMarkup+'</div></div></div>';
+ const html='<div class=\"member-marker '+(member.pulse?'pulse':'')+'\" data-member-id=\"'+escapeText(member.id)+'\" style=\"--role-color:'+roleColor+';--role-background:'+roleBackground+'\"><div class=\"member-core\" style=\"background:var(--role-color)\"><div class=\"member-inner\" style=\"background:var(--role-background)\">'+avatarMarkup+'</div></div></div>';
  const marker=L.marker([member.latitude,member.longitude],{{icon:L.divIcon({{className:'',html,iconSize:[58,58],iconAnchor:[29,29]}}),title:member.name}});
  marker.on('add',()=>{{const node=marker.getElement()?.querySelector('.member-marker');if(node)markerNodes.set(member.id,node)}});
  marker.on('click',()=>{click_js});
