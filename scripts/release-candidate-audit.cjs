@@ -9,7 +9,7 @@ const requiredFiles = [
   "assets/favicon.png",
   "assets/notification-icon.png",
   "assets/audio/connexio-ringtone.mp3",
-  "assets/audio/connexio-notification.mp3",
+  "assets/audio/connexio_notification.mp3",
   "app.config.ts",
   "eas.json",
   "docs/INTEGRATION_MATRIX.md",
@@ -60,7 +60,7 @@ const appConfig = fs.readFileSync(path.join(root, "app.config.ts"), "utf8");
 for (const marker of [
   'const APP_VERSION = "1.0.0"',
   "privacyManifests",
-  "connexio-notification.mp3",
+  "connexio_notification.mp3",
   "EXPO_PUBLIC_ACCOUNT_DELETION_URL",
   "EXPO_PUBLIC_PRIVACY_POLICY_URL"
 ]) {

@@ -12,6 +12,7 @@ import {
   View
 } from "react-native";
 
+import { getRoleAppearance } from "../domain/roleAppearance";
 import { colors, gradients, spacing, typography } from "../theme";
 import type {
   ChatMessage,
@@ -75,7 +76,8 @@ export function MessageBubble({
   const currentReaction = reactions.find(
     (reaction) => reaction.reactedByCurrentUser
   )?.emoji;
-  const showDetachedReactionButton = Boolean(onReact) && !message.isMine;
+  const canReactWithLongPress = Boolean(onReact) && !message.isMine;
+  const senderRoleAppearance = getRoleAppearance(message.senderRole ?? "triton");
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -239,7 +241,16 @@ export function MessageBubble({
             onPress={() => onOpenProfile?.(message.senderId)}
             style={styles.avatarPressable}
           >
-            <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
+            <View
+              style={[
+                styles.avatarShell,
+                {
+                  backgroundColor: senderRoleAppearance.background,
+                  borderColor: senderRoleAppearance.foreground,
+                  shadowColor: senderRoleAppearance.foreground
+                }
+              ]}
+            >
               <View style={styles.avatar}>
                 {message.senderAvatarUrl && !avatarFailed ? (
                   <Image
@@ -252,7 +263,7 @@ export function MessageBubble({
                   <Text style={styles.avatarText}>{message.senderInitials}</Text>
                 )}
               </View>
-            </LinearGradient>
+            </View>
           </Pressable>
         ) : null}
 
@@ -271,9 +282,25 @@ export function MessageBubble({
               onPress={() => onOpenProfile?.(message.senderId)}
               style={styles.senderPressable}
             >
-              <Text numberOfLines={1} style={styles.sender}>
-                {message.senderName}
-              </Text>
+              <View style={styles.senderLine}>
+                <Text numberOfLines={1} style={styles.sender}>
+                  {message.senderName}
+                </Text>
+                <Text
+                  accessibilityLabel={`Statut ${senderRoleAppearance.label}`}
+                  numberOfLines={1}
+                  style={[
+                    styles.senderRole,
+                    {
+                      color: senderRoleAppearance.foreground,
+                      borderColor: senderRoleAppearance.border,
+                      backgroundColor: senderRoleAppearance.background
+                    }
+                  ]}
+                >
+                  {senderRoleAppearance.shortLabel}
+                </Text>
+              </View>
             </Pressable>
           ) : null}
 
@@ -281,7 +308,7 @@ export function MessageBubble({
             <Pressable
               accessible={false}
               onLongPress={
-                showDetachedReactionButton
+                canReactWithLongPress
                   ? () => setReactionOpen(true)
                   : undefined
               }
@@ -312,7 +339,7 @@ export function MessageBubble({
               )}
             </Pressable>
 
-            {showDetachedReactionButton || reactionOpen ? (
+            {reactionOpen ? (
               <View style={styles.reactionAnchor} pointerEvents="box-none">
                 {reactionOpen ? (
                   <Animated.View
@@ -342,18 +369,6 @@ export function MessageBubble({
                       </Pressable>
                     ))}
                   </Animated.View>
-                ) : null}
-                {showDetachedReactionButton ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Ajouter une réaction"
-                    onPress={() => setReactionOpen((value) => !value)}
-                    style={styles.reactionAdd}
-                  >
-                    <View style={styles.reactionAddVisual}>
-                      <Ionicons name="add" size={10} color={colors.textMuted} />
-                    </View>
-                  </Pressable>
                 ) : null}
               </View>
             ) : null}
@@ -408,7 +423,11 @@ export function MessageBubble({
 }
 
 const styles = StyleSheet.create({
-  gestureStage: { width: "100%", position: "relative" },
+  gestureStage: {
+    width: "100%",
+    position: "relative",
+    marginBottom: spacing.md
+  },
   replyIndicator: {
     position: "absolute",
     left: 8,
@@ -442,6 +461,7 @@ const styles = StyleSheet.create({
     height: AVATAR_SIZE,
     padding: 2,
     borderRadius: 12,
+    borderWidth: 2,
     flexShrink: 0,
     shadowColor: colors.violet,
     shadowOpacity: 0.22,
@@ -465,12 +485,30 @@ const styles = StyleSheet.create({
   otherWrapper: { alignItems: "flex-start" },
   centerWrapper: { alignItems: "center", maxWidth: "92%" },
   senderPressable: { minWidth: 44, minHeight: 44, justifyContent: "flex-end" },
+  senderLine: {
+    minHeight: 28,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: spacing.sm
+  },
+  senderRole: {
+    maxWidth: 92,
+    overflow: "hidden",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    fontSize: 8,
+    lineHeight: 11,
+    fontWeight: "900"
+  },
   sender: {
     ...typography.caption,
     maxWidth: "100%",
     minHeight: 24,
     color: colors.textMuted,
-    marginLeft: spacing.sm,
     fontSize: 10,
     fontWeight: "800",
     textAlignVertical: "center"

@@ -35,6 +35,29 @@ function optionalStringArray(value: unknown): string[] | undefined {
   const values = value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim());
   return values.length ? [...new Set(values)] : undefined;
 }
+const USER_ROLES = new Set([
+  "visionnaire",
+  "visionary",
+  "amiral",
+  "admiral",
+  "capitaine",
+  "captain",
+  "legende",
+  "moussaillon",
+  "triton",
+  "member",
+  "allie",
+  "ally",
+  "free",
+  "admin"
+]);
+
+function optionalUserRole(value: unknown): ChatMessage["senderRole"] {
+  const role = optionalString(value);
+  return role && USER_ROLES.has(role)
+    ? (role as ChatMessage["senderRole"])
+    : undefined;
+}
 function safeHttpsUrl(value: unknown): string | undefined {
   const text = optionalString(value);
   if (!text) return undefined;
@@ -137,9 +160,21 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
   const hasBody = Boolean(optionalString(first(value, "body")));
   const input = poll && !hasBody ? { ...value, body: "Sondage" } : value;
   const message = normalizeBaseMessage(input);
+  const rawSender = first(value, "sender", "author", "user");
+  const senderRole =
+    optionalUserRole(first(value, "senderRole", "sender_role", "author_role")) ??
+    (isRecord(rawSender)
+      ? optionalUserRole(first(rawSender, "role", "status", "membership_role"))
+      : undefined);
   const rawAttachments = first(value, "attachments");
   const attachments = message.attachments && Array.isArray(rawAttachments) ? message.attachments.map((attachment, index) => augmentAttachment(attachment, rawAttachments[index])) : message.attachments;
-  return { ...message, body: poll && !hasBody ? "" : message.body, attachments, poll };
+  return {
+    ...message,
+    senderRole,
+    body: poll && !hasBody ? "" : message.body,
+    attachments,
+    poll
+  };
 }
 export function normalizeMessagePage(value: unknown): CursorPage<ChatMessage> {
   if (!isRecord(value)) throw new WireValidationError("Page de messages invalide.");

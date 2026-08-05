@@ -218,6 +218,8 @@ export interface ChatMessage {
   senderName: string;
   senderInitials: string;
   senderAvatarUrl?: string;
+  /** Statut Neptune de l’auteur, utilisé pour le contour et le badge. */
+  senderRole?: UserRole;
   body: string;
   createdAt: string;
   updatedAt?: string;

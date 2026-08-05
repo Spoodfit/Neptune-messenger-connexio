@@ -1,7 +1,7 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
 const APP_VERSION = "1.0.0";
-const NOTIFICATION_SOUND = "./assets/audio/connexio-notification.mp3";
+const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
 
 function requireHttps(name: string, value: string): void {
   if (!value.startsWith("https://")) {

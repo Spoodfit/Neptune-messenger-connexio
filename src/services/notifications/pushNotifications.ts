@@ -6,9 +6,14 @@ import { Platform } from "react-native";
 
 import { env } from "../../config/env";
 import type { PushTokenRegistration } from "../../types/messaging";
+import {
+  buildNotificationCopy,
+  type NotificationEvent,
+  type NotificationChannelId
+} from "./notificationCatalog";
 
 const REGISTERED_PUSH_TOKEN_KEY = "connexio.push.registered-token";
-const NOTIFICATION_SOUND = "connexio-notification.mp3";
+const NOTIFICATION_SOUND = "connexio_notification.mp3";
 
 function getProjectId(): string | undefined {
   return env.easProjectId || Constants.easConfig?.projectId || undefined;
@@ -64,24 +69,45 @@ export async function unregisterDeviceFromPushNotifications(): Promise<void> {
 
 async function ensureAndroidChannels(): Promise<void> {
   if (Platform.OS !== "android") return;
-  await Promise.all([
-    Notifications.setNotificationChannelAsync("messages", {
-      name: "Messages",
-      description: "Nouveaux messages et mentions Connexio",
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 180, 120, 180],
-      sound: NOTIFICATION_SOUND,
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
-    }),
-    Notifications.setNotificationChannelAsync("calls", {
-      name: "Appels et rappels",
-      description: "Appels entrants et rappels demandés dans Connexio",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 220, 100, 220],
-      sound: NOTIFICATION_SOUND,
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
-    })
-  ]);
+  const channels: Array<{
+    id: NotificationChannelId;
+    name: string;
+    description: string;
+    importance: Notifications.AndroidImportance;
+    vibrationPattern: number[];
+  }> = [
+    { id: "messages", name: "Messages", description: "Messages privés et de groupe", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180] },
+    { id: "mentions", name: "Mentions et réponses", description: "Mentions et réponses qui demandent votre attention", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 180] },
+    { id: "calls", name: "Appels et rappels", description: "Appels entrants, appels manqués et rappels", importance: Notifications.AndroidImportance.MAX, vibrationPattern: [0, 240, 90, 240] },
+    { id: "groups", name: "Groupes et annonces", description: "Invitations, annonces, sondages et automatisations", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180] },
+    { id: "events", name: "Évènements", description: "Votes, rappels et modifications d’évènements", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180] },
+    { id: "community", name: "Communauté", description: "Réactions, commentaires et Temps forts", importance: Notifications.AndroidImportance.DEFAULT, vibrationPattern: [0, 140] },
+    { id: "account", name: "Compte et sécurité", description: "Sécurité du compte et informations importantes", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 220] }
+  ];
+
+  await Promise.all(
+    channels.map((channel) =>
+      Notifications.setNotificationChannelAsync(channel.id, {
+        name: channel.name,
+        description: channel.description,
+        importance: channel.importance,
+        vibrationPattern: channel.vibrationPattern,
+        sound: NOTIFICATION_SOUND,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
+      })
+    )
+  );
+}
+
+export function buildRemotePushPayload(event: NotificationEvent) {
+  const copy = buildNotificationCopy(event);
+  return {
+    title: copy.title,
+    body: copy.body,
+    sound: NOTIFICATION_SOUND,
+    channelId: copy.channelId,
+    data: copy.data
+  };
 }
 
 export async function scheduleCallBackReminder(
@@ -101,11 +127,13 @@ export async function scheduleCallBackReminder(
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: `Rappeler ${callerName}`,
-      body: "Les 10 minutes sont écoulées. Ouvrez Connexio pour rappeler cette personne.",
-      sound: NOTIFICATION_SOUND,
+      ...buildRemotePushPayload({
+        type: "call_back_reminder",
+        actorName: callerName,
+        conversationId
+      }),
       data: {
-        type: "call-back-reminder",
+        type: "call_back_reminder",
         conversationId
       }
     },
