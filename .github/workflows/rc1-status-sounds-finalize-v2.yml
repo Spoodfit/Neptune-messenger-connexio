@@ -8,6 +8,7 @@ on:
       - .github/workflows/rc1-status-sounds-finalize-v2.yml
       - scripts/rc1_finalize_status_sounds.sh
       - scripts/rc1_mobile_store_patch.py
+      - scripts/rc1_visual_fixes.py
   workflow_dispatch:
 
 permissions:
@@ -75,7 +76,20 @@ jobs:
           guard = "\n".join(guard_lines)
           if shell.count(anchor) != 1:
               raise SystemExit("Point d’insertion de la garde finale MessageBubble ambigu.")
-          shell_path.write_text(shell.replace(anchor, anchor + guard, 1), encoding="utf-8")
+          shell = shell.replace(
+              anchor,
+              anchor + "python scripts/rc1_visual_fixes.py\n" + guard,
+              1,
+          )
+          cleanup_anchor = "rm -f scripts/rc1_mobile_store_patch.py\n"
+          if shell.count(cleanup_anchor) != 1:
+              raise SystemExit("Point de nettoyage du patch mobile ambigu.")
+          shell = shell.replace(
+              cleanup_anchor,
+              cleanup_anchor + "rm -f scripts/rc1_visual_fixes.py\n",
+              1,
+          )
+          shell_path.write_text(shell, encoding="utf-8")
           PY
       - name: Apply, audit and publish validated RC1
         run: bash scripts/rc1_finalize_status_sounds.sh
