@@ -18,6 +18,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     process.env.EXPO_PUBLIC_BUSINESS_WEB_BASE_URL ??
     "https://neptunebusiness.com";
   const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "";
+  const termsUrl =
+    process.env.EXPO_PUBLIC_TERMS_URL ??
+    "https://www.neptunebusiness.com/condition-generale-utilisation";
   const accountDeletionUrl =
     process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ?? "";
   const supportUrl =
@@ -36,6 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       !realtimeUrl && "EXPO_PUBLIC_REALTIME_URL",
       !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID",
       !privacyPolicyUrl && "EXPO_PUBLIC_PRIVACY_POLICY_URL",
+      !termsUrl && "EXPO_PUBLIC_TERMS_URL",
       !accountDeletionUrl && "EXPO_PUBLIC_ACCOUNT_DELETION_URL"
     ].filter(Boolean);
     if (mockMode) {
@@ -54,6 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     }
     requireHttps("EXPO_PUBLIC_BUSINESS_WEB_BASE_URL", businessWebBaseUrl);
     requireHttps("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);
+    requireHttps("EXPO_PUBLIC_TERMS_URL", termsUrl);
     requireHttps("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);
   }
 
@@ -205,6 +210,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       realtimeUrl,
       businessWebBaseUrl,
       privacyPolicyUrl,
+      termsUrl,
       accountDeletionUrl,
       supportUrl,
       mockMode,
