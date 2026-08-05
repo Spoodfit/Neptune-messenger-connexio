@@ -136,7 +136,8 @@ patch(
     [
         ("modeButton: { flex: 1, minHeight: 44", "modeButton: { flex: 1, minHeight: 48"),
         ("createButton: { width: 44, height: 44", "createButton: { width: 48, height: 48"),
-        ("mapHintText: {", "mapHintText: { fontSize: 14, lineHeight: 20,"),
+        ("mapHint: { position: \"absolute\", left: 22, right: 22, bottom: 24, minHeight: 44", "mapHint: { position: \"absolute\", left: 22, right: 22, bottom: 24, minHeight: 48"),
+        ("mapHintText: { color: colors.textSecondary, fontSize: 10, fontWeight: \"800\" }", "mapHintText: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, fontWeight: \"800\" }"),
     ],
 )
 
