@@ -1,5 +1,11 @@
 # Connexio — contrôle de publication stores
 
+## Validation RC1
+
+- Validation technique exécutée le 5 août 2026.
+- Commit applicatif validé : `8d9597119b49b97d0e32866cb5904609fd41bb1c`.
+- Cette mise à jour documentaire déclenche les contrôles GitHub indépendants sous un compte non-bot.
+
 ## Contrôles automatisés
 
 - Expo SDK 57, Android API 36 et image EAS `sdk-57`.
