@@ -36,17 +36,46 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          path = Path("scripts/rc1_mobile_store_patch.py")
-          text = path.read_text(encoding="utf-8")
+
+          patch_path = Path("scripts/rc1_mobile_store_patch.py")
+          patch = patch_path.read_text(encoding="utf-8")
           replacements = {
               "updated = patch_input_style_blocks(patch_numeric_design_tokens(text))": "updated = patch_numeric_design_tokens(text)",
               'if "getRoleAppearance(" in text and "domain/roleAppearance" not in text:': 'if "getRoleAppearance(" in text and \'import { getRoleAppearance }\' not in text:',
           }
           for old, new in replacements.items():
-              if text.count(old) != 1:
+              if patch.count(old) != 1:
                   raise SystemExit(f"Transformation déterministe introuvable ou ambiguë: {old}")
-              text = text.replace(old, new, 1)
-          path.write_text(text, encoding="utf-8")
+              patch = patch.replace(old, new, 1)
+          patch_path.write_text(patch, encoding="utf-8")
+
+          shell_path = Path("scripts/rc1_finalize_status_sounds.sh")
+          shell = shell_path.read_text(encoding="utf-8")
+          anchor = "python scripts/rc1_mobile_store_patch.py\n"
+          guard_lines = [
+              "python - <<'PY_FINAL_SOURCE'",
+              "from pathlib import Path",
+              "path = Path('src/components/MessageBubble.tsx')",
+              "source = path.read_text(encoding='utf-8')",
+              "import_line = 'import { getRoleAppearance } from \\\"../domain/roleAppearance\\\";'",
+              "if 'getRoleAppearance(' in source and import_line not in source.splitlines():",
+              "    marker = 'import { colors, gradients, spacing, typography } from \\\"../theme\\\";\\n'",
+              "    if marker not in source:",
+              "        raise SystemExit('Import du thème MessageBubble introuvable après génération.')",
+              "    source = source.replace(marker, import_line + '\\n' + marker, 1)",
+              "if 'senderRoleAppearance' in source and 'const senderRoleAppearance =' not in source:",
+              "    marker = '  const canReactWithLongPress = Boolean(onReact) && !message.isMine;\\n'",
+              "    if marker not in source:",
+              "        raise SystemExit('Déclaration de statut MessageBubble introuvable après génération.')",
+              "    source = source.replace(marker, marker + '  const senderRoleAppearance = getRoleAppearance(message.senderRole ?? \\\"triton\\\");\\n', 1)",
+              "path.write_text(source, encoding='utf-8')",
+              "PY_FINAL_SOURCE",
+              "",
+          ]
+          guard = "\n".join(guard_lines)
+          if shell.count(anchor) != 1:
+              raise SystemExit("Point d’insertion de la garde finale MessageBubble ambigu.")
+          shell_path.write_text(shell.replace(anchor, anchor + guard, 1), encoding="utf-8")
           PY
       - name: Apply, audit and publish validated RC1
         run: bash scripts/rc1_finalize_status_sounds.sh
