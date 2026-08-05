@@ -1,0 +1,137 @@
+name: Finalize Connexio RC1
+
+on:
+  push:
+    branches:
+      - release/connexio-rc1
+    paths:
+      - .github/workflows/rc1-finalize.yml
+      - scripts/rc1_finish_patch.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: connexio-rc1-finalize
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout RC1
+        uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+
+      - name: Apply final product corrections
+        run: python scripts/rc1_finish_patch.py
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify TypeScript, domain tests and RC audit
+        run: npm run verify:rc
+
+      - name: Verify corrected interaction contract
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const bubble = fs.readFileSync('src/components/MessageBubble.tsx', 'utf8');
+          const types = fs.readFileSync('src/types/messaging.ts', 'utf8');
+          const catalog = fs.readFileSync('src/services/notifications/notificationCatalog.ts', 'utf8');
+          if (bubble.includes('accessibilityLabel="Ajouter une réaction"')) {
+            throw new Error('Le bouton + de réaction est encore présent.');
+          }
+          if (!bubble.includes('onLongPress') || !bubble.includes('canReactWithLongPress')) {
+            throw new Error('La réaction par appui long n’est pas active.');
+          }
+          if (!bubble.includes('senderRoleAppearance') || !types.includes('senderRole?: UserRole')) {
+            throw new Error('Le statut auteur n’alimente pas le contour de conversation.');
+          }
+          if (!bubble.includes('marginBottom: spacing.md')) {
+            throw new Error('La marge verticale des messages n’est pas appliquée.');
+          }
+          const events = (catalog.match(/^  "[a-z_]+",?$/gm) || []).length;
+          if (events < 27) throw new Error(`Matrice push incomplète : ${events} évènements.`);
+          NODE
+
+      - name: Build web test version
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_GITHUB_PAGES: "true"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusiness.com/suppression-compte
+          EXPO_PUBLIC_SUPPORT_URL: https://neptunebusiness.com/contact
+        run: npm run web:build
+
+      - name: Validate release-candidate Expo configuration
+        env:
+          EAS_BUILD_PROFILE: release-candidate
+          EXPO_PUBLIC_MOCK_MODE: "false"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusiness.com/suppression-compte
+          EXPO_PUBLIC_SUPPORT_URL: https://neptunebusiness.com/contact
+        run: npx expo config --type public >/dev/null
+
+      - name: Validate native project generation
+        env:
+          EAS_BUILD_PROFILE: release-candidate
+          EXPO_PUBLIC_MOCK_MODE: "false"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusiness.com/suppression-compte
+          EXPO_PUBLIC_SUPPORT_URL: https://neptunebusiness.com/contact
+        run: |
+          cp package.json /tmp/connexio-package.json
+          cp package-lock.json /tmp/connexio-package-lock.json
+          npx expo prebuild --platform all --no-install --clean
+          test -d ios
+          test -d android
+          test -f ios/ConnexiobyNeptune/Info.plist || find ios -name Info.plist -print -quit | grep -q .
+          test -f android/app/src/main/AndroidManifest.xml
+          rm -rf ios android
+          cp /tmp/connexio-package.json package.json
+          cp /tmp/connexio-package-lock.json package-lock.json
+
+      - name: Ensure final repository hygiene
+        run: |
+          test ! -e scripts/rc1_finish_patch.py
+          test ! -e scripts/rc1_assets.json
+          test -f assets/icon.png
+          test -f assets/adaptive-icon.png
+          test -f assets/splash-icon.png
+          test -f assets/favicon.png
+          test -f assets/notification-icon.png
+          test -f assets/audio/connexio-notification.mp3
+
+      - name: Commit validated corrections
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git reset .github/workflows/rc1-finalize.yml
+          if git diff --cached --quiet; then
+            echo "Aucune correction applicative à enregistrer."
+            exit 0
+          fi
+          git commit -m "fix: finalize status chat reactions push matrix and store validation"
+          git push origin HEAD:release/connexio-rc1
