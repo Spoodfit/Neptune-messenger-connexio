@@ -32,17 +32,21 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
-      - name: Remove unsafe style heuristic
+      - name: Harden deterministic patch
         run: |
           python - <<'PY'
           from pathlib import Path
           path = Path("scripts/rc1_mobile_store_patch.py")
           text = path.read_text(encoding="utf-8")
-          old = "updated = patch_input_style_blocks(patch_numeric_design_tokens(text))"
-          new = "updated = patch_numeric_design_tokens(text)"
-          if text.count(old) != 1:
-              raise SystemExit("Transformation heuristique des champs introuvable ou ambiguë.")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          replacements = {
+              "updated = patch_input_style_blocks(patch_numeric_design_tokens(text))": "updated = patch_numeric_design_tokens(text)",
+              'if "getRoleAppearance(" in text and "domain/roleAppearance" not in text:': 'if "getRoleAppearance(" in text and \'import { getRoleAppearance }\' not in text:',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f"Transformation déterministe introuvable ou ambiguë: {old}")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
           PY
       - name: Apply, audit and publish validated RC1
         run: bash scripts/rc1_finalize_status_sounds.sh
