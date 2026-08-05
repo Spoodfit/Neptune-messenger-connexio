@@ -59,6 +59,7 @@ jobs:
                 assets/audio/connexio-notification.08.gz.b64 \
                 scripts/.tmp_* \
                 scripts/.native_*
+          git restore --source=HEAD --worktree .github/workflows
       - name: Validate final source
         env:
           EAS_BUILD_PROFILE: release-candidate
