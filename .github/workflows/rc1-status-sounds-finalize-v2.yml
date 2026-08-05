@@ -58,19 +58,45 @@ jobs:
           provider_lines = [
               "python - <<'PY2'",
               "from pathlib import Path",
+              "import re",
               "",
-              "audio_path = Path('src/services/audio/actionSounds.ts')",
-              "audio_source = audio_path.read_text(encoding='utf-8')",
-              "print('--- ACTION_SOUNDS_GENERATED_BEGIN ---')",
-              "print(audio_source)",
-              "print('--- ACTION_SOUNDS_GENERATED_END ---')",
-              "raise SystemExit('Inspection contrôlée du module audio généré.')",
+              "path = Path('src/providers/MessagingProvider.tsx')",
+              "source = path.read_text(encoding='utf-8')",
+              "",
+              "if 'void playMention();' not in source:",
+              "    hook_pattern = re.compile(r'const\\s+\\{(?P<names>[^}]*)\\}\\s*=\\s*useActionSounds\\(\\);', re.S)",
+              "    hook_match = hook_pattern.search(source)",
+              "    if not hook_match:",
+              "        raise SystemExit('Déstructuration de useActionSounds introuvable dans le provider.')",
+              "    names = [name.strip() for name in hook_match.group('names').split(',') if name.strip()]",
+              "    if 'playMention' not in names:",
+              "        names.append('playMention')",
+              "    replacement = 'const { ' + ', '.join(names) + ' } = useActionSounds();'",
+              "    source = source[:hook_match.start()] + replacement + source[hook_match.end():]",
+              "",
+              "    event_anchor = '        const isNewMessage = !hasKnownMessage(knownMessageKeys, event.payload);\\n'",
+              "    if event_anchor not in source:",
+              "        raise SystemExit('Point de branchement de la mention temps réel introuvable.')",
+              "    mention_logic = (",
+              "        '        if (\\n'",
+              "        '          event.type === \\\"message.created\\\" &&\\n'",
+              "        '          isNewMessage &&\\n'",
+              "        '          event.payload.senderId !== currentUser.id &&\\n'",
+              "        '          event.payload.mentionedUserIds?.includes(currentUser.id)\\n'",
+              "        '        ) {\\n'",
+              "        '          void playMention();\\n'",
+              "        '        }\\n'",
+              "    )",
+              "    source = source.replace(event_anchor, event_anchor + mention_logic, 1)",
+              "",
+              "path.write_text(source, encoding='utf-8')",
               "PY2",
           ]
           provider_fix = '\n'.join(provider_lines) + '\n'
           if text.count(npm_anchor) != 1:
-              raise SystemExit('Point d’insertion du diagnostic audio ambigu.')
+              raise SystemExit('Point d’insertion du correctif mention ambigu.')
           text = text.replace(npm_anchor, '\n' + provider_fix + npm_anchor, 1)
+          text = text.replace("'playMention' in provider", "'void playMention();' in provider")
           path.write_text(text, encoding='utf-8')
           PY
       - name: Apply, audit and publish validated RC1
