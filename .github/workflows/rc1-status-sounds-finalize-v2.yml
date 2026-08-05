@@ -1,4 +1,4 @@
-name: Finalize global status contours and action sounds v2
+name: Finalize RC1 store compliance and mobile UX
 
 on:
   push:
@@ -6,19 +6,20 @@ on:
       - release/connexio-rc1
     paths:
       - .github/workflows/rc1-status-sounds-finalize-v2.yml
+      - scripts/rc1_finalize_status_sounds.sh
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: connexio-rc1-status-sounds-finalize-v2
+  group: connexio-rc1-store-ux-finalize
   cancel-in-progress: false
 
 jobs:
   finalize:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75
     steps:
       - name: Checkout RC1
         uses: actions/checkout@v4
@@ -30,5 +31,5 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
-      - name: Apply, audit and publish validated corrections
+      - name: Apply, audit and publish validated RC1
         run: bash scripts/rc1_finalize_status_sounds.sh
