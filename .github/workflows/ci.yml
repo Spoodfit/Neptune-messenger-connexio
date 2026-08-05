@@ -42,7 +42,11 @@ jobs:
           EAS_BUILD_PROFILE: production
           EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
           EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
           EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusiness.com/suppression-compte
+          EXPO_PUBLIC_SUPPORT_URL: https://neptunebusiness.com/contact
           EXPO_PUBLIC_MOCK_MODE: "false"
         run: npx expo config --type public >/dev/null
 
