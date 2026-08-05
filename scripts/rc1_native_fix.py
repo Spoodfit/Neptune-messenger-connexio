@@ -17,6 +17,7 @@ for relative in (
     "app.config.ts",
     "src/services/notifications/pushNotifications.ts",
     "docs/PUSH_NOTIFICATION_MATRIX.md",
+    "scripts/release-candidate-audit.cjs",
 ):
     path = ROOT / relative
     if not path.exists():
@@ -30,4 +31,4 @@ for relative in (
 
 # This helper is staging-only and must never remain in the release branch.
 Path(__file__).unlink(missing_ok=True)
-print("Nom natif du son Android corrigé.")
+print("Nom natif du son Android et audit RC corrigés.")
