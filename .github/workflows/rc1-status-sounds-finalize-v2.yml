@@ -31,7 +31,7 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
-      - name: Harden generated status and mention behavior
+      - name: Harden generated status, mention and mobile UX behavior
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -54,14 +54,20 @@ jobs:
               raise SystemExit('Point de durcissement MessageBubble ambigu.')
           text = text.replace(old, new, 1)
 
+          old_account_check = "('accountDeletionUrl' in Path('app/account.tsx').read_text(encoding='utf-8'), 'Suppression de compte non accessible dans l’app.'),"
+          new_account_check = "(all(token in Path('app/account.tsx').read_text(encoding='utf-8') for token in ('requestAccountDeletion', 'deleteAccount', 'Supprimer mon compte')), 'Suppression de compte native non accessible dans l’app.'),"
+          if text.count(old_account_check) != 1:
+              raise SystemExit('Contrôle de suppression de compte ambigu.')
+          text = text.replace(old_account_check, new_account_check, 1)
+
           npm_anchor = '\nnpm ci --no-audit --no-fund\n'
           provider_lines = [
               "python - <<'PY2'",
               "from pathlib import Path",
               "import re",
               "",
-              "path = Path('src/providers/MessagingProvider.tsx')",
-              "source = path.read_text(encoding='utf-8')",
+              "provider_path = Path('src/providers/MessagingProvider.tsx')",
+              "source = provider_path.read_text(encoding='utf-8')",
               "",
               "if 'void playMention();' not in source:",
               "    hook_pattern = re.compile(r'const\\s+\\{(?P<names>[^}]*)\\}\\s*=\\s*useActionSounds\\(\\);', re.S)",
@@ -88,13 +94,93 @@ jobs:
               "        '        }\\n'",
               "    )",
               "    source = source.replace(event_anchor, event_anchor + mention_logic, 1)",
+              "provider_path.write_text(source, encoding='utf-8')",
               "",
-              "path.write_text(source, encoding='utf-8')",
+              "account_path = Path('app/account.tsx')",
+              "account = account_path.read_text(encoding='utf-8')",
+              "account_replacements = [",
+              "    ('meta: { color: colors.textMuted, fontSize: 10, marginTop: 4 }', 'meta: { color: colors.textMuted, fontSize: 12, lineHeight: 16, marginTop: 4 }'),",
+              "    ('syncButton: { minHeight: 44,', 'syncButton: { minHeight: 48,'),",
+              "    ('syncText: { color: colors.textSecondary, fontSize: 10,', 'syncText: { color: colors.textSecondary, fontSize: 12,'),",
+              "    ('menuTitle: { color: colors.text, fontSize: 13,', 'menuTitle: { color: colors.text, fontSize: 14,'),",
+              "    ('menuSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14,', 'menuSubtitle: { color: colors.textMuted, fontSize: 12, lineHeight: 16,'),",
+              "]",
+              "for previous, updated in account_replacements:",
+              "    if previous in account:",
+              "        account = account.replace(previous, updated, 1)",
+              "account_path.write_text(account, encoding='utf-8')",
+              "",
+              "visual_path = Path('scripts/visual-audit.cjs')",
+              "visual = visual_path.read_text(encoding='utf-8')",
+              "case_anchor = '  { name: \\\"highlights-feed-280x568\\\", width: 280, height: 568, route: \\\"/highlights\\\" },'",
+              "extra_cases = (",
+              "    '  { name: \\\"contacts-360x800\\\", width: 360, height: 800, route: \\\"/contacts\\\" },\\n'",
+              "    '  { name: \\\"account-390x844\\\", width: 390, height: 844, route: \\\"/account\\\" },\\n'",
+              "    '  { name: \\\"privacy-393x852\\\", width: 393, height: 852, route: \\\"/privacy\\\" },\\n'",
+              "    '  { name: \\\"notifications-360x800\\\", width: 360, height: 800, route: \\\"/notification-settings\\\" },\\n'",
+              "    '  { name: \\\"blocked-users-390x844\\\", width: 390, height: 844, route: \\\"/blocked-users\\\" },\\n'",
+              "    '  { name: \\\"new-highlight-393x852\\\", width: 393, height: 852, route: \\\"/new-highlight\\\" },\\n'",
+              ")",
+              "if 'account-390x844' not in visual:",
+              "    if case_anchor not in visual:",
+              "        raise SystemExit('Point d’insertion des écrans UX introuvable.')",
+              "    visual = visual.replace(case_anchor, extra_cases + case_anchor, 1)",
+              "",
+              "return_anchor = '    return {\\n      viewportWidth,\\n'",
+              "typography_audit = r'''    const typographyIssues = allElements",
+              "      .filter((element) => {",
+              "        const tag = element.tagName.toLowerCase();",
+              "        const isInput = [\"input\", \"textarea\", \"select\"].includes(tag);",
+              "        const text = (element.textContent || element.getAttribute(\"placeholder\") || \"\").trim();",
+              "        if (!isInput && (!text || element.children.length > 0)) return false;",
+              "        const fontSize = Number.parseFloat(getComputedStyle(element).fontSize);",
+              "        if (!Number.isFinite(fontSize)) return false;",
+              "        if (isInput) return fontSize < 16;",
+              "        if (fontSize < 11) return true;",
+              "        return text.length > 32 && fontSize < 14;",
+              "      })",
+              "      .slice(0, 30)",
+              "      .map((element) => ({",
+              "        label: label(element),",
+              "        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),",
+              "        tag: element.tagName.toLowerCase()",
+              "      }));",
+              "",
+              "    const controlSpacingIssues = [];",
+              "    for (let index = 0; index < controlRects.length; index += 1) {",
+              "      for (let nextIndex = index + 1; nextIndex < controlRects.length; nextIndex += 1) {",
+              "        const first = controlRects[index];",
+              "        const second = controlRects[nextIndex];",
+              "        if (first.element.contains(second.element) || second.element.contains(first.element)) continue;",
+              "        if (first.element.getAttribute(\"role\") === \"tab\" || second.element.getAttribute(\"role\") === \"tab\") continue;",
+              "        const a = first.rect;",
+              "        const b = second.rect;",
+              "        if (a.width > 88 || b.width > 88 || a.height > 88 || b.height > 88) continue;",
+              "        const verticalOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));",
+              "        const horizontalOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));",
+              "        const horizontalGap = Math.max(a.left, b.left) - Math.min(a.right, b.right);",
+              "        const verticalGap = Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom);",
+              "        const tooCloseHorizontally = verticalOverlap > Math.min(a.height, b.height) * 0.45 && horizontalGap >= 0 && horizontalGap < 8;",
+              "        const tooCloseVertically = horizontalOverlap > Math.min(a.width, b.width) * 0.45 && verticalGap >= 0 && verticalGap < 8;",
+              "        if (tooCloseHorizontally || tooCloseVertically) {",
+              "          controlSpacingIssues.push({ first: first.label, second: second.label, gap: Number(Math.max(horizontalGap, verticalGap).toFixed(2)) });",
+              "        }",
+              "      }",
+              "    }",
+              "",
+              "'''",
+              "if 'const typographyIssues =' not in visual:",
+              "    if return_anchor not in visual:",
+              "        raise SystemExit('Point d’insertion de l’audit typographique introuvable.')",
+              "    visual = visual.replace(return_anchor, typography_audit + return_anchor, 1)",
+              "    visual = visual.replace('      textOverflow\\n    };', '      textOverflow,\\n      typographyIssues,\\n      controlSpacingIssues\\n    };', 1)",
+              "    visual = visual.replace('finding.metrics.textOverflow.length > 0 ||', 'finding.metrics.textOverflow.length > 0 ||\\n      finding.metrics.typographyIssues.length > 0 ||\\n      finding.metrics.controlSpacingIssues.length > 0 ||', 1)",
+              "visual_path.write_text(visual, encoding='utf-8')",
               "PY2",
           ]
           provider_fix = '\n'.join(provider_lines) + '\n'
           if text.count(npm_anchor) != 1:
-              raise SystemExit('Point d’insertion du correctif mention ambigu.')
+              raise SystemExit('Point d’insertion du correctif UX ambigu.')
           text = text.replace(npm_anchor, '\n' + provider_fix + npm_anchor, 1)
           text = text.replace("'playMention' in provider", "'void playMention();' in provider")
           path.write_text(text, encoding='utf-8')
