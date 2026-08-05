@@ -32,12 +32,18 @@ def regex_once(text: str, pattern: str, replacement: str, label: str, flags: int
     return result
 
 
-# Official assets supplied by the user.
-assets = json.loads(read("scripts/rc1_assets.json"))
-for name, encoded in assets.items():
-    target = ROOT / "assets" / name
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(base64.b64decode(encoded, validate=True))
+# Official assets supplied by the user are committed as binary files before
+# this patch runs. Refuse to continue if one is missing.
+required_assets = [
+    "icon.png",
+    "adaptive-icon.png",
+    "splash-icon.png",
+    "favicon.png",
+    "notification-icon.png",
+]
+missing_assets = [name for name in required_assets if not (ROOT / "assets" / name).is_file()]
+if missing_assets:
+    raise RuntimeError(f"Ressources officielles manquantes : {', '.join(missing_assets)}")
 
 
 # Message model carries the sender's Neptune status.
