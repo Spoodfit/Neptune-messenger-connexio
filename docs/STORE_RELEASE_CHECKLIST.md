@@ -2,9 +2,9 @@
 
 ## Validation RC1
 
-- Validation technique exécutée le 5 août 2026.
-- Commit applicatif validé : `8d9597119b49b97d0e32866cb5904609fd41bb1c`.
-- Cette mise à jour documentaire déclenche les contrôles GitHub indépendants sous un compte non-bot.
+- Validation technique initiale exécutée le 5 août 2026.
+- Socle natif validé à partir du commit `8d9597119b49b97d0e32866cb5904609fd41bb1c`.
+- Les contrôles GitHub indépendants doivent rester verts sur le dernier commit de la branche avant soumission.
 
 ## Contrôles automatisés
 
@@ -14,6 +14,8 @@
 - Manifest de confidentialité iOS présent et syntaxiquement valide.
 - Permissions sensibles documentées.
 - Politique de confidentialité, assistance et suppression de compte obligatoires.
+- Conditions d’utilisation HTTPS et acceptation explicite avant accès aux fonctions de contenu utilisateur.
+- Signalement de contenu et blocage des utilisateurs accessibles dans l’application.
 - Sons natifs de notification et de mention embarqués.
 - APK de contrôle ciblant l’API 36 et vérifié pour l’alignement 16 Ko.
 - Audit visuel 360×800, 390×844 et 393×852.
@@ -42,6 +44,6 @@
 
 - Build signé réel avec les identifiants Apple et Google de Neptune.
 - APNs et FCM testés sur appareils physiques.
-- Appels audio/vidéo testés en Wi‑Fi, 4G/5G et via TURN de production.
+- Appels audio/vidéo testés en Wi-Fi, 4G/5G et via TURN de production.
 - Backend de production disponible sans données fictives.
 - Validation finale des déclarations de collecte avec le responsable RGPD.
