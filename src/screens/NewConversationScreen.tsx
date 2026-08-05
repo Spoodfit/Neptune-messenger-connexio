@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { env } from "../config/env";
+import {
+  canInitiatePrivateInteraction,
+  TRITON_CHECKOUT_URL
+} from "../domain/accessPolicy";
 import {
   GROUP_VISIBILITY_ROLES,
   isVisionnaireRole,
@@ -85,6 +90,7 @@ export default function NewConversationScreen() {
     [accessToken]
   );
   const canCreateOfficialGroup = isVisionnaireRole(currentUser.role);
+  const canInitiatePrivate = canInitiatePrivateInteraction(currentUser.role);
 
   const [mode, setMode] = useState<"private" | "group">("private");
   const [query, setQuery] = useState("");
@@ -130,6 +136,10 @@ export default function NewConversationScreen() {
   ]);
 
   const toggleMember = (memberId: string) => {
+    if (!canInitiatePrivate) {
+      void Linking.openURL(TRITON_CHECKOUT_URL);
+      return;
+    }
     setSelectedIds((previous) => {
       if (previous.includes(memberId)) {
         return previous.filter((id) => id !== memberId);
@@ -174,6 +184,20 @@ export default function NewConversationScreen() {
   const submit = async () => {
     if (creating) return;
     if (mode === "private") {
+      if (!canInitiatePrivate) {
+        Alert.alert(
+          "Passez Triton",
+          "Un compte Free peut recevoir une invitation privée, mais doit passer Triton pour démarrer une conversation.",
+          [
+            { text: "Plus tard", style: "cancel" },
+            {
+              text: "Passer Triton",
+              onPress: () => void Linking.openURL(TRITON_CHECKOUT_URL)
+            }
+          ]
+        );
+        return;
+      }
       if (selectedIds.length === 0) {
         Alert.alert("Contact requis", "Sélectionnez au moins un membre.");
         return;

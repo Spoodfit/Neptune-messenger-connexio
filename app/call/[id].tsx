@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -16,6 +17,10 @@ import CallSurface from "@/components/CallSurface";
 import { VoicePromptInput } from "@/components/VoicePromptInput";
 import type { CallUnansweredEvent } from "@/components/CallSurface.types";
 import { env } from "@/config/env";
+import {
+  canInitiatePrivateInteraction,
+  TRITON_CHECKOUT_URL
+} from "@/domain/accessPolicy";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { NeptuneCallApi } from "@/services/api/callApi";
@@ -42,7 +47,7 @@ export default function CallRoomScreen() {
     callerName?: string;
     reason?: string;
   }>();
-  const { accessToken } = useSession();
+  const { accessToken, currentUser } = useSession();
   const { getConversation, sendMessage } = useMessaging();
   const conversationId = first(params.id) ?? "";
   const mode: CallMode = first(params.mode) === "audio" ? "audio" : "video";
@@ -98,6 +103,20 @@ export default function CallRoomScreen() {
 
   const startOutgoingCall = async () => {
     if (preparing) return;
+    if (!canInitiatePrivateInteraction(currentUser.role)) {
+      Alert.alert(
+        "Passez Triton",
+        "Un compte Free peut recevoir un appel, mais doit passer Triton pour appeler.",
+        [
+          { text: "Plus tard", style: "cancel" },
+          {
+            text: "Passer Triton",
+            onPress: () => void Linking.openURL(TRITON_CHECKOUT_URL)
+          }
+        ]
+      );
+      return;
+    }
     const cleanReason = reason.trim();
     if (cleanReason.length < 3) {
       Alert.alert(

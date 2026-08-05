@@ -16,7 +16,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ActionSheet, type ActionSheetOption } from "@/components/ActionSheet";
+import { MemberStatusBadge } from "@/components/MemberStatusBadge";
+import { StatusAvatar } from "@/components/StatusAvatar";
 import { env } from "@/config/env";
+import {
+  canInitiatePrivateInteraction,
+  TRITON_CHECKOUT_URL
+} from "@/domain/accessPolicy";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
@@ -27,7 +33,7 @@ export default function MemberProfileScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const id = Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "");
-  const { accessToken } = useSession();
+  const { accessToken, currentUser } = useSession();
   const {
     getMember,
     posts,
@@ -67,6 +73,20 @@ export default function MemberProfileScreen() {
   );
 
   const ensureConversation = async () => {
+    if (!canInitiatePrivateInteraction(currentUser.role)) {
+      Alert.alert(
+        "Passez Triton",
+        "Un compte Free peut être invité à discuter ou recevoir un appel, mais ne peut pas initier l’échange.",
+        [
+          { text: "Plus tard", style: "cancel" },
+          {
+            text: "Passer Triton",
+            onPress: () => void Linking.openURL(TRITON_CHECKOUT_URL)
+          }
+        ]
+      );
+      throw new Error("Interaction réservée aux membres Triton et supérieurs.");
+    }
     if (existingConversation) return existingConversation;
     if (api) {
       const conversation = await api.createPrivateConversation([member.id]);
@@ -292,15 +312,7 @@ export default function MemberProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.identity}>
-          <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
-            <View style={styles.avatarInner}>
-              {member.avatarUrl ? (
-                <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.initials}>{member.initials}</Text>
-              )}
-            </View>
-          </LinearGradient>
+          <StatusAvatar user={member} size={104} showBadge />
           <View style={styles.onlineRow}>
             <View style={[styles.onlineDot, !member.online && styles.offlineDot]} />
             <Text style={styles.onlineText}>
@@ -314,9 +326,7 @@ export default function MemberProfileScreen() {
           <Text style={styles.name}>{member.name}</Text>
           <Text style={styles.company}>{member.company}</Text>
           <View style={styles.metaRow}>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleText}>{member.roleLabel}</Text>
-            </View>
+            <MemberStatusBadge role={member.role} compact />
             <View style={styles.cityBadge}>
               <Ionicons name="location-outline" size={13} color={colors.textMuted} />
               <Text style={styles.cityText}>{member.city}</Text>

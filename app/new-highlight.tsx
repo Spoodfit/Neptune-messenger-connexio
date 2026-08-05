@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HighlightMediaView } from "@/components/HighlightMediaView";
 import { InlineVoiceRecorder } from "@/components/InlineVoiceRecorder";
 import { env } from "@/config/env";
+import {
+  canPublishHighlightKind,
+  TRITON_CHECKOUT_URL
+} from "@/domain/accessPolicy";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { NeptuneExperienceApi } from "@/services/api/experienceApi";
@@ -86,7 +91,7 @@ const DEMO_PLACES: PlaceSuggestion[] = [
 
 export default function NewHighlightScreen() {
   const insets = useSafeAreaInsets();
-  const { accessToken } = useSession();
+  const { accessToken, currentUser } = useSession();
   const { members, createPost, refreshExperience } = useExperience();
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
@@ -260,8 +265,30 @@ export default function NewHighlightScreen() {
     }
   };
 
+  const chooseKind = (nextKind: HighlightKind) => {
+    if (!canPublishHighlightKind(currentUser.role, nextKind)) {
+      Alert.alert(
+        "Passez Triton",
+        "Les comptes Free peuvent publier uniquement des Besoins. L’abonnement Triton débloque tous les formats.",
+        [
+          { text: "Plus tard", style: "cancel" },
+          {
+            text: "Passer Triton",
+            onPress: () => void Linking.openURL(TRITON_CHECKOUT_URL)
+          }
+        ]
+      );
+      return;
+    }
+    setKind(nextKind);
+  };
+
   const publish = async () => {
     if (publishing) return;
+    if (!canPublishHighlightKind(currentUser.role, kind)) {
+      await Linking.openURL(TRITON_CHECKOUT_URL);
+      return;
+    }
     const cleanBody = body.trim();
     if (!cleanBody && !media) {
       Alert.alert(
@@ -438,7 +465,7 @@ style={[
                 key={item.value}
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
-                onPress={() => setKind(item.value)}
+                onPress={() => chooseKind(item.value)}
                 style={[
                   styles.kindButton,
                   selected && styles.kindButtonSelected

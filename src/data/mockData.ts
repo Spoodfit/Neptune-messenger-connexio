@@ -83,6 +83,12 @@ export const conversations: Conversation[] = [
     lastMessageAt: "2026-07-24T11:30:00.000Z",
     pinnedMessage: "Seuls les administrateurs publient dans cet espace.",
     restricted: false,
+    allowFreeDiscovery: true,
+    canPost: true,
+    ownerId: "user-johan",
+    adminIds: ["user-johan", "user-lea"],
+    announcementPublisherIds: ["user-oceane", "user-nabiha"],
+    memberIds: ["user-johan", "user-lea", "user-oceane", "user-nabiha"],
     activeMemberIds: ["user-lea", "user-johan", "user-oceane"]
   },
   {

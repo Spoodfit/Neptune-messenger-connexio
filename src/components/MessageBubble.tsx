@@ -30,6 +30,7 @@ interface MessageBubbleProps {
   onReply?: (message: ChatMessage) => void;
   onOpenProfile?: (memberId: string) => void;
   onVotePoll?: (message: ChatMessage, optionId: string) => void | Promise<void>;
+  centered?: boolean;
 }
 
 const STATUS_LABELS: Record<MessageStatus, string> = {
@@ -53,7 +54,8 @@ export function MessageBubble({
   onReact,
   onReply,
   onOpenProfile,
-  onVotePoll
+  onVotePoll,
+  centered = false
 }: MessageBubbleProps) {
   const { width: viewportWidth } = useWindowDimensions();
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -73,7 +75,7 @@ export function MessageBubble({
   const currentReaction = reactions.find(
     (reaction) => reaction.reactedByCurrentUser
   )?.emoji;
-  const showDetachedReactionButton = Boolean(onReact);
+  const showDetachedReactionButton = Boolean(onReact) && !message.isMine;
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -94,6 +96,7 @@ export function MessageBubble({
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
           Boolean(onReply) &&
+          !centered &&
           gesture.dx > 8 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.25,
         onPanResponderMove: (_, gesture) => {
@@ -225,10 +228,11 @@ export function MessageBubble({
         style={[
           styles.row,
           message.isMine ? styles.mineRow : styles.otherRow,
+          centered && styles.centerRow,
           { transform: [{ translateX }] }
         ]}
       >
-        {!message.isMine ? (
+        {!message.isMine && !centered ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Ouvrir le profil de ${message.senderName}`}
@@ -256,10 +260,11 @@ export function MessageBubble({
           style={[
             styles.wrapper,
             { maxWidth: maxBubbleWidth },
-            message.isMine ? styles.mineWrapper : styles.otherWrapper
+            message.isMine ? styles.mineWrapper : styles.otherWrapper,
+            centered && styles.centerWrapper
           ]}
         >
-          {!message.isMine ? (
+          {!message.isMine && !centered ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Ouvrir le profil de ${message.senderName}`}
@@ -275,7 +280,11 @@ export function MessageBubble({
           <View style={styles.bubbleStage}>
             <Pressable
               accessible={false}
-              onLongPress={() => setReactionOpen(true)}
+              onLongPress={
+                showDetachedReactionButton
+                  ? () => setReactionOpen(true)
+                  : undefined
+              }
               delayLongPress={320}
             >
               {message.isMine ? (
@@ -292,7 +301,11 @@ export function MessageBubble({
                   colors={gradients.glass}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0.85, y: 1 }}
-                  style={[styles.bubble, styles.other]}
+                  style={[
+                    styles.bubble,
+                    styles.other,
+                    centered && styles.centeredBubble
+                  ]}
                 >
                   {bubbleContent}
                 </LinearGradient>
@@ -305,9 +318,7 @@ export function MessageBubble({
                   <Animated.View
                     style={[
                       styles.reactionPicker,
-                      message.isMine
-                        ? styles.reactionPickerLeft
-                        : styles.reactionPickerRight,
+                      styles.reactionPickerLeft,
                       reactionStyle
                     ]}
                   >
@@ -420,6 +431,7 @@ const styles = StyleSheet.create({
   },
   mineRow: { justifyContent: "flex-end" },
   otherRow: { justifyContent: "flex-start" },
+  centerRow: { justifyContent: "center" },
   avatarPressable: {
     width: AVATAR_SIZE,
     minHeight: 44,
@@ -451,6 +463,7 @@ const styles = StyleSheet.create({
   wrapper: { minWidth: 0, flexShrink: 1, position: "relative", overflow: "visible" },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
+  centerWrapper: { alignItems: "center", maxWidth: "92%" },
   senderPressable: { minWidth: 44, minHeight: 44, justifyContent: "flex-end" },
   sender: {
     ...typography.caption,
@@ -481,6 +494,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderSoft,
     borderBottomLeftRadius: 5
+  },
+  centeredBubble: {
+    borderBottomLeftRadius: 17,
+    alignItems: "center"
   },
   replyPreview: {
     minWidth: 130,

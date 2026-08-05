@@ -27,6 +27,10 @@ import { MessageBubble } from "../../src/components/MessageBubble";
 import { PollComposerModal } from "../../src/components/PollComposerModal";
 import { env } from "../../src/config/env";
 import { isPrivateConversation } from "../../src/domain/conversationFilter";
+import {
+  canInitiatePrivateInteraction,
+  canPublishInConversation
+} from "../../src/domain/accessPolicy";
 import { buildSmartReplySuggestions } from "../../src/domain/smartReplies";
 import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
@@ -158,6 +162,11 @@ export default function ChatScreen() {
   const directMemberId = conversation?.memberIds?.find(
     (memberId) => memberId !== currentUser.id
   );
+  const canPost = conversation
+    ? canPublishInConversation(currentUser, conversation)
+    : false;
+  const canInitiateCalls = canInitiatePrivateInteraction(currentUser.role);
+  const announcement = conversation?.type === "announcement";
 
   const [draft, setDraft] = useState("");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
@@ -225,7 +234,7 @@ export default function ChatScreen() {
     [currentUser, latestIncomingMessage]
   );
   const canSubmit = Boolean(
-    conversation?.canPost &&
+    canPost &&
       !submitting &&
       (draft.trim() || pendingAttachments.length > 0)
   );
@@ -419,7 +428,7 @@ export default function ChatScreen() {
   const submit = () => {
     if (submitLockRef.current || submitting) return;
     const body = draft.trim();
-    if (!conversation.canPost || (!body && pendingAttachments.length === 0)) return;
+    if (!canPost || (!body && pendingAttachments.length === 0)) return;
 
     submitLockRef.current = true;
     setSubmitting(true);
@@ -646,7 +655,7 @@ export default function ChatScreen() {
       ? `${memberCount} membre${memberCount > 1 ? "s" : ""}`
       : connectionState === "connecting"
         ? "Connexion…"
-        : conversation.canPost
+        : canPost
           ? "Hors ligne — envois mis en attente"
           : "Hors ligne";
 
@@ -689,7 +698,7 @@ export default function ChatScreen() {
           >
             {conversation.name}
           </Text>
-          {conversation.type === "direct" ? (
+          {conversation.type === "direct" && canInitiateCalls ? (
             <Text numberOfLines={1} style={styles.headerSubtitle}>
               {connectionLabel}
             </Text>
@@ -796,7 +805,8 @@ export default function ChatScreen() {
               reactions={getMessageReactions(item)}
               onRetry={(clientMessageId) => void retryMessage(clientMessageId)}
               onReact={(message, emoji) => toggleMessageReaction(message, emoji)}
-              onReply={setReplyingTo}
+              onReply={announcement ? undefined : setReplyingTo}
+              centered={announcement}
               onOpenProfile={openMemberProfile}
               onVotePoll={votePoll}
             />
@@ -822,7 +832,7 @@ export default function ChatScreen() {
           }
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {conversation.canPost
+              {canPost
                 ? "Aucun message. Lancez la discussion."
                 : "Aucun message publié dans cet espace."}
             </Text>
@@ -830,7 +840,7 @@ export default function ChatScreen() {
         />
       )}
 
-      {conversation.canPost ? (
+      {canPost ? (
         <View
           style={[
             styles.composerArea,
