@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EventVoteBanner } from "../../src/components/EventVoteBanner";
 import { MemberAvatarStack } from "../../src/components/MemberAvatarStack";
+import { StatusAvatar } from "../../src/components/StatusAvatar";
 import { MessageAttachmentsGrid } from "../../src/components/MessageAttachmentsGrid";
 import { InlineVoiceRecorder } from "../../src/components/InlineVoiceRecorder";
 import { MessageBubble } from "../../src/components/MessageBubble";
@@ -859,9 +860,7 @@ export default function ChatScreen() {
                   onPress={() => insertMention(member.name)}
                   style={styles.mentionRow}
                 >
-                  <View style={styles.mentionAvatar}>
-                    <Text style={styles.mentionInitials}>{member.initials}</Text>
-                  </View>
+                  <StatusAvatar user={member} size={32} accessible={false} />
                   <View style={styles.mentionContent}>
                     <Text style={styles.mentionName}>{member.name}</Text>
                     <Text style={styles.mentionCompany} numberOfLines={1}>
@@ -1175,12 +1174,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5
   },
   headerTitle: { ...typography.heading3, color: colors.text },
-  headerSubtitle: { color: colors.textMuted, fontSize: 9.5, marginTop: 2 },
-  headerMembers: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 6 },
-  callActions: { flexDirection: "row", gap: 3 },
+  headerSubtitle: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  headerMembers: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 8 },
+  callActions: { flexDirection: "row", gap: 8 },
   callButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
@@ -1205,7 +1204,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     color: colors.danger,
     backgroundColor: colors.dangerSoft,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "800",
     textAlign: "center"
   },
@@ -1231,9 +1230,9 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSoft
   },
   smartReplyPanel: { marginBottom: 7 },
-  smartReplyHeading: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 6 },
-  smartReplyLabel: { color: colors.textSecondary, fontSize: 9.5, fontWeight: "900" },
-  smartReplyRow: { gap: 7, paddingRight: 10 },
+  smartReplyHeading: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 8 },
+  smartReplyLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
+  smartReplyRow: { gap: 8, paddingRight: 10 },
   smartReplyChip: {
     minHeight: 38,
     maxWidth: 260,
@@ -1245,7 +1244,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  smartReplyText: { color: colors.text, fontSize: 10.5, fontWeight: "800" },
+  smartReplyText: { color: colors.text, fontSize: 11, fontWeight: "800" },
   mentionSuggestions: {
     marginBottom: 6,
     borderRadius: 16,
@@ -1269,10 +1268,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  mentionInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  mentionInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   mentionContent: { flex: 1, minWidth: 0 },
-  mentionName: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  mentionCompany: { color: colors.textMuted, fontSize: 10, marginTop: 1 },
+  mentionName: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  mentionCompany: { color: colors.textMuted, fontSize: 11, marginTop: 1 },
   replyComposer: {
     marginBottom: 6,
     padding: 8,
@@ -1289,9 +1288,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.orange
   },
   replyComposerContent: { flex: 1, minWidth: 0 },
-  replyComposerTitle: { color: colors.orange, fontSize: 10, fontWeight: "900" },
+  replyComposerTitle: { color: colors.orange, fontSize: 11, fontWeight: "900" },
   replyComposerText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-  smallButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  smallButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   pendingPreview: {
     maxHeight: 270,
     marginBottom: 7,
@@ -1308,9 +1307,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8
   },
-  pendingSummary: { flex: 1, color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  pendingSummary: { flex: 1, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   clearAttachments: { width: 36, height: 34, alignItems: "center", justifyContent: "center" },
-  pendingAttachments: { gap: 7, paddingTop: 4 },
+  pendingAttachments: { gap: 8, paddingTop: 4 },
   pendingChip: {
     maxWidth: 230,
     minHeight: 34,
@@ -1319,13 +1318,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
-  pendingText: { color: colors.textSecondary, fontSize: 9, flexShrink: 1 },
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 7 },
+  pendingText: { color: colors.textSecondary, fontSize: 11, flexShrink: 1 },
+  composer: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   attachButton: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 17,
     backgroundColor: colors.surfaceStrong,
     borderWidth: 1,
@@ -1336,7 +1335,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minWidth: 0,
-    minHeight: 46,
+    minHeight: 48,
     maxHeight: 122,
     paddingHorizontal: spacing.md,
     paddingVertical: 11,
@@ -1345,12 +1344,14 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
     color: colors.text,
-    ...typography.bodySmall
+    ...typography.bodySmall,
+    fontSize: 16,
+    lineHeight: 22
   },
-  sendButton: { width: 46, height: 46, borderRadius: 17, overflow: "hidden" },
+  sendButton: { width: 48, height: 48, borderRadius: 17, overflow: "hidden" },
   voiceButton: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 17,
     overflow: "hidden",
     borderWidth: 1,
@@ -1407,7 +1408,7 @@ const styles = StyleSheet.create({
     minHeight: 86,
     alignItems: "center",
     justifyContent: "center",
-    gap: 7
+    gap: 8
   },
   attachmentChoiceIcon: {
     width: 48,
@@ -1416,7 +1417,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  attachmentChoiceText: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  attachmentChoiceText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
   backendHint: {
     ...typography.caption,
     color: colors.textMuted,

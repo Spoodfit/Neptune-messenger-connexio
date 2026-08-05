@@ -14,6 +14,7 @@ import type {
   MessageAttachment,
   MessagePoll,
   PollOption,
+  PollVoter,
   SessionPayload
 } from "../../types/messaging";
 
@@ -68,6 +69,26 @@ function safeHttpsUrl(value: unknown): string | undefined {
     return undefined;
   }
 }
+function normalizePollVoter(value: unknown, index: number): PollVoter | undefined {
+  if (!isRecord(value)) return undefined;
+  const name = optionalString(first(value, "name", "display_name", "full_name"));
+  if (!name) return undefined;
+  const initials =
+    optionalString(first(value, "initials")) ??
+    name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("");
+  return {
+    id: optionalString(first(value, "id", "user_id", "member_id")) ?? `poll-voter-${index}`,
+    name,
+    initials,
+    avatarUrl: safeHttpsUrl(first(value, "avatarUrl", "avatar_url", "photo_url")),
+    role: optionalUserRole(first(value, "role", "status", "membership_role"))
+  };
+}
+
 function normalizePollOption(value: unknown, index: number): PollOption {
   if (!isRecord(value)) throw new WireValidationError(`Choix de sondage ${index + 1} invalide.`);
   const label = optionalString(first(value, "label", "text", "value"));
@@ -76,7 +97,13 @@ function normalizePollOption(value: unknown, index: number): PollOption {
     id: optionalString(first(value, "id", "option_id")) ?? `poll-option-${index}`,
     label,
     voteCount: Math.max(0, Math.trunc(optionalNumber(first(value, "voteCount", "vote_count", "votes")) ?? 0)),
-    votedByCurrentUser: first(value, "votedByCurrentUser", "voted_by_current_user", "selected") === true
+    votedByCurrentUser: first(value, "votedByCurrentUser", "voted_by_current_user", "selected") === true,
+    voterIds: optionalStringArray(first(value, "voterIds", "voter_ids")),
+    voters: Array.isArray(first(value, "voters", "members"))
+      ? (first(value, "voters", "members") as unknown[])
+          .map(normalizePollVoter)
+          .filter((voter): voter is PollVoter => Boolean(voter))
+      : undefined
   };
 }
 function normalizePoll(value: unknown): MessagePoll | undefined {

@@ -264,8 +264,8 @@ const styles = StyleSheet.create({
   title: { ...typography.heading3, color: colors.text },
   subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3 },
   close: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   content: { paddingBottom: spacing.md },
   label: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
     marginTop: 12,
     marginBottom: 6
@@ -316,9 +316,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     paddingHorizontal: 12
   },
-  remove: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  remove: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   addOption: {
-    minHeight: 46,
+    minHeight: 48,
     borderRadius: 15,
     borderWidth: 1,
     borderStyle: "dashed",
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7
+    gap: 8
   },
   addOptionText: { color: colors.orange, fontSize: 11, fontWeight: "800" },
   settingRow: {
@@ -340,8 +340,8 @@ const styles = StyleSheet.create({
     gap: 12
   },
   settingText: { flex: 1, minWidth: 0 },
-  settingTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  settingSubtitle: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
+  settingTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  settingSubtitle: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
   submit: {
     minHeight: 52,
     borderRadius: 18,

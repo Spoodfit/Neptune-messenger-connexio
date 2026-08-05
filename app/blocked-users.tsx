@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +18,7 @@ import { useSession } from "@/providers/SessionProvider";
 import { NeptuneAccountApi } from "@/services/api/accountApi";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 import type { AppUser } from "@/types/messaging";
+import { StatusAvatar } from "@/components/StatusAvatar";
 
 export default function BlockedUsersScreen() {
   const insets = useSafeAreaInsets();
@@ -154,16 +154,7 @@ export default function BlockedUsersScreen() {
                   }
                   style={styles.identity}
                 >
-                  <View style={styles.avatar}>
-                    {member.avatarUrl ? (
-                      <Image
-                        source={{ uri: member.avatarUrl }}
-                        style={styles.avatarImage}
-                      />
-                    ) : (
-                      <Text style={styles.initials}>{member.initials}</Text>
-                    )}
-                  </View>
+                  <StatusAvatar user={member} size={44} accessible={false} />
                   <View style={styles.memberContent}>
                     <Text style={styles.memberName} numberOfLines={1}>
                       {member.name}
@@ -248,7 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10
   },
-  loadingText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
+  loadingText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   emptyCard: {
     marginTop: spacing.lg,
     minHeight: 240,
@@ -305,8 +296,8 @@ const styles = StyleSheet.create({
     gap: 10
   },
   avatar: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     overflow: "hidden",
     backgroundColor: colors.primarySoft,
@@ -314,13 +305,13 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   avatarImage: { width: "100%", height: "100%" },
-  initials: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  initials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   memberContent: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  memberMeta: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
+  memberName: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  memberMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
   unblockButton: {
     minWidth: 84,
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: 10,
     borderRadius: 15,
     borderWidth: 1,
@@ -329,7 +320,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  unblockText: { color: colors.orange, fontSize: 10, fontWeight: "900" },
+  unblockText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
   ruleCard: {
     marginTop: spacing.md,
     padding: spacing.md,
@@ -340,7 +331,7 @@ const styles = StyleSheet.create({
   },
   ruleTitle: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "900",
     marginBottom: 10
   },

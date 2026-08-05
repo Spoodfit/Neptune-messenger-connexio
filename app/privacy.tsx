@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   cardContent: { flex: 1, minWidth: 0 },
-  cardTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
+  cardTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
   cardBody: { ...typography.bodySmall, color: colors.textMuted, marginTop: 4 },
   sectionTitle: {
     ...typography.heading3,
@@ -188,10 +188,10 @@ const styles = StyleSheet.create({
     gap: 10
   },
   actionContent: { flex: 1, minWidth: 0 },
-  actionTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
+  actionTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
   actionSubtitle: {
     color: colors.textMuted,
-    fontSize: 10,
+    fontSize: 11,
     lineHeight: 14,
     marginTop: 3
   }

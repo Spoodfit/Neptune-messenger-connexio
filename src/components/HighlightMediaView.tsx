@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     flexShrink: 0
   },
   audioContent: { flex: 1, minWidth: 0 },
-  audioTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
+  audioTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
   waveform: {
     height: 32,
     marginTop: 6,
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   waveBar: { width: 3, borderRadius: 2, backgroundColor: colors.orange },
-  audioMeta: { color: colors.textMuted, fontSize: 9, marginTop: 3, fontWeight: "800" },
+  audioMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3, fontWeight: "800" },
   transcriptPending: {
     minHeight: 42,
     marginTop: 10,
@@ -224,19 +224,19 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSoft,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7
+    gap: 8
   },
-  transcriptPendingText: { color: colors.textMuted, fontSize: 9.5, fontWeight: "800" },
+  transcriptPendingText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   transcriptToggle: {
-    minHeight: 44,
+    minHeight: 48,
     marginTop: 8,
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7
+    gap: 8
   },
-  transcriptToggleText: { flex: 1, color: colors.textSecondary, fontSize: 10, fontWeight: "900" },
+  transcriptToggleText: { flex: 1, color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
   transcript: {
     padding: 10,
     borderRadius: 13,

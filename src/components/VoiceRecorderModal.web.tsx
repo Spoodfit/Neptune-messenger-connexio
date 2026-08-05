@@ -315,8 +315,8 @@ const styles = StyleSheet.create({
   title: { ...typography.heading3, color: colors.text },
   subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3 },
   closeButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.orange
   },
-  status: { color: colors.textMuted, fontSize: 10.5, fontWeight: "800" },
+  status: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   recordTarget: {
     width: 88,
     height: 88,

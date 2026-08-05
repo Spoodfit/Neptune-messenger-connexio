@@ -34,6 +34,7 @@ export type NotificationEventType =
 export type NotificationChannelId =
   | "messages"
   | "mentions"
+  | "replies"
   | "calls"
   | "groups"
   | "events"
@@ -99,7 +100,7 @@ export function buildNotificationCopy(event: NotificationEvent): NotificationCop
     case "mention":
       return { title: `${actor} vous a mentionné`, body: `Votre attention est demandée dans ${conversation}.`, channelId: "mentions", data };
     case "reply":
-      return { title: `${actor} vous a répondu`, body: preview(event.preview), channelId: "mentions", data };
+      return { title: `${actor} vous a répondu`, body: preview(event.preview), channelId: "replies", data };
     case "reaction":
       return { title: `${actor} a réagi à votre message`, body: `Une nouvelle réaction vous attend dans ${conversation}.`, channelId: "community", data };
     case "incoming_audio_call":

@@ -53,10 +53,10 @@ const styles = StyleSheet.create({
   },
   icon: { width: 40, height: 40, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(244,177,131,0.14)" },
   content: { flex: 1, minWidth: 0 },
-  eyebrow: { color: colors.orange, fontSize: 8, fontWeight: "900", letterSpacing: 0.7 },
-  title: { color: colors.text, fontSize: 11.5, fontWeight: "900", marginTop: 2 },
-  subtitle: { color: colors.textMuted, fontSize: 8.8, lineHeight: 12, marginTop: 2 },
-  button: { minWidth: 72, minHeight: 40, paddingHorizontal: 11, borderRadius: 14, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
-  buttonText: { color: colors.white, fontSize: 10, fontWeight: "900" },
+  eyebrow: { color: colors.orange, fontSize: 11, fontWeight: "900", letterSpacing: 0.7 },
+  title: { color: colors.text, fontSize: 14, fontWeight: "900", marginTop: 2 },
+  subtitle: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 2 },
+  button: { minWidth: 72, minHeight: 48, paddingHorizontal: 11, borderRadius: 14, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  buttonText: { color: colors.white, fontSize: 11, fontWeight: "900" },
   pressed: { opacity: 0.75, transform: [{ scale: 0.97 }] }
 });

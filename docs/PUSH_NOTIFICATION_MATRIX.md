@@ -25,7 +25,7 @@ Ils doivent rester humains, chaleureux, professionnels et courts.
   "to": "<ExpoPushToken>",
   "title": "Océane vous a mentionné",
   "body": "Votre attention est demandée dans Club Carcassonne.",
-  "sound": "connexio_notification.mp3",
+  "sound": "connexio_mention.mp3",
   "channelId": "mentions",
   "data": {
     "type": "mention",

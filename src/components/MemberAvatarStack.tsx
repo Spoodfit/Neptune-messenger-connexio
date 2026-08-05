@@ -1,8 +1,8 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { getRoleAppearance } from "../domain/roleAppearance";
 import { colors } from "../theme";
 import type { AppUser } from "../types/messaging";
+import { StatusAvatar } from "./StatusAvatar";
 
 interface MemberAvatarStackProps {
   memberIds?: readonly string[];
@@ -46,48 +46,27 @@ export function MemberAvatarStack({
       style={styles.row}
     >
       <View style={styles.stack}>
-        {resolvedMembers.map((member, index) => {
-          const appearance = getRoleAppearance(member.role);
-          return (
-            <View
-              key={member.id}
-              style={[
-                styles.avatar,
-                {
-                  width: size,
-                  height: size,
-                  borderRadius: Math.round(size * 0.38),
-                  marginLeft: index === 0 ? 0 : -overlap,
-                  zIndex: visibleLimit - index,
-                  transform: [{ translateY: index % 2 === 0 ? 0 : 1 }],
-                  borderColor: appearance.foreground,
-                  backgroundColor: appearance.background
-                }
-              ]}
-            >
-              {member.avatarUrl ? (
-                <Image source={{ uri: member.avatarUrl }} style={styles.image} />
-              ) : (
-                <Text
-                  style={[
-                    styles.initials,
-                    {
-                      fontSize: Math.max(7, size * 0.31),
-                      color: appearance.foreground
-                    }
-                  ]}
-                >
-                  {member.initials}
-                </Text>
-              )}
-            </View>
-          );
-        })}
+        {resolvedMembers.map((member, index) => (
+          <View
+            key={member.id}
+            style={{
+              marginLeft: index === 0 ? 0 : -overlap,
+              zIndex: visibleLimit - index,
+              transform: [{ translateY: index % 2 === 0 ? 0 : 1 }]
+            }}
+          >
+            <StatusAvatar
+              user={member}
+              size={size}
+              ringWidth={2}
+              accessible={false}
+            />
+          </View>
+        ))}
         {resolvedMembers.length === 0 ? (
           <View
             style={[
-              styles.avatar,
-              styles.emptyAvatar,
+              styles.fallback,
               {
                 width: size,
                 height: size,
@@ -95,26 +74,22 @@ export function MemberAvatarStack({
               }
             ]}
           >
-            <Text style={[styles.initials, { fontSize: Math.max(7, size * 0.31) }]}>N</Text>
+            <Text style={[styles.fallbackText, { fontSize: Math.max(7, size * 0.31) }]}>N</Text>
           </View>
         ) : null}
         {missing > 0 && resolvedMembers.length > 0 ? (
           <View
             style={[
-              styles.avatar,
-              styles.overflowAvatar,
+              styles.fallback,
               {
                 width: size,
                 height: size,
                 borderRadius: Math.round(size * 0.38),
-                marginLeft: -overlap,
-                zIndex: 0
+                marginLeft: -overlap
               }
             ]}
           >
-            <Text style={[styles.overflowText, { fontSize: Math.max(6.5, size * 0.27) }]}>
-              +{missing}
-            </Text>
+            <Text style={[styles.fallbackText, { fontSize: Math.max(11, size * 0.27) }]}>+{missing}</Text>
           </View>
         ) : null}
       </View>
@@ -126,22 +101,18 @@ export function MemberAvatarStack({
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", minHeight: 28, minWidth: 0 },
   stack: { flexDirection: "row", alignItems: "center", minWidth: 0, flexShrink: 1 },
-  avatar: {
-    overflow: "hidden",
+  fallback: {
     borderWidth: 2,
-    backgroundColor: colors.primarySoft,
+    borderColor: colors.navyLight,
+    backgroundColor: colors.surfaceStrong,
     alignItems: "center",
     justifyContent: "center"
   },
-  emptyAvatar: { backgroundColor: colors.surfaceStrong, borderColor: colors.navyLight },
-  overflowAvatar: { backgroundColor: colors.surfaceStrong, borderColor: colors.navyLight },
-  image: { width: "100%", height: "100%" },
-  initials: { color: colors.text, fontWeight: "900" },
-  overflowText: { color: colors.textSecondary, fontWeight: "900" },
+  fallbackText: { color: colors.textSecondary, fontWeight: "900" },
   count: {
     marginLeft: 5,
     color: colors.textMuted,
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: "800",
     flexShrink: 0
   }

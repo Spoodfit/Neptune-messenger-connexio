@@ -14,6 +14,7 @@ import {
 
 const REGISTERED_PUSH_TOKEN_KEY = "connexio.push.registered-token";
 const NOTIFICATION_SOUND = "connexio_notification.mp3";
+const MENTION_SOUND = "connexio_mention.mp3";
 
 function getProjectId(): string | undefined {
   return env.easProjectId || Constants.easConfig?.projectId || undefined;
@@ -75,14 +76,16 @@ async function ensureAndroidChannels(): Promise<void> {
     description: string;
     importance: Notifications.AndroidImportance;
     vibrationPattern: number[];
+    sound: string;
   }> = [
-    { id: "messages", name: "Messages", description: "Messages privés et de groupe", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180] },
-    { id: "mentions", name: "Mentions et réponses", description: "Mentions et réponses qui demandent votre attention", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 180] },
-    { id: "calls", name: "Appels et rappels", description: "Appels entrants, appels manqués et rappels", importance: Notifications.AndroidImportance.MAX, vibrationPattern: [0, 240, 90, 240] },
-    { id: "groups", name: "Groupes et annonces", description: "Invitations, annonces, sondages et automatisations", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180] },
-    { id: "events", name: "Évènements", description: "Votes, rappels et modifications d’évènements", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180] },
-    { id: "community", name: "Communauté", description: "Réactions, commentaires et Temps forts", importance: Notifications.AndroidImportance.DEFAULT, vibrationPattern: [0, 140] },
-    { id: "account", name: "Compte et sécurité", description: "Sécurité du compte et informations importantes", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 220] }
+    { id: "messages", name: "Messages", description: "Messages privés et de groupe", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180], sound: NOTIFICATION_SOUND },
+    { id: "mentions", name: "Mentions", description: "Mentions qui demandent votre attention", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 180], sound: MENTION_SOUND },
+    { id: "replies", name: "Réponses", description: "Réponses directes à vos messages", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 100, 160], sound: NOTIFICATION_SOUND },
+    { id: "calls", name: "Appels et rappels", description: "Appels entrants, appels manqués et rappels", importance: Notifications.AndroidImportance.MAX, vibrationPattern: [0, 240, 90, 240], sound: NOTIFICATION_SOUND },
+    { id: "groups", name: "Groupes et annonces", description: "Invitations, annonces, sondages et automatisations", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180], sound: NOTIFICATION_SOUND },
+    { id: "events", name: "Évènements", description: "Votes, rappels et modifications d’évènements", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180], sound: NOTIFICATION_SOUND },
+    { id: "community", name: "Communauté", description: "Réactions, commentaires et Temps forts", importance: Notifications.AndroidImportance.DEFAULT, vibrationPattern: [0, 140], sound: NOTIFICATION_SOUND },
+    { id: "account", name: "Compte et sécurité", description: "Sécurité du compte et informations importantes", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 220], sound: NOTIFICATION_SOUND }
   ];
 
   await Promise.all(
@@ -92,7 +95,7 @@ async function ensureAndroidChannels(): Promise<void> {
         description: channel.description,
         importance: channel.importance,
         vibrationPattern: channel.vibrationPattern,
-        sound: NOTIFICATION_SOUND,
+        sound: channel.sound,
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
       })
     )
@@ -104,7 +107,7 @@ export function buildRemotePushPayload(event: NotificationEvent) {
   return {
     title: copy.title,
     body: copy.body,
-    sound: NOTIFICATION_SOUND,
+    sound: event.type === "mention" ? MENTION_SOUND : NOTIFICATION_SOUND,
     channelId: copy.channelId,
     data: copy.data
   };

@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MemberAvatarStack } from "@/components/MemberAvatarStack";
 import { MemberStatusBadge } from "@/components/MemberStatusBadge";
+import { StatusAvatar } from "@/components/StatusAvatar";
 import { SwipeableMemberRow } from "@/components/SwipeableMemberRow";
 import { env } from "@/config/env";
 import {
@@ -539,7 +540,6 @@ export default function GroupSettingsScreen() {
             <View style={styles.panel}>
               {eligiblePublishers.map((member, index) => {
                 const selected = publisherIds.includes(member.id);
-                const appearance = getRoleAppearance(member.role);
                 return (
                   <Pressable
                     key={member.id}
@@ -549,9 +549,7 @@ export default function GroupSettingsScreen() {
                     onPress={() => void toggleAnnouncementPublisher(member)}
                     style={[styles.publisherRow, index < eligiblePublishers.length - 1 && styles.divider]}
                   >
-                    <View style={[styles.publisherAvatar, { borderColor: appearance.foreground, backgroundColor: appearance.background }]}>
-                      {member.avatarUrl ? <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} /> : <Text style={[styles.publisherInitials, { color: appearance.foreground }]}>{member.initials}</Text>}
-                    </View>
+                    <StatusAvatar user={member} size={44} accessible={false} />
                     <View style={styles.publisherContent}>
                       <Text style={styles.publisherName}>{member.name}</Text>
                       <MemberStatusBadge role={member.role} compact />
@@ -645,59 +643,59 @@ const styles = StyleSheet.create({
   header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
   headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   headerTitle: { ...typography.heading3, color: colors.text, flex: 1, minWidth: 0, textAlign: "center" },
-  saveButton: { minWidth: 88, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  saveButton: { minWidth: 88, minHeight: 48, alignItems: "center", justifyContent: "center" },
   saveDisabled: { opacity: 0.45 },
-  saveText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
+  saveText: { color: colors.orange, fontSize: 14, fontWeight: "900" },
   content: { width: "100%", maxWidth: 760, alignSelf: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
   title: { ...typography.heading2, color: colors.text, textAlign: "center" },
   mutedText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
   primaryAction: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   primaryActionText: { color: colors.white, fontWeight: "900" },
-  savedBanner: { minHeight: 42, marginBottom: 6, paddingHorizontal: 12, borderRadius: 15, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  savedText: { color: colors.success, fontSize: 10, fontWeight: "900" },
-  identityCard: { paddingVertical: spacing.lg, alignItems: "center", gap: 6 },
+  savedBanner: { minHeight: 42, marginBottom: 6, paddingHorizontal: 12, borderRadius: 15, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  savedText: { color: colors.success, fontSize: 11, fontWeight: "900" },
+  identityCard: { paddingVertical: spacing.lg, alignItems: "center", gap: 8 },
   avatarShell: { width: 84, height: 84, borderRadius: 29, padding: 3 },
   avatarInner: { flex: 1, borderRadius: 26, overflow: "hidden", position: "relative", backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface },
   cropBadge: { position: "absolute", right: 4, bottom: 4, width: 28, height: 28, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.80)", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: "100%", height: "100%" },
   groupName: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 6 },
-  announcementBadge: { minHeight: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: "rgba(244,177,131,0.12)", borderWidth: 1, borderColor: "rgba(244,177,131,0.28)", flexDirection: "row", alignItems: "center", gap: 6 },
-  announcementText: { color: colors.orange, fontSize: 9, fontWeight: "900" },
+  announcementBadge: { minHeight: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: "rgba(244,177,131,0.12)", borderWidth: 1, borderColor: "rgba(244,177,131,0.28)", flexDirection: "row", alignItems: "center", gap: 8 },
+  announcementText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
   groupMeta: { ...typography.caption, color: colors.textMuted },
   description: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center", marginTop: 5, maxWidth: 440 },
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
-  quickAction: { flexGrow: 1, flexBasis: 145, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 5 },
-  quickLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  quickAction: { flexGrow: 1, flexBasis: 145, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 8 },
+  quickLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
   dangerText: { color: colors.danger },
   governanceNote: { minHeight: 58, padding: 12, borderRadius: 18, backgroundColor: "rgba(244,177,131,0.09)", borderWidth: 1, borderColor: "rgba(244,177,131,0.20)", flexDirection: "row", alignItems: "center", gap: 9 },
-  governanceText: { flex: 1, color: colors.textSecondary, fontSize: 9.5, lineHeight: 14, fontWeight: "700" },
+  governanceText: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 14, fontWeight: "700" },
   sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.lg, marginBottom: 8 },
-  sectionHelp: { color: colors.textMuted, fontSize: 9.5, lineHeight: 14, marginTop: -3, marginBottom: 8 },
+  sectionHelp: { color: colors.textMuted, fontSize: 11, lineHeight: 14, marginTop: -3, marginBottom: 8 },
   panel: { borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, overflow: "hidden" },
   emptyMembers: { color: colors.textMuted, textAlign: "center", padding: spacing.lg },
   publisherRow: { minHeight: 72, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  publisherAvatar: { width: 44, height: 44, borderRadius: 15, borderWidth: 2, overflow: "hidden", alignItems: "center", justifyContent: "center" },
-  publisherInitials: { fontSize: 10, fontWeight: "900" },
-  publisherContent: { flex: 1, minWidth: 0, alignItems: "flex-start", gap: 5 },
-  publisherName: { color: colors.text, fontSize: 12, fontWeight: "900" },
+  publisherAvatar: { width: 48, height: 48, borderRadius: 15, borderWidth: 2, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  publisherInitials: { fontSize: 11, fontWeight: "900" },
+  publisherContent: { flex: 1, minWidth: 0, alignItems: "flex-start", gap: 8 },
+  publisherName: { color: colors.text, fontSize: 14, fontWeight: "900" },
   check: { width: 30, height: 30, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
   checkSelected: { borderColor: colors.violet, backgroundColor: colors.violet },
   panelForm: { padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, marginBottom: spacing.lg },
-  fieldLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 10, marginBottom: 6 },
+  fieldLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "900", marginTop: 10, marginBottom: 6 },
   input: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, ...typography.bodySmall },
   multiline: { minHeight: 96, textAlignVertical: "top" },
   iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   iconChoice: { width: 48, height: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
   iconChoiceSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.2)" },
-  roles: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  roleChip: { minHeight: 44, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  roleText: { fontSize: 10, fontWeight: "900" },
+  roles: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  roleChip: { minHeight: 48, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  roleText: { fontSize: 11, fontWeight: "900" },
   switchRow: { minHeight: 76, marginTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   switchContent: { flex: 1, minWidth: 0 },
-  switchTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  switchSubtitle: { color: colors.textMuted, fontSize: 9.5, lineHeight: 14, marginTop: 3 },
+  switchTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  switchSubtitle: { color: colors.textMuted, fontSize: 11, lineHeight: 14, marginTop: 3 },
   lockedRule: { minHeight: 56, marginTop: spacing.md, padding: 11, borderRadius: 16, backgroundColor: "rgba(244,177,131,0.09)", flexDirection: "row", alignItems: "center", gap: 8 },
-  lockedRuleText: { flex: 1, color: colors.textSecondary, fontSize: 9.5, lineHeight: 14 }
+  lockedRuleText: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 14 }
 });

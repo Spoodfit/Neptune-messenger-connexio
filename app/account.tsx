@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -23,6 +22,7 @@ import {
   type AccountSession
 } from "@/services/api/accountApi";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
+import { StatusAvatar } from "@/components/StatusAvatar";
 
 const demoSessions: AccountSession[] = [
   {
@@ -255,15 +255,7 @@ export default function AccountScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profileCard}>
-          <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
-            <View style={styles.avatarInner}>
-              {currentUser.avatarUrl ? (
-                <Image source={{ uri: currentUser.avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.initials}>{currentUser.initials}</Text>
-              )}
-            </View>
-          </LinearGradient>
+          <StatusAvatar user={currentUser} size={88} showBadge />
           <Text style={styles.name}>{currentUser.name}</Text>
           <Text style={styles.company}>{currentUser.company}</Text>
           <Text style={styles.meta}>
@@ -405,22 +397,22 @@ const styles = StyleSheet.create({
   initials: { color: colors.text, fontSize: 24, fontWeight: "900" },
   name: { ...typography.heading2, color: colors.text, marginTop: 12 },
   company: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 3 },
-  meta: { color: colors.textMuted, fontSize: 10, marginTop: 4 },
-  syncButton: { minHeight: 44, marginTop: 12, paddingHorizontal: 13, borderRadius: 15, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  syncText: { color: colors.textSecondary, fontSize: 10, fontWeight: "900" },
+  meta: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
+  syncButton: { minHeight: 48, marginTop: 12, paddingHorizontal: 13, borderRadius: 15, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  syncText: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
   panel: { borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, overflow: "hidden" },
   menuRow: { minHeight: 74, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: 11 },
   sessionRow: { minHeight: 76, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center", gap: 11 },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
   menuIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
   menuContent: { flex: 1, minWidth: 0 },
-  menuTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  menuSubtitle: { color: colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
+  menuTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  menuSubtitle: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 3 },
   sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.lg, marginBottom: 8 },
   loadingSessions: { minHeight: 90, alignItems: "center", justifyContent: "center" },
   emptyText: { ...typography.bodySmall, color: colors.textMuted, textAlign: "center", padding: spacing.lg },
   exportButton: { minHeight: 52, marginTop: spacing.md, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  exportText: { color: colors.textSecondary, fontSize: 12, fontWeight: "900" },
+  exportText: { color: colors.textSecondary, fontSize: 14, fontWeight: "900" },
   deleteButton: { minHeight: 52, marginTop: spacing.sm, borderRadius: 17, borderWidth: 1, borderColor: "rgba(255,93,115,0.35)", backgroundColor: colors.dangerSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  deleteText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
+  deleteText: { color: colors.danger, fontSize: 14, fontWeight: "900" }
 });

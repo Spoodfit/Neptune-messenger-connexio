@@ -24,6 +24,7 @@ import { useSession } from "@/providers/SessionProvider";
 import { NeptuneExperienceApi } from "@/services/api/experienceApi";
 import { colors, gradients, typography } from "@/theme";
 import type { HighlightPost } from "@/types/experience";
+import { StatusAvatar } from "@/components/StatusAvatar";
 
 type FeedRow =
   | { id: string; kind: "wide"; post: HighlightPost }
@@ -315,15 +316,7 @@ export default function HighlightsScreen() {
                   }
                   style={styles.memberIdentity}
                 >
-                  <LinearGradient colors={gradients.primaryWarm} style={styles.memberAvatar}>
-                    <View style={styles.memberAvatarInner}>
-                      {selectedMoment.member.avatarUrl ? (
-                        <Image source={{ uri: selectedMoment.member.avatarUrl }} style={styles.avatarImage} />
-                      ) : (
-                        <Text style={styles.memberInitials}>{selectedMoment.member.initials}</Text>
-                      )}
-                    </View>
-                  </LinearGradient>
+                  <StatusAvatar user={selectedMoment.member} size={43} accessible={false} />
                   <View style={styles.memberText}>
                     <Text style={styles.memberName} numberOfLines={1}>{selectedMoment.member.name}</Text>
                     <Text style={styles.memberMeta} numberOfLines={1}>
@@ -379,12 +372,12 @@ function publishIdSafe(value?: string): string {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  toolbar: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 7 },
+  toolbar: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingTop: 10, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 },
   modeBar: { flex: 1, height: 52, padding: 3, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", overflow: "hidden" },
-  modeButton: { flex: 1, minHeight: 44, overflow: "hidden", borderRadius: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  modeButton: { flex: 1, minHeight: 48, overflow: "hidden", borderRadius: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   modeLabel: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
   modeLabelActive: { color: colors.text },
-  createButton: { width: 44, height: 44, borderRadius: 15, overflow: "hidden" },
+  createButton: { width: 48, height: 48, borderRadius: 15, overflow: "hidden" },
   createGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
   feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24 },
   rows: { gap: 9 },
@@ -394,33 +387,33 @@ const styles = StyleSheet.create({
   emptyFeed: { width: "100%", minHeight: 180, alignItems: "center", justifyContent: "center", gap: 8 },
   emptyText: { ...typography.bodySmall, color: colors.textMuted },
   mapStage: { flex: 1, width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 12, position: "relative" },
-  mapHint: { position: "absolute", left: 22, right: 22, bottom: 24, minHeight: 44, paddingHorizontal: 12, borderRadius: 15, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,18,38,0.94)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  mapHintText: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  mapHint: { position: "absolute", left: 22, right: 22, bottom: 24, minHeight: 48, paddingHorizontal: 12, borderRadius: 15, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,18,38,0.94)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  mapHintText: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, fontWeight: "800" },
   momentOverlay: { position: "absolute", left: 18, right: 18, bottom: 20, maxHeight: "78%", padding: 10, borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(5,11,28,0.96)", shadowColor: "#000000", shadowOpacity: 0.4, shadowRadius: 26, shadowOffset: { width: 0, height: 16 } },
-  memberSummary: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 7 },
+  memberSummary: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 8 },
   memberIdentity: { flex: 1, minWidth: 0, minHeight: 50, flexDirection: "row", alignItems: "center", gap: 9 },
   memberAvatar: { width: 43, height: 43, padding: 2, borderRadius: 15 },
   memberAvatarInner: { flex: 1, borderRadius: 13, overflow: "hidden", backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.surface, alignItems: "center", justifyContent: "center" },
   avatarImage: { width: "100%", height: "100%" },
-  memberInitials: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  memberInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   memberText: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  memberMeta: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
-  closeButton: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceStrong },
+  memberName: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  memberMeta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  closeButton: { width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceStrong },
   momentScroll: { maxHeight: 310, marginTop: 6 },
   floatingMoments: { gap: 8, paddingBottom: 4 },
   momentBubble: { padding: 11, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
   momentTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  momentKind: { color: colors.orange, fontSize: 8, fontWeight: "900" },
-  momentDate: { color: colors.textMuted, fontSize: 8 },
+  momentKind: { color: colors.orange, fontSize: 11, fontWeight: "900" },
+  momentDate: { color: colors.textMuted, fontSize: 11 },
   momentBody: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 5 },
-  bubbleActions: { minHeight: 44, marginTop: 5, flexDirection: "row", alignItems: "center", gap: 2 },
-  bubbleReaction: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  bubbleActions: { minHeight: 48, marginTop: 5, flexDirection: "row", alignItems: "center", gap: 2 },
+  bubbleReaction: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   bubbleEmoji: { fontSize: 17 },
-  bubbleComment: { minWidth: 44, height: 44, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
-  momentStat: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
-  quickActions: { minHeight: 56, marginTop: 7, flexDirection: "row", alignItems: "center", gap: 7, position: "relative" },
-  quickAction: { flex: 1, minHeight: 48, borderRadius: 16, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  quickText: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  bubbleComment: { minWidth: 48, height: 48, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  momentStat: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  quickActions: { minHeight: 56, marginTop: 7, flexDirection: "row", alignItems: "center", gap: 8, position: "relative" },
+  quickAction: { flex: 1, minHeight: 48, borderRadius: 16, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  quickText: { color: colors.text, fontSize: 11, fontWeight: "900" },
   actionLoader: { position: "absolute", left: 0, right: 0, top: -38, alignItems: "center" }
 });

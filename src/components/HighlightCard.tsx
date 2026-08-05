@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
-  Image,
   Pressable,
   Share,
   StyleSheet,
@@ -20,6 +19,7 @@ import { colors, gradients, typography } from "../theme";
 import type { HighlightPost, QuickReaction } from "../types/experience";
 import { ActionSheet, type ActionSheetOption } from "./ActionSheet";
 import { HighlightMediaView } from "./HighlightMediaView";
+import { StatusAvatar } from "./StatusAvatar";
 
 interface HighlightCardProps {
   post: HighlightPost;
@@ -43,7 +43,6 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
   );
   const [reactionOpen, setReactionOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [avatarFailed, setAvatarFailed] = useState(false);
   const [sharing, setSharing] = useState(false);
   const totalReactions = post.reactions.reduce(
     (total, reaction) => total + reaction.count,
@@ -132,19 +131,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
           onPress={() => router.push(`/profile/${encodeURIComponent(post.author.id)}`)}
           style={styles.authorPressable}
         >
-          <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
-            <View style={styles.avatarInner}>
-              {post.author.avatarUrl && !avatarFailed ? (
-                <Image
-                  source={{ uri: post.author.avatarUrl }}
-                  onError={() => setAvatarFailed(true)}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <Text style={styles.initials}>{post.author.initials}</Text>
-              )}
-            </View>
-          </LinearGradient>
+          <StatusAvatar user={post.author} size={42} accessible={false} />
           <View style={styles.authorContent}>
             <Text style={styles.authorName} numberOfLines={1}>
               {post.author.name}
@@ -346,11 +333,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 }
   },
   compactCard: { minHeight: 205, padding: 10, flex: 1, alignSelf: "stretch" },
-  head: { flexDirection: "row", alignItems: "center", gap: 7 },
+  head: { flexDirection: "row", alignItems: "center", gap: 8 },
   authorPressable: {
     flex: 1,
-    minWidth: 0,
-    minHeight: 46,
+    minWidth: 48,
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     gap: 9
@@ -367,17 +354,17 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   avatarImage: { width: "100%", height: "100%" },
-  initials: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  initials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   authorContent: { flex: 1, minWidth: 0 },
-  authorName: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  meta: { color: colors.textMuted, fontSize: 8.5, marginTop: 2 },
-  moreButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  authorName: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  meta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  moreButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   kindRow: {
     marginTop: 8,
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: 6
+    gap: 8
   },
   kindBadge: {
     minHeight: 24,
@@ -397,7 +384,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(66,211,146,0.12)",
     borderColor: "rgba(66,211,146,0.35)"
   },
-  kindText: { color: colors.orange, fontSize: 8.5, fontWeight: "900" },
+  kindText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
   needText: { color: colors.danger },
   offerText: { color: colors.success },
   syncBadge: {
@@ -407,9 +394,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.successSoft,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 8
   },
-  syncText: { color: colors.success, fontSize: 8.5, fontWeight: "900" },
+  syncText: { color: colors.success, fontSize: 11, fontWeight: "900" },
   mediaWrap: { marginTop: 9, position: "relative" },
   duration: {
     position: "absolute",
@@ -420,25 +407,25 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "rgba(2,7,19,0.78)"
   },
-  durationText: { color: colors.white, fontSize: 9, fontWeight: "900" },
+  durationText: { color: colors.white, fontSize: 11, fontWeight: "900" },
   body: {
     ...typography.bodySmall,
     color: colors.textSecondary,
     lineHeight: 19,
     marginTop: 9
   },
-  compactBody: { fontSize: 11, lineHeight: 16 },
+  compactBody: { fontSize: 14, lineHeight: 20 },
   locationLine: {
     minHeight: 26,
     marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 8
   },
   locationText: {
     flex: 1,
     color: colors.textMuted,
-    fontSize: 8.5,
+    fontSize: 11,
     fontWeight: "700"
   },
   metrics: {
@@ -449,7 +436,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8
   },
-  metricText: { color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
+  metricText: { color: colors.textMuted, fontSize: 11, fontWeight: "700" },
   reactionPicker: {
     minHeight: 48,
     marginTop: 4,
@@ -462,8 +449,8 @@ const styles = StyleSheet.create({
     flexWrap: "wrap"
   },
   reactionTarget: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -481,15 +468,15 @@ const styles = StyleSheet.create({
   },
   reactionEmoji: { fontSize: 19 },
   reactionSummary: {
-    minHeight: 44,
+    minHeight: 48,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: 2
+    gap: 8
   },
   reactionSummaryTarget: {
-    minWidth: 44,
-    height: 44,
+    minWidth: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -502,26 +489,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 8
   },
-  reactionPillEmoji: { fontSize: 12 },
-  reactionPillCount: { color: colors.textSecondary, fontSize: 9, fontWeight: "900" },
+  reactionPillEmoji: { fontSize: 14 },
+  reactionPillCount: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
   actions: {
     minHeight: 48,
-    marginTop: 2,
+    marginTop: 8,
     borderTopWidth: 1,
     borderTopColor: colors.borderSoft,
     flexDirection: "row",
-    alignItems: "center"
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8
   },
   action: {
     flex: 1,
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: 48,
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5
+    gap: 8
   },
-  actionText: { color: colors.textMuted, fontSize: 9.5, fontWeight: "800" }
+  actionText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" }
 });

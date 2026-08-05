@@ -183,20 +183,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
   fieldListening: { borderColor: colors.violet },
   input: {
     flex: 1,
     minWidth: 0,
-    minHeight: 46,
+    minHeight: 48,
     paddingHorizontal: 9,
     color: colors.text,
     fontSize: 14
   },
   micButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     backgroundColor: colors.primary,
     alignItems: "center",
@@ -207,10 +207,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6
+    gap: 8
   },
   suggestion: {
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: 10,
     borderRadius: 999,
     borderWidth: 1,
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     color: colors.textSecondary,
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: "800"
   },
   voiceStatus: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   hint: {
     flex: 1,
     color: colors.textMuted,
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: "800"
   },
   error: { color: colors.danger }

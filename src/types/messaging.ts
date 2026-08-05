@@ -143,6 +143,7 @@ export interface PollVoter {
   name: string;
   initials: string;
   avatarUrl?: string;
+  role?: UserRole;
 }
 
 export interface PollOption {

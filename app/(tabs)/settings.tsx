@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -16,6 +15,7 @@ import {
 } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { StatusAvatar } from "@/components/StatusAvatar";
 import { useSession } from "@/providers/SessionProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 
@@ -102,19 +102,7 @@ export default function SettingsScreen() {
               end={{ x: 0.9, y: 1 }}
               style={styles.profile}
             >
-              <LinearGradient
-                colors={gradients.primaryWarm}
-                style={styles.avatarShell}
-                accessibilityElementsHidden
-              >
-                <View style={styles.avatar}>
-                  {currentUser.avatarUrl ? (
-                    <Image source={{ uri: currentUser.avatarUrl }} style={styles.avatarImage} />
-                  ) : (
-                    <Text style={styles.initials}>{currentUser.initials}</Text>
-                  )}
-                </View>
-              </LinearGradient>
+              <StatusAvatar user={currentUser} size={62} showBadge accessible={false} />
               <View style={styles.profileContent}>
                 <Text style={styles.name}>{currentUser.name}</Text>
                 <Text style={styles.role} numberOfLines={2}>
@@ -285,7 +273,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
     flexShrink: 1
   },
-  profileMeta: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  profileMeta: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 },
   roleChip: {
     minHeight: 26,
     paddingHorizontal: 8,
@@ -293,10 +281,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(107,79,234,0.20)",
     flexDirection: "row",
     alignItems: "center",
-    gap: 5
+    gap: 8
   },
   roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
-  roleChipText: { color: colors.textSecondary, fontSize: 9, fontWeight: "900" },
+  roleChipText: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
   cityChip: {
     minHeight: 26,
     paddingHorizontal: 8,
@@ -304,9 +292,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 8
   },
-  cityText: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  cityText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   list: { marginHorizontal: spacing.md, gap: spacing.sm },
   row: {
     width: "100%",
@@ -334,6 +322,8 @@ const styles = StyleSheet.create({
   rowTitle: { ...typography.heading3, color: colors.text, flexShrink: 1 },
   rowSubtitle: {
     ...typography.caption,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.textMuted,
     marginTop: 3,
     flexShrink: 1
@@ -365,7 +355,7 @@ const styles = StyleSheet.create({
   signOutText: {
     color: colors.danger,
     fontWeight: "900",
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 20,
     textAlign: "center",
     textAlignVertical: "center",
@@ -379,11 +369,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7
+    gap: 8
   },
-  systemSettingsText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
+  systemSettingsText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   version: {
     ...typography.caption,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.textMuted,
     textAlign: "center",
     marginTop: spacing.md,

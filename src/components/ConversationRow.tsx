@@ -15,6 +15,7 @@ import { colors, gradients, radii, spacing, typography } from "../theme";
 import type { AppUser, Conversation } from "../types/messaging";
 import { formatConversationTime } from "../utils/date";
 import { MemberAvatarStack } from "./MemberAvatarStack";
+import { StatusAvatar } from "./StatusAvatar";
 
 interface ConversationRowProps {
   conversation: Conversation;
@@ -46,6 +47,10 @@ export function ConversationRow({
       : conversation.memberIds ?? [];
   const exactMemberCount = conversation.memberIds?.length ?? conversation.memberCount;
   const canSchedule = Boolean(conversation.canManage && !privateConversation);
+  const privateMembers = (conversation.memberIds ?? [])
+    .map((id) => members.find((member) => member.id === id))
+    .filter((member): member is AppUser => Boolean(member));
+  const directMember = conversation.type === "direct" ? privateMembers[0] : undefined;
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -118,36 +123,49 @@ export function ConversationRow({
           delayLongPress={420}
           style={({ pressed }) => [styles.row, pressed && styles.pressed]}
         >
-          <LinearGradient
-            colors={gradients.primaryWarm}
-            style={styles.avatarBorder}
-            accessibilityElementsHidden
-          >
-            <View style={styles.avatar}>
-              {conversation.avatarUrl && !avatarFailed ? (
-                <Image
-                  source={{ uri: conversation.avatarUrl }}
-                  onError={() => setAvatarFailed(true)}
-                  resizeMode="cover"
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <Ionicons
-                  name={
-                    conversation.type === "announcement"
-                      ? "megaphone"
-                      : conversation.type === "support"
-                        ? "construct"
-                        : conversation.type === "direct"
-                          ? "person"
-                          : "people"
-                  }
-                  size={21}
-                  color={colors.text}
-                />
-              )}
+          {directMember ? (
+            <StatusAvatar user={directMember} size={50} accessible={false} />
+          ) : conversation.type === "small_group" && privateMembers.length > 0 ? (
+            <View style={styles.privateStack} accessibilityElementsHidden>
+              <MemberAvatarStack
+                memberIds={privateMembers.map((member) => member.id)}
+                members={privateMembers}
+                memberCount={privateMembers.length}
+                maxVisible={3}
+                size={30}
+                showCount={false}
+              />
             </View>
-          </LinearGradient>
+          ) : (
+            <LinearGradient
+              colors={gradients.primaryWarm}
+              style={styles.avatarBorder}
+              accessibilityElementsHidden
+            >
+              <View style={styles.avatar}>
+                {conversation.avatarUrl && !avatarFailed ? (
+                  <Image
+                    source={{ uri: conversation.avatarUrl }}
+                    onError={() => setAvatarFailed(true)}
+                    resizeMode="cover"
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <Ionicons
+                    name={
+                      conversation.type === "announcement"
+                        ? "megaphone"
+                        : conversation.type === "support"
+                          ? "construct"
+                          : "people"
+                    }
+                    size={21}
+                    color={colors.text}
+                  />
+                )}
+              </View>
+            </LinearGradient>
+          )}
 
           <View style={styles.content}>
             <View style={styles.topLine}>
@@ -264,6 +282,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   pressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
+  privateStack: { width: 50, minHeight: 50, alignItems: "center", justifyContent: "center", overflow: "visible" },
   avatarBorder: {
     width: 50,
     height: 50,
@@ -287,7 +306,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
   name: {
     ...typography.heading3,
@@ -300,7 +319,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     flexShrink: 0,
-    fontSize: 10
+    fontSize: 11
   },
   bottomLine: {
     minWidth: 0,
@@ -314,16 +333,16 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     flex: 1,
     minWidth: 0,
-    fontSize: 12
+    fontSize: 14
   },
   memberLine: {
     minHeight: 25,
     marginTop: 4,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
-  memberActivity: { flex: 1, color: colors.textMuted, fontSize: 8.5, fontWeight: "700" },
+  memberActivity: { flex: 1, color: colors.textMuted, fontSize: 11, fontWeight: "700" },
   mentionPill: {
     width: 20,
     height: 20,
@@ -336,7 +355,7 @@ const styles = StyleSheet.create({
   },
   mentionText: {
     color: colors.orange,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "900"
   },
   unread: {
@@ -348,10 +367,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0
   },
-  unreadText: { color: colors.white, fontSize: 10, fontWeight: "900" },
+  unreadText: { color: colors.white, fontSize: 11, fontWeight: "900" },
   scheduleButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     borderWidth: 1,
     borderColor: "rgba(244,177,131,0.24)",

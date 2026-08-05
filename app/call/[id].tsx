@@ -14,6 +14,7 @@ import {
 } from "react-native";
 
 import CallSurface from "@/components/CallSurface";
+import { StatusAvatar } from "@/components/StatusAvatar";
 import { VoicePromptInput } from "@/components/VoicePromptInput";
 import type { CallUnansweredEvent } from "@/components/CallSurface.types";
 import { env } from "@/config/env";
@@ -31,6 +32,9 @@ import {
 } from "@/services/calls/callRoom";
 import { scheduleCallBackReminder } from "@/services/notifications/pushNotifications";
 import { colors, gradients, spacing, typography } from "@/theme";
+import { useExperience } from "@/providers/ExperienceProvider";
+import { useActionSounds } from "@/services/audio/actionSounds";
+import type { AppUser } from "@/types/messaging";
 
 type DeclineResponse = "callback_10m" | "message_available";
 
@@ -49,6 +53,8 @@ export default function CallRoomScreen() {
   }>();
   const { accessToken, currentUser } = useSession();
   const { getConversation, sendMessage } = useMessaging();
+  const { members } = useExperience();
+  const { playCallEnd } = useActionSounds();
   const conversationId = first(params.id) ?? "";
   const mode: CallMode = first(params.mode) === "audio" ? "audio" : "video";
   const incoming = first(params.direction) === "incoming";
@@ -56,9 +62,12 @@ export default function CallRoomScreen() {
   const callerName = first(params.callerName) ?? "Un membre Neptune";
   const initialReason = first(params.reason) ?? "";
   const conversation = getConversation(conversationId);
+  const remoteMember = (conversation?.memberIds ?? [])
+    .map((memberId) => members.find((member) => member.id === memberId))
+    .find((member): member is AppUser => Boolean(member && member.id !== currentUser.id));
   const remoteDisplayName = incoming
-    ? callerName
-    : conversation?.name ?? "Membre Neptune";
+    ? remoteMember?.name ?? callerName
+    : remoteMember?.name ?? conversation?.name ?? "Membre Neptune";
 
   const [reason, setReason] = useState(initialReason);
   const [session, setSession] = useState<IntegratedCallSession | null>(null);
@@ -94,6 +103,7 @@ export default function CallRoomScreen() {
   const close = async () => {
     const activeSession = session;
     setSession(null);
+    if (activeSession) playCallEnd();
     if (api && activeSession && !activeSession.mock) {
       await api.endCall(activeSession.id).catch(() => undefined);
     }
@@ -180,6 +190,7 @@ export default function CallRoomScreen() {
       if (api && incomingCallId) {
         await api.declineCall(incomingCallId, response);
       }
+      playCallEnd();
       const topic = initialReason || "votre appel";
       const body =
         response === "callback_10m"
@@ -214,6 +225,7 @@ export default function CallRoomScreen() {
     const activeSession = session;
     setUnanswered(event);
     setSession(null);
+    playCallEnd();
     if (api && activeSession && !activeSession.mock) {
       await api.endCall(activeSession.id).catch(() => undefined);
     }
@@ -233,6 +245,7 @@ export default function CallRoomScreen() {
   if (unanswered) {
     return (
       <CallShell
+        member={remoteMember}
         icon="mic-outline"
         title="Aucune réponse"
         description="Ouvrez la conversation pour laisser un message vocal ou écrire un message."
@@ -253,6 +266,7 @@ export default function CallRoomScreen() {
   if (incoming) {
     return (
       <CallShell
+        member={remoteMember}
         icon={mode === "audio" ? "call-outline" : "videocam-outline"}
         title={callerName}
         eyebrow={mode === "audio" ? "APPEL AUDIO ENTRANT" : "APPEL VIDÉO ENTRANT"}
@@ -290,6 +304,7 @@ export default function CallRoomScreen() {
 
   return (
     <CallShell
+      member={remoteMember}
       icon={mode === "audio" ? "call-outline" : "videocam-outline"}
       title="Pourquoi appelez-vous ?"
       description="Une phrase suffit. Elle s’affichera avant que le destinataire décroche."
@@ -324,14 +339,21 @@ interface CallShellProps {
   description: string;
   eyebrow?: string;
   children: React.ReactNode;
+  member?: AppUser;
 }
 
-function CallShell({ icon, title, description, eyebrow, children }: CallShellProps) {
+function CallShell({ icon, title, description, eyebrow, children, member }: CallShellProps) {
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
-      <View style={styles.iconShell}>
-        <Ionicons name={icon} size={31} color={colors.orange} />
-      </View>
+      {member ? (
+        <View style={styles.memberIdentity}>
+          <StatusAvatar user={member} size={70} showBadge />
+        </View>
+      ) : (
+        <View style={styles.iconShell}>
+          <Ionicons name={icon} size={31} color={colors.orange} />
+        </View>
+      )}
       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
       <Text accessibilityRole="header" style={styles.title}>
         {title}
@@ -435,6 +457,7 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.md
   },
+  memberIdentity: { marginBottom: 5 },
   iconShell: {
     width: 70,
     height: 70,
@@ -447,7 +470,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: colors.orange,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1
   },
@@ -478,7 +501,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.orange,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.6
@@ -495,7 +518,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20
   },
-  counter: { marginTop: 6, color: colors.textMuted, fontSize: 9, textAlign: "right" },
+  counter: { marginTop: 6, color: colors.textMuted, fontSize: 11, textAlign: "right" },
   reasonValue: {
     marginTop: 7,
     color: colors.text,
@@ -526,14 +549,14 @@ const styles = StyleSheet.create({
     gap: 8
   },
   primarySuccess: { backgroundColor: colors.success },
-  primaryText: { color: colors.white, fontSize: 13, fontWeight: "900" },
+  primaryText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   secondary: {
     minWidth: 130,
-    minHeight: 44,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center"
   },
-  secondaryText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
+  secondaryText: { color: colors.textMuted, fontSize: 14, fontWeight: "800" },
   declineGrid: { width: "100%", maxWidth: 520, flexDirection: "row", gap: 9 },
   choice: {
     flex: 1,
@@ -545,11 +568,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    gap: 7
+    gap: 8
   },
   choiceText: {
     color: colors.textSecondary,
-    fontSize: 10,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: "900",
     textAlign: "center"

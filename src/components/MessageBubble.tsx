@@ -3,7 +3,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
-  Image,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -22,6 +21,7 @@ import type {
 import { formatMessageTime } from "../utils/date";
 import { MessageAttachmentsGrid } from "./MessageAttachmentsGrid";
 import { PollMessageCard } from "./PollMessageCard";
+import { StatusAvatar } from "./StatusAvatar";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -59,7 +59,6 @@ export function MessageBubble({
   centered = false
 }: MessageBubbleProps) {
   const { width: viewportWidth } = useWindowDimensions();
-  const [avatarFailed, setAvatarFailed] = useState(false);
   const [reactionOpen, setReactionOpen] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
   const reactionProgress = useRef(new Animated.Value(0)).current;
@@ -78,10 +77,6 @@ export function MessageBubble({
   )?.emoji;
   const canReactWithLongPress = Boolean(onReact) && !message.isMine;
   const senderRoleAppearance = getRoleAppearance(message.senderRole ?? "triton");
-
-  useEffect(() => {
-    setAvatarFailed(false);
-  }, [message.senderAvatarUrl]);
 
   useEffect(() => {
     Animated.spring(reactionProgress, {
@@ -241,29 +236,16 @@ export function MessageBubble({
             onPress={() => onOpenProfile?.(message.senderId)}
             style={styles.avatarPressable}
           >
-            <View
-              style={[
-                styles.avatarShell,
-                {
-                  backgroundColor: senderRoleAppearance.background,
-                  borderColor: senderRoleAppearance.foreground,
-                  shadowColor: senderRoleAppearance.foreground
-                }
-              ]}
-            >
-              <View style={styles.avatar}>
-                {message.senderAvatarUrl && !avatarFailed ? (
-                  <Image
-                    source={{ uri: message.senderAvatarUrl }}
-                    onError={() => setAvatarFailed(true)}
-                    resizeMode="cover"
-                    style={styles.avatarImage}
-                  />
-                ) : (
-                  <Text style={styles.avatarText}>{message.senderInitials}</Text>
-                )}
-              </View>
-            </View>
+            <StatusAvatar
+              user={{
+                name: message.senderName,
+                initials: message.senderInitials,
+                avatarUrl: message.senderAvatarUrl,
+                role: message.senderRole
+              }}
+              size={AVATAR_SIZE}
+              accessible={false}
+            />
           </Pressable>
         ) : null}
 
@@ -452,8 +434,10 @@ const styles = StyleSheet.create({
   otherRow: { justifyContent: "flex-start" },
   centerRow: { justifyContent: "center" },
   avatarPressable: {
-    width: AVATAR_SIZE,
-    minHeight: 44,
+    width: 48,
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: "center",
     justifyContent: "flex-end"
   },
   avatarShell: {
@@ -479,18 +463,18 @@ const styles = StyleSheet.create({
     borderColor: colors.surface
   },
   avatarImage: { width: "100%", height: "100%" },
-  avatarText: { color: colors.text, fontSize: 10, fontWeight: "900" },
+  avatarText: { color: colors.text, fontSize: 11, fontWeight: "900" },
   wrapper: { minWidth: 0, flexShrink: 1, position: "relative", overflow: "visible" },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
   centerWrapper: { alignItems: "center", maxWidth: "92%" },
-  senderPressable: { minWidth: 44, minHeight: 44, justifyContent: "flex-end" },
+  senderPressable: { minWidth: 48, minHeight: 48, justifyContent: "flex-end" },
   senderLine: {
     minHeight: 28,
     maxWidth: "100%",
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     marginLeft: spacing.sm
   },
   senderRole: {
@@ -500,7 +484,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 8,
     borderWidth: 1,
-    fontSize: 8,
+    fontSize: 11,
     lineHeight: 11,
     fontWeight: "900"
   },
@@ -509,7 +493,7 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     minHeight: 24,
     color: colors.textMuted,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "800",
     textAlignVertical: "center"
   },
@@ -519,7 +503,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     paddingHorizontal: 11,
     paddingVertical: 10,
-    gap: 6
+    gap: 8
   },
   mine: {
     borderBottomRightRadius: 5,
@@ -548,9 +532,9 @@ const styles = StyleSheet.create({
   },
   replyAccent: { width: 3, borderRadius: 2, backgroundColor: colors.orange },
   replyContent: { flex: 1, minWidth: 0 },
-  replyAuthor: { color: colors.orange, fontSize: 10, fontWeight: "900" },
+  replyAuthor: { color: colors.orange, fontSize: 11, fontWeight: "900" },
   replyBody: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-  body: { ...typography.body, flexShrink: 1, fontSize: 13, lineHeight: 19 },
+  body: { ...typography.body, flexShrink: 1, fontSize: 14, lineHeight: 19 },
   mineBody: { color: colors.white },
   otherBody: { color: colors.text },
   metadata: {
@@ -559,15 +543,15 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "flex-end",
-    columnGap: 6,
+    columnGap: 8,
     rowGap: 2
   },
-  time: { fontSize: 9, lineHeight: 12, fontWeight: "600", flexShrink: 0 },
+  time: { fontSize: 11, lineHeight: 12, fontWeight: "600", flexShrink: 0 },
   mineTime: { color: colors.whiteMuted },
   otherTime: { color: colors.textMuted },
   status: {
     color: colors.whiteMuted,
-    fontSize: 9,
+    fontSize: 11,
     lineHeight: 12,
     fontWeight: "700",
     flexShrink: 1,
@@ -577,8 +561,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: -8,
     bottom: -22,
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     zIndex: 40,
     elevation: 18,
     overflow: "visible"
@@ -647,17 +631,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 8
   },
   reactionPillActive: {
     borderColor: colors.violet,
     backgroundColor: "rgba(107,79,234,0.22)"
   },
-  reactionEmoji: { fontSize: 12 },
-  reactionCount: { color: colors.textSecondary, fontSize: 10, fontWeight: "800" },
+  reactionEmoji: { fontSize: 14 },
+  reactionCount: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
   reactionAdd: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 12,
@@ -677,6 +661,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
   },
-  retry: { minHeight: 44, justifyContent: "center", paddingHorizontal: 8 },
-  retryText: { color: colors.danger, fontSize: 12, fontWeight: "900" }
+  retry: { minHeight: 48, justifyContent: "center", paddingHorizontal: 8 },
+  retryText: { color: colors.danger, fontSize: 14, fontWeight: "900" }
 });

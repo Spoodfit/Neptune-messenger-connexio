@@ -2,6 +2,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 const APP_VERSION = "1.0.0";
 const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
+const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
 
 function requireHttps(name: string, value: string): void {
   if (!value.startsWith("https://")) {
@@ -176,7 +177,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           defaultChannel: "messages",
           icon: "./assets/notification-icon.png",
           color: "#0048BA",
-          sounds: [NOTIFICATION_SOUND]
+          sounds: [NOTIFICATION_SOUND, MENTION_SOUND]
         }
       ],
       [

@@ -43,6 +43,7 @@ import type {
   CanonicalUserRole,
   Conversation
 } from "../types/messaging";
+import { StatusAvatar } from "../components/StatusAvatar";
 
 const GROUP_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   "people",
@@ -437,13 +438,7 @@ export default function NewConversationScreen() {
                       pressed && styles.pressed
                     ]}
                   >
-                    <View style={styles.avatar}>
-                      {member.avatarUrl ? (
-                        <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} />
-                      ) : (
-                        <Text style={styles.initials}>{member.initials}</Text>
-                      )}
-                    </View>
+                    <StatusAvatar user={member} size={44} accessible={false} />
                     <View style={styles.memberContent}>
                       <Text style={styles.memberName}>{member.name}</Text>
                       <Text style={styles.memberMeta} numberOfLines={1}>
@@ -601,11 +596,11 @@ const styles = StyleSheet.create({
   },
   createAction: {
     minWidth: 62,
-    minHeight: 44,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center"
   },
-  createActionText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
+  createActionText: { color: colors.orange, fontSize: 14, fontWeight: "900" },
   tabs: {
     width: "100%",
     maxWidth: 680,
@@ -621,13 +616,13 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 48,
     overflow: "hidden",
     borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7
+    gap: 8
   },
   tabText: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
   tabTextActive: { color: colors.text },
@@ -667,8 +662,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8
   },
-  selectionText: { color: colors.textSecondary, fontSize: 10, fontWeight: "900" },
-  participantText: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  selectionText: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
+  participantText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   existingBanner: {
     minHeight: 58,
     padding: 10,
@@ -682,8 +677,8 @@ const styles = StyleSheet.create({
   },
   existingContent: { flex: 1, minWidth: 0 },
   existingTitle: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  existingText: { color: colors.textSecondary, fontSize: 9.5, marginTop: 2 },
-  memberList: { gap: 7 },
+  existingText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  memberList: { gap: 8 },
   memberRow: {
     minHeight: 65,
     padding: 10,
@@ -701,8 +696,8 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.78, transform: [{ scale: 0.993 }] },
   avatar: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     overflow: "hidden",
     backgroundColor: colors.primarySoft,
@@ -712,8 +707,8 @@ const styles = StyleSheet.create({
   avatarImage: { width: "100%", height: "100%" },
   initials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   memberContent: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  memberMeta: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
+  memberName: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  memberMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
   check: {
     width: 27,
     height: 27,
@@ -724,7 +719,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   checkSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  label: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 7 },
+  label: { color: colors.textSecondary, fontSize: 11, fontWeight: "900", marginTop: 7 },
   identityRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   groupAvatar: {
     width: 84,
@@ -749,9 +744,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  identityFields: { flex: 1, minWidth: 0, gap: 5 },
-  helperText: { color: colors.textMuted, fontSize: 8.5, lineHeight: 12 },
-  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  identityFields: { flex: 1, minWidth: 0, gap: 8 },
+  helperText: { color: colors.textMuted, fontSize: 11, lineHeight: 12 },
+  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   iconChoice: {
     width: 48,
     height: 48,
@@ -763,7 +758,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   iconChoiceSelected: { borderColor: colors.orange, backgroundColor: "rgba(244,177,131,0.12)" },
-  roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   roleChip: {
     minHeight: 42,
     paddingHorizontal: 11,
@@ -775,7 +770,7 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   roleChipSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.18)" },
-  roleText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
+  roleText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   roleTextSelected: { color: colors.text },
   switchRow: {
     minHeight: 74,
@@ -789,7 +784,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   switchContent: { flex: 1, minWidth: 0 },
-  switchTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  switchSubtitle: { color: colors.textMuted, fontSize: 9, lineHeight: 13, marginTop: 3 },
-  switchControl: { width: 48, height: 44 }
+  switchTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  switchSubtitle: { color: colors.textMuted, fontSize: 11, lineHeight: 13, marginTop: 3 },
+  switchControl: { width: 48, height: 48 }
 });

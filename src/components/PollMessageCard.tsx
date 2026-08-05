@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
 
 import { colors } from "../theme";
 import type { MessagePoll, PollVoter } from "../types/messaging";
+import { StatusAvatar } from "./StatusAvatar";
 
 interface PollMessageCardProps {
   poll: MessagePoll;
@@ -33,19 +33,12 @@ function VoterStack({ voters }: { voters: readonly PollVoter[] }) {
       {visible.map((voter, index) => (
         <View
           key={voter.id}
-          style={[
-            styles.voterAvatar,
-            {
-              marginLeft: index === 0 ? 0 : -7,
-              zIndex: visible.length - index
-            }
-          ]}
+          style={{
+            marginLeft: index === 0 ? 0 : -7,
+            zIndex: visible.length - index
+          }}
         >
-          {voter.avatarUrl ? (
-            <Image source={{ uri: voter.avatarUrl }} style={styles.voterImage} />
-          ) : (
-            <Text style={styles.voterInitials}>{voter.initials}</Text>
-          )}
+          <StatusAvatar user={voter} size={20} ringWidth={1.5} accessible={false} />
         </View>
       ))}
       {remaining > 0 ? (
@@ -171,7 +164,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 7
+    gap: 8
   },
   icon: {
     width: 30,
@@ -186,19 +179,19 @@ const styles = StyleSheet.create({
   question: {
     flexShrink: 1,
     color: colors.text,
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 17,
     fontWeight: "900"
   },
   meta: {
     flexShrink: 1,
     color: colors.textMuted,
-    fontSize: 8.5,
+    fontSize: 11,
     lineHeight: 12,
     marginTop: 3,
     fontWeight: "700"
   },
-  options: { width: "100%", minWidth: 0, gap: 6 },
+  options: { width: "100%", minWidth: 0, gap: 8 },
   option: {
     width: "100%",
     minWidth: 0,
@@ -211,7 +204,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSoft,
     backgroundColor: "rgba(2,7,19,0.22)",
     justifyContent: "center",
-    gap: 4
+    gap: 8
   },
   optionActive: { borderColor: colors.violet },
   progress: {
@@ -226,7 +219,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
   choiceMark: {
     width: 22,
@@ -245,14 +238,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexShrink: 1,
     color: colors.textSecondary,
-    fontSize: 10.5,
+    fontSize: 11,
     lineHeight: 15,
     fontWeight: "800"
   },
   optionCount: {
     flexShrink: 0,
     color: colors.text,
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: "900"
   },
   voterLine: {
@@ -275,9 +268,9 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   voterImage: { width: "100%", height: "100%" },
-  voterInitials: { color: colors.text, fontSize: 6.5, fontWeight: "900" },
+  voterInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   remainingAvatar: { backgroundColor: colors.surfaceStrong },
-  remainingText: { color: colors.textSecondary, fontSize: 6.5, fontWeight: "900" },
+  remainingText: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
   footer: {
     width: "100%",
     minWidth: 0,
@@ -294,22 +287,22 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 90,
     color: colors.textMuted,
-    fontSize: 8.5,
+    fontSize: 11,
     fontWeight: "700"
   },
   eventLink: {
-    minHeight: 44,
+    minHeight: 48,
     maxWidth: "100%",
     paddingHorizontal: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 4
+    gap: 8
   },
   eventLinkText: {
     flexShrink: 1,
     color: colors.orange,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "900"
   },
   pressed: { opacity: 0.76, transform: [{ scale: 0.993 }] }

@@ -152,14 +152,14 @@ const styles = StyleSheet.create({
   title: { ...typography.heading3, color: colors.text },
   subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3 },
   close: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceStrong
   },
-  options: { marginTop: spacing.sm, gap: 7 },
+  options: { marginTop: spacing.sm, gap: 8 },
   option: {
     minHeight: 58,
     paddingHorizontal: 10,
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft
   },
   optionIconDanger: { backgroundColor: colors.dangerSoft },
-  optionLabel: { flex: 1, color: colors.text, fontSize: 13, fontWeight: "800" },
+  optionLabel: { flex: 1, color: colors.text, fontSize: 14, fontWeight: "800" },
   optionLabelDanger: { color: colors.danger },
   pressed: { opacity: 0.75, transform: [{ scale: 0.993 }] },
   disabled: { opacity: 0.42 }

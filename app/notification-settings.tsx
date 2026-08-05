@@ -183,19 +183,24 @@ export default function NotificationSettingsScreen() {
                     <ActivityIndicator size="small" color={colors.violet} />
                   </View>
                 ) : (
-                  <Switch
+                  <Pressable
+                    accessibilityRole="switch"
                     accessibilityLabel={row.title}
+                    accessibilityState={{ checked: preferences[row.key], disabled: Boolean(savingKey) }}
                     disabled={Boolean(savingKey)}
-                    value={preferences[row.key]}
-                    onValueChange={(value) =>
-                      void updatePreference(row.key, value)
-                    }
-                    trackColor={{
-                      false: colors.surfaceMuted,
-                      true: colors.primary
-                    }}
-                    thumbColor={colors.white}
-                  />
+                    onPress={() => void updatePreference(row.key, !preferences[row.key])}
+                    style={styles.switchTarget}
+                  >
+                    <Switch
+                      pointerEvents="none"
+                      value={preferences[row.key]}
+                      trackColor={{
+                        false: colors.surfaceMuted,
+                        true: colors.primary
+                      }}
+                      thumbColor={colors.white}
+                    />
+                  </Pressable>
                 )}
               </View>
             ))
@@ -283,7 +288,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 9
   },
-  loaderText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
+  loaderText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   row: {
     minHeight: 74,
     paddingHorizontal: spacing.md,
@@ -293,11 +298,17 @@ const styles = StyleSheet.create({
   },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
   rowContent: { flex: 1, minWidth: 0 },
-  rowTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  rowSubtitle: { color: colors.textMuted, fontSize: 10, marginTop: 3 },
+  rowTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  rowSubtitle: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 3 },
+  switchTarget: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   switchLoader: {
     width: 52,
-    height: 44,
+    height: 48,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -314,11 +325,11 @@ const styles = StyleSheet.create({
     gap: 11
   },
   systemContent: { flex: 1, minWidth: 0 },
-  systemTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
+  systemTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
   systemSubtitle: {
     color: colors.textMuted,
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 14,
+    lineHeight: 20,
     marginTop: 3
   },
   note: {

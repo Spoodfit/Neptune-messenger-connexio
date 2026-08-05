@@ -8,6 +8,7 @@ import { useExperience } from "@/providers/ExperienceProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
+import { StatusAvatar } from "@/components/StatusAvatar";
 
 export default function ConversationInfoScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -139,13 +140,7 @@ export default function ConversationInfoScreen() {
                 index < participants.length - 1 && styles.divider
               ]}
             >
-              <View style={styles.memberAvatar}>
-                {member.avatarUrl ? (
-                  <Image source={{ uri: member.avatarUrl }} style={styles.image} />
-                ) : (
-                  <Text style={styles.initials}>{member.initials}</Text>
-                )}
-              </View>
+              <StatusAvatar user={member} size={42} accessible={false} />
               <View style={styles.memberContent}>
                 <Text style={styles.memberName}>{member.name}</Text>
                 <Text style={styles.memberMeta} numberOfLines={1}>
@@ -179,7 +174,7 @@ const styles = StyleSheet.create({
   title: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 12 },
   subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3, textAlign: "center" },
   actions: { width: "100%", marginTop: spacing.lg, flexDirection: "row", gap: 8 },
-  action: { flex: 1, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 5 },
+  action: { flex: 1, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 8 },
   actionText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
   danger: { color: colors.danger },
   sectionTitle: { ...typography.heading3, color: colors.text, alignSelf: "flex-start", marginTop: spacing.lg, marginBottom: 8 },
@@ -190,8 +185,8 @@ const styles = StyleSheet.create({
   image: { width: "100%", height: "100%" },
   initials: { color: colors.text, fontWeight: "900" },
   memberContent: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 13, fontWeight: "900" },
-  memberMeta: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
+  memberName: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  memberMeta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   note: { width: "100%", marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 10 },
   noteText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
   missing: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },

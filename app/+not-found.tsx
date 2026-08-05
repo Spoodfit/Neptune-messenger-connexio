@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
   primaryButton: { minHeight: 52, minWidth: 210, marginTop: spacing.lg, paddingHorizontal: spacing.lg, borderRadius: radii.lg, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   primaryText: { color: colors.white, fontWeight: "900" },
   secondaryButton: { minHeight: 48, minWidth: 100, alignItems: "center", justifyContent: "center" },
-  secondaryText: { color: colors.orange, fontSize: 12, fontWeight: "800" }
+  secondaryText: { color: colors.orange, fontSize: 14, fontWeight: "800" }
 });

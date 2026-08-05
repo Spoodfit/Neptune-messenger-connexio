@@ -180,11 +180,11 @@ const styles = StyleSheet.create({
     width: ACTION_WIDTH / 2,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4
+    gap: 8
   },
   responsibleAction: { backgroundColor: colors.primaryDark },
   removeAction: { backgroundColor: colors.dangerSoft },
-  actionText: { color: colors.white, fontSize: 8, fontWeight: "900" },
+  actionText: { color: colors.white, fontSize: 11, fontWeight: "900" },
   foreground: { backgroundColor: colors.surface },
   row: {
     minHeight: 82,
@@ -196,10 +196,10 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.78 },
   content: { flex: 1, minWidth: 0 },
-  nameLine: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
-  name: { flex: 1, minWidth: 0, color: colors.text, fontSize: 12, fontWeight: "900" },
-  company: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
-  metaLine: { minHeight: 25, marginTop: 5, flexDirection: "row", alignItems: "center", gap: 6 },
+  nameLine: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
+  name: { flex: 1, minWidth: 0, color: colors.text, fontSize: 14, fontWeight: "900" },
+  company: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
+  metaLine: { minHeight: 25, marginTop: 5, flexDirection: "row", alignItems: "center", gap: 8 },
   responsibleBadge: {
     minHeight: 22,
     paddingHorizontal: 7,
@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(244,177,131,0.12)",
     flexDirection: "row",
     alignItems: "center",
-    gap: 4
+    gap: 8
   },
-  responsibleText: { color: colors.orange, fontSize: 8, fontWeight: "900" },
-  swipeHint: { flex: 1, color: colors.textMuted, fontSize: 8, textAlign: "right" }
+  responsibleText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
+  swipeHint: { flex: 1, color: colors.textMuted, fontSize: 11, textAlign: "right" }
 });

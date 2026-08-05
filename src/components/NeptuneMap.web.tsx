@@ -2,6 +2,7 @@ import { createElement, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
 import type { NeptuneMapProps } from "./NeptuneMap.types";
+import { getRoleAppearance } from "../domain/roleAppearance";
 
 export default function NeptuneMap({
   moments,
@@ -33,14 +34,20 @@ export default function NeptuneMap({
   }, [selectedMemberId]);
 
   const html = useMemo(() => {
-    const markerData = moments.map((moment) => ({
-      id: moment.member.id,
-      name: moment.member.name,
-      initials: moment.member.initials,
-      latitude: moment.latitude,
-      longitude: moment.longitude,
-      pulse: moment.recentPostIds.length > 0
-    }));
+    const markerData = moments.map((moment) => {
+      const roleAppearance = getRoleAppearance(moment.member.role);
+      return {
+        id: moment.member.id,
+        name: moment.member.name,
+        initials: moment.member.initials,
+        avatarUrl: moment.member.avatarUrl ?? null,
+        roleColor: roleAppearance.border,
+        roleBackground: roleAppearance.background,
+        latitude: moment.latitude,
+        longitude: moment.longitude,
+        pulse: moment.recentPostIds.length > 0
+      };
+    });
     const serialized = JSON.stringify(markerData).replaceAll("<", "\\u003c");
     return `<!doctype html>
 <html lang="fr">
@@ -56,7 +63,7 @@ html,body,#map{height:100%;margin:0;background:#020713;font-family:Arial,sans-se
 .leaflet-control-attribution a{color:#86b8ff!important}
 .leaflet-bar a{background:#081226!important;color:#fff!important;border-color:rgba(255,255,255,.12)!important}
 .member-marker{width:56px;height:56px;position:relative;display:grid;place-items:center;will-change:transform}
-.member-core{width:44px;height:44px;border-radius:17px;padding:2px;background:linear-gradient(135deg,#0048ba,#6b4fea,#f4b183);box-shadow:0 0 22px rgba(107,79,234,.45);position:relative;z-index:2;transition:transform .18s ease,box-shadow .18s ease}
+.member-core{width:48px;height:48px;border-radius:17px;padding:2px;border:3px solid var(--role-color);background:var(--role-background);box-shadow:0 0 22px rgba(107,79,234,.45);position:relative;z-index:2;transition:transform .18s ease,box-shadow .18s ease}
 .member-inner{height:100%;border-radius:15px;border:2px solid #081226;background:#101a31;color:#fff;display:grid;place-items:center;font-weight:900;font-size:11px}
 .member-marker.pulse:before,.member-marker.pulse:after{content:"";position:absolute;inset:3px;border-radius:50%;border:2px solid rgba(0,114,255,.55);animation:pulse 4.8s ease-out infinite}
 .member-marker.pulse:after{inset:-4px;border-color:rgba(244,177,131,.38);animation-delay:.2s}
@@ -64,7 +71,7 @@ html,body,#map{height:100%;margin:0;background:#020713;font-family:Arial,sans-se
 @keyframes pulse{0%,68%,100%{opacity:0;transform:scale(.84)}72%{opacity:.9}88%{opacity:0;transform:scale(1.38)}}
 .custom-cluster{background:transparent!important;border:none!important}
 .cluster-core{width:48px;height:48px;border-radius:18px;border:3px solid #fff;background:linear-gradient(135deg,#0048ba,#6b4fea,#a950d8);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 0 28px rgba(107,79,234,.55)}
-.geo-btn{position:absolute;right:12px;top:12px;z-index:999;width:44px;height:44px;border:1px solid rgba(255,255,255,.16);border-radius:15px;background:#081226;color:#fff;font-size:20px;cursor:pointer}
+.geo-btn{position:absolute;right:12px;top:12px;z-index:999;width:48px;height:48px;border:1px solid rgba(255,255,255,.16);border-radius:15px;background:#081226;color:#fff;font-size:20px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -80,11 +87,14 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{sub
 const cluster=L.markerClusterGroup({maxClusterRadius:56,spiderfyOnMaxZoom:true,showCoverageOnHover:false,iconCreateFunction:c=>L.divIcon({className:'custom-cluster',html:'<div class="cluster-core">'+c.getChildCount()+'</div>',iconSize:[48,48]})});
 const bounds=[];
 members.forEach(member=>{
- const html='<div class="member-marker '+(member.pulse?'pulse':'')+'" data-member-id="'+escapeText(member.id)+'"><div class="member-core"><div class="member-inner">'+escapeText(member.initials)+'</div></div></div>';
- const marker=L.marker([member.latitude,member.longitude],{icon:L.divIcon({className:'',html,iconSize:[56,56],iconAnchor:[28,28]}),title:member.name});
+ const avatarMarkup=member.avatarUrl?'<img src="'+escapeText(member.avatarUrl)+'" alt="" />':escapeText(member.initials);
+ const roleColor=escapeText(member.roleColor||'#431E73');
+ const roleBackground=escapeText(member.roleBackground||'#150D33');
+ const html='<div class="member-marker '+(member.pulse?'pulse':'')+'" data-member-id="'+escapeText(member.id)+'" style="--role-color:'+roleColor+';--role-background:'+roleBackground+'"><div class="member-core" style="background:var(--role-color)"><div class="member-inner" style="background:var(--role-background)">'+avatarMarkup+'</div></div></div>';
+ const marker=L.marker([member.latitude,member.longitude],{icon:L.divIcon({className:'',html,iconSize:[58,58],iconAnchor:[29,29]}),title:member.name});
  marker.on('add',()=>{const node=marker.getElement()?.querySelector('.member-marker');if(node)markerNodes.set(member.id,node)});
  marker.on('click',()=>window.parent.postMessage({source:'connexio-map',type:'member-selected',memberId:member.id},'*'));
- marker.bindTooltip(escapeText(member.name),{direction:'bottom',offset:[0,22],opacity:.92});
+ marker.bindTooltip(escapeText(member.name),{direction:'bottom',offset:[0,23],opacity:.92});
  cluster.addLayer(marker);bounds.push([member.latitude,member.longitude]);
 });
 map.addLayer(cluster);

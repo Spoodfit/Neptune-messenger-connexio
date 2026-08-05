@@ -47,6 +47,7 @@ import type {
   Conversation,
   MessageAttachment
 } from "../types/messaging";
+import { useActionSounds } from "../services/audio/actionSounds";
 
 export type ConnectionState = "offline" | "connecting" | "online";
 
@@ -86,6 +87,7 @@ const demoConversations: Conversation[] = initialConversations.map(
 
 export function MessagingProvider({ children }: PropsWithChildren) {
   const { currentUser, accessToken } = useSession();
+  const { playMessageSent, playMention } = useActionSounds();
   const [conversations, setConversations] = useState<Conversation[]>(
     env.mockMode ? demoConversations : []
   );
@@ -618,6 +620,14 @@ export function MessagingProvider({ children }: PropsWithChildren) {
     (event: RealtimeEvent) => {
       if (event.type === "message.created" || event.type === "message.updated") {
         const isNewMessage = !hasKnownMessage(knownMessageKeys, event.payload);
+        if (
+          event.type === "message.created" &&
+          isNewMessage &&
+          event.payload.senderId !== currentUser.id &&
+          event.payload.mentionedUserIds?.includes(currentUser.id)
+        ) {
+          void playMention();
+        }
         upsertMessage(event.payload);
         if (event.type === "message.created" && isNewMessage) {
           setConversations((previous) =>

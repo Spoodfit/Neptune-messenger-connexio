@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
 } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { StatusAvatar } from "@/components/StatusAvatar";
 import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
@@ -99,15 +99,7 @@ export default function CallsScreen() {
                 }
                 style={styles.identity}
               >
-                <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
-                  <View style={styles.avatar}>
-                    {call.member.avatarUrl ? (
-                      <Image source={{ uri: call.member.avatarUrl }} style={styles.avatarImage} />
-                    ) : (
-                      <Text style={styles.avatarText}>{call.member.initials}</Text>
-                    )}
-                  </View>
-                </LinearGradient>
+                <StatusAvatar user={call.member} size={50} />
 
                 <View style={styles.rowContent}>
                   <Text style={styles.name} numberOfLines={1}>
@@ -203,7 +195,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm
   },
   sectionTitle: { ...typography.heading3, color: colors.text, fontWeight: "900" },
-  sectionMeta: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
+  sectionMeta: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   list: { gap: spacing.sm },
   row: {
     width: "100%",
@@ -223,13 +215,13 @@ const styles = StyleSheet.create({
   avatarImage: { width: "100%", height: "100%" },
   avatarText: { color: colors.text, fontSize: 11, fontWeight: "900" },
   rowContent: { flex: 1, minWidth: 0 },
-  name: { color: colors.text, fontSize: 15, lineHeight: 19, fontWeight: "900" },
-  callMetaLine: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 4 },
-  callType: { color: colors.textSecondary, fontSize: 10.5, lineHeight: 14, flexShrink: 1 },
+  name: { color: colors.text, fontSize: 16, lineHeight: 19, fontWeight: "900" },
+  callMetaLine: { marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 },
+  callType: { color: colors.textSecondary, fontSize: 11, lineHeight: 14, flexShrink: 1 },
   callTypeMissed: { color: colors.danger },
-  time: { color: colors.textMuted, fontSize: 9, lineHeight: 12, marginTop: 2 },
-  actions: { flexDirection: "row", gap: 5, flexShrink: 0, position: "relative" },
-  actionButton: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.glass, alignItems: "center", justifyContent: "center" },
+  time: { color: colors.textMuted, fontSize: 11, lineHeight: 12, marginTop: 2 },
+  actions: { flexDirection: "row", gap: 8, flexShrink: 0, position: "relative" },
+  actionButton: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.glass, alignItems: "center", justifyContent: "center" },
   actionLoader: { position: "absolute", zIndex: 3, inset: 0, borderRadius: 14, backgroundColor: "rgba(5,11,28,0.82)", alignItems: "center", justifyContent: "center" },
   pressed: { transform: [{ scale: 0.94 }], opacity: 0.8 }
 });

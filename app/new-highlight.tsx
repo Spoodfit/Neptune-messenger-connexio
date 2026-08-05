@@ -39,6 +39,7 @@ import type {
   PlaceSuggestion
 } from "@/types/experience";
 import type { MessageAttachment } from "@/types/messaging";
+import { StatusAvatar } from "@/components/StatusAvatar";
 
 const KINDS: Array<{
   value: HighlightKind;
@@ -535,9 +536,7 @@ style={[
                 onPress={() => insertMention(member.name)}
                 style={styles.suggestionRow}
               >
-                <View style={styles.suggestionAvatar}>
-                  <Text style={styles.suggestionInitials}>{member.initials}</Text>
-                </View>
+                <StatusAvatar user={member} size={34} accessible={false} />
                 <View style={styles.suggestionContent}>
                   <Text style={styles.suggestionName}>{member.name}</Text>
                   <Text style={styles.suggestionCompany} numberOfLines={1}>
@@ -731,11 +730,11 @@ const styles = StyleSheet.create({
   },
   publishButton: {
     minWidth: 68,
-    minHeight: 44,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center"
   },
-  publishText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
+  publishText: { color: colors.orange, fontSize: 14, fontWeight: "900" },
   content: { width: "100%", maxWidth: 680, alignSelf: "center" },
   animatedContent: { width: "100%" },
   momentumCard: {
@@ -748,22 +747,22 @@ const styles = StyleSheet.create({
   },
   momentumGradient: { minHeight: 138, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: 12 },
   momentumCopy: { flex: 1, minWidth: 0 },
-  momentumEyebrow: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "900", letterSpacing: 1.2 },
+  momentumEyebrow: { color: colors.whiteMuted, fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
   momentumTitle: { color: colors.white, fontSize: 19, lineHeight: 25, fontWeight: "900", marginTop: 7 },
-  momentumSubtitle: { color: colors.whiteMuted, fontSize: 10, lineHeight: 15, marginTop: 7 },
+  momentumSubtitle: { color: colors.whiteMuted, fontSize: 14, lineHeight: 20, marginTop: 7 },
   progressBadge: { width: 64, height: 64, borderRadius: 22, backgroundColor: "rgba(2,7,19,0.28)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
   progressValue: { color: colors.white, fontSize: 16, fontWeight: "900" },
-  progressLabel: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "800", marginTop: 1 },
+  progressLabel: { color: colors.whiteMuted, fontSize: 11, fontWeight: "800", marginTop: 1 },
   progressTrack: { height: 4, backgroundColor: "rgba(255,255,255,0.08)" },
   progressFill: { height: 4, borderRadius: 2, backgroundColor: colors.orange },
   starterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 8,
     marginBottom: 9
   },
   starterChip: {
-    minHeight: 46,
+    minHeight: 48,
     maxWidth: "100%",
     paddingHorizontal: 11,
     borderRadius: 999,
@@ -772,9 +771,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
-  starterText: { color: colors.textSecondary, fontSize: 9.5, fontWeight: "800" },
+  starterText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
   inlineRecorderWrap: { marginTop: 9 },
   sectionTitle: {
     ...typography.heading3,
@@ -784,7 +783,7 @@ const styles = StyleSheet.create({
   },
   kindGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   kindButton: {
-    minHeight: 46,
+    minHeight: 48,
     paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
@@ -792,7 +791,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
   kindButtonSelected: {
     borderColor: colors.violet,
@@ -826,7 +825,7 @@ const styles = StyleSheet.create({
   },
   counter: {
     color: colors.textMuted,
-    fontSize: 9,
+    fontSize: 11,
     textAlign: "right",
     marginTop: 4
   },
@@ -853,10 +852,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  suggestionInitials: { color: colors.text, fontSize: 9, fontWeight: "900" },
+  suggestionInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
   suggestionContent: { flex: 1, minWidth: 0 },
   suggestionName: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  suggestionCompany: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
+  suggestionCompany: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   mediaActions: { marginTop: 9, flexDirection: "row", gap: 8 },
   mediaButton: {
     flex: 1,
@@ -868,13 +867,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4
+    gap: 8
   },
-  mediaLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: "900" },
+  mediaLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
   mediaHint: {
     color: colors.textMuted,
-    fontSize: 8.5,
-    lineHeight: 13,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: "center",
     marginTop: 6
   },
@@ -895,7 +894,7 @@ const styles = StyleSheet.create({
   },
   mediaPreviewLabel: {
     color: colors.white,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "900",
     paddingHorizontal: 8,
     paddingVertical: 5,
@@ -903,8 +902,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(2,7,19,0.75)"
   },
   removeMedia: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     backgroundColor: "rgba(2,7,19,0.75)",
     alignItems: "center",
@@ -926,7 +925,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     minHeight: 50,
     color: colors.text,
-    ...typography.bodySmall
+    ...typography.bodySmall,
+    fontSize: 16,
+    lineHeight: 22
   },
   placeSuggestions: {
     marginTop: 7,
@@ -947,7 +948,7 @@ const styles = StyleSheet.create({
   },
   placeContent: { flex: 1, minWidth: 0 },
   placeLabel: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  placeAddress: { color: colors.textMuted, fontSize: 9, marginTop: 2 },
+  placeAddress: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
   currentLocationButton: {
     minHeight: 50,
     marginTop: 8,
@@ -983,12 +984,12 @@ const styles = StyleSheet.create({
   },
   selectedLocationAddress: {
     color: colors.textMuted,
-    fontSize: 9,
+    fontSize: 11,
     marginTop: 2
   },
   removeLocation: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     alignItems: "center",
     justifyContent: "center"
   }

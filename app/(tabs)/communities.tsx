@@ -130,8 +130,8 @@ const styles = StyleSheet.create({
   },
   cardPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
   icon: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 23,
     backgroundColor: colors.primarySoft,
     alignItems: "center",

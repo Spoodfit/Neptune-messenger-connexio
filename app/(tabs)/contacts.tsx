@@ -1,6 +1,7 @@
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { StatusAvatar } from "@/components/StatusAvatar";
 import { env } from "@/config/env";
 import { members } from "@/data/mockData";
 import { colors, radii, spacing, typography } from "@/theme";
@@ -32,11 +33,7 @@ export default function ContactsScreen() {
             accessibilityLabel={`${item.name}. ${item.company}. ${item.city}. ${item.online ? "En ligne" : "Absent"}`}
             style={styles.row}
           >
-            <View style={styles.avatar} accessibilityElementsHidden>
-              <Text style={styles.initials} numberOfLines={1}>
-                {item.initials}
-              </Text>
-            </View>
+            <StatusAvatar user={item} size={46} accessible={false} />
             <View style={styles.content}>
               <Text style={styles.name} numberOfLines={2}>
                 {item.name}
@@ -115,8 +112,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border
   },
   avatar: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
@@ -139,6 +136,8 @@ const styles = StyleSheet.create({
   },
   company: {
     ...typography.caption,
+    fontSize: 14,
+    lineHeight: 20,
     color: colors.textMuted,
     marginTop: 3,
     maxWidth: "100%"

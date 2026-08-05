@@ -83,14 +83,14 @@ const styles = StyleSheet.create({
   intro: { ...typography.body, color: colors.textSecondary, textAlign: "center", marginTop: 8, marginBottom: spacing.lg },
   step: { width: "100%", minHeight: 84, marginBottom: 9, padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "flex-start", gap: 12 },
   stepNumber: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  stepNumberText: { color: colors.orange, fontSize: 13, fontWeight: "900" },
+  stepNumberText: { color: colors.orange, fontSize: 14, fontWeight: "900" },
   stepContent: { flex: 1, minWidth: 0 },
-  stepTitle: { color: colors.text, fontSize: 13, fontWeight: "900" },
+  stepTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
   stepBody: { ...typography.bodySmall, color: colors.textMuted, marginTop: 4 },
   warning: { width: "100%", marginTop: 5, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.warningSoft, flexDirection: "row", alignItems: "flex-start", gap: 10 },
   warningText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
   primaryButton: { width: "100%", minHeight: 52, marginTop: spacing.lg, borderRadius: 18, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   primaryText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   secondaryButton: { minHeight: 48, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center" },
-  secondaryText: { color: colors.orange, fontSize: 12, fontWeight: "800" }
+  secondaryText: { color: colors.orange, fontSize: 14, fontWeight: "800" }
 });

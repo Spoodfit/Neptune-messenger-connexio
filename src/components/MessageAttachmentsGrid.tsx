@@ -207,7 +207,7 @@ export function MessageAttachmentsGrid({
 }
 
 const styles = StyleSheet.create({
-  root: { maxWidth: "100%", gap: 7 },
+  root: { maxWidth: "100%", gap: 8 },
   mediaGrid: {
     width: 268,
     maxWidth: "100%",
@@ -234,12 +234,12 @@ const styles = StyleSheet.create({
   overflow: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(2,7,19,0.68)" },
   overflowText: { color: colors.white, fontSize: 24, fontWeight: "900" },
   downloadBadge: { position: "absolute", right: 6, bottom: 6, width: 29, height: 29, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(2,7,19,0.72)" },
-  fileList: { gap: 6 },
+  fileList: { gap: 8 },
   file: { minWidth: 210, maxWidth: 340, minHeight: 58, padding: 9, borderRadius: 14, backgroundColor: "rgba(2,7,19,0.23)", flexDirection: "row", alignItems: "center", gap: 9 },
   fileIcon: { width: 39, height: 39, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.09)" },
   fileContent: { flex: 1, minWidth: 0 },
   fileName: { fontSize: 11.5, lineHeight: 15, fontWeight: "800" },
-  fileMeta: { fontSize: 8.5, marginTop: 3, fontWeight: "700" },
+  fileMeta: { fontSize: 11, marginTop: 3, fontWeight: "700" },
   mineText: { color: colors.white },
   otherText: { color: colors.text },
   mineMeta: { color: colors.whiteMuted },

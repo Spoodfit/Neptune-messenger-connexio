@@ -215,14 +215,14 @@ const styles = StyleSheet.create({
     zIndex: 2,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4
+    gap: 8
   },
   pressed: { transform: [{ scale: 0.96 }] },
   iconWrap: { position: "relative", width: 28, alignItems: "center" },
   label: {
     maxWidth: "100%",
     color: "#7F8DAB",
-    fontSize: 9.5,
+    fontSize: 11,
     lineHeight: 12,
     fontWeight: "800"
   },
@@ -241,5 +241,5 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.surface
   },
-  badgeText: { color: colors.white, fontSize: 9, fontWeight: "900" }
+  badgeText: { color: colors.white, fontSize: 11, fontWeight: "900" }
 });

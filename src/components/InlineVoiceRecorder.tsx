@@ -198,12 +198,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 8,
     paddingHorizontal: 5,
     overflow: "hidden"
   },
   action: {
-    width: 44,
+    width: 48,
     height: 48,
     alignItems: "center",
     justifyContent: "center"
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     justifyContent: "center"
   },
-  recordingHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  recordingHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   liveDot: {
     width: 7,
     height: 7,
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.danger
   },
   timer: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  status: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  status: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
   waveform: {
     width: "100%",
     height: 31,

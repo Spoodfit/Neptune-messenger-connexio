@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5
+    gap: 8
   },
   compact: {
     minHeight: 22,
@@ -61,6 +61,6 @@ const styles = StyleSheet.create({
     borderRadius: 11
   },
   dot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
-  label: { flexShrink: 1, fontSize: 10, fontWeight: "900" },
-  compactLabel: { fontSize: 8.5 }
+  label: { flexShrink: 1, fontSize: 11, fontWeight: "900" },
+  compactLabel: { fontSize: 11 }
 });
