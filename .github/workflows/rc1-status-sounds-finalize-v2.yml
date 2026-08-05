@@ -31,5 +31,26 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
+      - name: Harden generated message status import
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/rc1_finalize_status_sounds.sh')
+          text = path.read_text(encoding='utf-8')
+          old = "message_bubble.write_text(text, encoding='utf-8')"
+          new = '''if 'getRoleAppearance(' in text and 'domain/roleAppearance' not in text:
+              marker = 'import { colors, gradients, spacing, typography } from "../theme";\\n'
+              if marker not in text:
+                  raise SystemExit('Point d’insertion de l’import de statut introuvable.')
+              text = text.replace(
+                  marker,
+                  'import { getRoleAppearance } from "../domain/roleAppearance";\\n' + marker,
+                  1,
+              )
+          message_bubble.write_text(text, encoding='utf-8')'''
+          if text.count(old) != 1:
+              raise SystemExit('Point de durcissement MessageBubble ambigu.')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Apply, audit and publish validated RC1
         run: bash scripts/rc1_finalize_status_sounds.sh
