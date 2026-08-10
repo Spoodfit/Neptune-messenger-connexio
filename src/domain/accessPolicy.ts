@@ -7,8 +7,13 @@ import {
   normalizeUserRole
 } from "./roles";
 
-export const TRITON_CHECKOUT_URL =
-  "https://checkout.stripe.com/c/pay/cs_live_b1YnwZceomiOzdr1OrAv6pfplZ6rUUIkjL8UOM1w63Oa4NWOwwRSLKFJTR#fidnandhYHdWcXxpYCc%2FJ2FgY2RwaXEnKSd2cGd2ZndsdXFsamtQa2x0cGBrYHZ2QGtkZ2lgYSc%2FY2RpdmApJ2JwZGZkaGppYFNkd2xka3EnPydmamtxd2ppJyknZHVsTmB8Jz8ndW5aaWxzYFowNFZVTlVrQ0dNUFVcQW9VdmFLQGJvMGNhPTRMRD1kd11cREpvUFFcS0NjQ1Q2XzN1XVZHbFNHSGNMMG5KSmNzfFFHbGNGM2BGbldvcWBAZFFHaTxmU3JsbDU1N1JcPHJLcm4nKSdjd2poVmB3c2B3Jz9xd3BgKSdnZGZuYndqcGthRmppancnPycmY2NjY2NjJyknaWR8anBxUXx1YCc%2FJ2hwaXFsWmxxYGgnKSdga2RnaWBVaWRmYG1qaWFgd3YnP3F3cGB4JSUl";
+/**
+ * Store builds must not direct users to an external checkout to unlock digital
+ * functionality. Existing Neptune memberships are recognized by the backend;
+ * this route only explains the access level inside Connexio and contains no
+ * purchase link.
+ */
+export const TRITON_CHECKOUT_URL = "neptuneconnexio://membership-required";
 
 export function isFreeRole(role: UserRole): boolean {
   return normalizeUserRole(role) === "free";
