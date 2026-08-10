@@ -1,73 +1,88 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { env } from "@/config/env";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 
 const sections = [
   {
     icon: "location-outline" as const,
     title: "Localisation et Map",
-    body: "Position approximative uniquement, rayon minimal, durée de conservation courte et Ghost Mode appliqué côté serveur."
+    body: "La localisation n’est utilisée que lorsque vous déclenchez une fonction qui en a besoin. Vous pouvez utiliser le Ghost Mode et modifier vos autorisations depuis les réglages du téléphone."
   },
   {
     icon: "people-outline" as const,
     title: "Visibilité du profil",
-    body: "Photo, téléphone, présence et publications doivent respecter les préférences synchronisées depuis Neptune Business."
+    body: "La visibilité de votre photo, téléphone, présence, localisation approximative et contenus dépend de vos réglages et des règles de votre espace Neptune."
   },
   {
     icon: "lock-closed-outline" as const,
     title: "Conversations",
-    body: "Les messages, pièces jointes et notifications ne sont accessibles qu’aux membres autorisés de la conversation."
+    body: "Les messages, pièces jointes, appels et notifications sont réservés aux membres autorisés de la conversation et protégés par les contrôles d’accès Neptune."
   },
   {
     icon: "shield-checkmark-outline" as const,
     title: "Blocage et signalement",
-    body: "Le blocage doit interrompre les messages, appels, mentions et visibilité selon les règles de modération Neptune."
+    body: "Vous pouvez bloquer un membre et signaler un profil ou un contenu. Les signalements sont transmis à la modération Neptune."
   }
 ];
 
-const accountRights: Array<{ title: string; subtitle: string }> = [
-  {
-    title: "Télécharger mes données",
-    subtitle: "Le backend doit générer une archive sécurisée et temporaire."
-  },
-  {
-    title: "Supprimer mon compte",
-    subtitle:
-      "La suppression doit révoquer les sessions, traiter les contenus et respecter les obligations légales."
-  },
-  {
-    title: "Historique des appareils",
-    subtitle:
-      "Les sessions actives doivent être visibles et révocables individuellement."
+async function openExternalUrl(label: string, url: string): Promise<void> {
+  if (!url) {
+    Alert.alert(label, "Ce lien est temporairement indisponible.");
+    return;
   }
-];
+  const supported = await Linking.canOpenURL(url);
+  if (!supported) {
+    Alert.alert(label, "Ce lien ne peut pas être ouvert sur cet appareil.");
+    return;
+  }
+  await Linking.openURL(url);
+}
 
 export default function PrivacyScreen() {
   const insets = useSafeAreaInsets();
+
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.sm) }]}>
-        <Pressable onPress={() => router.back()} style={styles.headerButton}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+          onPress={() => router.back()}
+          style={styles.headerButton}
+        >
           <Ionicons name="chevron-back" size={25} color={colors.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Confidentialité</Text>
+        <Text accessibilityRole="header" style={styles.headerTitle}>
+          Confidentialité
+        </Text>
         <View style={styles.headerButton} />
       </View>
+
       <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(insets.bottom, spacing.xl) }
         ]}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
           <Ionicons name="shield-checkmark" size={34} color={colors.success} />
           <Text style={styles.title}>Vos données restent sous votre contrôle</Text>
           <Text style={styles.intro}>
-            Cet écran définit les parcours front. Les choix doivent être persistés, appliqués et audités par le backend Neptune.
+            Gérez ici les informations essentielles liées à la confidentialité, à la modération et à vos droits sur votre compte Connexio.
           </Text>
         </View>
 
@@ -83,25 +98,107 @@ export default function PrivacyScreen() {
           </View>
         ))}
 
-        <Text style={styles.sectionTitle}>Droits du compte</Text>
-        {accountRights.map((right) => (
-          <Pressable
-            key={right.title}
-            onPress={() =>
-              Alert.alert(
-                right.title,
-                `${right.subtitle}\n\nLe front est prêt ; l’action serveur doit être connectée avant le pilote.`
-              )
-            }
-            style={styles.actionRow}
-          >
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>{right.title}</Text>
-              <Text style={styles.actionSubtitle}>{right.subtitle}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={19} color={colors.textMuted} />
-          </Pressable>
-        ))}
+        <Text style={styles.sectionTitle}>Documents et droits</Text>
+
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Lire la politique de confidentialité"
+          onPress={() => void openExternalUrl("Politique de confidentialité", env.privacyPolicyUrl)}
+          style={styles.actionRow}
+        >
+          <View style={styles.actionIcon}>
+            <Ionicons name="document-text-outline" size={20} color={colors.text} />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Politique de confidentialité</Text>
+            <Text style={styles.actionSubtitle}>
+              Données collectées, finalités, destinataires, conservation et exercice de vos droits.
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={19} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Lire les conditions d’utilisation"
+          onPress={() => void openExternalUrl("Conditions d’utilisation", env.termsUrl)}
+          style={styles.actionRow}
+        >
+          <View style={styles.actionIcon}>
+            <Ionicons name="reader-outline" size={20} color={colors.text} />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Conditions d’utilisation</Text>
+            <Text style={styles.actionSubtitle}>
+              Conditions applicables à l’utilisation des services Neptune et de Connexio.
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={19} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir les règles communautaires"
+          onPress={() => router.push("/community-guidelines")}
+          style={styles.actionRow}
+        >
+          <View style={styles.actionIcon}>
+            <Ionicons name="people-circle-outline" size={20} color={colors.text} />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Règles communautaires</Text>
+            <Text style={styles.actionSubtitle}>
+              Contenus interdits, signalement, blocage et règles de modération.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={19} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Gérer l’export et la suppression du compte"
+          onPress={() => router.push("/account")}
+          style={styles.actionRow}
+        >
+          <View style={styles.actionIcon}>
+            <Ionicons name="person-circle-outline" size={20} color={colors.text} />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Mes données et mon compte</Text>
+            <Text style={styles.actionSubtitle}>
+              Télécharger vos données, consulter vos sessions ou demander la suppression de votre compte.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={19} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Accéder à la page de suppression du compte"
+          onPress={() => void openExternalUrl("Suppression du compte", env.accountDeletionUrl)}
+          style={styles.actionRow}
+        >
+          <View style={styles.actionIcon}>
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+          </View>
+          <View style={styles.actionContent}>
+            <Text style={styles.actionTitle}>Suppression du compte sur le web</Text>
+            <Text style={styles.actionSubtitle}>
+              Accéder à la procédure de suppression même si vous ne pouvez plus utiliser l’application.
+            </Text>
+          </View>
+          <Ionicons name="open-outline" size={19} color={colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Contacter le support Neptune"
+          onPress={() => void openExternalUrl("Support Neptune", env.supportUrl)}
+          style={styles.supportButton}
+        >
+          <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+          <Text style={styles.supportText}>Contacter le support Neptune</Text>
+        </Pressable>
       </ScrollView>
     </LinearGradient>
   );
@@ -176,7 +273,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   actionRow: {
-    minHeight: 76,
+    minHeight: 82,
     marginBottom: 8,
     padding: spacing.md,
     borderRadius: radii.lg,
@@ -187,12 +284,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10
   },
+  actionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   actionContent: { flex: 1, minWidth: 0 },
   actionTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
   actionSubtitle: {
     color: colors.textMuted,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 14,
+    lineHeight: 20,
     marginTop: 3
-  }
+  },
+  supportButton: {
+    minHeight: 48,
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  supportText: { color: colors.textSecondary, fontSize: 14, fontWeight: "800" }
 });
