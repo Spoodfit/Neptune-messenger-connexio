@@ -92,7 +92,14 @@ for (const marker of [
 }
 
 const sourceExtensions = new Set([".ts", ".tsx", ".js", ".cjs", ".mjs", ".json", ".md", ".html"]);
-const textFiles = repositoryFiles.filter((file) => sourceExtensions.has(path.extname(file)));
+const scannerImplementationFiles = new Set([
+  "scripts/release-candidate-audit.cjs"
+]);
+const textFiles = repositoryFiles.filter(
+  (file) =>
+    sourceExtensions.has(path.extname(file)) &&
+    !scannerImplementationFiles.has(file)
+);
 const forbiddenStoreMarkers = [
   "checkout.stripe.com",
   "buy.stripe.com",
@@ -120,7 +127,7 @@ for (const marker of [
 }
 
 const publicTerms = fs.readFileSync(path.join(root, "public/connexio-terms.html"), "utf8");
-for (const marker of ["Contenus générés par les utilisateurs", "Signalement, blocage et modération"] ) {
+for (const marker of ["Contenus générés par les utilisateurs", "Signalement, blocage et modération"]) {
   if (!publicTerms.includes(marker)) {
     throw new Error(`Conditions Connexio incomplètes : ${marker}`);
   }
