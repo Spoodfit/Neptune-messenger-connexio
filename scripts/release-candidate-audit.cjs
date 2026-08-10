@@ -15,7 +15,12 @@ const requiredFiles = [
   "docs/INTEGRATION_MATRIX.md",
   "src/config/integrationRegistry.ts",
   "src/domain/accessPolicy.ts",
-  "src/domain/roleAppearance.ts"
+  "src/domain/roleAppearance.ts",
+  "app/community-guidelines.tsx",
+  "app/membership-required.tsx",
+  "public/privacy-policy.html",
+  "public/connexio-terms.html",
+  "public/account-deletion.html"
 ];
 
 const forbiddenNames = [
@@ -62,11 +67,16 @@ for (const marker of [
   "privacyManifests",
   "connexio_notification.mp3",
   "EXPO_PUBLIC_ACCOUNT_DELETION_URL",
-  "EXPO_PUBLIC_PRIVACY_POLICY_URL"
+  "EXPO_PUBLIC_PRIVACY_POLICY_URL",
+  "EXPO_PUBLIC_TERMS_URL",
+  "PUBLIC_POLICY_BASE_URL"
 ]) {
   if (!appConfig.includes(marker)) {
     throw new Error(`Configuration store incomplète : ${marker}`);
   }
+}
+if (appConfig.includes('"ACCESS_FINE_LOCATION"')) {
+  throw new Error("Permission Android ACCESS_FINE_LOCATION interdite sans besoin produit prouvé.");
 }
 
 const accessPolicy = fs.readFileSync(path.join(root, "src/domain/accessPolicy.ts"), "utf8");
@@ -81,4 +91,46 @@ for (const marker of [
   }
 }
 
-console.log(`Audit RC réussi : ${repositoryFiles.length} fichiers contrôlés.`);
+const sourceExtensions = new Set([".ts", ".tsx", ".js", ".cjs", ".mjs", ".json", ".md", ".html"]);
+const scannerImplementationFiles = new Set([
+  "scripts/release-candidate-audit.cjs"
+]);
+const textFiles = repositoryFiles.filter(
+  (file) =>
+    sourceExtensions.has(path.extname(file)) &&
+    !scannerImplementationFiles.has(file)
+);
+const forbiddenStoreMarkers = [
+  "checkout.stripe.com",
+  "buy.stripe.com",
+  "Le front est prêt ; l’action serveur doit être connectée avant le pilote",
+  "Cet écran définit les parcours front"
+];
+for (const file of textFiles) {
+  const content = fs.readFileSync(path.join(root, file), "utf8");
+  const marker = forbiddenStoreMarkers.find((value) => content.includes(value));
+  if (marker) {
+    throw new Error(`Contenu interdit pour une release Store dans ${file} : ${marker}`);
+  }
+}
+
+const privacyScreen = fs.readFileSync(path.join(root, "app/privacy.tsx"), "utf8");
+for (const marker of [
+  "env.privacyPolicyUrl",
+  "env.termsUrl",
+  "env.accountDeletionUrl",
+  'router.push("/community-guidelines")'
+]) {
+  if (!privacyScreen.includes(marker)) {
+    throw new Error(`Parcours confidentialité incomplet : ${marker}`);
+  }
+}
+
+const publicTerms = fs.readFileSync(path.join(root, "public/connexio-terms.html"), "utf8");
+for (const marker of ["Contenus générés par les utilisateurs", "Signalement, blocage et modération"]) {
+  if (!publicTerms.includes(marker)) {
+    throw new Error(`Conditions Connexio incomplètes : ${marker}`);
+  }
+}
+
+console.log(`Audit RC/store réussi : ${repositoryFiles.length} fichiers contrôlés.`);

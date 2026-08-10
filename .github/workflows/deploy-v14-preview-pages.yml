@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - release/connexio-rc1
+      - store/go-store-hardening
   workflow_dispatch:
 
 permissions:
@@ -18,10 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout RC1
+      - name: Checkout release source
         uses: actions/checkout@v4
-        with:
-          ref: release/connexio-rc1
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -32,16 +31,23 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Build RC1 web preview
+      - name: Build web preview and public store documents
         env:
           EXPO_PUBLIC_MOCK_MODE: "true"
           EXPO_PUBLIC_GITHUB_PAGES: "true"
           EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
           EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
-          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusiness.com/confidentialite
-          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusiness.com/suppression-compte
-          EXPO_PUBLIC_SUPPORT_URL: https://neptunebusiness.com/contact
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusinessclub.github.io/Neptune-messenger-connexio/privacy-policy.html
+          EXPO_PUBLIC_TERMS_URL: https://neptunebusinessclub.github.io/Neptune-messenger-connexio/connexio-terms.html
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusinessclub.github.io/Neptune-messenger-connexio/account-deletion.html
+          EXPO_PUBLIC_SUPPORT_URL: mailto:contact@neptunebusiness.com
         run: npm run web:build
+
+      - name: Ensure store policy documents are published
+        run: |
+          test -f dist/privacy-policy.html
+          test -f dist/connexio-terms.html
+          test -f dist/account-deletion.html
 
       - name: Adapt build for project Pages URL
         run: |
@@ -71,14 +77,14 @@ jobs:
           (root / '.nojekyll').write_text('', encoding='utf-8')
           PY
 
-      - name: Publish RC1 preview
+      - name: Publish preview
         run: |
           cd dist
           git init
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Deploy Connexio RC1 preview ${GITHUB_SHA}"
+          git commit -m "Deploy Connexio preview ${GITHUB_SHA}"
           git branch -M gh-pages
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin gh-pages
