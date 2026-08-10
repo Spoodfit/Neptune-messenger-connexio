@@ -1,0 +1,48 @@
+name: Temporary Expo alignment
+
+on:
+  push:
+    branches:
+      - store/go-store-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  align:
+    if: "!contains(github.event.head_commit.message, 'chore(deps): align Expo SDK 57 patches')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: store/go-store-hardening
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Align Expo SDK 57 patch versions
+        run: >-
+          npx expo install
+          expo@~57.0.11
+          expo-image-picker@~57.0.8
+          expo-location@~57.0.8
+          expo-notifications@~57.0.9
+          expo-router@~57.0.11
+      - name: Verify Expo compatibility
+        run: npx expo install --check
+      - name: Commit lockfile alignment
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "Dependencies already aligned."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore(deps): align Expo SDK 57 patches"
+          git push origin HEAD:store/go-store-hardening
