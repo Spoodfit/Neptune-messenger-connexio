@@ -3,6 +3,8 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 const APP_VERSION = "1.0.0";
 const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
 const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
+const PUBLIC_POLICY_BASE_URL =
+  "https://neptunebusinessclub.github.io/Neptune-messenger-connexio";
 
 function requireHttps(name: string, value: string): void {
   if (!value.startsWith("https://")) {
@@ -17,12 +19,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const businessWebBaseUrl =
     process.env.EXPO_PUBLIC_BUSINESS_WEB_BASE_URL ??
     "https://neptunebusiness.com";
-  const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? "";
+  const privacyPolicyUrl =
+    process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ??
+    `${PUBLIC_POLICY_BASE_URL}/privacy-policy.html`;
   const termsUrl =
     process.env.EXPO_PUBLIC_TERMS_URL ??
-    "https://www.neptunebusiness.com/condition-generale-utilisation";
+    `${PUBLIC_POLICY_BASE_URL}/connexio-terms.html`;
   const accountDeletionUrl =
-    process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ?? "";
+    process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ??
+    `${PUBLIC_POLICY_BASE_URL}/account-deletion.html`;
   const supportUrl =
     process.env.EXPO_PUBLIC_SUPPORT_URL ??
     "mailto:contact@neptunebusiness.com";
@@ -40,7 +45,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID",
       !privacyPolicyUrl && "EXPO_PUBLIC_PRIVACY_POLICY_URL",
       !termsUrl && "EXPO_PUBLIC_TERMS_URL",
-      !accountDeletionUrl && "EXPO_PUBLIC_ACCOUNT_DELETION_URL"
+      !accountDeletionUrl && "EXPO_PUBLIC_ACCOUNT_DELETION_URL",
+      !supportUrl && "EXPO_PUBLIC_SUPPORT_URL"
     ].filter(Boolean);
     if (mockMode) {
       throw new Error("EXPO_PUBLIC_MOCK_MODE doit être false pour une build store.");
@@ -60,6 +66,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     requireHttps("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);
     requireHttps("EXPO_PUBLIC_TERMS_URL", termsUrl);
     requireHttps("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);
+    if (!supportUrl.startsWith("https://") && !supportUrl.startsWith("mailto:")) {
+      throw new Error(
+        "EXPO_PUBLIC_SUPPORT_URL doit utiliser HTTPS ou mailto: pour une build store."
+      );
+    }
   }
 
   return {
@@ -136,8 +147,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         "POST_NOTIFICATIONS",
         "CAMERA",
         "RECORD_AUDIO",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     plugins: [
