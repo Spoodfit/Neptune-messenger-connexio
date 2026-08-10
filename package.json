@@ -19,8 +19,9 @@
     "verify": "npm run typecheck && npm test",
     "doctor": "npx expo-doctor",
     "prebuild": "expo prebuild",
+    "audit:dependencies": "node scripts/npm-production-audit.cjs",
     "audit:rc": "node scripts/release-candidate-audit.cjs",
-    "verify:rc": "npm run verify && npm run audit:rc && npx expo install --check",
+    "verify:rc": "npm run verify && npm run audit:dependencies && npm run audit:rc && npx expo install --check",
     "build:preview": "eas build --profile preview --platform all",
     "build:rc": "eas build --profile release-candidate --platform all",
     "build:production": "eas build --profile production --platform all"
