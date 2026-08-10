@@ -16,6 +16,8 @@ interface AppExtra {
   };
 }
 
+const PUBLIC_POLICY_BASE_URL =
+  "https://neptunebusinessclub.github.io/Neptune-messenger-connexio";
 const extra = (Constants.expoConfig?.extra ?? {}) as AppExtra;
 
 export const env = {
@@ -23,11 +25,12 @@ export const env = {
   realtimeUrl: extra.realtimeUrl ?? "",
   businessWebBaseUrl:
     extra.businessWebBaseUrl ?? "https://neptunebusiness.com",
-  privacyPolicyUrl: extra.privacyPolicyUrl ?? "",
+  privacyPolicyUrl:
+    extra.privacyPolicyUrl ?? `${PUBLIC_POLICY_BASE_URL}/privacy-policy.html`,
   termsUrl:
-    extra.termsUrl ??
-    "https://www.neptunebusiness.com/condition-generale-utilisation",
-  accountDeletionUrl: extra.accountDeletionUrl ?? "",
+    extra.termsUrl ?? `${PUBLIC_POLICY_BASE_URL}/connexio-terms.html`,
+  accountDeletionUrl:
+    extra.accountDeletionUrl ?? `${PUBLIC_POLICY_BASE_URL}/account-deletion.html`,
   supportUrl: extra.supportUrl ?? "mailto:contact@neptunebusiness.com",
   mockMode: extra.mockMode === true,
   buildProfile: extra.buildProfile ?? "development",
