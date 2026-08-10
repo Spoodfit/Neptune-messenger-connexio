@@ -5,10 +5,26 @@ const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
 const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
 const PUBLIC_POLICY_BASE_URL =
   "https://neptunebusinessclub.github.io/Neptune-messenger-connexio";
+const LEGACY_STORE_URLS = new Set([
+  "https://neptunebusiness.com/confidentialite",
+  "https://www.neptunebusiness.com/confidentialite",
+  "https://neptunebusiness.com/suppression-compte",
+  "https://www.neptunebusiness.com/suppression-compte",
+  "https://www.neptunebusiness.com/condition-generale-utilisation",
+  "https://neptunebusiness.com/condition-generale-utilisation"
+]);
 
 function requireHttps(name: string, value: string): void {
   if (!value.startsWith("https://")) {
     throw new Error(`${name} doit utiliser HTTPS en production.`);
+  }
+}
+
+function rejectLegacyStoreUrl(name: string, value: string): void {
+  if (LEGACY_STORE_URLS.has(value.replace(/\/$/, ""))) {
+    throw new Error(
+      `${name} pointe vers une ancienne page non dédiée à Connexio. Utilisez les documents Connexio validés.`
+    );
   }
 }
 
@@ -66,6 +82,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     requireHttps("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);
     requireHttps("EXPO_PUBLIC_TERMS_URL", termsUrl);
     requireHttps("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);
+    rejectLegacyStoreUrl("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);
+    rejectLegacyStoreUrl("EXPO_PUBLIC_TERMS_URL", termsUrl);
+    rejectLegacyStoreUrl("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);
     if (!supportUrl.startsWith("https://") && !supportUrl.startsWith("mailto:")) {
       throw new Error(
         "EXPO_PUBLIC_SUPPORT_URL doit utiliser HTTPS ou mailto: pour une build store."
