@@ -5,6 +5,7 @@ import { capabilitiesForBackendContract } from "../src/config/backendCapabilitie
 import { env } from "../src/config/env";
 
 const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
+const MESSAGING_AVAILABLE = env.mockMode || BACKEND_CAPABILITIES.messaging;
 
 export default function IndexRoute() {
   const { isAuthenticated } = useSession();
@@ -12,7 +13,7 @@ export default function IndexRoute() {
     <Redirect
       href={
         isAuthenticated
-          ? BACKEND_CAPABILITIES.messaging
+          ? MESSAGING_AVAILABLE
             ? "/(tabs)/messages"
             : "/(tabs)/highlights"
           : "/sign-in"

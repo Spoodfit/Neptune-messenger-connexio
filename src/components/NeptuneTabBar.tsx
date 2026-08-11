@@ -23,6 +23,7 @@ import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
 import { env } from "@/config/env";
 
 const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
+const CALLS_AVAILABLE = env.mockMode || BACKEND_CAPABILITIES.calls;
 
 type TabsProps = ComponentProps<typeof Tabs>;
 type NeptuneTabBarProps = Parameters<NonNullable<TabsProps["tabBar"]>>[0];
@@ -63,7 +64,7 @@ export function NeptuneTabBar({
     () =>
       state.routes.filter((route) => {
         if (!(route.name in ICONS)) return false;
-        if (route.name === "calls" && !BACKEND_CAPABILITIES.calls) return false;
+        if (route.name === "calls" && !CALLS_AVAILABLE) return false;
         return true;
       }),
     [state.routes]

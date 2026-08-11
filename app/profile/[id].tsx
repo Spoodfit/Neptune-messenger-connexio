@@ -76,7 +76,7 @@ export default function MemberProfileScreen() {
   );
 
   const ensureConversation = async () => {
-    if (!BACKEND_CAPABILITIES.messaging) {
+    if (!env.mockMode && !BACKEND_CAPABILITIES.messaging) {
       throw new Error("La messagerie sécurisée Connexio n’est pas encore activée.");
     }
     if (!canInitiatePrivateInteraction(currentUser.role)) {

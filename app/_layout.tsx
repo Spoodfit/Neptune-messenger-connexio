@@ -27,6 +27,8 @@ import { colors } from "../src/theme";
 
 configureNotificationPresentation();
 const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
+const MESSAGING_AVAILABLE = env.mockMode || BACKEND_CAPABILITIES.messaging;
+const CALLS_AVAILABLE = env.mockMode || BACKEND_CAPABILITIES.calls;
 
 const PUBLIC_ROUTES = new Set(["sign-in", "access-help", "privacy"]);
 const MESSAGING_ROUTES = new Set([
@@ -59,11 +61,11 @@ function AuthenticatedApp() {
   const onPublicRoute =
     typeof currentRootSegment === "string" && PUBLIC_ROUTES.has(currentRootSegment);
   const onUnavailableMessagingRoute =
-    !BACKEND_CAPABILITIES.messaging &&
+    !MESSAGING_AVAILABLE &&
     typeof currentRootSegment === "string" &&
     MESSAGING_ROUTES.has(currentRootSegment);
   const onUnavailableCallRoute =
-    !BACKEND_CAPABILITIES.calls &&
+    !CALLS_AVAILABLE &&
     (currentRootSegment === "call" ||
       (currentRootSegment === "(tabs)" && secondarySegment === "calls"));
 
@@ -79,7 +81,7 @@ function AuthenticatedApp() {
 
     if (onSignInRoute) {
       router.replace(
-        BACKEND_CAPABILITIES.messaging
+        MESSAGING_AVAILABLE
           ? "/(tabs)/messages"
           : "/(tabs)/highlights"
       );
