@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { env } from "../config/env";
+import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import {
   latestPersistedMessageId,
   mergeMessagesNewestFirst
@@ -52,6 +53,7 @@ import { useActionSounds } from "../services/audio/actionSounds";
 export type ConnectionState = "offline" | "connecting" | "online";
 
 interface MessagingContextValue {
+  serviceAvailable: boolean;
   visibleConversations: Conversation[];
   getConversation: (conversationId: string) => Conversation | undefined;
   getMessages: (conversationId: string) => ChatMessage[];
@@ -76,6 +78,7 @@ interface MessagingContextValue {
 }
 
 const MessagingContext = createContext<MessagingContextValue | null>(null);
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 const sleep = (duration: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, duration));
 const demoConversations: Conversation[] = initialConversations.map(
@@ -97,7 +100,10 @@ export function MessagingProvider({ children }: PropsWithChildren) {
   const [nextCursorByConversation, setNextCursorByConversation] = useState<
     Record<string, string | null | undefined>
   >({});
-  const [loadingConversations, setLoadingConversations] = useState(!env.mockMode);
+  const serviceAvailable = env.mockMode || BACKEND_CAPABILITIES.messaging;
+  const [loadingConversations, setLoadingConversations] = useState(
+    !env.mockMode && serviceAvailable
+  );
   const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(
     new Set()
   );
@@ -123,7 +129,10 @@ export function MessagingProvider({ children }: PropsWithChildren) {
     seededMockMessagesRef.current = true;
   }
   const api = useMemo(
-    () => (env.mockMode ? null : new NeptuneMessagingApi(accessToken)),
+    () =>
+      env.mockMode || !serviceAvailable
+        ? null
+        : new NeptuneMessagingApi(accessToken),
     [accessToken]
   );
 
@@ -756,6 +765,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<MessagingContextValue>(
     () => ({
+      serviceAvailable,
       visibleConversations,
       getConversation,
       getMessages,
@@ -787,6 +797,7 @@ export function MessagingProvider({ children }: PropsWithChildren) {
       refreshConversations,
       retryMessage,
       sendMessage,
+      serviceAvailable,
       visibleConversations
     ]
   );

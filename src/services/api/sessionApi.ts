@@ -34,6 +34,14 @@ export class NeptuneSessionApi implements SessionApi {
     return normalizeAppUser(unwrapUser(payload));
   }
 
+  async refreshCookieSession(): Promise<AppUser> {
+    await apiRequest("/v1/auth/refresh", {
+      method: "POST",
+      credentials: "include"
+    });
+    return this.getCurrentUser();
+  }
+
   async logoutCookieSession(): Promise<void> {
     await apiRequest("/v1/auth/logout", {
       method: "POST",

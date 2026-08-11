@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HighlightMediaView } from "@/components/HighlightMediaView";
 import { InlineVoiceRecorder } from "@/components/InlineVoiceRecorder";
+import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
 import { env } from "@/config/env";
 import {
   canPublishHighlightKind,
@@ -51,6 +52,11 @@ const KINDS: Array<{
   { value: "reussite", label: "Réussite", icon: "trophy-outline" },
   { value: "offre", label: "Offre", icon: "pricetag-outline" }
 ];
+
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
+const AVAILABLE_KINDS = BACKEND_CAPABILITIES.highlightsCommunity
+  ? KINDS
+  : KINDS.filter((item) => item.value === "besoin");
 
 const HIGHLIGHT_PROMPTS: Record<HighlightKind, string> = {
   standard: "Qu’est-ce qui mérite d’être partagé maintenant ?",
@@ -98,7 +104,9 @@ export default function NewHighlightScreen() {
     () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
     [accessToken]
   );
-  const [kind, setKind] = useState<HighlightKind>("standard");
+  const [kind, setKind] = useState<HighlightKind>(
+    BACKEND_CAPABILITIES.highlightsCommunity ? "standard" : "besoin"
+  );
   const [body, setBody] = useState("");
   const [media, setMedia] = useState<HighlightMedia | undefined>();
   const [voiceRecorderOpen, setVoiceRecorderOpen] = useState(false);
@@ -339,7 +347,8 @@ export default function NewHighlightScreen() {
             media: readyMedia,
             mentionedUserIds,
             coordinates,
-            location: selectedLocation ?? undefined
+            location: selectedLocation ?? undefined,
+            author: currentUser
           })
         : createPost({
             kind,
@@ -459,7 +468,7 @@ style={[
 
         <Text style={styles.sectionTitle}>Donnez le ton</Text>
         <View style={styles.kindGrid}>
-          {KINDS.map((item) => {
+          {AVAILABLE_KINDS.map((item) => {
             const selected = kind === item.value;
             return (
               <Pressable
@@ -773,7 +782,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8
   },
-  starterText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
+  starterText: { color: colors.textSecondary, fontSize: 14, fontWeight: "800" },
   inlineRecorderWrap: { marginTop: 9 },
   sectionTitle: {
     ...typography.heading3,

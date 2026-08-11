@@ -36,6 +36,7 @@ function matchesMention(conversation: Conversation, aliases: string[]): boolean 
 
 export default function MessagesScreen() {
   const {
+    serviceAvailable,
     visibleConversations,
     getMessages,
     refreshConversations,
@@ -157,6 +158,34 @@ export default function MessagesScreen() {
     }
     closeMenu();
   };
+
+  if (!serviceAvailable) {
+    return (
+      <LinearGradient colors={gradients.screen} style={styles.screen}>
+        <BrandHeader
+          title="Messages"
+          subtitle="Activation du backend sécurisé requise."
+        />
+        <View style={styles.feedbackWrap}>
+          <LinearGradient colors={gradients.glass} style={styles.feedback}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={36}
+              color={colors.violet}
+            />
+            <Text accessibilityRole="header" style={styles.feedbackTitle}>
+              Messagerie temporairement protégée
+            </Text>
+            <Text style={styles.feedbackText}>
+              Le compte Neptune, l’annuaire, les besoins et les avantages sont
+              connectés. Les conversations resteront désactivées jusqu’à ce que le
+              backend vérifie systématiquement l’appartenance à chaque discussion.
+            </Text>
+          </LinearGradient>
+        </View>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>

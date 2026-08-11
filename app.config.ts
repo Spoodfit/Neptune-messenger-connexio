@@ -1,10 +1,11 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
 const APP_VERSION = "1.0.0";
+const EAS_PROJECT_ID = "d2288b09-8249-4879-810f-7cb0072baeeb";
 const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
 const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
 const PUBLIC_POLICY_BASE_URL =
-  "https://neptunebusinessclub.github.io/Neptune-messenger-connexio";
+  "https://spoodfit.github.io/Neptune-messenger-connexio";
 const LEGACY_STORE_URLS = new Set([
   "https://neptunebusiness.com/confidentialite",
   "https://www.neptunebusiness.com/confidentialite",
@@ -29,7 +30,8 @@ function rejectLegacyStoreUrl(name: string, value: string): void {
 }
 
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? "";
+  const easProjectId =
+    process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? EAS_PROJECT_ID;
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   const realtimeUrl = process.env.EXPO_PUBLIC_REALTIME_URL ?? "";
   const businessWebBaseUrl =
@@ -47,6 +49,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const supportUrl =
     process.env.EXPO_PUBLIC_SUPPORT_URL ??
     "mailto:contact@neptunebusiness.com";
+  const backendContract =
+    process.env.EXPO_PUBLIC_BACKEND_CONTRACT ?? "neptune-web-v1";
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
   const isProduction = buildProfile === "production";
@@ -57,7 +61,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   if (isStoreBuild) {
     const missing = [
       !apiBaseUrl && "EXPO_PUBLIC_API_BASE_URL",
-      !realtimeUrl && "EXPO_PUBLIC_REALTIME_URL",
+      backendContract === "connexio-v1" &&
+        !realtimeUrl &&
+        "EXPO_PUBLIC_REALTIME_URL",
       !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID",
       !privacyPolicyUrl && "EXPO_PUBLIC_PRIVACY_POLICY_URL",
       !termsUrl && "EXPO_PUBLIC_TERMS_URL",
@@ -72,8 +78,25 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         `Configuration Connexio store incomplète : ${missing.join(", ")}`
       );
     }
+    if (
+      backendContract !== "neptune-web-v1" &&
+      backendContract !== "connexio-v1"
+    ) {
+      throw new Error(
+        "EXPO_PUBLIC_BACKEND_CONTRACT doit valoir neptune-web-v1 ou connexio-v1."
+      );
+    }
+    if (isProduction && backendContract !== "connexio-v1") {
+      throw new Error(
+        "Build Store bloquée : le backend ne déclare pas encore le contrat sécurisé connexio-v1."
+      );
+    }
     requireHttps("EXPO_PUBLIC_API_BASE_URL", apiBaseUrl);
-    if (!realtimeUrl.startsWith("wss://") && !realtimeUrl.startsWith("https://")) {
+    if (
+      backendContract === "connexio-v1" &&
+      !realtimeUrl.startsWith("wss://") &&
+      !realtimeUrl.startsWith("https://")
+    ) {
       throw new Error(
         "EXPO_PUBLIC_REALTIME_URL doit utiliser WSS ou HTTPS pour une build store."
       );
@@ -157,6 +180,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       package: "com.neptunebusiness.connexio",
       icon: "./assets/icon.png",
+      blockedPermissions: ["android.permission.ACCESS_FINE_LOCATION"],
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#020713"
@@ -177,11 +201,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           image: "./assets/splash-icon.png",
           imageWidth: 220,
           resizeMode: "contain",
-          backgroundColor: "#020713",
-          dark: {
-            image: "./assets/splash-icon.png",
-            backgroundColor: "#020713"
-          }
+          backgroundColor: "#020713"
         }
       ],
       "expo-audio",
@@ -199,6 +219,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         }
       ],
       "expo-secure-store",
+      "expo-system-ui",
       [
         "expo-sqlite",
         {
@@ -242,6 +263,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       termsUrl,
       accountDeletionUrl,
       supportUrl,
+      backendContract,
       mockMode,
       buildProfile,
       releaseStage: isProduction

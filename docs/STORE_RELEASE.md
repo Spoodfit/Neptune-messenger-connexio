@@ -2,7 +2,7 @@
 
 ## Avant toute soumission
 
-- créer le projet EAS et renseigner `EXPO_PUBLIC_EAS_PROJECT_ID` ;
+- utiliser le projet EAS Connexio déjà lié (`d2288b09-8249-4879-810f-7cb0072baeeb`) ;
 - ajouter les identifiants Apple Developer et Google Play Console ;
 - configurer APNs et FCM v1 ;
 - ajouter l’icône 1024 × 1024, le splash screen et les captures ;
@@ -19,11 +19,14 @@
 ## Builds
 
 ```bash
-npx eas init
+npx eas-cli project:info
+npx eas-cli credentials --platform android
 npx eas build --profile development --platform all
 npx eas build --profile preview --platform all
 npx eas build --profile production --platform all
 ```
+
+Ne pas relancer `eas init` : le dépôt est déjà relié au projet EAS Connexio.
 
 ## Publication
 

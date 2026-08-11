@@ -13,6 +13,7 @@ const requiredFiles = [
   "app.config.ts",
   "eas.json",
   "docs/INTEGRATION_MATRIX.md",
+  "src/config/backendCapabilities.ts",
   "src/config/integrationRegistry.ts",
   "src/domain/accessPolicy.ts",
   "src/domain/roleAppearance.ts",
@@ -69,7 +70,11 @@ for (const marker of [
   "EXPO_PUBLIC_ACCOUNT_DELETION_URL",
   "EXPO_PUBLIC_PRIVACY_POLICY_URL",
   "EXPO_PUBLIC_TERMS_URL",
-  "PUBLIC_POLICY_BASE_URL"
+  "EXPO_PUBLIC_BACKEND_CONTRACT",
+  "Build Store bloquée",
+  "PUBLIC_POLICY_BASE_URL",
+  "blockedPermissions",
+  "android.permission.ACCESS_FINE_LOCATION"
 ]) {
   if (!appConfig.includes(marker)) {
     throw new Error(`Configuration store incomplète : ${marker}`);

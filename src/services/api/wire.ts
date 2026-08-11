@@ -220,10 +220,45 @@ function initialsFromName(name: string): string {
   );
 }
 
+function normalizedRoleText(value: unknown): string {
+  return typeof value === "string"
+    ? value
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase("fr")
+    : "";
+}
+
 function normalizeRole(value: unknown): UserRole {
-  return typeof value === "string" && USER_ROLES.has(value as UserRole)
-    ? (value as UserRole)
-    : "triton";
+  const role = normalizedRoleText(value);
+  if (role === "legende") return "moussaillon";
+  return USER_ROLES.has(role as UserRole) ? (role as UserRole) : "triton";
+}
+
+function normalizeNeptuneRole(record: Record<string, unknown>): UserRole {
+  if (readUnknown(record, "is_amiral") === true) return "amiral";
+  if (readUnknown(record, "is_ambassadeur") === true) return "capitaine";
+  if (readUnknown(record, "is_allie") === true) return "allie";
+
+  for (const key of [
+    "special_role",
+    "role",
+    "neptune_role",
+    "Role",
+    "plan",
+    "statut"
+  ]) {
+    const value = readUnknown(record, key);
+    const normalized = normalizedRoleText(value);
+    if (!normalized) continue;
+    if (normalized === "ambassadeur") return "capitaine";
+    if (normalized === "legende") return "moussaillon";
+    if (USER_ROLES.has(normalized as UserRole)) {
+      return normalized as UserRole;
+    }
+  }
+  return "triton";
 }
 
 function requireConversationType(value: unknown): ConversationType {
@@ -334,14 +369,23 @@ function normalizeReplyPreview(value: unknown): ReplyPreview | undefined {
 
 export function normalizeAppUser(value: unknown): AppUser {
   if (!isRecord(value)) throw new WireValidationError("Utilisateur invalide.");
-  const name = requireBoundedString(
+  const explicitName = optionalBoundedString(
     value,
-    "Nom utilisateur",
     160,
     "name",
-    "full_name"
+    "full_name",
+    "Name"
   );
-  const role = normalizeRole(readUnknown(value, "role", "neptune_role"));
+  const composedName = [
+    optionalBoundedString(value, 100, "prenom"),
+    optionalBoundedString(value, 100, "nom")
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const name = explicitName ?? composedName;
+  if (!name) throw new WireValidationError("Nom utilisateur manquant ou invalide.");
+  const role = normalizeNeptuneRole(value);
   return {
     id: requireBoundedString(
       value,
@@ -354,13 +398,30 @@ export function normalizeAppUser(value: unknown): AppUser {
     initials:
       optionalBoundedString(value, 8, "initials") ?? initialsFromName(name),
     company:
-      optionalBoundedString(value, 160, "company", "company_name") ?? "",
-    city: optionalBoundedString(value, 160, "city") ?? "",
+      optionalBoundedString(
+        value,
+        200,
+        "company",
+        "company_name",
+        "entreprise"
+      ) ?? "",
+    city: optionalBoundedString(value, 160, "city", "ville") ?? "",
     role,
     roleLabel: ROLE_LABELS[normalizeUserRole(role)],
     online: booleanOrDefault(value, false, "online", "is_online"),
-    avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url"),
-    phone: optionalBoundedString(value, 32, "phone", "phone_number"),
+    avatarUrl: optionalHttpsUrl(
+      value,
+      "avatarUrl",
+      "avatar_url",
+      "photo_profil"
+    ),
+    phone: optionalBoundedString(
+      value,
+      32,
+      "phone",
+      "phone_number",
+      "telephone"
+    ),
     videoCallEnabled: booleanOrDefault(
       value,
       false,

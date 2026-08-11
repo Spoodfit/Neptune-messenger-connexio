@@ -70,7 +70,7 @@ L’application utilise alors les données locales de `src/data/mockData.ts`.
 EXPO_PUBLIC_MOCK_MODE=false
 EXPO_PUBLIC_API_BASE_URL=https://api.votre-domaine.fr
 EXPO_PUBLIC_REALTIME_URL=wss://api.votre-domaine.fr/v1/realtime
-EXPO_PUBLIC_EAS_PROJECT_ID=identifiant-eas
+EXPO_PUBLIC_EAS_PROJECT_ID=d2288b09-8249-4879-810f-7cb0072baeeb
 ```
 
 Une build EAS `production` échoue si une de ces valeurs manque, si le mock est actif ou si les transports ne sont pas chiffrés.

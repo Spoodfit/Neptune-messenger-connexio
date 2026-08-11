@@ -112,6 +112,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const refreshTokenRef = useRef<string | null>(null);
   const accessTokenExpiresAtRef = useRef<number | null>(null);
   const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
+  const cookieRefreshInFlightRef = useRef<Promise<boolean> | null>(null);
 
   const persistSession = useCallback(async (session: SessionPayload) => {
     const serializedUser = JSON.stringify(session.user);
@@ -198,9 +199,37 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return refreshAccessToken();
   }, [mockAuthenticated, refreshAccessToken]);
 
+  const refreshCookieSession = useCallback(async (): Promise<boolean> => {
+    if (env.mockMode) return mockAuthenticated;
+    if (cookieRefreshInFlightRef.current) {
+      return cookieRefreshInFlightRef.current;
+    }
+
+    const operation = (async () => {
+      try {
+        const user = await sessionApi.refreshCookieSession();
+        setCurrentUser(user);
+        setCookieAuthenticated(true);
+        return true;
+      } catch {
+        return false;
+      }
+    })().finally(() => {
+      cookieRefreshInFlightRef.current = null;
+    });
+
+    cookieRefreshInFlightRef.current = operation;
+    return operation;
+  }, [mockAuthenticated]);
+
   useLayoutEffect(
-    () => configureSessionRuntime({ getAccessToken, refreshAccessToken }),
-    [getAccessToken, refreshAccessToken]
+    () =>
+      configureSessionRuntime({
+        getAccessToken,
+        refreshAccessToken,
+        refreshCookieSession
+      }),
+    [getAccessToken, refreshAccessToken, refreshCookieSession]
   );
 
   useEffect(() => {
@@ -220,6 +249,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
             throw error;
           }
         }
+
+        if (await refreshCookieSession()) return;
 
         const [storedRefreshToken, storedUser] = await Promise.all([
           secureGet(REFRESH_TOKEN_KEY),
@@ -253,7 +284,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [invalidateSession, persistSession]);
+  }, [invalidateSession, persistSession, refreshCookieSession]);
 
   useEffect(() => {
     if (env.mockMode || cookieAuthenticated || accessToken || !refreshToken) return;

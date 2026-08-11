@@ -18,6 +18,7 @@ import { BrandHeader } from "@/components/BrandHeader";
 import { HighlightCard } from "@/components/HighlightCard";
 import NeptuneMap from "@/components/NeptuneMap";
 import { env } from "@/config/env";
+import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
@@ -29,6 +30,7 @@ import { StatusAvatar } from "@/components/StatusAvatar";
 type FeedRow =
   | { id: string; kind: "wide"; post: HighlightPost }
   | { id: string; kind: "pair"; left: HighlightPost; right?: HighlightPost };
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 function canUseCompactColumn(post: HighlightPost): boolean {
   if (post.kind === "besoin") return false;
@@ -200,7 +202,11 @@ export default function HighlightsScreen() {
         <HighlightCard
           post={post}
           compact={compact}
-          onReact={(emoji) => togglePostReaction(post.id, emoji)}
+          onReact={
+            env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity
+              ? (emoji) => togglePostReaction(post.id, emoji)
+              : undefined
+          }
         />
       </Animated.View>
     );
@@ -215,7 +221,11 @@ export default function HighlightsScreen() {
 
       <View style={styles.toolbar}>
         <View style={styles.modeBar} accessibilityRole="tablist">
-          {(["feed", "map"] as const).map((item) => {
+          {(
+            env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity
+              ? (["feed", "map"] as const)
+              : (["feed"] as const)
+          ).map((item) => {
             const active = mode === item;
             return (
               <Pressable

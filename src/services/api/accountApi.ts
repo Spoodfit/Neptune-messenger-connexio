@@ -1,5 +1,6 @@
 import type { AppUser } from "../../types/messaging";
 import { authenticatedRequest } from "./authenticatedRequest";
+import { normalizeAppUser } from "./wireExtensions";
 
 export interface AccountSession {
   id: string;
@@ -55,20 +56,43 @@ export class NeptuneAccountApi {
     );
   }
 
-  resyncProfile(): Promise<AppUser> {
-    return authenticatedRequest(
-      "/v1/account/resync",
-      { method: "POST" },
+  async resyncProfile(): Promise<AppUser> {
+    const payload = await authenticatedRequest<unknown>(
+      "/v1/auth/me",
+      {},
       this.fallbackAccessToken
     );
+    const record =
+      payload && typeof payload === "object"
+        ? (payload as Record<string, unknown>)
+        : null;
+    const data =
+      record?.data && typeof record.data === "object"
+        ? (record.data as Record<string, unknown>)
+        : null;
+    return normalizeAppUser(record?.user ?? data?.user ?? data ?? payload);
   }
 
-  async requestAccountDeletion(): Promise<void> {
-    await authenticatedRequest(
-      "/v1/account/deletion",
-      { method: "POST" },
+  async requestAccountDeletion(password: string): Promise<void> {
+    const payload = await authenticatedRequest<unknown>(
+      "/v1/functions/deleteUserAccount",
+      {
+        method: "POST",
+        body: JSON.stringify({ password })
+      },
       this.fallbackAccessToken
     );
+    const result =
+      payload && typeof payload === "object" && "data" in payload
+        ? (payload as { data?: unknown }).data
+        : payload;
+    if (
+      !result ||
+      typeof result !== "object" ||
+      (result as { success?: unknown }).success !== true
+    ) {
+      throw new Error("La suppression du compte n’a pas été confirmée par Neptune.");
+    }
   }
 
   getNotificationPreferences(): Promise<NotificationPreferences> {

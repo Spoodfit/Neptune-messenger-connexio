@@ -17,6 +17,8 @@
     "src/services/api/contracts.ts",
     "src/services/api/realtimeTicketWire.ts",
     "src/services/api/wire.ts",
+    "src/services/api/neptuneWebFeed.ts",
+    "src/config/backendCapabilities.ts",
     "src/services/realtime/realtimeEvents.ts",
     "src/storage/outboxStore.memory.ts",
     "src/storage/outboxStore.types.ts",
