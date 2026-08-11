@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   deletionLabel: {
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "800",
     marginBottom: 8
   },
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSoft,
     backgroundColor: colors.surfaceStrong,
     color: colors.text,
-    fontSize: 15
+    fontSize: 16
   },
   deleteButton: { minHeight: 52, marginTop: spacing.sm, borderRadius: 17, borderWidth: 1, borderColor: "rgba(255,93,115,0.35)", backgroundColor: colors.dangerSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   deleteText: { color: colors.danger, fontSize: 14, fontWeight: "900" }

@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8
   },
-  starterText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
+  starterText: { color: colors.textSecondary, fontSize: 14, fontWeight: "800" },
   inlineRecorderWrap: { marginTop: 9 },
   sectionTitle: {
     ...typography.heading3,
