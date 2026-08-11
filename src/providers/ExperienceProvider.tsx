@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { env } from "../config/env";
+import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import { members as initialMembers } from "../data/mockData";
 import {
   callHistory as initialCallHistory,
@@ -90,6 +91,7 @@ interface ExperienceContextValue {
 }
 
 const ExperienceContext = createContext<ExperienceContextValue | null>(null);
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 function toggleReaction(
   reactions: readonly MessageReactionSummary[],
@@ -182,7 +184,9 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
     const [memberResult, highlightResult, mapResult] = await Promise.allSettled([
       api.listMembers(),
       api.listHighlights(),
-      api.listMapMoments()
+      BACKEND_CAPABILITIES.highlightsCommunity
+        ? api.listMapMoments()
+        : Promise.resolve([])
     ]);
     if (memberResult.status === "fulfilled") {
       setMembers(memberResult.value);

@@ -10,6 +10,7 @@ interface AppExtra {
   supportUrl?: string;
   mockMode?: boolean;
   buildProfile?: string;
+  backendContract?: "neptune-web-v1" | "connexio-v1";
   releaseStage?: "development" | "preview" | "release-candidate" | "production";
   eas?: {
     projectId?: string;
@@ -17,7 +18,7 @@ interface AppExtra {
 }
 
 const PUBLIC_POLICY_BASE_URL =
-  "https://neptunebusinessclub.github.io/Neptune-messenger-connexio";
+  "https://spoodfit.github.io/Neptune-messenger-connexio";
 const extra = (Constants.expoConfig?.extra ?? {}) as AppExtra;
 
 export const env = {
@@ -34,6 +35,7 @@ export const env = {
   supportUrl: extra.supportUrl ?? "mailto:contact@neptunebusiness.com",
   mockMode: extra.mockMode === true,
   buildProfile: extra.buildProfile ?? "development",
+  backendContract: extra.backendContract ?? "neptune-web-v1",
   releaseStage: extra.releaseStage ?? "development",
   easProjectId: extra.eas?.projectId ?? Constants.easConfig?.projectId ?? ""
 } as const;

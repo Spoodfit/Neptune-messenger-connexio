@@ -1,14 +1,30 @@
 # Connexio V14 — contrat de remise backend
 
-## Architecture cible
+## État réel du backend Neptune (11 août 2026)
+
+Connexio utilise le même compte et la même base métier que Neptune Business via :
+
+```text
+EXPO_PUBLIC_API_BASE_URL=https://api.neptunebusiness.com/api
+EXPO_PUBLIC_BACKEND_CONTRACT=neptune-web-v1
+EXPO_PUBLIC_BUSINESS_WEB_BASE_URL=https://neptunebusiness.com
+EXPO_PUBLIC_MOCK_MODE=false
+```
+
+Ce mode connecte `/v1/auth`, `/v1/users`, `/v1/needs`, `/v1/benefits` et la suppression de compte. Il désactive volontairement messagerie, appels, push et fonctions communautaires non protégées. Les routes historiques `/message-threads` et `/messages` ne doivent pas être utilisées : elles ne garantissent pas actuellement l’appartenance du demandeur au thread.
+
+Le profil EAS `production` refuse ce contrat. Il ne devient constructible qu’après déploiement et déclaration explicite du contrat `connexio-v1` décrit ci-dessous.
+
+## Architecture cible `connexio-v1`
 
 Connexio est le client de messagerie de Neptune Business. Le frontend Expo/React Native consomme le backend existant : **Node.js / Express 5**, **Prisma 7**, **PostgreSQL 16**, **Redis**, authentification Neptune et **Socket.IO**.
 
 `EXPO_PUBLIC_API_BASE_URL` pointe vers la racine précédant `/v1`. Pour une API publique sous `/api/v1`, utiliser par exemple :
 
 ```text
-EXPO_PUBLIC_API_BASE_URL=https://neptunebusiness.com/api
-EXPO_PUBLIC_REALTIME_URL=https://neptunebusiness.com
+EXPO_PUBLIC_API_BASE_URL=https://api.neptunebusiness.com/api
+EXPO_PUBLIC_REALTIME_URL=https://api.neptunebusiness.com
+EXPO_PUBLIC_BACKEND_CONTRACT=connexio-v1
 EXPO_PUBLIC_BUSINESS_WEB_BASE_URL=https://neptunebusiness.com
 EXPO_PUBLIC_MOCK_MODE=false
 ```
@@ -19,6 +35,7 @@ EXPO_PUBLIC_MOCK_MODE=false
 |---|---|---|
 | `POST` | `/v1/auth/login` | email et mot de passe Neptune |
 | `GET` | `/v1/auth/me` | restauration de la session cookie |
+| `POST` | `/v1/auth/refresh` | renouvellement des cookies HttpOnly |
 | `POST` | `/v1/auth/logout` | révocation de la session |
 
 Les requêtes d’authentification utilisent `credentials: include`. Le mot de passe n’est jamais persisté dans Connexio. Le backend normalise `role`, `special_role` et `statut`.

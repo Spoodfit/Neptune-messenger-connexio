@@ -11,11 +11,13 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { env } from "@/config/env";
+import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
 import { useSession } from "@/providers/SessionProvider";
 import {
   NeptuneAccountApi,
@@ -36,6 +38,8 @@ const demoSessions: AccountSession[] = [
   }
 ];
 
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
+
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const {
@@ -53,9 +57,13 @@ export default function AccountScreen() {
   );
   const [loading, setLoading] = useState(!env.mockMode);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [deletionPassword, setDeletionPassword] = useState("");
 
   const loadSessions = async () => {
-    if (!api) return;
+    if (!api || !BACKEND_CAPABILITIES.accountSessions) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       setSessions(await api.listSessions());
@@ -175,6 +183,13 @@ export default function AccountScreen() {
   };
 
   const deleteAccount = () => {
+    if (!deletionPassword) {
+      Alert.alert(
+        "Mot de passe requis",
+        "Confirmez la suppression avec le mot de passe de votre compte Neptune."
+      );
+      return;
+    }
     Alert.alert(
       "Supprimer définitivement le compte ?",
       "Cette demande révoque les sessions et lance le traitement de suppression des données selon les obligations applicables.",
@@ -187,7 +202,7 @@ export default function AccountScreen() {
             setBusyAction("delete");
             void (async () => {
               try {
-                if (api) await api.requestAccountDeletion();
+                if (api) await api.requestAccountDeletion(deletionPassword);
                 await signOut();
                 router.replace("/sign-in");
               } catch (error) {
@@ -230,7 +245,15 @@ export default function AccountScreen() {
       subtitle: "Code à usage unique et assistance Neptune",
       route: "/access-help" as const
     }
-  ];
+  ].filter((item) => {
+    if (item.route === "/notification-settings") {
+      return BACKEND_CAPABILITIES.notificationPreferences;
+    }
+    if (item.route === "/blocked-users") {
+      return BACKEND_CAPABILITIES.blockedMembers;
+    }
+    return true;
+  });
 
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
@@ -300,6 +323,8 @@ export default function AccountScreen() {
           ))}
         </View>
 
+        {BACKEND_CAPABILITIES.accountSessions ? (
+          <>
         <Text style={styles.sectionTitle}>Appareils et sessions</Text>
         <View style={styles.panel}>
           {loading ? (
@@ -350,7 +375,10 @@ export default function AccountScreen() {
             <Text style={styles.emptyText}>Aucune session active trouvée.</Text>
           )}
         </View>
+          </>
+        ) : null}
 
+        {BACKEND_CAPABILITIES.accountExport ? (
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ busy: busyAction === "export" }}
@@ -365,6 +393,24 @@ export default function AccountScreen() {
           )}
           <Text style={styles.exportText}>Télécharger mes données</Text>
         </Pressable>
+        ) : null}
+
+        <View style={styles.deletionField}>
+          <Text style={styles.deletionLabel}>Confirmer avec votre mot de passe Neptune</Text>
+          <TextInput
+            value={deletionPassword}
+            onChangeText={setDeletionPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="current-password"
+            textContentType="password"
+            accessibilityLabel="Mot de passe pour supprimer le compte"
+            placeholder="Votre mot de passe"
+            placeholderTextColor={colors.textMuted}
+            style={styles.deletionInput}
+          />
+        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -413,6 +459,30 @@ const styles = StyleSheet.create({
   emptyText: { ...typography.bodySmall, color: colors.textMuted, textAlign: "center", padding: spacing.lg },
   exportButton: { minHeight: 52, marginTop: spacing.md, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   exportText: { color: colors.textSecondary, fontSize: 14, fontWeight: "900" },
+  deletionField: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: "rgba(255,93,115,0.28)",
+    backgroundColor: colors.surface
+  },
+  deletionLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "800",
+    marginBottom: 8
+  },
+  deletionInput: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surfaceStrong,
+    color: colors.text,
+    fontSize: 15
+  },
   deleteButton: { minHeight: 52, marginTop: spacing.sm, borderRadius: 17, borderWidth: 1, borderColor: "rgba(255,93,115,0.35)", backgroundColor: colors.dangerSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   deleteText: { color: colors.danger, fontSize: 14, fontWeight: "900" }
 });

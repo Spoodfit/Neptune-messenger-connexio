@@ -37,9 +37,9 @@ jobs:
           EXPO_PUBLIC_GITHUB_PAGES: "true"
           EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
           EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
-          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://neptunebusinessclub.github.io/Neptune-messenger-connexio/privacy-policy.html
-          EXPO_PUBLIC_TERMS_URL: https://neptunebusinessclub.github.io/Neptune-messenger-connexio/connexio-terms.html
-          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://neptunebusinessclub.github.io/Neptune-messenger-connexio/account-deletion.html
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://spoodfit.github.io/Neptune-messenger-connexio/privacy-policy.html
+          EXPO_PUBLIC_TERMS_URL: https://spoodfit.github.io/Neptune-messenger-connexio/connexio-terms.html
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://spoodfit.github.io/Neptune-messenger-connexio/account-deletion.html
           EXPO_PUBLIC_SUPPORT_URL: mailto:contact@neptunebusiness.com
         run: npm run web:build
 

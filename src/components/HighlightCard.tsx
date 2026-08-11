@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { env } from "../config/env";
+import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import { useSession } from "../providers/SessionProvider";
 import { NeptuneExperienceApi } from "../services/api/experienceApi";
 import { colors, gradients, typography } from "../theme";
@@ -24,7 +25,7 @@ import { StatusAvatar } from "./StatusAvatar";
 interface HighlightCardProps {
   post: HighlightPost;
   compact?: boolean;
-  onReact: (emoji: QuickReaction) => void;
+  onReact?: (emoji: QuickReaction) => void;
 }
 
 const REACTIONS: QuickReaction[] = ["❤️", "🔥", "👏", "💡", "🤝", "😂"];
@@ -34,11 +35,15 @@ const KIND_LABELS: Record<HighlightPost["kind"], string> = {
   reussite: "RÉUSSITE",
   offre: "OFFRE"
 };
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 export function HighlightCard({ post, compact = false, onReact }: HighlightCardProps) {
   const { accessToken } = useSession();
   const api = useMemo(
-    () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
+    () =>
+      env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity
+        ? new NeptuneExperienceApi(accessToken)
+        : null,
     [accessToken]
   );
   const [reactionOpen, setReactionOpen] = useState(false);
@@ -102,7 +107,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
       icon: "person-outline",
       onPress: () => router.push(`/profile/${encodeURIComponent(post.author.id)}`)
     },
-    {
+    ...(env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity ? [{
       id: "share",
       label: "Partager cette publication",
       icon: "paper-plane-outline",
@@ -114,7 +119,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
       icon: "flag-outline",
       destructive: true,
       onPress: reportPost
-    }
+    }] satisfies ActionSheetOption[] : [])
   ];
 
   return (
@@ -220,7 +225,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
         {!compact ? <Text style={styles.metricText}>{post.shareCount} partages</Text> : null}
       </View>
 
-      {reactionOpen ? (
+      {reactionOpen && onReact ? (
         <View style={styles.reactionPicker}>
           {REACTIONS.map((emoji) => {
             const active = post.reactions.some(
@@ -247,7 +252,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
         </View>
       ) : null}
 
-      {post.reactions.length > 0 ? (
+      {post.reactions.length > 0 && onReact ? (
         <View style={styles.reactionSummary}>
           {post.reactions.map((reaction) => (
             <Pressable
@@ -272,6 +277,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
         </View>
       ) : null}
 
+      {env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity ? (
       <View style={styles.actions}>
         <Pressable
           accessibilityRole="button"
@@ -307,6 +313,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
           {!compact ? <Text style={styles.actionText}>Partager</Text> : null}
         </Pressable>
       </View>
+      ) : null}
 
       <ActionSheet
         visible={menuOpen}

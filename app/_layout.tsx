@@ -9,6 +9,8 @@ import {
 } from "react-native-safe-area-context";
 
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
+import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
+import { env } from "../src/config/env";
 import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
 import { MessagingProvider } from "../src/providers/MessagingProvider";
 import { SessionProvider, useSession } from "../src/providers/SessionProvider";
@@ -24,8 +26,16 @@ import type { PushTokenRegistration } from "../src/types/messaging";
 import { colors } from "../src/theme";
 
 configureNotificationPresentation();
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 const PUBLIC_ROUTES = new Set(["sign-in", "access-help", "privacy"]);
+const MESSAGING_ROUTES = new Set([
+  "chat",
+  "conversation",
+  "group",
+  "new-conversation",
+  "schedule-message"
+]);
 
 function chatPath(conversationId: string): `/chat/${string}` {
   return `/chat/${encodeURIComponent(conversationId)}`;
@@ -44,9 +54,18 @@ function AuthenticatedApp() {
   const processedNotificationResponseId = useRef<string | null>(null);
   const hasAccessToken = Boolean(accessToken);
   const currentRootSegment = segments[0];
+  const secondarySegment = (segments as readonly string[])[1];
   const onSignInRoute = currentRootSegment === "sign-in";
   const onPublicRoute =
     typeof currentRootSegment === "string" && PUBLIC_ROUTES.has(currentRootSegment);
+  const onUnavailableMessagingRoute =
+    !BACKEND_CAPABILITIES.messaging &&
+    typeof currentRootSegment === "string" &&
+    MESSAGING_ROUTES.has(currentRootSegment);
+  const onUnavailableCallRoute =
+    !BACKEND_CAPABILITIES.calls &&
+    (currentRootSegment === "call" ||
+      (currentRootSegment === "(tabs)" && secondarySegment === "calls"));
 
   useEffect(() => {
     if (!sessionReady || !isAuthenticated) return;
@@ -58,7 +77,13 @@ function AuthenticatedApp() {
       return;
     }
 
-    if (onSignInRoute) router.replace("/(tabs)/messages");
+    if (onSignInRoute) {
+      router.replace(
+        BACKEND_CAPABILITIES.messaging
+          ? "/(tabs)/messages"
+          : "/(tabs)/highlights"
+      );
+    }
   }, [isAuthenticated, onSignInRoute, sessionReady]);
 
   useEffect(() => {
@@ -66,7 +91,8 @@ function AuthenticatedApp() {
       Platform.OS === "web" ||
       !sessionReady ||
       !isAuthenticated ||
-      !hasAccessToken
+      !hasAccessToken ||
+      !BACKEND_CAPABILITIES.pushNotifications
     ) {
       return;
     }
@@ -121,7 +147,7 @@ function AuthenticatedApp() {
   }, [getAccessToken, hasAccessToken, isAuthenticated, sessionReady]);
 
   useEffect(() => {
-    if (Platform.OS === "web") return;
+    if (Platform.OS === "web" || !BACKEND_CAPABILITIES.messaging) return;
 
     const openConversation = (
       response: Notifications.NotificationResponse | null
@@ -188,6 +214,10 @@ function AuthenticatedApp() {
   if (!isAuthenticated) {
     if (!onPublicRoute) return <Redirect href="/sign-in" />;
     return applicationStack;
+  }
+
+  if (onUnavailableMessagingRoute || onUnavailableCallRoute) {
+    return <Redirect href="/(tabs)/highlights" />;
   }
 
   return (

@@ -19,6 +19,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, gradients, radii } from "@/theme";
+import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
+import { env } from "@/config/env";
+
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 type TabsProps = ComponentProps<typeof Tabs>;
 type NeptuneTabBarProps = Parameters<NonNullable<TabsProps["tabBar"]>>[0];
@@ -56,7 +60,12 @@ export function NeptuneTabBar({
   const translateX = useRef(new Animated.Value(0)).current;
 
   const visibleRoutes = useMemo(
-    () => state.routes.filter((route) => route.name in ICONS),
+    () =>
+      state.routes.filter((route) => {
+        if (!(route.name in ICONS)) return false;
+        if (route.name === "calls" && !BACKEND_CAPABILITIES.calls) return false;
+        return true;
+      }),
     [state.routes]
   );
 

@@ -1,6 +1,7 @@
 import { ApiError, apiRequest } from "./httpClient";
 import {
   refreshSessionAccessToken,
+  refreshSessionCookie,
   resolveSessionAccessToken
 } from "../auth/sessionRuntime";
 
@@ -22,11 +23,14 @@ export async function authenticatedRequest<T>(
       credentials: "include"
     });
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401 || !token) {
+    if (!(error instanceof ApiError) || error.status !== 401) {
       throw error;
     }
-    const refreshedToken = await refreshSessionAccessToken();
-    if (!refreshedToken) throw error;
+    const refreshedToken = token ? await refreshSessionAccessToken() : null;
+    const cookieRefreshed = refreshedToken
+      ? false
+      : await refreshSessionCookie();
+    if (!refreshedToken && !cookieRefreshed) throw error;
     return apiRequest<T>(path, {
       ...options,
       token: refreshedToken,

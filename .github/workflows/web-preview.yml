@@ -90,7 +90,7 @@ jobs:
       - name: Wait for public preview
         if: github.event_name != 'pull_request'
         run: |
-          URL="https://neptunebusinessclub.github.io/Neptune-messenger-connexio/"
+          URL="https://spoodfit.github.io/Neptune-messenger-connexio/"
           for attempt in $(seq 1 30); do
             code=$(curl --location --silent --output /tmp/connexio-page --write-out "%{http_code}" "$URL" || true)
             if [ "$code" = "200" ] && grep -qi "connexio\|expo" /tmp/connexio-page; then
@@ -111,7 +111,7 @@ jobs:
         with:
           script: |
             const marker = '<!-- connexio-web-preview -->';
-            const pageUrl = 'https://neptunebusinessclub.github.io/Neptune-messenger-connexio/';
+            const pageUrl = 'https://spoodfit.github.io/Neptune-messenger-connexio/';
             const ok = process.env.JOB_STATUS === 'success';
             const body = `${marker}\n## Prévisualisation Connexio\n\n- Publication : **${process.env.JOB_STATUS}**\n- Commit : \`${context.sha}\`\n- Exécution : ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n${ok ? `✅ [Ouvrir la démonstration](${pageUrl})` : '❌ Le site n’est pas encore accessible. L’exécution ci-dessus contient la cause exacte.'}`;
             const { data: comments } = await github.rest.issues.listComments({

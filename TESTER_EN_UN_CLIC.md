@@ -4,7 +4,7 @@
 
 Ouvrir la prévisualisation web de démonstration :
 
-https://neptunebusinessclub.github.io/Neptune-messenger-connexio/
+https://spoodfit.github.io/Neptune-messenger-connexio/
 
 Le déploiement GitHub Pages est construit automatiquement depuis la branche `feat/production-hardening` en mode démonstration.
 

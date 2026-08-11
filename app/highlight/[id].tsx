@@ -18,12 +18,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HighlightCard } from "@/components/HighlightCard";
 import { HighlightShareButton } from "@/components/HighlightShareButton";
+import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
+import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 import type { HighlightComment, QuickReaction } from "@/types/experience";
 import { StatusAvatar } from "@/components/StatusAvatar";
 
 const REACTIONS: QuickReaction[] = ["❤️", "🔥", "👏", "💡", "🤝", "😂"];
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 export default function HighlightDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -119,12 +122,12 @@ export default function HighlightDetailScreen() {
               minute: "2-digit"
             })}
           </Text>
-          <Pressable onPress={() => setReplyingTo(item)} hitSlop={8}>
+          {env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity ? <Pressable onPress={() => setReplyingTo(item)} hitSlop={8}>
             <Text style={styles.commentActionText}>Répondre</Text>
-          </Pressable>
-          <Pressable onPress={() => setReactionCommentId(item.id)} hitSlop={8}>
+          </Pressable> : null}
+          {env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity ? <Pressable onPress={() => setReactionCommentId(item.id)} hitSlop={8}>
             <Text style={styles.commentActionText}>Réagir</Text>
-          </Pressable>
+          </Pressable> : null}
         </View>
         {reactionCommentId === item.id ? (
           <View style={styles.commentReactionPicker}>
@@ -203,7 +206,11 @@ export default function HighlightDetailScreen() {
           <View style={styles.postWrap}>
             <HighlightCard
               post={post}
-              onReact={(emoji) => togglePostReaction(post.id, emoji)}
+              onReact={
+                env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity
+                  ? (emoji) => togglePostReaction(post.id, emoji)
+                  : undefined
+              }
             />
             <Text style={styles.commentsTitle}>
               Commentaires · {post.comments.length}
@@ -218,7 +225,7 @@ export default function HighlightDetailScreen() {
         }
       />
 
-      <View
+      {env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity ? <View
         style={[
           styles.composerArea,
           {
@@ -287,7 +294,7 @@ export default function HighlightDetailScreen() {
             </LinearGradient>
           </Pressable>
         </View>
-      </View>
+      </View> : null}
     </KeyboardAvoidingView>
   );
 }

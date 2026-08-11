@@ -19,6 +19,7 @@ import { ActionSheet, type ActionSheetOption } from "@/components/ActionSheet";
 import { MemberStatusBadge } from "@/components/MemberStatusBadge";
 import { StatusAvatar } from "@/components/StatusAvatar";
 import { env } from "@/config/env";
+import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
 import {
   canInitiatePrivateInteraction,
   TRITON_CHECKOUT_URL
@@ -28,6 +29,8 @@ import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { NeptuneExperienceApi } from "@/services/api/experienceApi";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
+
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 export default function MemberProfileScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -73,6 +76,9 @@ export default function MemberProfileScreen() {
   );
 
   const ensureConversation = async () => {
+    if (!BACKEND_CAPABILITIES.messaging) {
+      throw new Error("La messagerie sécurisée Connexio n’est pas encore activée.");
+    }
     if (!canInitiatePrivateInteraction(currentUser.role)) {
       Alert.alert(
         "Passez Triton",
@@ -242,7 +248,7 @@ export default function MemberProfileScreen() {
       icon: "open-outline",
       onPress: openBusinessProfile
     },
-    {
+    ...(env.mockMode || BACKEND_CAPABILITIES.messaging ? [{
       id: "mute",
       label: existingConversation?.muted
         ? "Réactiver ses notifications"
@@ -251,20 +257,20 @@ export default function MemberProfileScreen() {
         ? "notifications-outline"
         : "notifications-off-outline",
       onPress: muteMember
-    },
-    {
+    }] satisfies ActionSheetOption[] : []),
+    ...(env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity ? [{
       id: "report",
       label: "Signaler ce membre",
       icon: "flag-outline",
       onPress: reportMember
-    },
-    {
+    }] satisfies ActionSheetOption[] : []),
+    ...(env.mockMode || BACKEND_CAPABILITIES.blockedMembers ? [{
       id: "block",
       label: "Bloquer ce membre",
       icon: "person-remove-outline",
       destructive: true,
       onPress: blockMember
-    }
+    }] satisfies ActionSheetOption[] : [])
   ];
 
   return (
@@ -342,7 +348,7 @@ export default function MemberProfileScreen() {
         ) : null}
 
         <View style={styles.actions}>
-          <Pressable
+          {env.mockMode || BACKEND_CAPABILITIES.messaging ? <Pressable
             accessibilityRole="button"
             disabled={opening}
             onPress={() => void openMessage()}
@@ -352,14 +358,14 @@ export default function MemberProfileScreen() {
               <Ionicons name="chatbubble-ellipses" size={22} color={colors.text} />
             </LinearGradient>
             <Text style={styles.actionText}>Message</Text>
-          </Pressable>
+          </Pressable> : null}
           <Pressable accessibilityRole="button" onPress={callPhone} style={styles.action}>
             <View style={styles.actionIconPlain}>
               <Ionicons name="call-outline" size={22} color={colors.text} />
             </View>
             <Text style={styles.actionText}>Téléphone</Text>
           </Pressable>
-          <Pressable
+          {env.mockMode || BACKEND_CAPABILITIES.calls ? <Pressable
             accessibilityRole="button"
             disabled={opening || member.videoCallEnabled === false}
             onPress={() => void startCall("video")}
@@ -369,10 +375,10 @@ export default function MemberProfileScreen() {
               <Ionicons name="videocam-outline" size={23} color={colors.text} />
             </View>
             <Text style={styles.actionText}>Visio</Text>
-          </Pressable>
+          </Pressable> : null}
         </View>
 
-        <Pressable
+        {env.mockMode || BACKEND_CAPABILITIES.calls ? <Pressable
           accessibilityRole="button"
           disabled={opening}
           onPress={() => void startCall("audio")}
@@ -380,7 +386,7 @@ export default function MemberProfileScreen() {
         >
           <Ionicons name="headset-outline" size={20} color={colors.text} />
           <Text style={styles.audioText}>Appel audio Connexio</Text>
-        </Pressable>
+        </Pressable> : null}
 
         <Text style={styles.sectionTitle}>Derniers Temps forts</Text>
         {memberPosts.length > 0 ? (

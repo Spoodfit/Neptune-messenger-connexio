@@ -1,0 +1,42 @@
+name: Build native release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Plateforme à construire
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+
+permissions:
+  contents: read
+
+jobs:
+  eas-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: d2288b09-8249-4879-810f-7cb0072baeeb
+    steps:
+      - name: Vérifier les accès EAS
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "Secret EXPO_TOKEN manquant"; exit 1; }
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Installer les dépendances verrouillées
+        run: npm ci --no-audit --no-fund
+      - name: Vérifier la release candidate
+        run: npm run verify && npm run audit:rc && npx expo install --check
+      - name: Construire avec EAS
+        run: npx eas-cli@21.7.1 build --profile release-candidate --platform "${{ inputs.platform }}" --non-interactive --wait

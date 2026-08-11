@@ -16,10 +16,13 @@ import {
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { StatusAvatar } from "@/components/StatusAvatar";
+import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
+import { env } from "@/config/env";
 import { useSession } from "@/providers/SessionProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 
 const MAX_CONTENT_WIDTH = 720;
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 function getEnvironmentLabel(): string {
   const buildProfile = Constants.expoConfig?.extra?.buildProfile;
@@ -59,7 +62,15 @@ const entries = [
     subtitle: "Code de connexion et sécurité du compte",
     route: "/access-help" as const
   }
-];
+].filter((item) => {
+  if (item.route === "/notification-settings") {
+    return BACKEND_CAPABILITIES.notificationPreferences;
+  }
+  if (item.route === "/blocked-users") {
+    return BACKEND_CAPABILITIES.blockedMembers;
+  }
+  return true;
+});
 
 export default function SettingsScreen() {
   const { currentUser, signOut } = useSession();
