@@ -1,7 +1,8 @@
 import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { getLanguageFrenchName } from "../i18n/languages";
+import { getLanguageFrenchName, isSameLanguage } from "../i18n/languages";
+import { getTranslationRequestLanguage } from "../i18n/translationLocale";
 import { colors, spacing } from "../theme";
 import { MessageBubble as BaseMessageBubble } from "./BaseMessageBubble";
 
@@ -12,8 +13,14 @@ export function MessageBubble(props: MessageBubbleProps) {
   const [showOriginal, setShowOriginal] = useState(false);
   const translation = message.translation;
   const translatedBody = translation?.body?.trim() ?? "";
+  const viewerLanguage = getTranslationRequestLanguage();
+  const translationTargetsViewer = Boolean(
+    !translation?.targetLanguage ||
+      isSameLanguage(translation.targetLanguage, viewerLanguage)
+  );
   const translationReady = Boolean(
     !message.isMine &&
+      translationTargetsViewer &&
       translation?.status === "ready" &&
       translatedBody &&
       translatedBody !== message.body.trim()
