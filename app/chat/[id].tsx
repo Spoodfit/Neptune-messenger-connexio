@@ -9,149 +9,132 @@ import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
 import { useMessaging } from "../../src/providers/MessagingProvider";
 import { useSession } from "../../src/providers/SessionProvider";
+import ChatConversationScreen from "../../src/screens/ChatConversationScreen";
 import { colors, gradients, spacing, typography } from "../../src/theme";
 import type { ChatMessage } from "../../src/types/messaging";
-import ChatConversationScreen from "../../src/screens/ChatConversationScreen";
 
-function first(value?: string | string[]): string {
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
-}
+const first = (value?: string | string[]) => Array.isArray(value) ? value[0] ?? "" : value ?? "";
 
-function messageMentionsUser(message: ChatMessage, user: { id: string; name: string; company: string }): boolean {
+function mentionsViewer(message: ChatMessage, user: { id: string; name: string; company: string }) {
   if (message.isMine) return false;
   if (message.mentionedUserIds?.includes(user.id)) return true;
-  const body = message.body.toLocaleLowerCase("fr");
-  const [firstName = "", ...rest] = user.name.toLocaleLowerCase("fr").trim().split(/\s+/);
-  const aliases = [firstName, rest.join(" "), user.name.toLocaleLowerCase("fr"), user.company.toLocaleLowerCase("fr")].filter(Boolean);
-  return aliases.some((alias) => body.includes(`@${alias}`));
+  const text = message.body.toLocaleLowerCase("fr");
+  const firstName = user.name.trim().split(/\s+/)[0]?.toLocaleLowerCase("fr") ?? "";
+  return [firstName, user.name.toLocaleLowerCase("fr"), user.company.toLocaleLowerCase("fr")]
+    .filter(Boolean)
+    .some((alias) => text.includes(`@${alias}`));
 }
 
 export default function ChatRoute() {
   const params = useLocalSearchParams<{ id: string | string[]; focusMention?: string | string[] }>();
   const insets = useSafeAreaInsets();
-  const conversationId = first(params.id);
+  const id = first(params.id);
   const focusMention = first(params.focusMention) === "1";
   const { currentUser } = useSession();
-  const {
-    getConversation: getServerConversation,
-    getMessages: getServerMessages,
-    loadMessages,
-    loadMoreMessages,
-    hasMoreMessages,
-    loadingConversationIds,
-    loadingMoreConversationIds,
-    markConversationRead
-  } = useMessaging();
-  const { getConversation: getLocalConversation, getConversationMessages } = useExperience();
-  const { getCreatedGroup, getCreatedGroupMessages } = useGroupAdmin();
+  const messaging = useMessaging();
+  const experience = useExperience();
+  const groupAdmin = useGroupAdmin();
 
-  const serverConversation = getServerConversation(conversationId);
-  const privateConversation = getLocalConversation(conversationId);
-  const adminConversation = getCreatedGroup(conversationId);
+  const serverConversation = messaging.getConversation(id);
+  const privateConversation = experience.getConversation(id);
+  const adminConversation = groupAdmin.getCreatedGroup(id);
   const conversation = serverConversation ?? privateConversation ?? adminConversation;
-  const source = adminConversation ? "admin" : privateConversation ? "private" : "server";
-  const localOnly = source !== "server";
-  const messages = source === "admin"
-    ? getCreatedGroupMessages(conversationId)
-    : source === "private"
-      ? getConversationMessages(conversationId)
-      : getServerMessages(conversationId);
-  const sortedMessages = useMemo(
+  const localOnly = Boolean(privateConversation || adminConversation);
+  const messages = adminConversation
+    ? groupAdmin.getCreatedGroupMessages(id)
+    : privateConversation
+      ? experience.getConversationMessages(id)
+      : messaging.getMessages(id);
+
+  const ordered = useMemo(
     () => [...messages].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
     [messages]
   );
   const mentionIndex = useMemo(() => {
-    for (let index = sortedMessages.length - 1; index >= 0; index -= 1) {
-      if (messageMentionsUser(sortedMessages[index]!, currentUser)) return index;
+    for (let index = ordered.length - 1; index >= 0; index -= 1) {
+      if (mentionsViewer(ordered[index]!, currentUser)) return index;
     }
     return -1;
-  }, [currentUser, sortedMessages]);
-  const mentionMessage = mentionIndex >= 0 ? sortedMessages[mentionIndex] : undefined;
-  const contextMessages = mentionIndex >= 0
-    ? sortedMessages.slice(Math.max(0, mentionIndex - 2), Math.min(sortedMessages.length, mentionIndex + 3))
+  }, [currentUser, ordered]);
+  const mention = mentionIndex >= 0 ? ordered[mentionIndex] : undefined;
+  const context = mention
+    ? ordered.slice(Math.max(0, mentionIndex - 2), Math.min(ordered.length, mentionIndex + 3))
     : [];
-  const loading = loadingConversationIds.has(conversationId);
-  const loadingMore = loadingMoreConversationIds.has(conversationId);
-  const hasMore = hasMoreMessages(conversationId);
+  const loading = messaging.loadingConversationIds.has(id);
+  const loadingMore = messaging.loadingMoreConversationIds.has(id);
+  const hasMore = messaging.hasMoreMessages(id);
 
   useEffect(() => {
-    if (!focusMention || localOnly || !conversationId) return;
-    if (messages.length === 0 && !loading) void loadMessages(conversationId);
-  }, [conversationId, focusMention, loadMessages, loading, localOnly, messages.length]);
+    if (!focusMention || localOnly || !id || messages.length || loading) return;
+    void messaging.loadMessages(id);
+  }, [focusMention, id, loading, localOnly, messages.length, messaging]);
 
   useEffect(() => {
-    if (!focusMention || localOnly || !conversationId || mentionMessage || loading || loadingMore || !hasMore) return;
-    void loadMoreMessages(conversationId);
-  }, [conversationId, focusMention, hasMore, loadMoreMessages, loading, loadingMore, localOnly, mentionMessage]);
+    if (!focusMention || localOnly || !id || mention || loading || loadingMore || !hasMore) return;
+    void messaging.loadMoreMessages(id);
+  }, [focusMention, hasMore, id, loading, loadingMore, localOnly, mention, messaging]);
 
   useEffect(() => {
-    if (!focusMention || localOnly || !conversationId || messages.length === 0) return;
-    void markConversationRead(conversationId);
-  }, [conversationId, focusMention, localOnly, markConversationRead, messages.length]);
+    if (!focusMention || localOnly || !id || messages.length === 0) return;
+    void messaging.markConversationRead(id);
+  }, [focusMention, id, localOnly, messages.length, messaging]);
 
-  if (!focusMention || (!mentionMessage && !loading && !loadingMore && !hasMore)) {
+  if (!focusMention || (!mention && !loading && !loadingMore && !hasMore)) {
     return <ChatConversationScreen />;
   }
 
-  const openRecentMessages = () => {
-    router.replace({ pathname: "/chat/[id]", params: { id: conversationId } });
-  };
+  const openConversation = () => router.replace({ pathname: "/chat/[id]", params: { id } });
 
   return (
     <LinearGradient colors={gradients.screen} style={styles.screen}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.sm), paddingLeft: spacing.sm + insets.left, paddingRight: spacing.sm + insets.right }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Retour aux discussions" onPress={() => router.replace("/(tabs)/messages")} style={styles.headerButton}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.sm) }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Retour aux discussions" onPress={() => router.replace("/(tabs)/messages")} style={styles.iconButton}>
           <Ionicons name="chevron-back" size={25} color={colors.text} />
         </Pressable>
         <View style={styles.headerCopy}>
-          <Text accessibilityRole="header" numberOfLines={1} style={styles.headerTitle}>{conversation?.name ?? "Conversation"}</Text>
-          <Text style={styles.headerSubtitle}>Mention retrouvée</Text>
+          <Text numberOfLines={1} style={styles.title}>{conversation?.name ?? "Conversation"}</Text>
+          <Text style={styles.headerMeta}>Mention retrouvée</Text>
         </View>
-        <Pressable accessibilityRole="button" accessibilityLabel="Afficher les messages récents" onPress={openRecentMessages} style={styles.headerButton}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Afficher les messages récents" onPress={openConversation} style={styles.iconButton}>
           <Ionicons name="arrow-down-circle-outline" size={24} color={colors.text} />
         </Pressable>
       </View>
 
-      {!mentionMessage ? (
-        <View style={styles.loadingStage}>
+      {!mention ? (
+        <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.violet} />
           <Text style={styles.loadingTitle}>Recherche de votre mention…</Text>
-          <Text style={styles.loadingText}>Connexio remonte automatiquement dans l’historique.</Text>
+          <Text style={styles.muted}>Connexio remonte automatiquement dans l’historique.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]} showsVerticalScrollIndicator={false}>
-          <View style={styles.focusIntro}>
-            <View style={styles.mentionIcon}><Ionicons name="at" size={24} color={colors.orange} /></View>
-            <View style={styles.focusCopy}>
-              <Text style={styles.focusTitle}>Vous avez été mentionné ici</Text>
-              <Text style={styles.focusSubtitle}>Le message est affiché avec son contexte immédiat, même s’il est ancien.</Text>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, spacing.xl) }]}>
+          <View style={styles.info}>
+            <Ionicons name="at" size={23} color={colors.orange} />
+            <View style={styles.infoCopy}>
+              <Text style={styles.infoTitle}>Vous avez été mentionné ici</Text>
+              <Text style={styles.muted}>Le message est affiché avec son contexte immédiat.</Text>
             </View>
           </View>
 
-          <View style={styles.contextStack}>
-            {contextMessages.map((message) => {
-              const focused = message.id === mentionMessage.id;
+          <View style={styles.stack}>
+            {context.map((message) => {
+              const selected = message.id === mention.id;
               return (
-                <View key={message.id} style={[styles.messageCard, focused && styles.focusedMessageCard]}>
-                  <View style={styles.messageTop}>
-                    <Text style={[styles.sender, focused && styles.focusedSender]}>{message.senderName}</Text>
+                <View key={message.id} style={[styles.card, selected && styles.selectedCard]}>
+                  <View style={styles.messageHeader}>
+                    <Text style={[styles.sender, selected && styles.selectedSender]}>{message.senderName}</Text>
                     <Text style={styles.date}>{new Date(message.createdAt).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</Text>
                   </View>
                   <Text selectable style={styles.body}>{message.body}</Text>
-                  {message.attachments?.length ? <View style={styles.attachmentHint}><Ionicons name="attach" size={14} color={colors.textMuted} /><Text style={styles.attachmentText}>{message.attachments.length} pièce{message.attachments.length > 1 ? "s" : ""} jointe{message.attachments.length > 1 ? "s" : ""}</Text></View> : null}
-                  {focused ? <View style={styles.focusBadge}><Ionicons name="at" size={13} color={colors.orange} /><Text style={styles.focusBadgeText}>Votre mention</Text></View> : null}
+                  {selected ? <Text style={styles.badge}>@ Votre mention</Text> : null}
                 </View>
               );
             })}
           </View>
 
-          <Pressable accessibilityRole="button" acessibilityLabel="Ouvrir la discussion et répondre" onPress={openRecentMessages} style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir la discussion et répondre" onPress={openConversation} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
             <Ionicons name="chatbubble-ellipses" size={20} color={colors.white} />
-            <Text style={styles.primaryActionText}>Ouvrir la discussion et répondre</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Afficher les messages récents" onPress={openRecentMessages} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}>
-            <Ionicons name="arrow-down" size={18} color={colors.textSecondary} />
-            <Text style={styles.secondaryActionText}>Revenir aux messages récents</Text>
+            <Text style={styles.primaryText}>Ouvrir la discussion et répondre</Text>
           </Pressable>
         </ScrollView>
       )}
@@ -161,35 +144,28 @@ export default function ChatRoute() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { minHeight: 64, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 8 },
-  headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  header: { minHeight: 66, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 8 },
+  iconButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1, minWidth: 0, alignItems: "center" },
-  headerTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
-  headerSubtitle: { color: colors.orange, fontSize: 10, fontWeight: "900", marginTop: 2 },
-  loadingStage: { flex: 1, padding: spacing.xl, alignItems: "center", justifyContent: "center", gap: 10 },
+  title: { ...typography.heading3, color: colors.text },
+  headerMeta: { color: colors.orange, fontSize: 11, fontWeight: "900", marginTop: 2 },
+  loading: { flex: 1, padding: spacing.xl, alignItems: "center", justifyContent: "center", gap: 10 },
   loadingTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
-  loadingText: { ...typography.bodySmall, color: colors.textMuted, textAlign: "center" },
+  muted: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
   content: { width: "100%", maxWidth: 720, alignSelf: "center", padding: spacing.md },
-  focusIntro: { minHeight: 76, padding: 13, borderRadius: 20, borderWidth: 1, borderColor: "rgba(244,177,131,0.30)", backgroundColor: "rgba(244,177,131,0.08)", flexDirection: "row", alignItems: "center", gap: 12 },
-  mentionIcon: { width: 46, height: 46, borderRadius: 16, backgroundColor: "rgba(244,177,131,0.12)", alignItems: "center", justifyContent: "center" },
-  focusCopy: { flex: 1 },
-  focusTitle: { ...typography.heading3, color: colors.text },
-  focusSubtitle: { ...typography.bodySmall, color: colors.textMuted, marginTop: 3 },
-  contextStack: { marginTop: spacing.md, gap: 9 },
-  messageCard: { padding: 13, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
-  focusedMessageCard: { borderColor: colors.orange, backgroundColor: "rgba(244,177,131,0.09)", shadowColor: colors.orange, shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
-  messageTop: { flexDirection: "row", alignItems: "center", gap: 8 },
-  sender: { flex: 1, color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
-  focusedSender: { color: colors.orange },
-  date: { color: colors.textMuted, fontSize: 10 },
+  info: { minHeight: 72, padding: 13, borderRadius: 20, borderWidth: 1, borderColor: "rgba(244,177,131,0.30)", backgroundColor: "rgba(244,177,131,0.08)", flexDirection: "row", alignItems: "center", gap: 11 },
+  infoCopy: { flex: 1 },
+  infoTitle: { ...typography.heading3, color: colors.text, marginBottom: 3 },
+  stack: { marginTop: spacing.md, gap: 9 },
+  card: { padding: 13, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
+  selectedCard: { borderColor: colors.orange, backgroundColor: "rgba(244,177,131,0.09)" },
+  messageHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sender: { flex: 1, color: colors.textSecondary, fontSize: 14, fontWeight: "900" },
+  selectedSender: { color: colors.orange },
+  date: { color: colors.textMuted, fontSize: 11 },
   body: { color: colors.text, fontSize: 15, lineHeight: 21, marginTop: 7 },
-  attachmentHint: { marginTop: 8, flexDirection: "row", alignItems: "center", gap: 5 },
-  attachmentText: { color: colors.textMuted, fontSize: 10 },
-  focusBadge: { alignSelf: "flex-start", minHeight: 28, marginTop: 10, paddingHorizontal: 9, borderRadius: 14, backgroundColor: "rgba(244,177,131,0.12)", flexDirection: "row", alignItems: "center", gap: 5 },
-  focusBadgeText: { color: colors.orange, fontSize: 10, fontWeight: "900" },
-  primaryAction: { minHeight: 54, marginTop: spacing.lg, borderRadius: 18, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
-  primaryActionText: { color: colors.white, fontSize: 13, fontWeight: "900" },
-  secondaryAction: { minHeight: 50, marginTop: 8, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  secondaryActionText: { color: colors.textSecondary, fontSize: 12, fontWeight: "800" },
+  badge: { color: colors.orange, fontSize: 11, fontWeight: "900", marginTop: 10 },
+  primary: { minHeight: 54, marginTop: spacing.lg, borderRadius: 18, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },
+  primaryText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   pressed: { opacity: 0.8, transform: [{ scale: 0.99 }] }
 });
