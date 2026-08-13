@@ -8,6 +8,7 @@ export interface BackendCapabilities {
   benefitsRead: boolean;
   highlightsCommunity: boolean;
   messaging: boolean;
+  messageTranslation: boolean;
   realtime: boolean;
   calls: boolean;
   pushNotifications: boolean;
@@ -26,6 +27,7 @@ const WEB_BACKEND_CAPABILITIES: BackendCapabilities = {
   benefitsRead: true,
   highlightsCommunity: false,
   messaging: false,
+  messageTranslation: false,
   realtime: false,
   calls: false,
   pushNotifications: false,
@@ -44,6 +46,7 @@ const CONNEXIO_BACKEND_CAPABILITIES: BackendCapabilities = {
   benefitsRead: true,
   highlightsCommunity: true,
   messaging: true,
+  messageTranslation: true,
   realtime: true,
   calls: true,
   pushNotifications: true,
