@@ -95,7 +95,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       <Animated.View style={[styles.createShell, { transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "45deg"] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={menuOpen ? "Fermer le menu de création" : "Créer"} accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen((value) => !value)} style={({ pressed }) => [styles.createPressable, pressed && styles.createPressed]}>
           <LinearGradient colors={gradients.primary} style={styles.createGradient}>
-            <Ionicons name="add" size={31} color={colors.white} />
+            <Ionicons name="add" size={29} color={colors.white} />
           </LinearGradient>
         </Pressable>
       </Animated.View>
@@ -104,26 +104,26 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
 }
 
 const styles = StyleSheet.create({
-  outer: { paddingHorizontal: 10, paddingTop: 4, backgroundColor: colors.background, position: "relative", zIndex: 40 },
+  outer: { paddingHorizontal: 8, paddingTop: 4, backgroundColor: colors.background, position: "relative", zIndex: 40 },
   dismissLayer: { position: "absolute", left: -20, right: -20, top: -180, bottom: 0, zIndex: 1 },
   bar: { height: 72, padding: 5, overflow: "visible", position: "relative", borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,18,38,0.98)", flexDirection: "row", alignItems: "center", elevation: 18, zIndex: 2 },
   sideGroup: { flex: 1, height: "100%", flexDirection: "row" },
-  centerSlot: { width: 72 },
-  item: { flex: 1, minWidth: 0, minHeight: 62, borderRadius: 18, alignItems: "center", justifyContent: "center", gap: 7, overflow: "hidden" },
+  centerSlot: { width: 56 },
+  item: { flex: 1, minWidth: 48, minHeight: 62, borderRadius: 18, alignItems: "center", justifyContent: "center", gap: 6, overflow: "hidden" },
   activePill: { ...StyleSheet.absoluteFillObject, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft },
   pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
   iconWrap: { position: "relative", width: 28, alignItems: "center" },
-  label: { maxWidth: "100%", color: "#7F8DAB", fontSize: 10, lineHeight: 12, fontWeight: "800" },
+  label: { maxWidth: "100%", color: "#7F8DAB", fontSize: 11, lineHeight: 13, fontWeight: "800" },
   labelActive: { color: colors.text },
   badge: { position: "absolute", right: -13, top: -8, minWidth: 21, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.magenta, borderWidth: 2, borderColor: colors.surface },
   badgeText: { color: colors.white, fontSize: 11, fontWeight: "900" },
-  createShell: { position: "absolute", left: "50%", marginLeft: -31, top: -13, width: 62, height: 62, borderRadius: 31, padding: 4, backgroundColor: colors.background, zIndex: 6, elevation: 24 },
-  createPressable: { flex: 1, borderRadius: 27 },
+  createShell: { position: "absolute", left: "50%", marginLeft: -28, top: -10, width: 56, height: 56, borderRadius: 28, padding: 4, backgroundColor: colors.background, zIndex: 6, elevation: 24 },
+  createPressable: { flex: 1, borderRadius: 24 },
   createPressed: { opacity: 0.86 },
-  createGradient: { flex: 1, borderRadius: 27, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  createGradient: { flex: 1, borderRadius: 24, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   quickAction: { position: "absolute", top: 0, zIndex: 5, minWidth: 112, height: 52, borderRadius: 18, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.border, elevation: 22, shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-  quickMessage: { left: "50%", marginLeft: -126 },
-  quickHighlight: { left: "50%", marginLeft: 14 },
+  quickMessage: { left: "50%", marginLeft: -124 },
+  quickHighlight: { left: "50%", marginLeft: 12 },
   quickPressable: { flex: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900" }
 });
