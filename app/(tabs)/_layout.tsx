@@ -2,6 +2,7 @@ import { Tabs } from "expo-router";
 
 import { NeptuneTabBar } from "@/components/NeptuneTabBar";
 import { StandalonePersistenceBridge } from "@/components/StandalonePersistenceBridge";
+import { TabsLoadingOverlay } from "@/components/TabsLoadingOverlay";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { colors } from "@/theme";
 
@@ -40,6 +41,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="communities" options={{ href: null, title: "Espaces" }} />
         <Tabs.Screen name="contacts" options={{ href: null, title: "Membres" }} />
       </Tabs>
+      <TabsLoadingOverlay />
     </>
   );
 }
