@@ -13,6 +13,23 @@
       "distribution": "internal",
       "channel": "preview"
     },
+    "standalone": {
+      "distribution": "internal",
+      "channel": "standalone",
+      "env": {
+        "EXPO_PUBLIC_MOCK_MODE": "true",
+        "EXPO_PUBLIC_BACKEND_CONTRACT": "connexio-v1",
+        "EXPO_PUBLIC_API_BASE_URL": "",
+        "EXPO_PUBLIC_REALTIME_URL": "",
+        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL": "https://neptunebusiness.com"
+      },
+      "ios": {
+        "image": "sdk-57"
+      },
+      "android": {
+        "image": "sdk-57"
+      }
+    },
     "release-candidate": {
       "distribution": "internal",
       "channel": "release-candidate",

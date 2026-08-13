@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 
 import { NeptuneTabBar } from "@/components/NeptuneTabBar";
+import { StandalonePersistenceBridge } from "@/components/StandalonePersistenceBridge";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { colors } from "@/theme";
 
@@ -12,30 +13,33 @@ export default function TabsLayout() {
   );
 
   return (
-    <Tabs
-      tabBar={(props) => <NeptuneTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { backgroundColor: colors.background }
-      }}
-    >
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: "Messages",
-          tabBarAccessibilityLabel:
-            unreadCount > 0
-              ? `Messages, ${unreadCount} message${unreadCount > 1 ? "s" : ""} non lu${unreadCount > 1 ? "s" : ""}`
-              : "Messages, aucun message non lu",
-          tabBarBadge:
-            unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined
+    <>
+      <StandalonePersistenceBridge />
+      <Tabs
+        tabBar={(props) => <NeptuneTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: colors.background }
         }}
-      />
-      <Tabs.Screen name="highlights" options={{ title: "Temps forts" }} />
-      <Tabs.Screen name="calls" options={{ title: "Appels" }} />
-      <Tabs.Screen name="settings" options={{ title: "Profil" }} />
-      <Tabs.Screen name="communities" options={{ href: null, title: "Espaces" }} />
-      <Tabs.Screen name="contacts" options={{ href: null, title: "Membres" }} />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="messages"
+          options={{
+            title: "Messages",
+            tabBarAccessibilityLabel:
+              unreadCount > 0
+                ? `Messages, ${unreadCount} message${unreadCount > 1 ? "s" : ""} non lu${unreadCount > 1 ? "s" : ""}`
+                : "Messages, aucun message non lu",
+            tabBarBadge:
+              unreadCount > 0 ? (unreadCount > 99 ? "99+" : unreadCount) : undefined
+          }}
+        />
+        <Tabs.Screen name="highlights" options={{ title: "Temps forts" }} />
+        <Tabs.Screen name="calls" options={{ title: "Appels" }} />
+        <Tabs.Screen name="settings" options={{ title: "Profil" }} />
+        <Tabs.Screen name="communities" options={{ href: null, title: "Espaces" }} />
+        <Tabs.Screen name="contacts" options={{ href: null, title: "Membres" }} />
+      </Tabs>
+    </>
   );
 }
