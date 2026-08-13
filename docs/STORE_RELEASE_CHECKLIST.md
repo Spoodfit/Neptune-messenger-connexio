@@ -21,13 +21,14 @@
 - Audit visuel 360×800, 390×844 et 393×852.
 - Zones tactiles minimales 48×48, champs à 16 px, textes courts ≥11 px et textes longs ≥14 px.
 - TypeScript, tests métier, audit RC, build web et audit responsive.
+- Tests de contrat traduction/sous-titrage : feature-gate, langue cible, micro coupé et disponibilité du service.
 
 ## Éléments manuels avant soumission
 
 ### App Store Connect
 
 - Compte de démonstration stable et instructions de revue.
-- Réponses App Privacy conformes au backend et aux SDK réellement déployés.
+- Réponses App Privacy conformes au backend, aux SDK et aux fournisseurs de traduction/transcription réellement déployés.
 - Questionnaire de classification d’âge.
 - Captures demandées pour tous les appareils pris en charge.
 - Coordonnées d’assistance et notes de revue.
@@ -35,7 +36,7 @@
 ### Google Play Console
 
 - Compte de démonstration dans « Accès à l’application ».
-- Formulaire « Sécurité des données » conforme au backend et aux SDK.
+- Formulaire « Sécurité des données » conforme au backend, aux SDK et aux fournisseurs de traduction/transcription réellement déployés.
 - Politique de confidentialité, suppression de compte et classification du contenu.
 - Déclarations relatives aux permissions sensibles.
 - Test interne ou fermé avant production.
@@ -45,5 +46,8 @@
 - Build signé réel avec les identifiants Apple et Google de Neptune.
 - APNs et FCM testés sur appareils physiques.
 - Appels audio/vidéo testés en Wi-Fi, 4G/5G et via TURN de production.
+- Sous-titres traduits testés sur appareils physiques avec micro actif, coupé, réactivé et perte/reprise réseau.
+- Traduction de messages testée entre au moins trois langues avec original consultable et absence de traduction obsolète après changement de langue.
+- Fournisseurs de traduction/transcription choisis, contractuellement validés et nommés dans les informations de confidentialité avant activation publique.
 - Backend de production disponible sans données fictives.
 - Validation finale des déclarations de collecte avec le responsable RGPD.

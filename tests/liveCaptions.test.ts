@@ -8,9 +8,7 @@ import {
 } from "../src/services/calls/liveCaptions";
 import type { IntegratedCallSession } from "../src/services/calls/callRoom";
 
-function session(
-  overrides: Partial<IntegratedCallSession> = {}
-): IntegratedCallSession {
+function session(overrides: Partial<IntegratedCallSession> = {}): IntegratedCallSession {
   return {
     id: "call-1",
     conversationId: "conversation-1",
@@ -56,6 +54,35 @@ test("une session vidéo autorisée transporte la langue cible et les limites se
   assert.match(script, /"audioChunkMs":950/);
   assert.match(script, /call:caption-audio/);
   assert.match(script, /call:caption/);
+});
+
+test("le recorder attend le signal ready et ne transmet rien si le micro est coupé", () => {
+  const call = session() as IntegratedCallSession & {
+    captioningEnabled?: boolean;
+    captionsDefaultOn?: boolean;
+  };
+  call.captioningEnabled = true;
+  call.captionsDefaultOn = true;
+
+  const script = buildLiveCaptionBootstrapScript(call, "Dana");
+  assert.match(script, /let captionServiceReady = cfg\.mock/);
+  assert.match(script, /call:captions:ready/);
+  assert.match(script, /!captionServiceReady/);
+  assert.match(script, /track\.enabled === false/);
+  assert.match(script, /captionServiceReady = false/);
+});
+
+test("un sous-titre destiné à une autre langue est rejeté côté client", () => {
+  const call = session() as IntegratedCallSession & {
+    captioningEnabled?: boolean;
+    captionTargetLanguage?: string;
+  };
+  call.captioningEnabled = true;
+  call.captionTargetLanguage = "fr";
+
+  const script = buildLiveCaptionBootstrapScript(call, "Eva");
+  assert.match(script, /expectedTargetLanguage/);
+  assert.match(script, /targetLanguage !== expectedTargetLanguage\) return/);
 });
 
 test("la couche CC est injectée avant la fermeture du head sans supprimer le moteur d'appel", () => {
