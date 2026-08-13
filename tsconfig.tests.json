@@ -13,6 +13,8 @@
   },
   "include": [
     "src/domain/**/*.ts",
+    "src/i18n/languages.ts",
+    "src/i18n/translationLocale.ts",
     "src/services/auth/**/*.ts",
     "src/services/api/contracts.ts",
     "src/services/api/realtimeTicketWire.ts",
@@ -20,6 +22,7 @@
     "src/services/api/neptuneWebFeed.ts",
     "src/config/backendCapabilities.ts",
     "src/services/realtime/realtimeEvents.ts",
+    "src/services/calls/liveCaptions.ts",
     "src/storage/outboxStore.memory.ts",
     "src/storage/outboxStore.types.ts",
     "src/theme/**/*.ts",
