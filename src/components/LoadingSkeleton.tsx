@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useContext, useRef } from "react";
 import {
   Animated,
   type DimensionValue,
@@ -7,8 +7,8 @@ import {
   type ViewStyle
 } from "react-native";
 
-import { useReducedMotion } from "../hooks/useReducedMotion";
 import { colors, radii } from "../theme";
+import { SkeletonPulseContext } from "./SkeletonPulseGroup";
 
 interface LoadingSkeletonProps {
   width?: DimensionValue;
@@ -23,33 +23,9 @@ export function LoadingSkeleton({
   radius = radii.md,
   style
 }: LoadingSkeletonProps) {
-  const reducedMotion = useReducedMotion();
-  const opacity = useRef(new Animated.Value(0.46)).current;
-
-  useEffect(() => {
-    opacity.stopAnimation();
-    if (reducedMotion) {
-      opacity.setValue(0.64);
-      return;
-    }
-
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.8,
-          duration: 700,
-          useNativeDriver: true
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.42,
-          duration: 700,
-          useNativeDriver: true
-        })
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [opacity, reducedMotion]);
+  const sharedOpacity = useContext(SkeletonPulseContext);
+  const fallbackOpacity = useRef(new Animated.Value(0.62)).current;
+  const opacity = sharedOpacity ?? fallbackOpacity;
 
   return (
     <Animated.View
