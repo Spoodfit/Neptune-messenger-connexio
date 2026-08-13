@@ -6,7 +6,12 @@ import { useGroupAdmin } from "../providers/GroupAdminProvider";
 import { useMessaging } from "../providers/MessagingProvider";
 import { useSession } from "../providers/SessionProvider";
 import { createStandaloneStateStore } from "../storage/standaloneStore";
-import type { GroupDraft, HighlightKind, HighlightMedia } from "../types/experience";
+import type {
+  GroupDraft,
+  HighlightKind,
+  HighlightMedia,
+  QuickReaction
+} from "../types/experience";
 import type { MessageAttachment } from "../types/messaging";
 
 interface SavedMessage {
@@ -16,7 +21,6 @@ interface SavedMessage {
 }
 
 interface SavedPrivateConversation {
-  id: string;
   memberIds: string[];
   name?: string;
   messages: SavedMessage[];
@@ -37,7 +41,6 @@ interface SavedComment {
 }
 
 interface SavedPost {
-  id: string;
   kind: HighlightKind;
   body: string;
   media?: HighlightMedia;
@@ -47,7 +50,7 @@ interface SavedPost {
     longitude: number;
     accuracyRadiusMeters: number;
   };
-  reactions: string[];
+  reactions: QuickReaction[];
   comments: SavedComment[];
 }
 
@@ -57,7 +60,6 @@ interface SavedSeedPostComments {
 }
 
 interface SavedGroup {
-  id: string;
   draft: GroupDraft;
   messages: SavedMessage[];
 }
@@ -96,6 +98,13 @@ export function StandalonePersistenceBridge() {
   const messaging = useMessaging();
   const experience = useExperience();
   const groupAdmin = useGroupAdmin();
+  const messagingRef = useRef(messaging);
+  const experienceRef = useRef(experience);
+  const groupAdminRef = useRef(groupAdmin);
+  messagingRef.current = messaging;
+  experienceRef.current = experience;
+  groupAdminRef.current = groupAdmin;
+
   const store = useRef(createStandaloneStateStore()).current;
   const [restored, setRestored] = useState(!env.mockMode);
   const restoring = useRef(false);
@@ -117,7 +126,6 @@ export function StandalonePersistenceBridge() {
     const privateConversations = experience.localConversations
       .filter((conversation) => conversation.id.startsWith("local-"))
       .map((conversation) => ({
-        id: conversation.id,
         memberIds: (conversation.memberIds ?? []).filter(
           (memberId) => memberId !== currentUser.id
         ),
@@ -156,7 +164,6 @@ export function StandalonePersistenceBridge() {
     const posts = experience.posts
       .filter((post) => post.author.id === currentUser.id)
       .map((post) => ({
-        id: post.id,
         kind: post.kind,
         body: post.body,
         media: post.media,
@@ -192,7 +199,6 @@ export function StandalonePersistenceBridge() {
       .filter((entry) => entry.comments.length > 0);
 
     const groups = groupAdmin.createdGroups.map((group) => ({
-      id: group.id,
       draft: {
         name: group.name,
         description: group.description ?? "",
@@ -227,6 +233,7 @@ export function StandalonePersistenceBridge() {
       setRestored(true);
       return;
     }
+
     let cancelled = false;
     restoring.current = true;
 
@@ -234,10 +241,13 @@ export function StandalonePersistenceBridge() {
       .load<StandaloneSnapshot>("experience")
       .then(async (saved) => {
         if (cancelled || !saved || saved.version !== 1) return;
+        const messagingApi = messagingRef.current;
+        const experienceApi = experienceRef.current;
+        const groupAdminApi = groupAdminRef.current;
 
         for (const item of chronological(saved.groupMessages ?? [])) {
           if (cancelled) return;
-          await messaging.sendMessage(
+          await messagingApi.sendMessage(
             item.conversationId,
             item.body,
             undefined,
@@ -246,17 +256,15 @@ export function StandalonePersistenceBridge() {
           );
         }
 
-        const privateIdMap = new Map<string, string>();
         for (const item of saved.privateConversations ?? []) {
           if (cancelled || item.memberIds.length === 0) continue;
           try {
-            const conversation = experience.createPrivateConversation({
+            const conversation = experienceApi.createPrivateConversation({
               memberIds: item.memberIds,
               name: item.name
             });
-            privateIdMap.set(item.id, conversation.id);
             for (const message of chronological(item.messages ?? [])) {
-              await experience.sendLocalMessage(
+              await experienceApi.sendLocalMessage(
                 conversation.id,
                 message.body,
                 undefined,
@@ -264,8 +272,8 @@ export function StandalonePersistenceBridge() {
                 message.mentionedUserIds
               );
             }
-            if (item.muted) experience.toggleConversationMuted(conversation.id);
-            if (item.left) experience.leaveConversation(conversation.id);
+            if (item.muted) experienceApi.toggleConversationMuted(conversation.id);
+            if (item.left) experienceApi.leaveConversation(conversation.id);
           } catch {
             // Un contact retiré du jeu de données ne doit pas bloquer le démarrage.
           }
@@ -274,7 +282,7 @@ export function StandalonePersistenceBridge() {
         for (const item of saved.seedPrivateMessages ?? []) {
           if (cancelled) return;
           for (const message of chronological(item.messages ?? [])) {
-            await experience.sendLocalMessage(
+            await experienceApi.sendLocalMessage(
               item.conversationId,
               message.body,
               undefined,
@@ -282,26 +290,24 @@ export function StandalonePersistenceBridge() {
               message.mentionedUserIds
             );
           }
-          if (item.muted) experience.toggleConversationMuted(item.conversationId);
-          if (item.left) experience.leaveConversation(item.conversationId);
+          if (item.muted) experienceApi.toggleConversationMuted(item.conversationId);
+          if (item.left) experienceApi.leaveConversation(item.conversationId);
         }
 
-        const postIdMap = new Map<string, string>();
         for (const item of chronological(saved.posts ?? [])) {
           if (cancelled) return;
-          const post = experience.createPost({
+          const post = experienceApi.createPost({
             kind: item.kind,
             body: item.body,
             media: item.media,
             mentionedUserIds: item.mentionedUserIds,
             coordinates: item.coordinates
           });
-          postIdMap.set(item.id, post.id);
           for (const emoji of item.reactions ?? []) {
-            experience.togglePostReaction(post.id, emoji as never);
+            experienceApi.togglePostReaction(post.id, emoji);
           }
           for (const comment of item.comments ?? []) {
-            experience.addComment(
+            experienceApi.addComment(
               post.id,
               comment.body,
               undefined,
@@ -312,10 +318,9 @@ export function StandalonePersistenceBridge() {
 
         for (const item of saved.seedPostComments ?? []) {
           if (cancelled) return;
-          const postId = postIdMap.get(item.postId) ?? item.postId;
           for (const comment of item.comments ?? []) {
-            experience.addComment(
-              postId,
+            experienceApi.addComment(
+              item.postId,
               comment.body,
               undefined,
               comment.mentionedUserIds
@@ -326,9 +331,9 @@ export function StandalonePersistenceBridge() {
         for (const item of saved.groups ?? []) {
           if (cancelled) return;
           try {
-            const group = groupAdmin.createGroup(item.draft);
+            const group = groupAdminApi.createGroup(item.draft);
             for (const message of chronological(item.messages ?? [])) {
-              await groupAdmin.sendCreatedGroupMessage(
+              await groupAdminApi.sendCreatedGroupMessage(
                 group.id,
                 message.body,
                 undefined,
@@ -351,7 +356,7 @@ export function StandalonePersistenceBridge() {
     return () => {
       cancelled = true;
     };
-  }, [currentUser.id, experience, groupAdmin, messaging, store]);
+  }, [currentUser.id, store]);
 
   useEffect(() => {
     if (!env.mockMode || !restored || restoring.current || !currentUser.id) return;
