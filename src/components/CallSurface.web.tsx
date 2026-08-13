@@ -2,6 +2,7 @@ import { createElement, useEffect, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { buildIntegratedCallHtml } from "../services/calls/callRoom";
+import { injectLiveCaptionRuntime } from "../services/calls/liveCaptions";
 import { colors } from "../theme";
 import type { CallSurfaceProps } from "./CallSurface.types";
 
@@ -12,7 +13,12 @@ export default function CallSurface({
   onUnanswered
 }: CallSurfaceProps) {
   const html = useMemo(
-    () => buildIntegratedCallHtml(session, displayName),
+    () =>
+      injectLiveCaptionRuntime(
+        buildIntegratedCallHtml(session, displayName),
+        session,
+        displayName
+      ),
     [displayName, session]
   );
 
