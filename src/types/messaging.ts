@@ -35,6 +35,16 @@ export type MessageStatus =
   | "read"
   | "failed";
 
+export type MessageTranslationStatus = "pending" | "ready" | "failed";
+
+export interface MessageTranslation {
+  targetLanguage: string;
+  sourceLanguage?: string;
+  body?: string;
+  status: MessageTranslationStatus;
+  generatedAt?: string;
+}
+
 export type AttachmentKind =
   | "photo"
   | "video"
@@ -221,7 +231,12 @@ export interface ChatMessage {
   senderAvatarUrl?: string;
   /** Statut Neptune de l’auteur, utilisé pour le contour et le badge. */
   senderRole?: UserRole;
+  /** Texte canonique tel qu’il a été écrit par l’auteur. Ne jamais l’écraser par une traduction. */
   body: string;
+  /** Langue source détectée côté serveur, au format BCP-47/ISO 639 lorsque disponible. */
+  sourceLanguage?: string;
+  /** Traduction dérivée pour la langue du lecteur. Le corps original reste dans `body`. */
+  translation?: MessageTranslation;
   createdAt: string;
   updatedAt?: string;
   status: MessageStatus;
