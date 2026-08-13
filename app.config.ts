@@ -118,7 +118,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: "Connexio by Neptune",
-    slug: "neptune-messenger-connexio",
+    slug: "neptune",
     version: APP_VERSION,
     orientation: "default",
     scheme: "neptuneconnexio",
