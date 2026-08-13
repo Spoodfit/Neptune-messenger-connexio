@@ -9,9 +9,10 @@ interface AppExtra {
   accountDeletionUrl?: string;
   supportUrl?: string;
   mockMode?: boolean;
+  standaloneMode?: boolean;
   buildProfile?: string;
   backendContract?: "neptune-web-v1" | "connexio-v1";
-  releaseStage?: "development" | "preview" | "release-candidate" | "production";
+  releaseStage?: "development" | "preview" | "standalone" | "release-candidate" | "production";
   eas?: {
     projectId?: string;
   };
@@ -20,6 +21,7 @@ interface AppExtra {
 const PUBLIC_POLICY_BASE_URL =
   "https://spoodfit.github.io/Neptune-messenger-connexio";
 const extra = (Constants.expoConfig?.extra ?? {}) as AppExtra;
+const standaloneMode = extra.standaloneMode === true;
 
 export const env = {
   apiBaseUrl: extra.apiBaseUrl ?? "",
@@ -33,7 +35,8 @@ export const env = {
   accountDeletionUrl:
     extra.accountDeletionUrl ?? `${PUBLIC_POLICY_BASE_URL}/account-deletion.html`,
   supportUrl: extra.supportUrl ?? "mailto:contact@neptunebusiness.com",
-  mockMode: extra.mockMode === true,
+  standaloneMode,
+  mockMode: extra.mockMode === true || standaloneMode,
   buildProfile: extra.buildProfile ?? "development",
   backendContract: extra.backendContract ?? "neptune-web-v1",
   releaseStage: extra.releaseStage ?? "development",
