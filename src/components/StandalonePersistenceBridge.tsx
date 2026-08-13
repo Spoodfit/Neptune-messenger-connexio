@@ -81,6 +81,10 @@ function chronological<T>(items: readonly T[]): T[] {
   return [...items].reverse();
 }
 
+function nextProviderRender(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function savedMessage(message: {
   body: string;
   attachments?: MessageAttachment[];
@@ -241,13 +245,10 @@ export function StandalonePersistenceBridge() {
       .load<StandaloneSnapshot>("experience")
       .then(async (saved) => {
         if (cancelled || !saved || saved.version !== 1) return;
-        const messagingApi = messagingRef.current;
-        const experienceApi = experienceRef.current;
-        const groupAdminApi = groupAdminRef.current;
 
         for (const item of chronological(saved.groupMessages ?? [])) {
           if (cancelled) return;
-          await messagingApi.sendMessage(
+          await messagingRef.current.sendMessage(
             item.conversationId,
             item.body,
             undefined,
@@ -259,12 +260,13 @@ export function StandalonePersistenceBridge() {
         for (const item of saved.privateConversations ?? []) {
           if (cancelled || item.memberIds.length === 0) continue;
           try {
-            const conversation = experienceApi.createPrivateConversation({
+            const conversation = experienceRef.current.createPrivateConversation({
               memberIds: item.memberIds,
               name: item.name
             });
+            await nextProviderRender();
             for (const message of chronological(item.messages ?? [])) {
-              await experienceApi.sendLocalMessage(
+              await experienceRef.current.sendLocalMessage(
                 conversation.id,
                 message.body,
                 undefined,
@@ -272,8 +274,10 @@ export function StandalonePersistenceBridge() {
                 message.mentionedUserIds
               );
             }
-            if (item.muted) experienceApi.toggleConversationMuted(conversation.id);
-            if (item.left) experienceApi.leaveConversation(conversation.id);
+            if (item.muted) {
+              experienceRef.current.toggleConversationMuted(conversation.id);
+            }
+            if (item.left) experienceRef.current.leaveConversation(conversation.id);
           } catch {
             // Un contact retiré du jeu de données ne doit pas bloquer le démarrage.
           }
@@ -282,7 +286,7 @@ export function StandalonePersistenceBridge() {
         for (const item of saved.seedPrivateMessages ?? []) {
           if (cancelled) return;
           for (const message of chronological(item.messages ?? [])) {
-            await experienceApi.sendLocalMessage(
+            await experienceRef.current.sendLocalMessage(
               item.conversationId,
               message.body,
               undefined,
@@ -290,13 +294,15 @@ export function StandalonePersistenceBridge() {
               message.mentionedUserIds
             );
           }
-          if (item.muted) experienceApi.toggleConversationMuted(item.conversationId);
-          if (item.left) experienceApi.leaveConversation(item.conversationId);
+          if (item.muted) {
+            experienceRef.current.toggleConversationMuted(item.conversationId);
+          }
+          if (item.left) experienceRef.current.leaveConversation(item.conversationId);
         }
 
         for (const item of chronological(saved.posts ?? [])) {
           if (cancelled) return;
-          const post = experienceApi.createPost({
+          const post = experienceRef.current.createPost({
             kind: item.kind,
             body: item.body,
             media: item.media,
@@ -304,10 +310,10 @@ export function StandalonePersistenceBridge() {
             coordinates: item.coordinates
           });
           for (const emoji of item.reactions ?? []) {
-            experienceApi.togglePostReaction(post.id, emoji);
+            experienceRef.current.togglePostReaction(post.id, emoji);
           }
           for (const comment of item.comments ?? []) {
-            experienceApi.addComment(
+            experienceRef.current.addComment(
               post.id,
               comment.body,
               undefined,
@@ -319,7 +325,7 @@ export function StandalonePersistenceBridge() {
         for (const item of saved.seedPostComments ?? []) {
           if (cancelled) return;
           for (const comment of item.comments ?? []) {
-            experienceApi.addComment(
+            experienceRef.current.addComment(
               item.postId,
               comment.body,
               undefined,
@@ -331,9 +337,10 @@ export function StandalonePersistenceBridge() {
         for (const item of saved.groups ?? []) {
           if (cancelled) return;
           try {
-            const group = groupAdminApi.createGroup(item.draft);
+            const group = groupAdminRef.current.createGroup(item.draft);
+            await nextProviderRender();
             for (const message of chronological(item.messages ?? [])) {
-              await groupAdminApi.sendCreatedGroupMessage(
+              await groupAdminRef.current.sendCreatedGroupMessage(
                 group.id,
                 message.body,
                 undefined,
