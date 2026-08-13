@@ -21,7 +21,8 @@ interface AppExtra {
 const PUBLIC_POLICY_BASE_URL =
   "https://spoodfit.github.io/Neptune-messenger-connexio";
 const extra = (Constants.expoConfig?.extra ?? {}) as AppExtra;
-const standaloneMode = extra.standaloneMode === true;
+const standaloneMode =
+  extra.standaloneMode === true || extra.buildProfile === "standalone";
 
 export const env = {
   apiBaseUrl: extra.apiBaseUrl ?? "",
