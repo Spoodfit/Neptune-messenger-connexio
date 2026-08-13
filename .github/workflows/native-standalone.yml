@@ -7,6 +7,7 @@ on:
       - release/connexio-rc1
     paths:
       - .github/workflows/native-standalone.yml
+      - eas.json
 
 permissions:
   contents: read
@@ -27,8 +28,6 @@ jobs:
       EXPO_PUBLIC_EAS_PROJECT_ID: d2288b09-8249-4879-810f-7cb0072baeeb
       EXPO_PUBLIC_MOCK_MODE: "true"
       EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
-      EXPO_PUBLIC_API_BASE_URL: ""
-      EXPO_PUBLIC_REALTIME_URL: ""
       EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
     steps:
       - name: Vérifier les accès EAS
