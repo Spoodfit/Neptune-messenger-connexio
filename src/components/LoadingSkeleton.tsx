@@ -1,14 +1,7 @@
-import { useEffect, useRef } from "react";
-import {
-  Animated,
-  type DimensionValue,
-  StyleSheet,
-  type StyleProp,
-  type ViewStyle
-} from "react-native";
-
-import { useReducedMotion } from "../hooks/useReducedMotion";
+import { useContext, useEffect, useRef } from "react";
+import { Animated, type DimensionValue, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { colors, radii } from "../theme";
+import { SkeletonPulseContext } from "./SkeletonPulseGroup";
 
 interface LoadingSkeletonProps {
   width?: DimensionValue;
@@ -17,56 +10,23 @@ interface LoadingSkeletonProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function LoadingSkeleton({
-  width = "100%",
-  height,
-  radius = radii.md,
-  style
-}: LoadingSkeletonProps) {
-  const reducedMotion = useReducedMotion();
-  const opacity = useRef(new Animated.Value(0.46)).current;
+export function LoadingSkeleton({ width = "100%", height, radius = radii.md, style }: LoadingSkeletonProps) {
+  const controller = useContext(SkeletonPulseContext);
+  const fallback = useRef(new Animated.Value(0.62)).current;
 
   useEffect(() => {
-    opacity.stopAnimation();
-    if (reducedMotion) {
-      opacity.setValue(0.64);
-      return;
-    }
-
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.8,
-          duration: 700,
-          useNativeDriver: true
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.42,
-          duration: 700,
-          useNativeDriver: true
-        })
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [opacity, reducedMotion]);
+    if (!controller) return;
+    return controller.retain();
+  }, [controller]);
 
   return (
     <Animated.View
       accessibilityElementsHidden
-      style={[
-        styles.block,
-        { width, height, borderRadius: radius, opacity },
-        style
-      ]}
+      style={[styles.block, { width, height, borderRadius: radius, opacity: controller ? controller.opacity : fallback }, style]}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  block: {
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.borderSoft
-  }
+  block: { backgroundColor: colors.surfaceMuted, borderWidth: 1, borderColor: colors.borderSoft }
 });
