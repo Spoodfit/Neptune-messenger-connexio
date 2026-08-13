@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { buildIntegratedCallHtml } from "../services/calls/callRoom";
+import { buildLiveCaptionBootstrapScript } from "../services/calls/liveCaptions";
 import { colors } from "../theme";
 import type { CallSurfaceProps } from "./CallSurface.types";
 
@@ -14,6 +15,10 @@ export default function CallSurface({
 }: CallSurfaceProps) {
   const html = useMemo(
     () => buildIntegratedCallHtml(session, displayName),
+    [displayName, session]
+  );
+  const captionBootstrap = useMemo(
+    () => buildLiveCaptionBootstrapScript(session, displayName),
     [displayName, session]
   );
 
@@ -46,6 +51,7 @@ export default function CallSurface({
     <View style={styles.screen}>
       <WebView
         source={{ html, baseUrl: new URL(session.socketUrl).origin }}
+        injectedJavaScriptBeforeContentLoaded={captionBootstrap}
         javaScriptEnabled
         domStorageEnabled
         mediaPlaybackRequiresUserAction={false}
