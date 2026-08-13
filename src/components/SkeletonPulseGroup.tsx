@@ -1,28 +1,55 @@
-import { createContext, type PropsWithChildren, useEffect, useRef } from "react";
+import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo, useRef } from "react";
 import { Animated } from "react-native";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
-export const SkeletonPulseContext = createContext<Animated.Value | null>(null);
+type PulseController = {
+  opacity: Animated.Value;
+  retain: () => () => void;
+};
+
+export const SkeletonPulseContext = createContext<PulseController | null>(null);
 
 export function SkeletonPulseGroup({ children }: PropsWithChildren) {
   const reducedMotion = useReducedMotion();
-  const opacity = useRef(new Animated.Value(0.46)).current;
+  const opacity = useRef(new Animated.Value(0.62)).current;
+  const consumers = useRef(0);
+  const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  useEffect(() => {
-    opacity.stopAnimation();
+  const stop = useCallback(() => {
+    loopRef.current?.stop();
+    loopRef.current = null;
+  }, []);
+
+  const start = useCallback(() => {
+    stop();
     if (reducedMotion) {
       opacity.setValue(0.64);
       return;
     }
-    const loop = Animated.loop(
+    opacity.setValue(0.46);
+    loopRef.current = Animated.loop(
       Animated.sequence([
         Animated.timing(opacity, { toValue: 0.8, duration: 700, useNativeDriver: true }),
         Animated.timing(opacity, { toValue: 0.42, duration: 700, useNativeDriver: true })
       ])
     );
-    loop.start();
-    return () => loop.stop();
-  }, [opacity, reducedMotion]);
+    loopRef.current.start();
+  }, [opacity, reducedMotion, stop]);
 
-  return <SkeletonPulseContext.Provider value={opacity}>{children}</SkeletonPulseContext.Provider>;
+  const retain = useCallback(() => {
+    consumers.current += 1;
+    if (consumers.current === 1) start();
+    return () => {
+      consumers.current = Math.max(0, consumers.current - 1);
+      if (consumers.current === 0) stop();
+    };
+  }, [start, stop]);
+
+  useEffect(() => {
+    if (consumers.current > 0) start();
+    return stop;
+  }, [start, stop]);
+
+  const value = useMemo(() => ({ opacity, retain }), [opacity, retain]);
+  return <SkeletonPulseContext.Provider value={value}>{children}</SkeletonPulseContext.Provider>;
 }
