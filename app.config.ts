@@ -183,7 +183,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       blockedPermissions: ["android.permission.ACCESS_FINE_LOCATION"],
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#020713"
+        backgroundColor: "#FFFFFF"
       },
       softwareKeyboardLayoutMode: "resize",
       permissions: [
