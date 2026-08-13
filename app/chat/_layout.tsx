@@ -1,17 +1,21 @@
 import { Slot } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
 
 import { ChatLoadingOverlay } from "@/components/ChatLoadingOverlay";
 import { SkeletonPulseGroup } from "@/components/SkeletonPulseGroup";
 
 export default function ChatLayout() {
   return (
-    <View style={styles.root}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={0}
+      style={styles.root}
+    >
       <Slot />
       <SkeletonPulseGroup>
         <ChatLoadingOverlay />
       </SkeletonPulseGroup>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
