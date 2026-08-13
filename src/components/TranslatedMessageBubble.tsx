@@ -1,89 +1,59 @@
 import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { getLanguageFrenchName, isSameLanguage } from "../i18n/languages";
-import { resolveMessagePresentation } from "../domain/messageTranslation";
-import { useTranslationPreferences } from "../providers/TranslationPreferencesProvider";
+import { getLanguageFrenchName } from "../i18n/languages";
 import { colors, spacing } from "../theme";
-import { MessageBubble } from "./MessageBubble";
+import { MessageBubble as BaseMessageBubble } from "./BaseMessageBubble";
 
-type MessageBubbleProps = ComponentProps<typeof MessageBubble>;
+type MessageBubbleProps = ComponentProps<typeof BaseMessageBubble>;
 
-export function TranslatedMessageBubble(props: MessageBubbleProps) {
+export function MessageBubble(props: MessageBubbleProps) {
   const { message, centered = false } = props;
-  const { enabled, targetLanguage } = useTranslationPreferences();
   const [showOriginal, setShowOriginal] = useState(false);
+  const translation = message.translation;
+  const translatedBody = translation?.body?.trim() ?? "";
+  const translationReady = Boolean(
+    !message.isMine &&
+      translation?.status === "ready" &&
+      translatedBody &&
+      translatedBody !== message.body.trim()
+  );
 
   useEffect(() => {
     setShowOriginal(false);
-  }, [message.id, targetLanguage]);
-
-  const presentation = useMemo(
-    () =>
-      resolveMessagePresentation(
-        message,
-        targetLanguage,
-        enabled,
-        showOriginal
-      ),
-    [enabled, message, showOriginal, targetLanguage]
-  );
+  }, [message.id, translation?.targetLanguage, translatedBody]);
 
   const renderedMessage = useMemo(
-    () => ({ ...message, body: presentation.body }),
-    [message, presentation.body]
+    () => ({
+      ...message,
+      body: translationReady && !showOriginal ? translatedBody : message.body
+    }),
+    [message, showOriginal, translatedBody, translationReady]
   );
 
-  const canToggle = Boolean(
-    !message.isMine &&
-      enabled &&
-      presentation.translationAvailable &&
-      presentation.sourceLanguage &&
-      !isSameLanguage(presentation.sourceLanguage, targetLanguage)
-  );
+  const sourceLabel = translation?.sourceLanguage
+    ? getLanguageFrenchName(translation.sourceLanguage).toLocaleLowerCase("fr")
+    : "la langue d’origine";
 
   return (
     <View style={styles.container}>
-      <MessageBubble
+      <BaseMessageBubble
         {...props}
         message={renderedMessage}
-        onReply={
-          props.onReply
-            ? () => props.onReply?.(message)
-            : undefined
-        }
-        onReact={
-          props.onReact
-            ? (_rendered, emoji) => props.onReact?.(message, emoji)
-            : undefined
-        }
-        onVotePoll={
-          props.onVotePoll
-            ? (_rendered, optionId) => props.onVotePoll?.(message, optionId)
-            : undefined
-        }
+        onReply={props.onReply ? () => props.onReply?.(message) : undefined}
+        onReact={props.onReact ? (_rendered, emoji) => props.onReact?.(message, emoji) : undefined}
+        onVotePoll={props.onVotePoll ? (_rendered, optionId) => props.onVotePoll?.(message, optionId) : undefined}
       />
 
-      {canToggle ? (
-        <View
-          style={[
-            styles.translationMeta,
-            centered ? styles.centeredMeta : styles.otherMeta
-          ]}
-        >
+      {translationReady ? (
+        <View style={[styles.translationMeta, centered ? styles.centeredMeta : styles.otherMeta]}>
           <Text style={styles.translationLabel}>
-            {showOriginal
-              ? "Message original"
-              : `Traduit de ${getLanguageFrenchName(presentation.sourceLanguage).toLocaleLowerCase("fr")}`}
+            {showOriginal ? "Message original" : `Traduit de ${sourceLabel}`}
           </Text>
           <Text style={styles.separator}>·</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={
-              showOriginal
-                ? "Afficher la traduction"
-                : "Afficher le message original"
-            }
+            accessibilityLabel={showOriginal ? "Afficher la traduction" : "Afficher le message original"}
             onPress={() => setShowOriginal((current) => !current)}
             style={styles.toggleTarget}
           >
@@ -110,22 +80,8 @@ const styles = StyleSheet.create({
   },
   otherMeta: { marginLeft: 56 + spacing.sm },
   centeredMeta: { justifyContent: "center", marginHorizontal: spacing.md },
-  translationLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: "700"
-  },
+  translationLabel: { color: colors.textMuted, fontSize: 11, lineHeight: 15, fontWeight: "700" },
   separator: { color: colors.textMuted, fontSize: 11 },
-  toggleTarget: {
-    minHeight: 32,
-    justifyContent: "center",
-    paddingHorizontal: 4
-  },
-  toggleText: {
-    color: colors.violet,
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: "900"
-  }
+  toggleTarget: { minHeight: 32, justifyContent: "center", paddingHorizontal: 4 },
+  toggleText: { color: colors.violet, fontSize: 11, lineHeight: 15, fontWeight: "900" }
 });
