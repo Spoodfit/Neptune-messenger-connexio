@@ -82,7 +82,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickMessage, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Créer une conversation" onPress={openNewConversation} style={styles.quickPressable}>
           <Ionicons name="chatbubble-ellipses" size={22} color={colors.white} />
-          <Text style={styles.quickLabel}>Conversation</Text>
+          <Text style={styles.quickLabel}>Nouvelle conversation</Text>
         </Pressable>
       </Animated.View>
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickHighlight, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
@@ -93,7 +93,13 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       </Animated.View>
 
       <Animated.View style={[styles.createShell, { transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "45deg"] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel={menuOpen ? "Fermer le menu de création" : "Créer"} accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen((value) => !value)} style={({ pressed }) => [styles.createPressable, pressed && styles.createPressed]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={menuOpen ? "Fermer la création" : "Créer une nouvelle conversation ou un Temps fort"}
+          accessibilityState={{ expanded: menuOpen }}
+          onPress={() => setMenuOpen((value) => !value)}
+          style={({ pressed }) => [styles.createPressable, pressed && styles.createPressed]}
+        >
           <LinearGradient colors={gradients.primary} style={styles.createGradient}>
             <Ionicons name="add" size={29} color={colors.white} />
           </LinearGradient>
@@ -122,8 +128,8 @@ const styles = StyleSheet.create({
   createPressed: { opacity: 0.86 },
   createGradient: { flex: 1, borderRadius: 24, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
   quickAction: { position: "absolute", top: 0, zIndex: 5, minWidth: 112, height: 52, borderRadius: 18, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.border, elevation: 22, shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-  quickMessage: { left: "50%", marginLeft: -124 },
+  quickMessage: { left: "50%", marginLeft: -132 },
   quickHighlight: { left: "50%", marginLeft: 12 },
-  quickPressable: { flex: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  quickPressable: { flex: 1, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900" }
 });
