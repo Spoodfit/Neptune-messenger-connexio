@@ -1,5 +1,6 @@
 import type { ChatMessage } from "../../types/messaging";
-import { normalizeChatMessage, WireValidationError } from "../api/wire";
+import { normalizeChatMessage } from "../api/wireExtensions";
+import { WireValidationError } from "../api/wire";
 
 export type RealtimeEvent =
   | { type: "message.created"; payload: ChatMessage }
