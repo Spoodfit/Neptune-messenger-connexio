@@ -11,7 +11,7 @@ import { useMessaging } from "../../src/providers/MessagingProvider";
 import { useSession } from "../../src/providers/SessionProvider";
 import { colors, gradients, spacing, typography } from "../../src/theme";
 import type { ChatMessage } from "../../src/types/messaging";
-import ChatConversationScreen from "./ChatConversationScreen";
+import ChatConversationScreen from "../../src/screens/ChatConversationScreen";
 
 function first(value?: string | string[]): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -145,7 +145,7 @@ export default function ChatRoute() {
             })}
           </View>
 
-          <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir la discussion et répondre" onPress={openRecentMessages} style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" acessibilityLabel="Ouvrir la discussion et répondre" onPress={openRecentMessages} style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}>
             <Ionicons name="chatbubble-ellipses" size={20} color={colors.white} />
             <Text style={styles.primaryActionText}>Ouvrir la discussion et répondre</Text>
           </Pressable>
