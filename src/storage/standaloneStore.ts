@@ -1,14 +1,20 @@
+import Storage from "expo-sqlite/kv-store";
+
 import type {
   StandaloneStateKey,
   StandaloneStateStore
 } from "./standaloneStore.types";
 
-const memory = new Map<StandaloneStateKey, string>();
+const PREFIX = "connexio.standalone.";
+
+function fullKey(key: StandaloneStateKey): string {
+  return `${PREFIX}${key}`;
+}
 
 export function createStandaloneStateStore(): StandaloneStateStore {
   return {
     async load<T>(key: StandaloneStateKey): Promise<T | null> {
-      const raw = memory.get(key);
+      const raw = await Storage.getItem(fullKey(key));
       if (!raw) return null;
       try {
         return JSON.parse(raw) as T;
@@ -17,17 +23,19 @@ export function createStandaloneStateStore(): StandaloneStateStore {
       }
     },
     async save<T>(key: StandaloneStateKey, value: T): Promise<void> {
-      memory.set(key, JSON.stringify(value));
+      await Storage.setItem(fullKey(key), JSON.stringify(value));
     },
     async remove(key: StandaloneStateKey): Promise<void> {
-      memory.delete(key);
+      await Storage.removeItem(fullKey(key));
     },
     async purge(): Promise<void> {
-      memory.clear();
+      for (const key of ["messaging", "experience", "group-admin"] as StandaloneStateKey[]) {
+        await Storage.removeItem(fullKey(key));
+      }
     }
   };
 }
 
 export async function purgeStandaloneData(): Promise<void> {
-  memory.clear();
+  await createStandaloneStateStore().purge();
 }
