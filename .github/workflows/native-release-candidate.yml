@@ -1,25 +1,19 @@
 name: Build native release candidate
 
-run-name: Build RC (${{ inputs.platform }}) from release/connexio-rc1
+run-name: Build Android RC from release/connexio-rc1
 
 on:
-  workflow_dispatch:
-    inputs:
-      platform:
-        description: Plateforme à construire
-        required: true
-        default: android
-        type: choice
-        options:
-          - android
-          - ios
-          - all
+  push:
+    branches:
+      - build/android-rc-20260813
+    paths:
+      - .github/workflows/native-release-candidate.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: connexio-native-rc-${{ inputs.platform }}
+  group: connexio-native-rc-android
   cancel-in-progress: false
 
 jobs:
@@ -50,5 +44,5 @@ jobs:
       - name: Vérifier la release candidate
         run: npm run verify && npm run audit:rc && npx expo install --check
 
-      - name: Construire avec EAS
-        run: npx eas-cli@21.7.1 build --profile release-candidate --platform "${{ inputs.platform }}" --non-interactive --wait
+      - name: Construire Android avec EAS
+        run: npx eas-cli@21.7.1 build --profile release-candidate --platform android --non-interactive --wait
