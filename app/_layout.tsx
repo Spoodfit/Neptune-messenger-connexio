@@ -13,6 +13,7 @@ import { capabilitiesForBackendContract } from "../src/config/backendCapabilitie
 import { env } from "../src/config/env";
 import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
 import { MessagingProvider } from "../src/providers/MessagingProvider";
+import { ScheduledCallsProvider } from "../src/providers/ScheduledCallsProvider";
 import { SessionProvider, useSession } from "../src/providers/SessionProvider";
 import { NeptuneMessagingApi } from "../src/services/api/neptuneApi";
 import {
@@ -67,6 +68,7 @@ function AuthenticatedApp() {
   const onUnavailableCallRoute =
     !CALLS_AVAILABLE &&
     (currentRootSegment === "call" ||
+      currentRootSegment === "schedule-call" ||
       (currentRootSegment === "(tabs)" && secondarySegment === "calls"));
 
   useEffect(() => {
@@ -133,14 +135,10 @@ function AuthenticatedApp() {
             .then((rotatedRegistration) =>
               rotatedRegistration ? synchronize(rotatedRegistration) : undefined
             )
-            .catch(() => {
-              // Une rotation échouée sera retentée au prochain démarrage actif.
-            });
+            .catch(() => undefined);
         }
       );
-    })().catch(() => {
-      // Le refus ou l’échec d’enregistrement push ne bloque pas la messagerie.
-    });
+    })().catch(() => undefined);
 
     return () => {
       cancelled = true;
@@ -149,23 +147,38 @@ function AuthenticatedApp() {
   }, [getAccessToken, hasAccessToken, isAuthenticated, sessionReady]);
 
   useEffect(() => {
-    if (Platform.OS === "web" || !BACKEND_CAPABILITIES.messaging) return;
+    if (Platform.OS === "web") return;
 
-    const openConversation = (
+    const openNotificationTarget = (
       response: Notifications.NotificationResponse | null
     ) => {
       if (!response) return;
-      if (
-        response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER
-      ) {
-        return;
-      }
+      if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
 
       const responseId = response.notification.request.identifier;
       if (processedNotificationResponseId.current === responseId) return;
+      const data = response.notification.request.content.data ?? {};
 
-      const conversationId =
-        response.notification.request.content.data?.conversationId;
+      if (data.type === "scheduled_call_due" && typeof data.conversationId === "string") {
+        processedNotificationResponseId.current = responseId;
+        void Notifications.clearLastNotificationResponseAsync();
+        const mode = data.mode === "audio" ? "audio" : "video";
+        const reason = typeof data.reason === "string" ? data.reason : "Appel programmé";
+        router.push({
+          pathname: "/call/[id]",
+          params: {
+            id: data.conversationId,
+            mode,
+            reason,
+            scheduled: "1",
+            autoStart: env.mockMode ? "1" : "0"
+          }
+        });
+        return;
+      }
+
+      if (!BACKEND_CAPABILITIES.messaging) return;
+      const conversationId = data.conversationId;
       if (typeof conversationId !== "string" || !conversationId.trim()) return;
 
       processedNotificationResponseId.current = responseId;
@@ -182,12 +195,10 @@ function AuthenticatedApp() {
     };
 
     void Notifications.getLastNotificationResponseAsync()
-      .then(openConversation)
-      .catch(() => {
-        // Une réponse native illisible ne doit pas bloquer le démarrage.
-      });
+      .then(openNotificationTarget)
+      .catch(() => undefined);
     const subscription = Notifications.addNotificationResponseReceivedListener(
-      openConversation
+      openNotificationTarget
     );
     return () => subscription.remove();
   }, [isAuthenticated, sessionReady]);
@@ -225,7 +236,9 @@ function AuthenticatedApp() {
   return (
     <MessagingProvider key={`user:${currentUser.id}`}>
       <GroupAdminProvider>
-        <ExperienceProvider>{applicationStack}</ExperienceProvider>
+        <ExperienceProvider>
+          <ScheduledCallsProvider>{applicationStack}</ScheduledCallsProvider>
+        </ExperienceProvider>
       </GroupAdminProvider>
     </MessagingProvider>
   );
