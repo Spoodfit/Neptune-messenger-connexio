@@ -70,7 +70,7 @@ export function MemberAvatarStack({
               {
                 width: size,
                 height: size,
-                borderRadius: Math.round(size * 0.38)
+                borderRadius: size / 2
               }
             ]}
           >
@@ -84,7 +84,7 @@ export function MemberAvatarStack({
               {
                 width: size,
                 height: size,
-                borderRadius: Math.round(size * 0.38),
+                borderRadius: size / 2,
                 marginLeft: -overlap
               }
             ]}
