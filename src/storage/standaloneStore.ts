@@ -11,7 +11,8 @@ const ALL_KEYS: StandaloneStateKey[] = [
   "experience",
   "group-admin",
   "scheduled-calls",
-  "appearance"
+  "appearance",
+  "app-language"
 ];
 
 function fullKey(key: StandaloneStateKey): string {
