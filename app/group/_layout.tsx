@@ -62,7 +62,7 @@ export default function GroupLayout() {
 
   return (
     <View style={styles.root}>
-      <Slot key={`${id}-${revision}`} />
+      <Slot />
       {canManage ? (
         <Pressable
           accessibilityRole="button"
