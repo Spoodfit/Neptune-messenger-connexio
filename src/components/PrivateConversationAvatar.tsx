@@ -43,9 +43,10 @@ export function PrivateConversationAvatar({
         (member): member is AppUser => Boolean(member)
       )
     : participants.filter((member) => member.id !== currentUserId).slice(0, 4);
+  const singleMember = visible[0];
 
-  if (visible.length === 1) {
-    return <StatusAvatar user={visible[0]} size={size} ringWidth={2.5} accessible={false} />;
+  if (visible.length === 1 && singleMember) {
+    return <StatusAvatar user={singleMember} size={size} ringWidth={2.5} accessible={false} />;
   }
 
   if (visible.length === 0) {
