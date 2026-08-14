@@ -148,17 +148,13 @@ async function pageDiagnostic(page) {
   }));
 }
 
-async function closeConversationMenu(page) {
-  const closeOptions = page.getByLabel("Fermer les options de conversation");
-  await expectVisible(closeOptions, "fermeture du menu de conversation");
-  if (!(await closeOptions.isVisible().catch(() => false))) return;
-  await closeOptions.click();
-  try {
-    await closeOptions.waitFor({ state: "hidden", timeout: 2500 });
-  } catch {
-    await page.keyboard.press("Escape").catch(() => undefined);
-    await page.waitForTimeout(250);
-  }
+async function resetToMessages(page) {
+  await page.goto(`http://127.0.0.1:${port}/messages`, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000
+  });
+  await page.waitForTimeout(650);
+  await expectVisible(page.getByText("Messages", { exact: true }).first(), "retour propre aux Messages");
 }
 
 async function openQuickCreate(page) {
@@ -214,11 +210,14 @@ async function run() {
         await page.waitForTimeout(650);
         await page.mouse.up();
         await expectVisible(page.getByText(/Mettre en sourdine|Réactiver les notifications/).first(), "menu maintien long");
-        await closeConversationMenu(page);
       }
     } else {
       failures.push("maintien long: aucune conversation de groupe visible");
     }
+
+    // Isole la suite du parcours : la feuille ouverte par le maintien long ne doit
+    // jamais intercepter les contrôles testés ensuite.
+    await resetToMessages(page);
 
     await openQuickCreate(page);
     const newConversationAction = page.getByLabel("Nouvelle conversation", { exact: true });
