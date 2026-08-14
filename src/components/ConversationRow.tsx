@@ -45,11 +45,16 @@ export function ConversationRow({ conversation, members = [], mentioned = false,
 
   const borderOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.62, 1] });
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.006] });
-  const neutralBorder = theme.isLight ? [theme.borderSoft, theme.borderSoft, theme.borderSoft] : [colors.borderSoft, colors.borderSoft, colors.borderSoft];
+  const neutralBorder: readonly [string, string, string] = theme.isLight
+    ? [theme.borderSoft, theme.borderSoft, theme.borderSoft]
+    : [colors.borderSoft, colors.borderSoft, colors.borderSoft];
+  const rowBorder: readonly [string, string, string] = mentioned
+    ? [colors.primary, theme.violet, theme.orange]
+    : neutralBorder;
 
   return (
     <Animated.View style={[styles.animatedWrap, { shadowColor: theme.shadow }, mentioned && { opacity: borderOpacity, transform: [{ scale }] }]}>
-      <LinearGradient colors={mentioned ? [colors.primary, theme.violet, theme.orange] : neutralBorder as readonly [string, string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.border}>
+      <LinearGradient colors={rowBorder} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.border}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${conversation.name}. ${conversation.lastMessage ?? "Aucun message"}. ${unreadLabel}${mentioned ? ". Vous avez été mentionné" : ""}${muted ? ". Conversation en sourdine" : ""}`}
