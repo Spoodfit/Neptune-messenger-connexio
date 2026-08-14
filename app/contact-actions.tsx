@@ -105,9 +105,10 @@ export default function ContactActionsScreen() {
   const openSmsInvitation = async () => {
     const valid = inviteContacts.filter((contact) => contact.phone?.trim());
     if (valid.length === 0) { setError("Sélectionnez au moins un contact disposant d’un numéro de téléphone."); return; }
-    const firstName = valid.length === 1 ? valid[0].displayName.split(" ")[0] : "";
+    const primary = valid[0]!;
+    const firstName = valid.length === 1 ? primary.displayName.split(" ")[0] : "";
     const body = valid.length === 1
-      ? `Bonjour ${firstName || valid[0].displayName}, je t’invite à découvrir Connexio by Neptune, l’app de mise en relation du réseau Neptune Business. ${env.businessWebBaseUrl}`
+      ? `Bonjour ${firstName || primary.displayName}, je t’invite à découvrir Connexio by Neptune, l’app de mise en relation du réseau Neptune Business. ${env.businessWebBaseUrl}`
       : `Je vous invite à découvrir Connexio by Neptune, l’app de mise en relation du réseau Neptune Business. ${env.businessWebBaseUrl}`;
     const recipients = valid.map((contact) => contact.phone!.replace(/[\s().-]/g, "")).join(",");
     const separator = Platform.OS === "ios" ? "&" : "?";

@@ -3,13 +3,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
   Text,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors, gradients, spacing, typography } from "../theme";
 import type { VoiceRecorderModalProps } from "./VoiceRecorderModal.types";
@@ -100,7 +100,7 @@ export default function VoiceRecorderModal({
       });
       onClose();
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Vocal indisponible",
         error instanceof Error ? error.message : "Le vocal n’a pas pu être préparé."
       );
@@ -124,7 +124,7 @@ export default function VoiceRecorderModal({
       !navigator.mediaDevices?.getUserMedia ||
       typeof MediaRecorder === "undefined"
     ) {
-      Alert.alert(
+      AppAlert.alert(
         "Microphone non compatible",
         "Ce navigateur ne prend pas en charge l’enregistrement vocal intégré."
       );
@@ -157,7 +157,7 @@ export default function VoiceRecorderModal({
       };
       recorder.onerror = () => {
         cleanup();
-        Alert.alert(
+        AppAlert.alert(
           "Microphone interrompu",
           "L’enregistrement vocal a été interrompu par le navigateur."
         );
@@ -174,7 +174,7 @@ export default function VoiceRecorderModal({
       }, 250);
     } catch (error) {
       cleanup();
-      Alert.alert(
+      AppAlert.alert(
         "Microphone indisponible",
         error instanceof DOMException && error.name === "NotAllowedError"
           ? "Autorisez le microphone dans le navigateur pour enregistrer un vocal."

@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Linking,
   Pressable,
@@ -15,6 +14,7 @@ import {
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { HighlightMediaView } from "@/components/HighlightMediaView";
 import { InlineVoiceRecorder } from "@/components/InlineVoiceRecorder";
@@ -214,7 +214,7 @@ export default function NewHighlightScreen() {
       const selected = await pickHighlightMedia(mediaKind);
       if (selected) setMedia(selected);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Média indisponible",
         error instanceof Error
           ? error.message
@@ -267,7 +267,7 @@ export default function NewHighlightScreen() {
       setSelectedLocation(location);
       setLocationQuery(location.label);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Localisation impossible",
         error instanceof Error
           ? error.message
@@ -280,7 +280,7 @@ export default function NewHighlightScreen() {
 
   const chooseKind = (nextKind: HighlightKind) => {
     if (!canPublishHighlightKind(currentUser.role, nextKind)) {
-      Alert.alert(
+      AppAlert.alert(
         "Passez Triton",
         "Les comptes Free peuvent publier uniquement des Besoins. L’abonnement Triton débloque tous les formats.",
         [
@@ -304,14 +304,14 @@ export default function NewHighlightScreen() {
     }
     const cleanBody = body.trim();
     if (!cleanBody && !media) {
-      Alert.alert(
+      AppAlert.alert(
         "Publication vide",
         "Ajoutez un texte, une photo, une vidéo ou un message vocal."
       );
       return;
     }
     if (media?.kind === "video" && (media.durationSeconds ?? 0) > 60) {
-      Alert.alert("Vidéo trop longue", "La durée maximale est de 60 secondes.");
+      AppAlert.alert("Vidéo trop longue", "La durée maximale est de 60 secondes.");
       return;
     }
 
@@ -373,7 +373,7 @@ export default function NewHighlightScreen() {
       setMedia((current) =>
         current ? { ...current, status: "failed" } : current
       );
-      Alert.alert(
+      AppAlert.alert(
         "Publication impossible",
         error instanceof Error
           ? error.message

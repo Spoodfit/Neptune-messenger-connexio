@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { ThemeModeButton } from "@/components/ThemeModeButton";
 import { env } from "@/config/env";
@@ -17,9 +18,9 @@ const sections = [
 ];
 
 async function openExternalUrl(label: string, url: string): Promise<void> {
-  if (!url) { Alert.alert(label, "Ce lien est temporairement indisponible."); return; }
+  if (!url) { AppAlert.alert(label, "Ce lien est temporairement indisponible."); return; }
   const supported = await Linking.canOpenURL(url);
-  if (!supported) { Alert.alert(label, "Ce lien ne peut pas être ouvert sur cet appareil."); return; }
+  if (!supported) { AppAlert.alert(label, "Ce lien ne peut pas être ouvert sur cet appareil."); return; }
   await Linking.openURL(url);
 }
 

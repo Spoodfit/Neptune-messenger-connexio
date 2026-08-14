@@ -14,6 +14,7 @@ import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { hidePrivateConversation, isConversationMentionSeen, isPrivateConversationPresented, markConversationMentionSeen, removePrivateConversation, restorePrivateConversation, useConversationPresentationRevision } from "@/state/conversationPresentation";
+import { AppAlert } from "@/services/ui/AppAlert";
 import { colors, gradients, spacing, typography } from "@/theme";
 import type { ConversationFilter } from "@/types/experience";
 import type { Conversation } from "@/types/messaging";
@@ -30,7 +31,7 @@ function matchesMention(conversation: Conversation, aliases: string[]): boolean 
 export default function MessagesScreen() {
   const theme = useAppTheme();
   const { serviceAvailable, visibleConversations, getMessages, refreshConversations, loadingConversations, lastError } = useMessaging();
-  const { members, localConversations, decorateConversation, isConversationVisible, toggleConversationMuted, leaveConversation } = useExperience();
+  const { members, localConversations, decorateConversation, isConversationVisible, toggleConversationMuted, leaveConversation, joinConversation } = useExperience();
   const { createdGroups, removeCreatedGroup } = useGroupAdmin();
   const { currentUser } = useSession();
   const presentationRevision = useConversationPresentationRevision();
@@ -64,11 +65,19 @@ export default function MessagesScreen() {
   }, [createdGroups, decorateConversation, filter, getMessages, isConversationVisible, localConversations, presentationRevision, visibleConversations]);
 
   const closeMenu = () => setSelectedConversation(null);
-  const openConversation = (conversation: Conversation) => {
-    const mentioned = matchesMention(conversation, mentionAliases) && !isConversationMentionSeen(conversation);
-    restorePrivateConversation(conversation.id);
-    if (mentioned) markConversationMentionSeen(conversation);
-    router.push({ pathname: "/chat/[id]", params: { id: conversation.id, ...(mentioned ? { focusMention: "1" } : {}) } });
+  const openConversation = async (conversation: Conversation) => {
+    try {
+      if (conversation.left) {
+        await joinConversation(conversation.id);
+        await refreshConversations();
+      }
+      const mentioned = matchesMention(conversation, mentionAliases) && !isConversationMentionSeen(conversation);
+      restorePrivateConversation(conversation.id);
+      if (mentioned) markConversationMentionSeen(conversation);
+      router.push({ pathname: "/chat/[id]", params: { id: conversation.id, ...(mentioned ? { focusMention: "1" } : {}) } });
+    } catch (error) {
+      AppAlert.alert("Impossible de rejoindre le groupe", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
+    }
   };
   const openDetails = () => {
     if (!selectedConversation) return;
@@ -86,6 +95,18 @@ export default function MessagesScreen() {
     if (selectedConversation.id.startsWith("local-group-")) removeCreatedGroup(selectedConversation.id);
     else leaveConversation(selectedConversation.id);
     closeMenu();
+  };
+  const joinSelectedGroup = async () => {
+    if (!selectedConversation) return;
+    const id = selectedConversation.id;
+    closeMenu();
+    try {
+      await joinConversation(id);
+      await refreshConversations();
+      router.push(`/chat/${encodeURIComponent(id)}`);
+    } catch (error) {
+      AppAlert.alert("Impossible de rejoindre le groupe", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
+    }
   };
   const deletePrivateConversation = () => {
     if (!deleteCandidate) return;
@@ -146,7 +167,7 @@ export default function MessagesScreen() {
           renderItem={({ item }) => {
             const privateConversation = isPrivateConversation(item);
             const mentioned = matchesMention(item, mentionAliases) && !isConversationMentionSeen(item);
-            const row = <ConversationRow conversation={item} members={members} mentioned={mentioned} muted={item.muted} onPress={() => openConversation(item)} onLongPress={() => setSelectedConversation(item)} />;
+            const row = <ConversationRow conversation={item} members={members} mentioned={mentioned} muted={item.muted} onPress={() => void openConversation(item)} onLongPress={() => setSelectedConversation(item)} />;
             return privateConversation ? <SwipeableConversationRow enabled onDelete={() => setDeleteCandidate(item)} onHide={() => hidePrivateConversation(item)}>{row}</SwipeableConversationRow> : row;
           }}
           style={styles.listViewport}
@@ -167,7 +188,7 @@ export default function MessagesScreen() {
             <Text style={[styles.sheetSubtitle, { color: theme.pageTextMuted }]}>{selectedConversation?.type === "direct" ? "Conversation privée" : `${selectedConversation?.memberIds?.length ?? selectedConversation?.memberCount ?? 0} membres`}</Text>
             <Pressable style={styles.sheetAction} onPress={toggleMute}><Ionicons name={selectedConversation?.muted ? "notifications" : "notifications-off"} size={21} color={theme.pageText} /><Text style={[styles.sheetActionText, { color: theme.pageText }]}>{selectedConversation?.muted ? "Réactiver les notifications" : "Mettre en sourdine"}</Text></Pressable>
             <Pressable style={styles.sheetAction} onPress={openDetails}><Ionicons name="settings-outline" size={21} color={theme.pageText} /><Text style={[styles.sheetActionText, { color: theme.pageText }]}>{selectedConversation && isPrivateConversation(selectedConversation) ? "Informations de la conversation" : "Paramètres et membres du groupe"}</Text></Pressable>
-            {selectedConversation && selectedConversation.type !== "direct" && selectedConversation.type !== "announcement" ? <Pressable style={[styles.sheetAction, { marginTop: 4, backgroundColor: theme.dangerSoft }]} onPress={leaveSelectedGroup}><Ionicons name="exit-outline" size={21} color={theme.danger} /><Text style={[styles.sheetActionText, { color: theme.danger }]}>Quitter le groupe</Text></Pressable> : null}
+            {selectedConversation && selectedConversation.type !== "direct" && selectedConversation.type !== "announcement" ? (selectedConversation.left ? <Pressable style={[styles.sheetAction, { marginTop: 4, backgroundColor: theme.successSoft }]} onPress={() => void joinSelectedGroup()}><Ionicons name="enter-outline" size={21} color={theme.success} /><Text style={[styles.sheetActionText, { color: theme.success }]}>Rejoindre le groupe</Text></Pressable> : <Pressable style={[styles.sheetAction, { marginTop: 4, backgroundColor: theme.dangerSoft }]} onPress={leaveSelectedGroup}><Ionicons name="exit-outline" size={21} color={theme.danger} /><Text style={[styles.sheetActionText, { color: theme.danger }]}>Quitter le groupe</Text></Pressable>) : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -180,8 +201,8 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   toolbar: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", paddingHorizontal: 10, paddingTop: 10 },
-  segmented: { height: 52, padding: 3, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" },
-  segmentButton: { flex: 1, minHeight: 48, borderRadius: 13, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  segmented: { height: 56, padding: 3, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" },
+  segmentButton: { flex: 1, height: 48, borderRadius: 12, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   segmentText: { fontSize: 14, fontWeight: "800" },
   sectionHeader: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", paddingHorizontal: spacing.md, paddingTop: 14, paddingBottom: 10, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   sectionTitle: { ...typography.heading3, flex: 1, fontWeight: "900" },

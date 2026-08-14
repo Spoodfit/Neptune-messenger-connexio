@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { useState } from "react";
 import {
-  Alert,
   Image,
   Linking,
   Pressable,
@@ -10,6 +9,7 @@ import {
   Text,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors } from "../theme";
 import type { HighlightMedia } from "../types/experience";
@@ -26,12 +26,12 @@ function formatDuration(durationSeconds?: number): string {
 
 async function openMedia(uri?: string): Promise<void> {
   if (!uri) {
-    Alert.alert("Contenu indisponible", "Ce média n’est plus accessible.");
+    AppAlert.alert("Contenu indisponible", "Ce média n’est plus accessible.");
     return;
   }
   const supported = await Linking.canOpenURL(uri);
   if (!supported) {
-    Alert.alert("Ouverture impossible", "Aucune application ne peut lire ce média.");
+    AppAlert.alert("Ouverture impossible", "Aucune application ne peut lire ce média.");
     return;
   }
   await Linking.openURL(uri);

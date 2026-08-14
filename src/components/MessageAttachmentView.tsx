@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useState } from "react";
 import {
-  Alert,
   Image,
   Linking,
   Platform,
@@ -11,6 +10,7 @@ import {
   Text,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors } from "../theme";
 import type { MessageAttachment } from "../types/messaging";
@@ -57,12 +57,12 @@ function formatDuration(durationSeconds?: number): string {
 async function openExternal(attachment: MessageAttachment): Promise<void> {
   const uri = attachment.kind === "location" ? locationUrl(attachment) : resolveUri(attachment);
   if (!uri) {
-    Alert.alert("Contenu indisponible", "Ce fichier n’est plus accessible.");
+    AppAlert.alert("Contenu indisponible", "Ce fichier n’est plus accessible.");
     return;
   }
   const supported = await Linking.canOpenURL(uri);
   if (!supported) {
-    Alert.alert("Ouverture impossible", "Aucune application ne peut ouvrir ce contenu.");
+    AppAlert.alert("Ouverture impossible", "Aucune application ne peut ouvrir ce contenu.");
     return;
   }
   await Linking.openURL(uri);
@@ -79,7 +79,7 @@ function VoiceAttachment({ attachment, isMine }: MessageAttachmentViewProps) {
 
   const togglePlayback = () => {
     if (!sourceUri) {
-      Alert.alert("Vocal indisponible", "Ce message vocal n’est plus accessible.");
+      AppAlert.alert("Vocal indisponible", "Ce message vocal n’est plus accessible.");
       return;
     }
     if (playerStatus.playing) {

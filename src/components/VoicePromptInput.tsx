@@ -5,13 +5,13 @@ import {
 } from "expo-speech-recognition";
 import { useMemo, useState } from "react";
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors } from "../theme";
 
@@ -97,7 +97,7 @@ export function VoicePromptInput({
           ? recognitionError.message
           : "La dictée vocale n’est pas disponible sur cet appareil.";
       setError(message);
-      Alert.alert("Dictée indisponible", message);
+      AppAlert.alert("Dictée indisponible", message);
     }
   };
 

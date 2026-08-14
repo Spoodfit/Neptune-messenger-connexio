@@ -5,7 +5,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { ThemeModeButton } from "@/components/ThemeModeButton";
 import { env } from "@/config/env";
@@ -216,7 +216,7 @@ export default function GroupAutomationsScreen() {
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          Alert.alert(
+          AppAlert.alert(
             "Automatisations indisponibles",
             error instanceof Error ? error.message : "Réessayez ultérieurement."
           );
@@ -295,13 +295,13 @@ export default function GroupAutomationsScreen() {
             Date.parse(firstItem.scheduledFor) - Date.parse(secondItem.scheduledFor)
         )
       );
-      Alert.alert(
+      AppAlert.alert(
         editingId ? "Automatisation modifiée" : "Automatisation créée",
         `${saved.name} démarrera ${formatScheduledDate(saved.scheduledFor)}.`
       );
       resetForm();
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Enregistrement impossible",
         error instanceof Error ? error.message : "L’automatisation n’a pas été enregistrée."
       );
@@ -312,7 +312,7 @@ export default function GroupAutomationsScreen() {
 
   const editAutomation = (item: ScheduledMessage) => {
     if (!canManageItem(item)) {
-      Alert.alert(
+      AppAlert.alert(
         "Modification réservée",
         "Seuls les Visionnaires peuvent modifier une automatisation créée par un autre responsable."
       );
@@ -352,7 +352,7 @@ export default function GroupAutomationsScreen() {
       setAutomations((previous) =>
         previous.map((candidate) => (candidate.id === item.id ? item : candidate))
       );
-      Alert.alert(
+      AppAlert.alert(
         "Modification impossible",
         error instanceof Error ? error.message : "L’état n’a pas été modifié."
       );
@@ -363,7 +363,7 @@ export default function GroupAutomationsScreen() {
 
   const deleteAutomation = (item: ScheduledMessage) => {
     if (!canManageItem(item) || busyId) return;
-    Alert.alert(`Supprimer « ${item.name} » ?`, "Cette action est définitive.", [
+    AppAlert.alert(`Supprimer « ${item.name} » ?`, "Cette action est définitive.", [
       { text: "Annuler", style: "cancel" },
       {
         text: "Supprimer",
@@ -376,7 +376,7 @@ export default function GroupAutomationsScreen() {
               setAutomations((previous) => previous.filter((candidate) => candidate.id !== item.id));
               if (editingId === item.id) resetForm();
             } catch (error) {
-              Alert.alert(
+              AppAlert.alert(
                 "Suppression impossible",
                 error instanceof Error ? error.message : "L’automatisation n’a pas été supprimée."
               );

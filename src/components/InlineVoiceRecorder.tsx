@@ -11,12 +11,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors, gradients } from "../theme";
 import type { MessageAttachment } from "../types/messaging";
@@ -90,7 +90,7 @@ export function InlineVoiceRecorder({
         recorder.record({ forDuration: maxDurationSeconds });
         if (mountedRef.current) setPreparing(false);
       } catch (error) {
-        Alert.alert(
+        AppAlert.alert(
           "Microphone indisponible",
           error instanceof Error
             ? error.message
@@ -136,7 +136,7 @@ export function InlineVoiceRecorder({
       });
     } catch (error) {
       setFinishing(false);
-      Alert.alert(
+      AppAlert.alert(
         "Vocal indisponible",
         error instanceof Error ? error.message : "Le vocal n’a pas pu être envoyé."
       );

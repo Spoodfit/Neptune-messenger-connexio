@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Slot, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { StatusAvatar } from "@/components/StatusAvatar";
 import { env } from "@/config/env";
@@ -47,7 +48,7 @@ export default function GroupLayout() {
 
   const addMember = (memberId: string) => {
     if (!env.mockMode) {
-      Alert.alert(
+      AppAlert.alert(
         "Ajout prêt côté application",
         "L’ajout réel sera synchronisé dès que l’endpoint de gestion des membres sera branché au backend Connexio. Aucun faux ajout serveur n’est effectué."
       );

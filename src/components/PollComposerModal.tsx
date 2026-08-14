@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors, radii, spacing, typography } from "../theme";
 import type { CreatePollInput } from "../types/messaging";
@@ -56,18 +56,18 @@ export function PollComposerModal({
     const cleanQuestion = question.trim();
     const cleanOptions = options.map((option) => option.trim()).filter(Boolean);
     if (cleanQuestion.length < 3) {
-      Alert.alert("Question requise", "Ajoutez une question de sondage claire.");
+      AppAlert.alert("Question requise", "Ajoutez une question de sondage claire.");
       return;
     }
     if (cleanOptions.length < 2) {
-      Alert.alert("Réponses requises", "Ajoutez au moins deux choix.");
+      AppAlert.alert("Réponses requises", "Ajoutez au moins deux choix.");
       return;
     }
     if (
       new Set(cleanOptions.map((item) => item.toLocaleLowerCase("fr"))).size !==
       cleanOptions.length
     ) {
-      Alert.alert("Choix en double", "Chaque réponse doit être différente.");
+      AppAlert.alert("Choix en double", "Chaque réponse doit être différente.");
       return;
     }
     setCreating(true);

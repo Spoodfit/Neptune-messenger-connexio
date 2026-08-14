@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, Share, StyleSheet } from "react-native";
+import { Pressable, Share, StyleSheet } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { env } from "../config/env";
 import { useSession } from "../providers/SessionProvider";
@@ -37,7 +38,7 @@ export function HighlightShareButton({ post }: HighlightShareButtonProps) {
         url: result.url
       });
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Partage impossible",
         error instanceof Error ? error.message : "Réessayez ultérieurement."
       );

@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
@@ -49,7 +50,7 @@ export default function ConversationInfoScreen() {
 
   const leave = () => {
     if (conversation.type === "direct") return;
-    Alert.alert(
+    AppAlert.alert(
       "Quitter ce mini-groupe ?",
       "Il disparaîtra de vos discussions privées.",
       [

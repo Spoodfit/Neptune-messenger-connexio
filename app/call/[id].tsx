@@ -3,7 +3,8 @@ import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import CallSurface from "@/components/CallSurface";
 import type { CallUnansweredEvent } from "@/components/CallSurface.types";
@@ -86,14 +87,13 @@ export default function CallRoomScreen() {
     setSession(null);
     if (activeSession) playCallEnd();
     if (api && activeSession && !activeSession.mock) await api.endCall(activeSession.id).catch(() => undefined);
-    if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)/calls");
+    router.replace(conversationId ? `/chat/${encodeURIComponent(conversationId)}` : "/(tabs)/calls");
   };
 
   const startOutgoingCall = async () => {
     if (preparing) return;
     if (!canInitiatePrivateInteraction(currentUser.role)) {
-      Alert.alert("Passez Triton", "Un compte Free peut recevoir un appel, mais doit passer Triton pour appeler.", [
+      AppAlert.alert("Passez Triton", "Un compte Free peut recevoir un appel, mais doit passer Triton pour appeler.", [
         { text: "Plus tard", style: "cancel" },
         { text: "Passer Triton", onPress: () => void Linking.openURL(TRITON_CHECKOUT_URL) }
       ]);
@@ -101,7 +101,7 @@ export default function CallRoomScreen() {
     }
     const cleanReason = reason.trim();
     if (cleanReason.length < 3) {
-      Alert.alert("Objet de l’appel requis", "Expliquez brièvement pourquoi vous appelez. Le destinataire verra cette information avant de répondre.");
+      AppAlert.alert("Objet de l’appel requis", "Expliquez brièvement pourquoi vous appelez. Le destinataire verra cette information avant de répondre.");
       return;
     }
     setPreparing(true);
@@ -148,11 +148,11 @@ export default function CallRoomScreen() {
       if (!sent) throw new Error("Le message automatique n’a pas pu être envoyé.");
       if (response === "callback_10m") {
         const reminderScheduled = await scheduleCallBackReminder(conversationId, callerName);
-        if (!reminderScheduled) Alert.alert("Rappel non programmé", "Le message a été envoyé, mais les notifications ne sont pas autorisées sur cet appareil.");
+        if (!reminderScheduled) AppAlert.alert("Rappel non programmé", "Le message a été envoyé, mais les notifications ne sont pas autorisées sur cet appareil.");
       }
       router.replace(`/chat/${encodeURIComponent(conversationId)}`);
     } catch (declineError) {
-      Alert.alert("Action impossible", declineError instanceof Error ? declineError.message : "La réponse n’a pas pu être envoyée.");
+      AppAlert.alert("Action impossible", declineError instanceof Error ? declineError.message : "La réponse n’a pas pu être envoyée.");
     } finally {
       setDeclining(null);
     }

@@ -3,7 +3,8 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import { env } from "../config/env";
@@ -38,13 +39,13 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
     try {
       const result = api ? await api.shareHighlight(post.id) : { url: Linking.createURL(`/highlight/${encodeURIComponent(post.id)}`), shareCount: post.shareCount + 1 };
       await Share.share({ title: `${post.author.name} sur Connexio`, message: `${post.body || "Temps fort Neptune"}\n${result.url}`, url: result.url });
-    } catch (error) { Alert.alert("Partage impossible", error instanceof Error ? error.message : "La publication n’a pas pu être partagée."); }
+    } catch (error) { AppAlert.alert("Partage impossible", error instanceof Error ? error.message : "La publication n’a pas pu être partagée."); }
     finally { setSharing(false); }
   };
   const reportPost = async () => {
-    if (!api) { Alert.alert("Signalement enregistré", "Le signalement est simulé en démonstration."); return; }
-    try { await api.reportContent("highlight", post.id, "Contenu signalé depuis Connexio"); Alert.alert("Signalement transmis", "La modération Neptune examinera ce contenu."); }
-    catch (error) { Alert.alert("Signalement impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+    if (!api) { AppAlert.alert("Signalement enregistré", "Le signalement est simulé en démonstration."); return; }
+    try { await api.reportContent("highlight", post.id, "Contenu signalé depuis Connexio"); AppAlert.alert("Signalement transmis", "La modération Neptune examinera ce contenu."); }
+    catch (error) { AppAlert.alert("Signalement impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
   };
   const menuOptions: ActionSheetOption[] = [
     { id: "profile", label: `Voir le profil de ${post.author.name}`, icon: "person-outline", onPress: () => router.push(`/profile/${encodeURIComponent(post.author.id)}`) },

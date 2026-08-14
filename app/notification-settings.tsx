@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { ThemeModeButton } from "@/components/ThemeModeButton";
 import { env } from "@/config/env";
@@ -36,7 +37,7 @@ export default function NotificationSettingsScreen() {
     if (!api) return;
     let cancelled = false;
     setLoading(true);
-    void api.getNotificationPreferences().then((next) => { if (!cancelled) setPreferences(next); }).catch((error: unknown) => { if (!cancelled) Alert.alert("Préférences indisponibles", error instanceof Error ? error.message : "Réessayez ultérieurement."); }).finally(() => { if (!cancelled) setLoading(false); });
+    void api.getNotificationPreferences().then((next) => { if (!cancelled) setPreferences(next); }).catch((error: unknown) => { if (!cancelled) AppAlert.alert("Préférences indisponibles", error instanceof Error ? error.message : "Réessayez ultérieurement."); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [api]);
 
@@ -47,7 +48,7 @@ export default function NotificationSettingsScreen() {
     setPreferences(next);
     setSavingKey(key);
     try { if (api) setPreferences(await api.updateNotificationPreferences(next)); }
-    catch (error) { setPreferences(previous); Alert.alert("Enregistrement impossible", error instanceof Error ? error.message : "La préférence n’a pas été enregistrée."); }
+    catch (error) { setPreferences(previous); AppAlert.alert("Enregistrement impossible", error instanceof Error ? error.message : "La préférence n’a pas été enregistrée."); }
     finally { setSavingKey(null); }
   };
 

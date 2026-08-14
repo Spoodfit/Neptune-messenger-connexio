@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { ActionSheet, type ActionSheetOption } from "@/components/ActionSheet";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
@@ -58,7 +59,7 @@ export default function MemberProfileScreen() {
     if (opening) return;
     setOpening(true);
     try { const conversation = await ensureConversation(); restorePrivateConversation(conversation.id); router.push(`/chat/${encodeURIComponent(conversation.id)}`); }
-    catch (error) { Alert.alert("Conversation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+    catch (error) { AppAlert.alert("Conversation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
     finally { setOpening(false); }
   };
 
@@ -79,7 +80,7 @@ export default function MemberProfileScreen() {
       const accepted = conversation.id.startsWith("local-") ? await sendLocalMessage(conversation.id, message) : await sendMessage(conversation.id, message);
       if (!accepted) throw new Error("Le message de mise en relation n’a pas pu être envoyé.");
       router.push(`/chat/${encodeURIComponent(conversation.id)}`);
-    } catch (error) { Alert.alert("Mise en relation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+    } catch (error) { AppAlert.alert("Mise en relation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
     finally { setOpening(false); }
   };
 
@@ -87,15 +88,15 @@ export default function MemberProfileScreen() {
     if (opening) return;
     setOpening(true);
     try { const conversation = await ensureConversation(); router.push({ pathname: "/call/[id]", params: { id: conversation.id, mode } }); }
-    catch (error) { Alert.alert("Appel impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+    catch (error) { AppAlert.alert("Appel impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
     finally { setOpening(false); }
   };
 
-  const blockMember = async () => { setBlockConfirmOpen(false); try { if (api) await api.blockMember(member.id); router.replace("/(tabs)/messages"); } catch (error) { Alert.alert("Blocage impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); } };
-  const muteMember = async () => { try { const conversation = await ensureConversation(); const nextMuted = !conversation.muted; if (api && !conversation.id.startsWith("local-")) { await api.setConversationMuted(conversation.id, nextMuted); await refreshConversations(); } else toggleConversationMuted(conversation.id); } catch (error) { Alert.alert("Action impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); } };
-  const reportMember = async () => { try { if (api) await api.reportContent("profile", member.id, "Profil signalé depuis Connexio"); Alert.alert("Signalement transmis", "La modération Neptune va examiner ce profil."); } catch (error) { Alert.alert("Signalement impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); } };
-  const openBusinessProfile = async () => { const url = member.webProfileUrl ?? `${env.businessWebBaseUrl.replace(/\/$/, "")}/profile/${encodeURIComponent(member.id)}`; if (await Linking.canOpenURL(url)) await Linking.openURL(url); else Alert.alert("Profil indisponible", "Le profil Neptune Business ne peut pas être ouvert."); };
-  const callPhone = () => member.phone ? void Linking.openURL(`tel:${member.phone}`) : Alert.alert("Téléphone non partagé", "Le membre n’a pas rendu son numéro disponible dans son profil Neptune.");
+  const blockMember = async () => { setBlockConfirmOpen(false); try { if (api) await api.blockMember(member.id); router.replace("/(tabs)/messages"); } catch (error) { AppAlert.alert("Blocage impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); } };
+  const muteMember = async () => { try { const conversation = await ensureConversation(); const nextMuted = !conversation.muted; if (api && !conversation.id.startsWith("local-")) { await api.setConversationMuted(conversation.id, nextMuted); await refreshConversations(); } else toggleConversationMuted(conversation.id); } catch (error) { AppAlert.alert("Action impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); } };
+  const reportMember = async () => { try { if (api) await api.reportContent("profile", member.id, "Profil signalé depuis Connexio"); AppAlert.alert("Signalement transmis", "La modération Neptune va examiner ce profil."); } catch (error) { AppAlert.alert("Signalement impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); } };
+  const openBusinessProfile = async () => { const url = member.webProfileUrl ?? `${env.businessWebBaseUrl.replace(/\/$/, "")}/profile/${encodeURIComponent(member.id)}`; if (await Linking.canOpenURL(url)) await Linking.openURL(url); else AppAlert.alert("Profil indisponible", "Le profil Neptune Business ne peut pas être ouvert."); };
+  const callPhone = () => member.phone ? void Linking.openURL(`tel:${member.phone}`) : AppAlert.alert("Téléphone non partagé", "Le membre n’a pas rendu son numéro disponible dans son profil Neptune.");
   const recommendContact = () => router.push({ pathname: "/contact-actions", params: { intent: "recommend", recipientId: member.id } });
 
   const menuOptions: ActionSheetOption[] = [

@@ -1,7 +1,8 @@
 import * as Crypto from "expo-crypto";
 import { useMemo } from "react";
-import { Alert, Modal, StyleSheet, View } from "react-native";
+import { Modal, StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors } from "../theme";
 import type {
@@ -128,7 +129,7 @@ export default function VoiceRecorderModal({
       });
       onClose();
     } catch {
-      Alert.alert(
+      AppAlert.alert(
         "Vocal indisponible",
         "Le message vocal n’a pas pu être récupéré depuis le microphone."
       );

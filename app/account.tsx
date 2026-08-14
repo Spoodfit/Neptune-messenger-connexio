@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { StatusAvatar } from "@/components/StatusAvatar";
 import { ThemeModeButton } from "@/components/ThemeModeButton";
@@ -31,7 +32,7 @@ export default function AccountScreen() {
     if (!api || !BACKEND_CAPABILITIES.accountSessions) { setLoading(false); return; }
     setLoading(true);
     try { setSessions(await api.listSessions()); }
-    catch (error) { Alert.alert("Sessions indisponibles", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+    catch (error) { AppAlert.alert("Sessions indisponibles", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
     finally { setLoading(false); }
   };
 
@@ -48,39 +49,39 @@ export default function AccountScreen() {
       const result = await api.requestDataExport();
       if (!(await Linking.canOpenURL(result.downloadUrl))) throw new Error("Le lien sécurisé d’export ne peut pas être ouvert.");
       await Linking.openURL(result.downloadUrl);
-    } catch (error) { Alert.alert("Export impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+    } catch (error) { AppAlert.alert("Export impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
     finally { setBusyAction(null); }
   };
 
   const resyncProfile = async () => {
     if (busyAction) return;
     setBusyAction("resync");
-    try { if (api) { await api.resyncProfile(); await refreshAccessToken(); } Alert.alert("Profil synchronisé", "Les informations Neptune Business sont maintenant à jour."); }
-    catch (error) { Alert.alert("Synchronisation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+    try { if (api) { await api.resyncProfile(); await refreshAccessToken(); } AppAlert.alert("Profil synchronisé", "Les informations Neptune Business sont maintenant à jour."); }
+    catch (error) { AppAlert.alert("Synchronisation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
     finally { setBusyAction(null); }
   };
 
   const revokeSession = (session: AccountSession) => {
-    if (session.current) { Alert.alert("Session actuelle", "Utilisez le bouton Déconnexion pour fermer cette session."); return; }
-    Alert.alert("Révoquer cette session ?", `${session.deviceName} sera immédiatement déconnecté.`, [
+    if (session.current) { AppAlert.alert("Session actuelle", "Utilisez le bouton Déconnexion pour fermer cette session."); return; }
+    AppAlert.alert("Révoquer cette session ?", `${session.deviceName} sera immédiatement déconnecté.`, [
       { text: "Annuler", style: "cancel" },
       { text: "Révoquer", style: "destructive", onPress: () => {
         if (!api) { setSessions((previous) => previous.filter((item) => item.id !== session.id)); return; }
         setBusyAction(session.id);
-        void api.revokeSession(session.id).then(() => setSessions((previous) => previous.filter((item) => item.id !== session.id))).catch((error: unknown) => Alert.alert("Révocation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement.")).finally(() => setBusyAction(null));
+        void api.revokeSession(session.id).then(() => setSessions((previous) => previous.filter((item) => item.id !== session.id))).catch((error: unknown) => AppAlert.alert("Révocation impossible", error instanceof Error ? error.message : "Réessayez ultérieurement.")).finally(() => setBusyAction(null));
       } }
     ]);
   };
 
   const deleteAccount = () => {
-    if (!deletionPassword) { Alert.alert("Mot de passe requis", "Confirmez la suppression avec le mot de passe de votre compte Neptune."); return; }
-    Alert.alert("Supprimer définitivement le compte ?", "Cette demande révoque les sessions et lance le traitement de suppression des données selon les obligations applicables.", [
+    if (!deletionPassword) { AppAlert.alert("Mot de passe requis", "Confirmez la suppression avec le mot de passe de votre compte Neptune."); return; }
+    AppAlert.alert("Supprimer définitivement le compte ?", "Cette demande révoque les sessions et lance le traitement de suppression des données selon les obligations applicables.", [
       { text: "Annuler", style: "cancel" },
       { text: "Supprimer mon compte", style: "destructive", onPress: () => {
         setBusyAction("delete");
         void (async () => {
           try { if (api) await api.requestAccountDeletion(deletionPassword); await signOut(); router.replace("/sign-in"); }
-          catch (error) { Alert.alert("Suppression impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
+          catch (error) { AppAlert.alert("Suppression impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
           finally { setBusyAction(null); }
         })();
       } }
