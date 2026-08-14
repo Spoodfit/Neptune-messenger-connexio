@@ -80,12 +80,14 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       </View>
 
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickMessage, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
+        <LinearGradient colors={["#0754C8", "#674FEA"]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.quickGradient} />
         <Pressable accessibilityRole="button" accessibilityLabel="Nouvelle conversation" onPress={openNewConversation} style={styles.quickPressable}>
           <Ionicons name="chatbubble-ellipses" size={22} color={colors.white} />
           <Text style={styles.quickLabel}>Conversation</Text>
         </Pressable>
       </Animated.View>
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickHighlight, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
+        <LinearGradient colors={["#6436C8", "#A044C8", "#C36A8D"]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.quickGradient} />
         <Pressable accessibilityRole="button" accessibilityLabel="Publier un Temps fort" onPress={openNewHighlight} style={styles.quickPressable}>
           <Ionicons name="star" size={22} color={colors.white} />
           <Text style={styles.quickLabel}>Temps fort</Text>
@@ -127,9 +129,10 @@ const styles = StyleSheet.create({
   createPressable: { flex: 1, borderRadius: 25 },
   createPressed: { opacity: 0.86 },
   createGradient: { flex: 1, borderRadius: 25, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
-  quickAction: { position: "absolute", top: 0, zIndex: 5, minWidth: 108, height: 52, borderRadius: 18, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.border, elevation: 22, shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  quickAction: { position: "absolute", top: 0, zIndex: 5, minWidth: 108, height: 52, borderRadius: 18, overflow: "hidden", backgroundColor: "#263D77", borderWidth: 1.5, borderColor: "rgba(180,159,255,0.72)", elevation: 24, shadowColor: "#805DFF", shadowOpacity: 0.62, shadowRadius: 17, shadowOffset: { width: 0, height: 7 } },
   quickMessage: { left: "50%", marginLeft: -122 },
-  quickHighlight: { left: "50%", marginLeft: 14 },
+  quickHighlight: { left: "50%", marginLeft: 14, borderColor: "rgba(232,154,255,0.76)", shadowColor: "#C05DFF" },
+  quickGradient: { ...StyleSheet.absoluteFillObject },
   quickPressable: { flex: 1, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900" }
+  quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900", textShadowColor: "rgba(0,0,0,0.36)", textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } }
 });
