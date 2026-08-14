@@ -19,7 +19,7 @@ jobs:
           echo '=== NATIVE DIALOG / SCREEN GESTURE PRIMITIVES ==='
           grep -RIn --include='*.ts' --include='*.tsx' -E '(^|[^A-Za-z0-9_])Alert\.alert|ToastAndroid|ActionSheetIOS|SwipeTabShell|EdgeSwipeBack' app src || true
           echo '=== CALL ROUTES / LAUNCHERS ==='
-          grep -RIn --include='*.ts' --include='*.tsx' -E '/call/|call/\[id\]|pathname:[[:space:]]*["'"']/call' app src || true
+          grep -RIn --include='*.ts' --include='*.tsx' -E '/call/|call/\[id\]' app src || true
           echo '=== PRESSABLES WITHOUT OBVIOUS PRESS CALLBACK (heuristic) ==='
           python3 - <<'PY'
           from pathlib import Path
