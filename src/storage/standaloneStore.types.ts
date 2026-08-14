@@ -1,4 +1,9 @@
-export type StandaloneStateKey = "messaging" | "experience" | "group-admin";
+export type StandaloneStateKey =
+  | "messaging"
+  | "experience"
+  | "group-admin"
+  | "scheduled-calls"
+  | "appearance";
 
 export interface StandaloneStateStore {
   load<T>(key: StandaloneStateKey): Promise<T | null>;
