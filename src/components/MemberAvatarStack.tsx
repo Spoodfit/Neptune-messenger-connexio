@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { colors } from "../theme";
+import { useAppTheme } from "../providers/ThemeProvider";
 import type { AppUser } from "../types/messaging";
 import { StatusAvatar } from "./StatusAvatar";
 
@@ -21,79 +21,37 @@ function resolveVisibleLimit(memberCount: number, requested: number): number {
   return requested;
 }
 
-export function MemberAvatarStack({
-  memberIds = [],
-  members,
-  memberCount,
-  maxVisible = 4,
-  size = 25,
-  showCount = true
-}: MemberAvatarStackProps) {
+export function MemberAvatarStack({ memberIds = [], members, memberCount, maxVisible = 4, size = 25, showCount = true }: MemberAvatarStackProps) {
+  const theme = useAppTheme();
   const visibleLimit = resolveVisibleLimit(memberCount, maxVisible);
-  const resolvedMembers = memberIds
+  const ids = memberIds.length > 0 ? memberIds : members.slice(0, Math.min(memberCount, visibleLimit)).map((member) => member.id);
+  const resolvedMembers = ids
     .map((id) => members.find((member) => member.id === id))
     .filter((member): member is AppUser => Boolean(member))
     .slice(0, visibleLimit);
   const missing = Math.max(0, memberCount - resolvedMembers.length);
-  const overlap = Math.round(
-    size * (resolvedMembers.length >= 8 ? 0.48 : resolvedMembers.length >= 6 ? 0.4 : 0.3)
-  );
+  const overlap = Math.round(size * (resolvedMembers.length >= 8 ? 0.48 : resolvedMembers.length >= 6 ? 0.4 : 0.3));
 
   return (
-    <View
-      accessible
-      accessibilityLabel={`${memberCount} membre${memberCount > 1 ? "s" : ""}. Les contours indiquent les statuts Neptune.`}
-      style={styles.row}
-    >
+    <View accessible accessibilityLabel={`${memberCount} membre${memberCount > 1 ? "s" : ""}. Les contours indiquent les statuts Neptune.`} style={styles.row}>
       <View style={styles.stack}>
         {resolvedMembers.map((member, index) => (
-          <View
-            key={member.id}
-            style={{
-              marginLeft: index === 0 ? 0 : -overlap,
-              zIndex: visibleLimit - index,
-              transform: [{ translateY: index % 2 === 0 ? 0 : 1 }]
-            }}
-          >
-            <StatusAvatar
-              user={member}
-              size={size}
-              ringWidth={Math.max(2, size * 0.08)}
-              accessible={false}
-            />
+          <View key={member.id} style={{ marginLeft: index === 0 ? 0 : -overlap, zIndex: visibleLimit - index, transform: [{ translateY: index % 2 === 0 ? 0 : 1 }] }}>
+            <StatusAvatar user={member} size={size} ringWidth={Math.max(2, size * 0.08)} accessible={false} />
           </View>
         ))}
         {resolvedMembers.length === 0 ? (
-          <View
-            style={[
-              styles.fallback,
-              {
-                width: size,
-                height: size,
-                borderRadius: size / 2
-              }
-            ]}
-          >
-            <Text style={[styles.fallbackText, { fontSize: Math.max(7, size * 0.31) }]}>N</Text>
+          <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2, borderColor: theme.border, backgroundColor: theme.surfaceStrong }]}>
+            <Text style={[styles.fallbackText, { color: theme.pageTextSecondary, fontSize: Math.max(7, size * 0.31) }]}>N</Text>
           </View>
         ) : null}
         {missing > 0 && resolvedMembers.length > 0 ? (
-          <View
-            style={[
-              styles.fallback,
-              {
-                width: size,
-                height: size,
-                borderRadius: size / 2,
-                marginLeft: -overlap
-              }
-            ]}
-          >
-            <Text style={[styles.fallbackText, { fontSize: Math.max(11, size * 0.27) }]}>+{missing}</Text>
+          <View style={[styles.fallback, { width: size, height: size, borderRadius: size / 2, marginLeft: -overlap, borderColor: theme.border, backgroundColor: theme.surfaceStrong }]}>
+            <Text style={[styles.fallbackText, { color: theme.pageTextSecondary, fontSize: Math.max(11, size * 0.27) }]}>+{missing}</Text>
           </View>
         ) : null}
       </View>
-      {showCount ? <Text style={styles.count}>{memberCount}</Text> : null}
+      {showCount ? <Text style={[styles.count, { color: theme.pageTextMuted }]}>{memberCount}</Text> : null}
     </View>
   );
 }
@@ -101,19 +59,7 @@ export function MemberAvatarStack({
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", minHeight: 28, minWidth: 0 },
   stack: { flexDirection: "row", alignItems: "center", minWidth: 0, flexShrink: 1 },
-  fallback: {
-    borderWidth: 2,
-    borderColor: colors.navyLight,
-    backgroundColor: colors.surfaceStrong,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  fallbackText: { color: colors.textSecondary, fontWeight: "900" },
-  count: {
-    marginLeft: 5,
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: "800",
-    flexShrink: 0
-  }
+  fallback: { borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  fallbackText: { fontWeight: "900" },
+  count: { marginLeft: 5, fontSize: 11, fontWeight: "800", flexShrink: 0 }
 });
