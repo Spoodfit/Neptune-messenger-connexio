@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 
+import { EdgeSwipeBack } from "../src/components/EdgeSwipeBack";
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
@@ -28,7 +29,6 @@ configureNotificationPresentation();
 const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 const MESSAGING_AVAILABLE = env.mockMode || BACKEND_CAPABILITIES.messaging;
 const CALLS_AVAILABLE = env.mockMode || BACKEND_CAPABILITIES.calls;
-
 const PUBLIC_ROUTES = new Set(["sign-in", "access-help", "privacy"]);
 const MESSAGING_ROUTES = new Set(["chat", "conversation", "group", "new-conversation", "schedule-message"]);
 
@@ -100,16 +100,7 @@ function AuthenticatedApp() {
       if (data.type === "scheduled_call_due" && typeof data.conversationId === "string") {
         processedNotificationResponseId.current = responseId;
         void Notifications.clearLastNotificationResponseAsync();
-        router.push({
-          pathname: "/call/[id]",
-          params: {
-            id: data.conversationId,
-            mode: data.mode === "audio" ? "audio" : "video",
-            reason: typeof data.reason === "string" ? data.reason : "Appel programmé",
-            scheduled: "1",
-            autoStart: env.mockMode ? "1" : "0"
-          }
-        });
+        router.push({ pathname: "/call/[id]", params: { id: data.conversationId, mode: data.mode === "audio" ? "audio" : "video", reason: typeof data.reason === "string" ? data.reason : "Appel programmé", scheduled: "1", autoStart: env.mockMode ? "1" : "0" } });
         return;
       }
       if (!BACKEND_CAPABILITIES.messaging) return;
@@ -129,15 +120,13 @@ function AuthenticatedApp() {
     return () => subscription.remove();
   }, [isAuthenticated, sessionReady]);
 
-  if (!sessionReady) {
-    return <View style={[styles.loading, { backgroundColor: theme.pageBackground }]} accessibilityLabel="Chargement de Connexio"><ActivityIndicator size="large" color={colors.primary} /></View>;
-  }
+  if (!sessionReady) return <View style={[styles.loading, { backgroundColor: theme.pageBackground }]} accessibilityLabel="Chargement de Connexio"><ActivityIndicator size="large" color={colors.primary} /></View>;
 
   const applicationStack = (
-    <>
+    <EdgeSwipeBack>
       <StatusBar style={theme.isLight ? "dark" : "light"} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: Platform.OS === "web" ? "fade" : "default" }} />
-    </>
+    </EdgeSwipeBack>
   );
 
   if (!isAuthenticated) {
@@ -146,27 +135,11 @@ function AuthenticatedApp() {
   }
   if (onUnavailableMessagingRoute || onUnavailableCallRoute) return <Redirect href="/(tabs)/highlights" />;
 
-  return (
-    <MessagingProvider key={`user:${currentUser.id}`}>
-      <GroupAdminProvider>
-        <ExperienceProvider>
-          <ScheduledCallsProvider>{applicationStack}</ScheduledCallsProvider>
-        </ExperienceProvider>
-      </GroupAdminProvider>
-    </MessagingProvider>
-  );
+  return <MessagingProvider key={`user:${currentUser.id}`}><GroupAdminProvider><ExperienceProvider><ScheduledCallsProvider>{applicationStack}</ScheduledCallsProvider></ExperienceProvider></GroupAdminProvider></MessagingProvider>;
 }
 
 export default function RootLayout() {
-  return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-      <ThemeProvider>
-        <SessionProvider><AuthenticatedApp /></SessionProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
-  );
+  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><ThemeProvider><SessionProvider><AuthenticatedApp /></SessionProvider></ThemeProvider></SafeAreaProvider>;
 }
 
-const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: "center", justifyContent: "center" }
-});
+const styles = StyleSheet.create({ loading: { flex: 1, alignItems: "center", justifyContent: "center" } });
