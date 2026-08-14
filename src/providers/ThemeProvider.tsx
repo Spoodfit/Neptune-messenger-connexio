@@ -1,5 +1,5 @@
 import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
-import { Appearance, useColorScheme } from "react-native";
+import { useColorScheme } from "react-native";
 
 import { createStandaloneStateStore } from "../storage/standaloneStore";
 
@@ -37,10 +37,6 @@ export function ThemeProvider({ children }: PropsWithChildren) {
     });
     return () => { cancelled = true; };
   }, [store]);
-
-  useEffect(() => {
-    Appearance.setColorScheme(mode === "system" ? null : mode);
-  }, [mode]);
 
   const setMode = (next: ConnexioAppearanceMode) => {
     setModeState(next);
