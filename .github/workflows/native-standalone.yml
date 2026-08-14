@@ -57,7 +57,19 @@ jobs:
       - name: Vérifier la configuration standalone
         run: npx expo config --type public >/dev/null
 
-      - name: Inspecter la phase Prebuild Android
+      - name: Reproduire le vrai Expo Prebuild Android
+        env:
+          EXPO_DEBUG: "1"
+          EXPO_CONFIG_PLUGIN_VERBOSE_ERRORS: "1"
+        run: |
+          set -euxo pipefail
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install 2>&1 | tee expo-prebuild-android.log
+          test -x android/gradlew
+          test -f android/app/build.gradle
+          rm -rf android
+
+      - name: Inspecter la phase Prebuild EAS Android
         env:
           EXPO_DEBUG: "1"
           EXPO_CONFIG_PLUGIN_VERBOSE_ERRORS: "1"
