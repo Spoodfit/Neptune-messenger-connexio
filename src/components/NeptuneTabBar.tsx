@@ -70,6 +70,10 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
   const openNewConversation = () => { setMenuOpen(false); router.push("/new-conversation"); };
   const openNewHighlight = () => { setMenuOpen(false); router.push("/new-highlight"); };
 
+  const actionOpacity = menuProgress;
+  const actionTranslate = menuProgress.interpolate({ inputRange: [0, 1], outputRange: [26, -74] });
+  const actionScale = menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+
   return (
     <View pointerEvents="box-none" style={[styles.outer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {menuOpen ? <Pressable accessibilityLabel="Fermer les actions rapides" onPress={() => setMenuOpen(false)} style={styles.dismissLayer} /> : null}
@@ -79,16 +83,20 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
         <View style={styles.sideGroup}>{rightRoutes.map(renderRoute)}</View>
       </View>
 
-      <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickMessage, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Nouvelle conversation" onPress={openNewConversation} style={styles.quickPressable}>
-          <Ionicons name="chatbubble-ellipses" size={22} color={colors.white} />
-          <Text style={styles.quickLabel}>Conversation</Text>
+      <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickMessage, { opacity: actionOpacity, transform: [{ translateY: actionTranslate }, { scale: actionScale }] }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Nouvelle conversation" onPress={openNewConversation} style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}>
+          <LinearGradient colors={["#0E5ED7", "#644FEA"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickGradient}>
+            <View style={styles.quickIcon}><Ionicons name="chatbubble-ellipses" size={21} color={colors.white} /></View>
+            <Text style={styles.quickLabel}>Conversation</Text>
+          </LinearGradient>
         </Pressable>
       </Animated.View>
-      <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickHighlight, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Publier un Temps fort" onPress={openNewHighlight} style={styles.quickPressable}>
-          <Ionicons name="star" size={22} color={colors.white} />
-          <Text style={styles.quickLabel}>Temps fort</Text>
+      <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickHighlight, { opacity: actionOpacity, transform: [{ translateY: actionTranslate }, { scale: actionScale }] }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Publier un Temps fort" onPress={openNewHighlight} style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}>
+          <LinearGradient colors={["#7B49EA", "#C043C8", "#EA6A8D"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.quickGradient}>
+            <View style={styles.quickIcon}><Ionicons name="star" size={21} color={colors.white} /></View>
+            <Text style={styles.quickLabel}>Temps fort</Text>
+          </LinearGradient>
         </Pressable>
       </Animated.View>
 
@@ -111,7 +119,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
 
 const styles = StyleSheet.create({
   outer: { paddingHorizontal: 8, paddingTop: 4, backgroundColor: colors.background, position: "relative", zIndex: 40 },
-  dismissLayer: { position: "absolute", left: -20, right: -20, top: -180, bottom: 0, zIndex: 1 },
+  dismissLayer: { position: "absolute", left: -20, right: -20, top: -190, bottom: 0, zIndex: 1 },
   bar: { height: 72, padding: 5, overflow: "visible", position: "relative", borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,18,38,0.98)", flexDirection: "row", alignItems: "center", elevation: 18, zIndex: 2 },
   sideGroup: { flex: 1, minWidth: 0, height: "100%", flexDirection: "row" },
   centerSlot: { width: 48, flexShrink: 0 },
@@ -127,9 +135,12 @@ const styles = StyleSheet.create({
   createPressable: { flex: 1, borderRadius: 25 },
   createPressed: { opacity: 0.86 },
   createGradient: { flex: 1, borderRadius: 25, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
-  quickAction: { position: "absolute", top: 0, zIndex: 5, minWidth: 108, height: 52, borderRadius: 18, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.border, elevation: 22, shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-  quickMessage: { left: "50%", marginLeft: -122 },
-  quickHighlight: { left: "50%", marginLeft: 14 },
-  quickPressable: { flex: 1, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900" }
+  quickAction: { position: "absolute", top: 0, zIndex: 5, width: 132, height: 56, borderRadius: 20, elevation: 24, shadowColor: "#000", shadowOpacity: 0.42, shadowRadius: 20, shadowOffset: { width: 0, height: 10 } },
+  quickMessage: { left: "50%", marginLeft: -142 },
+  quickHighlight: { left: "50%", marginLeft: 10 },
+  quickPressable: { flex: 1, borderRadius: 20, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.32)" },
+  quickPressed: { opacity: 0.86, transform: [{ scale: 0.97 }] },
+  quickGradient: { flex: 1, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  quickIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(2,7,19,0.26)", alignItems: "center", justifyContent: "center" },
+  quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900", textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 4 }
 });
