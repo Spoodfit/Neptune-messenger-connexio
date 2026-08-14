@@ -11,7 +11,8 @@ import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
 import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useSession } from "@/providers/SessionProvider";
-import { colors, gradients, radii, spacing, typography } from "@/theme";
+import { type ConnexioAppearanceMode, useAppTheme } from "@/providers/ThemeProvider";
+import { colors, gradients, spacing, typography } from "@/theme";
 
 const MAX_CONTENT_WIDTH = 720;
 const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
@@ -32,9 +33,16 @@ const settingsEntries = [
   { icon: "help-circle-outline" as const, title: "Aide et accès", subtitle: "Connexion, sécurité et assistance", route: "/access-help" as const }
 ].filter((item) => item.route !== "/notification-settings" || BACKEND_CAPABILITIES.notificationPreferences).filter((item) => item.route !== "/blocked-users" || BACKEND_CAPABILITIES.blockedMembers);
 
+const APPEARANCE_OPTIONS: Array<{ mode: ConnexioAppearanceMode; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  { mode: "system", label: "Système", icon: "phone-portrait-outline" },
+  { mode: "dark", label: "Sombre", icon: "moon-outline" },
+  { mode: "light", label: "Clair", icon: "sunny-outline" }
+];
+
 export default function SettingsScreen() {
   const { currentUser, signOut } = useSession();
   const { posts } = useExperience();
+  const theme = useAppTheme();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const businessItems = useMemo(() => {
@@ -55,9 +63,11 @@ export default function SettingsScreen() {
     const url = currentUser.webProfileUrl ?? `${env.businessWebBaseUrl.replace(/\/$/, "")}/profile/${encodeURIComponent(currentUser.id)}`;
     void Linking.openURL(url);
   };
+  const heading = { color: theme.pageText };
+  const subtitle = { color: theme.pageTextMuted };
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.screen}>
+    <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <BrandHeader title="Profil" subtitle="Votre vitrine professionnelle dans Connexio." />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.contentColumn}>
@@ -65,31 +75,30 @@ export default function SettingsScreen() {
             <StatusAvatar user={currentUser} size={84} showBadge accessible={false} />
             <Text style={styles.name}>{currentUser.name}</Text>
             <Text style={styles.company}>{currentUser.company || "Neptune Business"}</Text>
-            <View style={styles.metaRow}>
-              <View style={styles.metaChip}><Ionicons name="ribbon-outline" size={13} color={colors.orange} /><Text style={styles.metaText}>{currentUser.roleLabel}</Text></View>
-              {currentUser.city ? <View style={styles.metaChip}><Ionicons name="location-outline" size={13} color={colors.textMuted} /><Text style={styles.metaText}>{currentUser.city}</Text></View> : null}
-            </View>
+            <View style={styles.metaRow}><View style={styles.metaChip}><Ionicons name="ribbon-outline" size={13} color={colors.orange} /><Text style={styles.metaText}>{currentUser.roleLabel}</Text></View>{currentUser.city ? <View style={styles.metaChip}><Ionicons name="location-outline" size={13} color={colors.textMuted} /><Text style={styles.metaText}>{currentUser.city}</Text></View> : null}</View>
             <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir mon profil Neptune Business" onPress={openBusinessProfile} style={styles.businessLink}><Ionicons name="open-outline" size={17} color={colors.text} /><Text style={styles.businessLinkText}>Voir / mettre à jour sur Neptune Business</Text></Pressable>
           </LinearGradient>
 
-          <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Mon activité</Text><Text style={styles.sectionSubtitle}>Services, produits et activités synchronisés avec votre profil Neptune.</Text></View>
-          <View style={styles.businessGrid}>
-            {businessItems.map((item, index) => <Pressable key={item.id ?? `${item.title}-${index}`} onPress={item.url ? () => void Linking.openURL(item.url!) : openBusinessProfile} style={({ pressed }) => [styles.businessCard, pressed && styles.pressed]}><View style={styles.businessIcon}><Ionicons name={item.kind === "product" ? "cube-outline" : item.kind === "service" ? "briefcase-outline" : "business-outline"} size={21} color={colors.orange} /></View><Text style={styles.businessTitle}>{item.title}</Text>{item.description ? <Text style={styles.businessDescription} numberOfLines={3}>{item.description}</Text> : null}<View style={styles.businessFooter}><Text style={styles.businessKind}>{item.kind === "product" ? "PRODUIT" : item.kind === "service" ? "SERVICE" : "ACTIVITÉ"}</Text><Ionicons name="chevron-forward" size={15} color={colors.textMuted} /></View></Pressable>)}
+          <View style={styles.sectionHeading}><Text style={[styles.sectionTitle, heading]}>Mon activité</Text><Text style={[styles.sectionSubtitle, subtitle]}>Services, produits et activités synchronisés avec votre profil Neptune.</Text></View>
+          <View style={styles.businessGrid}>{businessItems.map((item, index) => <Pressable key={item.id ?? `${item.title}-${index}`} onPress={item.url ? () => void Linking.openURL(item.url!) : openBusinessProfile} style={({ pressed }) => [styles.businessCard, pressed && styles.pressed]}><View style={styles.businessIcon}><Ionicons name={item.kind === "product" ? "cube-outline" : item.kind === "service" ? "briefcase-outline" : "business-outline"} size={21} color={colors.orange} /></View><Text style={styles.businessTitle}>{item.title}</Text>{item.description ? <Text style={styles.businessDescription} numberOfLines={3}>{item.description}</Text> : null}<View style={styles.businessFooter}><Text style={styles.businessKind}>{item.kind === "product" ? "PRODUIT" : item.kind === "service" ? "SERVICE" : "ACTIVITÉ"}</Text><Ionicons name="chevron-forward" size={15} color={colors.textMuted} /></View></Pressable>)}</View>
+
+          {recentPosts.length > 0 ? <><View style={styles.sectionHeading}><Text style={[styles.sectionTitle, heading]}>Mes derniers Temps forts</Text></View><View style={styles.recentPosts}>{recentPosts.map((post) => <Pressable key={post.id} onPress={() => router.push(`/highlight/${encodeURIComponent(post.id)}`)} style={({ pressed }) => [styles.postCard, pressed && styles.pressed]}><Text style={styles.postKind}>{post.kind.toLocaleUpperCase("fr")}</Text><Text numberOfLines={2} style={styles.postText}>{post.body}</Text><Ionicons name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}</View></> : null}
+
+          <View style={styles.sectionHeading}><Text style={[styles.sectionTitle, heading]}>Apparence</Text><Text style={[styles.sectionSubtitle, subtitle]}>Connexio peut suivre automatiquement le thème de votre téléphone.</Text></View>
+          <View style={[styles.appearanceCard, { backgroundColor: theme.pageRaised, borderColor: theme.shellBorder }]}>
+            {APPEARANCE_OPTIONS.map((option) => {
+              const active = theme.mode === option.mode;
+              return <Pressable key={option.mode} accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => theme.setMode(option.mode)} style={[styles.appearanceOption, active && styles.appearanceActive]}><Ionicons name={option.icon} size={20} color={active ? colors.primary : theme.pageTextMuted} /><Text style={[styles.appearanceText, { color: active ? theme.pageText : theme.pageTextMuted }]}>{option.label}</Text>{active ? <Ionicons name="checkmark-circle" size={19} color={colors.primary} /> : null}</Pressable>;
+            })}
           </View>
 
-          {recentPosts.length > 0 ? <><View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Mes derniers Temps forts</Text></View><View style={styles.recentPosts}>{recentPosts.map((post) => <Pressable key={post.id} onPress={() => router.push(`/highlight/${encodeURIComponent(post.id)}`)} style={({ pressed }) => [styles.postCard, pressed && styles.pressed]}><Text style={styles.postKind}>{post.kind.toLocaleUpperCase("fr")}</Text><Text numberOfLines={2} style={styles.postText}>{post.body}</Text><Ionicons name="chevron-forward" size={17} color={colors.textMuted} /></Pressable>)}</View></> : null}
-
-          <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Réglages</Text><Text style={styles.sectionSubtitle}>Les fonctions sont classées par usage pour retrouver rapidement ce que vous cherchez.</Text></View>
-          <View style={styles.settingsList}>
-            {settingsEntries.map((item) => <Pressable key={item.title} accessibilityRole="button" onPress={() => router.push(item.route)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}><View style={styles.rowIcon}><Ionicons name={item.icon} size={21} color={colors.text} /></View><View style={styles.rowContent}><Text style={styles.rowTitle}>{item.title}</Text><Text style={styles.rowSubtitle}>{item.subtitle}</Text></View><Ionicons name="chevron-forward" size={19} color={colors.textMuted} /></Pressable>)}
-            <Pressable onPress={() => void Linking.openURL("mailto:contact@neptunebusiness.com?subject=Support%20Connexio")} style={({ pressed }) => [styles.row, pressed && styles.pressed]}><View style={styles.rowIcon}><Ionicons name="chatbubbles-outline" size={21} color={colors.text} /></View><View style={styles.rowContent}><Text style={styles.rowTitle}>SAV application</Text><Text style={styles.rowSubtitle}>Signaler un problème ou demander de l’aide</Text></View><Ionicons name="mail-outline" size={19} color={colors.textMuted} /></Pressable>
-          </View>
+          <View style={styles.sectionHeading}><Text style={[styles.sectionTitle, heading]}>Réglages</Text><Text style={[styles.sectionSubtitle, subtitle]}>Les fonctions sont classées par usage pour retrouver rapidement ce que vous cherchez.</Text></View>
+          <View style={styles.settingsList}>{settingsEntries.map((item) => <Pressable key={item.title} accessibilityRole="button" onPress={() => router.push(item.route)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}><View style={styles.rowIcon}><Ionicons name={item.icon} size={21} color={colors.text} /></View><View style={styles.rowContent}><Text style={styles.rowTitle}>{item.title}</Text><Text style={styles.rowSubtitle}>{item.subtitle}</Text></View><Ionicons name="chevron-forward" size={19} color={colors.textMuted} /></Pressable>)}<Pressable onPress={() => void Linking.openURL("mailto:contact@neptunebusiness.com?subject=Support%20Connexio")} style={({ pressed }) => [styles.row, pressed && styles.pressed]}><View style={styles.rowIcon}><Ionicons name="chatbubbles-outline" size={21} color={colors.text} /></View><View style={styles.rowContent}><Text style={styles.rowTitle}>SAV application</Text><Text style={styles.rowSubtitle}>Signaler un problème ou demander de l’aide</Text></View><Ionicons name="mail-outline" size={19} color={colors.textMuted} /></Pressable></View>
 
           {signOutError ? <Text accessibilityRole="alert" style={styles.signOutError}>{signOutError}</Text> : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter de Connexio" disabled={signingOut} onPress={() => void handleSignOut()} style={({ pressed }) => [styles.signOutButton, pressed && styles.pressed, signingOut && styles.disabled]}>{signingOut ? <ActivityIndicator color={colors.danger} /> : <><Ionicons name="log-out-outline" size={22} color={colors.danger} /><View style={styles.signOutContent}><Text style={styles.signOutText}>Se déconnecter</Text><Text style={styles.signOutHint}>Action rapide — aucune suppression de compte</Text></View></>}</Pressable>
-
-          <Pressable onPress={() => void Linking.openSettings()} style={styles.systemSettings}><Ionicons name="settings-outline" size={17} color={colors.textMuted} /><Text style={styles.systemSettingsText}>Réglages système de l’application</Text></Pressable>
-          <Text style={styles.version}>Connexio {Constants.expoConfig?.version ?? "1.0.0"} · {getEnvironmentLabel()}</Text>
+          <Pressable onPress={() => void Linking.openSettings()} style={styles.systemSettings}><Ionicons name="settings-outline" size={17} color={theme.pageTextMuted} /><Text style={[styles.systemSettingsText, { color: theme.pageTextMuted }]}>Réglages système de l’application</Text></Pressable>
+          <Text style={[styles.version, { color: theme.pageTextMuted }]}>Connexio {Constants.expoConfig?.version ?? "1.0.0"} · {getEnvironmentLabel()}</Text>
         </View>
       </ScrollView>
     </LinearGradient>
@@ -99,10 +108,10 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 }, scrollContent: { width: "100%", paddingBottom: 32 }, contentColumn: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" },
   hero: { margin: spacing.md, padding: spacing.lg, borderRadius: 28, borderWidth: 1, borderColor: colors.borderSoft, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 22, shadowOffset: { width: 0, height: 12 } }, name: { ...typography.heading2, color: colors.text, marginTop: 12, textAlign: "center" }, company: { ...typography.body, color: colors.textSecondary, marginTop: 3, textAlign: "center" }, metaRow: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8 }, metaChip: { minHeight: 28, paddingHorizontal: 9, borderRadius: 14, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 6 }, metaText: { color: colors.textMuted, fontSize: 11, fontWeight: "800" }, businessLink: { minHeight: 48, marginTop: 14, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: "rgba(107,79,234,0.14)", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }, businessLinkText: { color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: "900", textAlign: "center" },
-  sectionHeading: { marginHorizontal: spacing.md, marginTop: spacing.lg, marginBottom: 10 }, sectionTitle: { ...typography.heading2, color: colors.text }, sectionSubtitle: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  sectionHeading: { marginHorizontal: spacing.md, marginTop: spacing.lg, marginBottom: 10 }, sectionTitle: { ...typography.heading2 }, sectionSubtitle: { fontSize: 14, lineHeight: 20, marginTop: 4 },
   businessGrid: { marginHorizontal: spacing.md, flexDirection: "row", flexWrap: "wrap", gap: 10 }, businessCard: { flexGrow: 1, flexBasis: 210, minHeight: 158, padding: 14, borderRadius: 20, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface }, businessIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: "rgba(244,177,131,0.12)", alignItems: "center", justifyContent: "center" }, businessTitle: { ...typography.heading3, color: colors.text, marginTop: 10 }, businessDescription: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 5, flex: 1 }, businessFooter: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, businessKind: { color: colors.orange, fontSize: 11, fontWeight: "900" },
   recentPosts: { marginHorizontal: spacing.md, gap: 8 }, postCard: { minHeight: 70, padding: 12, borderRadius: 17, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 10 }, postKind: { color: colors.orange, fontSize: 11, fontWeight: "900" }, postText: { flex: 1, color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
+  appearanceCard: { marginHorizontal: spacing.md, padding: 5, borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 5 }, appearanceOption: { flex: 1, minHeight: 56, paddingHorizontal: 8, borderRadius: 16, alignItems: "center", justifyContent: "center", gap: 3 }, appearanceActive: { backgroundColor: "rgba(0,72,186,0.10)" }, appearanceText: { fontSize: 11, fontWeight: "900" },
   settingsList: { marginHorizontal: spacing.md, gap: 8 }, row: { minHeight: 72, padding: 12, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: 12 }, rowIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" }, rowContent: { flex: 1, minWidth: 0 }, rowTitle: { ...typography.heading3, color: colors.text }, rowSubtitle: { color: colors.textMuted, fontSize: 14, lineHeight: 20, marginTop: 3 }, pressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
-  signOutError: { margin: spacing.md, color: colors.danger, backgroundColor: colors.dangerSoft, borderRadius: 14, padding: 12 }, signOutButton: { minHeight: 68, marginHorizontal: spacing.md, marginTop: spacing.lg, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.dangerSoft, flexDirection: "row", alignItems: "center", gap: 12 }, signOutContent: { flex: 1 }, signOutText: { color: colors.danger, fontSize: 14, fontWeight: "900" }, signOutHint: { color: colors.textMuted, fontSize: 14, lineHeight: 19, marginTop: 2 }, disabled: { opacity: 0.5 },
-  systemSettings: { minHeight: 48, marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }, systemSettingsText: { color: colors.textMuted, fontSize: 14, fontWeight: "800" }, version: { color: colors.textMuted, fontSize: 11, textAlign: "center", marginBottom: 8 }
+  signOutError: { margin: spacing.md, color: colors.danger, backgroundColor: colors.dangerSoft, borderRadius: 14, padding: 12 }, signOutButton: { minHeight: 68, marginHorizontal: spacing.md, marginTop: spacing.lg, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.dangerSoft, flexDirection: "row", alignItems: "center", gap: 12 }, signOutContent: { flex: 1 }, signOutText: { color: colors.danger, fontSize: 14, fontWeight: "900" }, signOutHint: { color: colors.textMuted, fontSize: 14, lineHeight: 19, marginTop: 2 }, disabled: { opacity: 0.5 }, systemSettings: { minHeight: 48, marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }, systemSettingsText: { fontSize: 14, fontWeight: "800" }, version: { fontSize: 11, textAlign: "center", marginBottom: 8 }
 });
