@@ -1,0 +1,52 @@
+name: V15 stabilization patch
+
+on:
+  push:
+    branches:
+      - feat/v15-ux-navigation-calls
+    paths:
+      - .github/workflows/v15-stabilize-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v15-ux-navigation-calls
+      - name: Patch exact V15 audit findings
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          calls = Path('app/(tabs)/calls.tsx')
+          text = calls.read_text()
+          old = 'newAppointment: { minHeight: 38,'
+          if old not in text:
+              raise SystemExit('Calls target pattern not found')
+          calls.write_text(text.replace(old, 'newAppointment: { minHeight: 48,', 1))
+
+          audit = Path('scripts/visual-audit.cjs')
+          text = audit.read_text()
+          old_case = '{ name: "Highlights 390", width: 390, height: 844, navigateLabel: "Temps forts", clickLabel: "Afficher la carte" },'
+          new_case = '{ name: "Highlights 390", width: 390, height: 844, navigateLabel: "Temps forts", clickText: "Map" },'
+          if old_case not in text:
+              raise SystemExit('Visual audit Map case not found')
+          text = text.replace(old_case, new_case, 1)
+          old_runner = '''      if (testCase.clickLabel) {\n        await page.getByLabel(testCase.clickLabel).click();\n        await page.waitForTimeout(180);\n      }\n'''
+          new_runner = '''      if (testCase.clickLabel) {\n        await page.getByLabel(testCase.clickLabel).click();\n        await page.waitForTimeout(180);\n      }\n      if (testCase.clickText) {\n        await page.getByText(testCase.clickText, { exact: true }).click();\n        await page.waitForTimeout(180);\n      }\n'''
+          if old_runner not in text:
+              raise SystemExit('Visual audit click runner not found')
+          audit.write_text(text.replace(old_runner, new_runner, 1))
+          PY
+      - name: Commit exact patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'app/(tabs)/calls.tsx' scripts/visual-audit.cjs
+          git commit -m "fix: stabilize V15 browser audits"
+          git push origin HEAD:feat/v15-ux-navigation-calls
