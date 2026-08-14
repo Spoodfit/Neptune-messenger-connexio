@@ -1,0 +1,76 @@
+name: V15 asset fix
+
+on:
+  push:
+    branches:
+      - feat/v15-ux-navigation-calls
+    paths:
+      - .github/workflows/v15-asset-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v15-ux-navigation-calls
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate missing native icon assets
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          assets = Path('assets')
+          icon = Image.open(assets / 'icon.png').convert('RGBA')
+          if icon.size != (1024, 1024):
+              icon = icon.resize((1024, 1024), Image.Resampling.LANCZOS)
+          icon.convert('RGB').save(assets / 'icon-ios-legacy.png', format='PNG', optimize=False, compress_level=6)
+
+          source = Image.open(assets / 'splash-icon.png').convert('RGBA')
+          if source.size != (1024, 1024):
+              source = source.resize((1024, 1024), Image.Resampling.LANCZOS)
+          alpha = source.getchannel('A')
+          bbox = alpha.getbbox()
+          if not bbox:
+              raise SystemExit('splash-icon.png ne contient aucun logo visible')
+
+          # Template monochrome iOS : silhouette blanche, transparence source conservée.
+          tinted = Image.new('RGBA', source.size, (255, 255, 255, 0))
+          tinted.putalpha(alpha)
+          tinted.save(assets / 'icon-ios-tinted.png', format='PNG', optimize=False, compress_level=6)
+
+          # Notification Android : même silhouette, mais volontairement contenue dans
+          # une safe-zone plus petite pour les masques/status bars constructeurs.
+          logo = source.crop(bbox)
+          max_side = 640
+          scale = min(max_side / logo.width, max_side / logo.height)
+          logo = logo.resize((max(1, round(logo.width * scale)), max(1, round(logo.height * scale))), Image.Resampling.LANCZOS)
+          logo_alpha = logo.getchannel('A')
+          white_logo = Image.new('RGBA', logo.size, (255, 255, 255, 0))
+          white_logo.putalpha(logo_alpha)
+          notification = Image.new('RGBA', (1024, 1024), (255, 255, 255, 0))
+          notification.alpha_composite(white_logo, ((1024 - white_logo.width) // 2, (1024 - white_logo.height) // 2))
+          notification.save(assets / 'notification-icon.png', format='PNG', optimize=False, compress_level=6)
+
+          for path in ('icon-ios-legacy.png', 'icon-ios-tinted.png', 'notification-icon.png'):
+              image = Image.open(assets / path)
+              image.load()
+              if image.size != (1024, 1024):
+                  raise SystemExit(f'{path}: dimensions inattendues {image.size}')
+              print(path, image.mode, image.size, (assets / path).stat().st_size)
+          PY
+      - name: Commit generated assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/icon-ios-legacy.png assets/icon-ios-tinted.png assets/notification-icon.png
+          git commit -m "fix: add complete Connexio native icon assets"
+          git push origin HEAD:feat/v15-ux-navigation-calls
