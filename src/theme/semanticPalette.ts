@@ -64,35 +64,41 @@ export const darkSemanticPalette: ConnexioSemanticPalette = {
   shadow: "#000000"
 };
 
+/*
+ * Le mode clair est volontairement une gamme "brume marine", pas un thème blanc.
+ * Les surfaces sont séparées par luminance ET par bordure afin de rester lisibles
+ * sur les écrans Android très lumineux. Les couleurs d'état utilisent des fonds
+ * teintés opaques plutôt que de faibles transparences qui disparaissent au soleil.
+ */
 export const lightSemanticPalette: ConnexioSemanticPalette = {
-  background: "#F6F8FC",
-  raised: "#FFFFFF",
-  surface: "#FFFFFF",
-  surfaceStrong: "#EEF3FA",
-  surfaceMuted: "#E7EDF6",
-  gradient: ["#FFFFFF", "#F3F6FB"],
-  text: "#07152E",
-  textSecondary: "#2B3B56",
-  textMuted: "#5D6B82",
-  border: "rgba(7,21,46,0.18)",
-  borderSoft: "rgba(7,21,46,0.10)",
-  input: "#FFFFFF",
-  chip: "#EEF3FA",
-  shell: "rgba(255,255,255,0.98)",
-  nav: "rgba(255,255,255,0.99)",
-  navInactive: "#5D6B82",
-  overlay: "rgba(7,21,46,0.38)",
-  accent: "#0048BA",
-  accentSoft: "#E9F0FF",
-  violet: "#5B3FD6",
-  violetSoft: "#EFEAFF",
-  orange: "#9A4E15",
-  orangeSoft: "#FFF0E4",
-  success: "#087452",
-  successSoft: "#E3F7EF",
-  warning: "#8A5600",
-  warningSoft: "#FFF4D6",
-  danger: "#B42335",
-  dangerSoft: "#FDECEF",
-  shadow: "#17345B"
+  background: "#EAF0F7",
+  raised: "#F8FAFD",
+  surface: "#F3F7FB",
+  surfaceStrong: "#E4ECF6",
+  surfaceMuted: "#D7E2EF",
+  gradient: ["#F5F8FC", "#E8EFF7"],
+  text: "#09172F",
+  textSecondary: "#293D59",
+  textMuted: "#5A6D86",
+  border: "rgba(17,45,82,0.23)",
+  borderSoft: "rgba(17,45,82,0.13)",
+  input: "#F9FBFD",
+  chip: "#E3ECF6",
+  shell: "rgba(244,248,252,0.985)",
+  nav: "rgba(238,244,250,0.99)",
+  navInactive: "#60738C",
+  overlay: "rgba(8,22,45,0.42)",
+  accent: "#0A58C4",
+  accentSoft: "#DCE9FB",
+  violet: "#6243C7",
+  violetSoft: "#E8E2F8",
+  orange: "#92501F",
+  orangeSoft: "#F5E4D6",
+  success: "#087157",
+  successSoft: "#D8EFE7",
+  warning: "#805400",
+  warningSoft: "#F5E9C8",
+  danger: "#AB3043",
+  dangerSoft: "#F4DDE2",
+  shadow: "#223D5A"
 };
