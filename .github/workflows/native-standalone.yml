@@ -17,7 +17,16 @@ on:
       - release/connexio-rc1
     paths:
       - .github/workflows/native-standalone.yml
+      - app/**
+      - src/**
+      - assets/**
+      - scripts/**
+      - app.json
+      - app.config.*
       - eas.json
+      - package.json
+      - package-lock.json
+      - tsconfig.json
 
 permissions:
   contents: read
