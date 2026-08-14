@@ -16,7 +16,7 @@ const cases = [
   { name: "blocked-users-390x844", width: 390, height: 844, route: "/blocked-users" },
   { name: "new-highlight-393x852", width: 393, height: 852, route: "/new-highlight" },
   { name: "highlights-feed-280x568", width: 280, height: 568, route: "/highlights" },
-  { name: "highlights-map-390x844", width: 390, height: 844, route: "/highlights", clickLabel: "Afficher la carte" },
+  { name: "highlights-map-390x844", width: 390, height: 844, route: "/highlights", clickText: "Map" },
   { name: "calls-280x568", width: 280, height: 568, route: "/calls" },
   { name: "settings-280x568", width: 280, height: 568, route: "/settings" },
   { name: "settings-zoom140", width: 320, height: 568, route: "/settings", zoom: 1.4 },
@@ -273,6 +273,10 @@ async function run() {
       }
       if (testCase.clickLabel) {
         await page.getByLabel(testCase.clickLabel).click();
+        await page.waitForTimeout(350);
+      }
+      if (testCase.clickText) {
+        await page.getByText(testCase.clickText, { exact: true }).click();
         await page.waitForTimeout(350);
       }
       await page.waitForTimeout(200);
