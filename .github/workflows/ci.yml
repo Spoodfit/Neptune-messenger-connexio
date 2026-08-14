@@ -15,6 +15,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-lock-refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Refresh Expo-compatible patch versions
+        run: npx expo install --fix
+      - name: Verify refreshed compatibility
+        run: npx expo install --check
+      - name: Upload refreshed manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-compatible-lockfiles
+          path: |
+            package.json
+            package-lock.json
+          retention-days: 1
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
