@@ -38,27 +38,21 @@ jobs:
     steps:
       - name: Vérifier les accès EAS
         run: test -n "$EXPO_TOKEN"
-
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
           cache: npm
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
-
       - name: Vérifier Connexio avant build
         run: npm run verify && npm run audit:rc && npx expo install --check
-
       - name: Normaliser les assets PNG Connexio
         run: |
           python -m pip install --disable-pip-version-check --quiet pillow
@@ -88,32 +82,49 @@ jobs:
               size = (max(1, round(width * scale)), max(1, round(height * scale)))
               return logo.resize(size, Image.Resampling.LANCZOS)
 
-          # Splash : même pixels/source, simplement réencodés en PNG standard.
+          # Splash : pixels source inchangés, PNG RGBA standard compatible Expo/Jimp.
           source.save(splash_path, format="PNG", optimize=False, compress_level=6)
 
-          # Android adaptive icon : logo transparent dans la safe-zone afin qu'il ne soit jamais coupé.
-          adaptive_logo = fit_logo(580)
+          # Adaptive icon Android : foreground volontairement très conservateur.
+          # Android applique ensuite différents masques (rond, squircle, etc.) : le logo
+          # doit rester intégralement dans la zone centrale, même sur les launchers agressifs.
+          adaptive_logo = fit_logo(460)
           adaptive = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
           adaptive_pos = ((1024 - adaptive_logo.width) // 2, (1024 - adaptive_logo.height) // 2)
           adaptive.alpha_composite(adaptive_logo, adaptive_pos)
           adaptive.save(adaptive_path, format="PNG", optimize=False, compress_level=6)
 
-          # Icône générale/iOS : le même logo, centré sur le fond blanc demandé.
+          # Icône générale/iOS : même logo, plus présent, sur le fond blanc demandé.
           icon_logo = fit_logo(660)
           icon = Image.new("RGBA", (1024, 1024), (255, 255, 255, 255))
           icon_pos = ((1024 - icon_logo.width) // 2, (1024 - icon_logo.height) // 2)
           icon.alpha_composite(icon_logo, icon_pos)
           icon.convert("RGB").save(icon_path, format="PNG", optimize=False, compress_level=6)
 
+          # Régression guard : le foreground Android doit être centré et ne jamais
+          # dépasser 46 % du canvas sur son plus grand axe.
+          check_adaptive = Image.open(adaptive_path).convert("RGBA")
+          bbox = check_adaptive.getchannel("A").getbbox()
+          if not bbox:
+              raise SystemExit("adaptive-icon.png est vide.")
+          left, top, right, bottom = bbox
+          width, height = right - left, bottom - top
+          center_x, center_y = (left + right) / 2, (top + bottom) / 2
+          if max(width, height) > 472:
+              raise SystemExit(f"Foreground Android trop grand: {width}x{height}.")
+          if abs(center_x - 512) > 4 or abs(center_y - 512) > 4:
+              raise SystemExit(f"Foreground Android mal centré: centre=({center_x},{center_y}).")
+          if icon_path.read_bytes() == adaptive_path.read_bytes():
+              raise SystemExit("icon.png et adaptive-icon.png ne doivent jamais être identiques.")
+
           for path in (icon_path, adaptive_path, splash_path):
               check = Image.open(path)
               check.load()
               print(f"{path}: {check.mode} {check.size} {path.stat().st_size} bytes")
+          print(f"adaptive visible bbox={bbox}, size={width}x{height}, center=({center_x:.1f},{center_y:.1f})")
           PY
-
       - name: Vérifier la configuration standalone
         run: npx expo config --type public >/dev/null
-
       - name: Reproduire le vrai Expo Prebuild Android
         env:
           EXPO_DEBUG: "1"
@@ -125,7 +136,6 @@ jobs:
           test -x android/gradlew
           test -f android/app/build.gradle
           rm -rf android
-
       - name: Inspecter la phase Prebuild EAS Android
         env:
           EXPO_DEBUG: "1"
@@ -140,7 +150,6 @@ jobs:
             --force \
             --verbose
           rm -rf .eas-prebuild
-
       - name: Construire standalone Android avec EAS
         run: |
           npx eas-cli@21.7.1 build \
@@ -160,25 +169,19 @@ jobs:
     steps:
       - name: Vérifier les accès EAS
         run: test -n "$EXPO_TOKEN"
-
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
           cache: npm
-
       - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
-
       - name: Vérifier Connexio avant build
         run: npm run verify && npm run audit:rc && npx expo install --check
-
       - name: Vérifier la configuration standalone
         run: npx expo config --type public >/dev/null
-
       - name: Construire standalone iOS avec EAS
         run: |
           npx eas-cli@21.7.1 build \
