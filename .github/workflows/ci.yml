@@ -40,20 +40,23 @@ jobs:
         run: npx expo install --fix
       - name: Verify refreshed compatibility
         run: npx expo install --check
+      - name: Archive generated source and manifests
+        run: |
+          tar -czf connexio-migration-output.tgz \
+            package.json \
+            package-lock.json \
+            app/new-highlight.tsx \
+            'app/conversation/[id].tsx' \
+            'app/highlight/[id].tsx' \
+            'app/group/[id].tsx' \
+            'app/schedule-message/[id].tsx' \
+            src/screens/ChatConversationScreen.tsx \
+            src/screens/NewConversationScreen.tsx
       - name: Upload generated source and manifests
         uses: actions/upload-artifact@v4
         with:
           name: connexio-migration-output
-          path: |
-            package.json
-            package-lock.json
-            app/new-highlight.tsx
-            app/conversation/[id].tsx
-            app/highlight/[id].tsx
-            app/group/[id].tsx
-            app/schedule-message/[id].tsx
-            src/screens/ChatConversationScreen.tsx
-            src/screens/NewConversationScreen.tsx
+          path: connexio-migration-output.tgz
           retention-days: 1
 
   verify:
