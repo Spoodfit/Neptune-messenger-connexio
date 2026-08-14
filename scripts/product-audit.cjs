@@ -92,9 +92,7 @@ async function checkGeometry(page, label) {
         rect.top >= viewport.height ||
         rect.right <= 0 ||
         rect.left >= viewport.width
-      ) {
-        return false;
-      }
+      ) return false;
       const left = Math.max(1, rect.left + 2);
       const right = Math.min(viewport.width - 1, rect.right - 2);
       const top = Math.max(1, rect.top + 2);
@@ -112,41 +110,17 @@ async function checkGeometry(page, label) {
       .filter(reachable)
       .map((element) => {
         const rect = element.getBoundingClientRect();
-        return {
-          label: labelFor(element),
-          left: rect.left,
-          right: rect.right,
-          width: rect.width,
-          height: rect.height
-        };
+        return { label: labelFor(element), left: rect.left, right: rect.right, width: rect.width, height: rect.height };
       });
     return {
       horizontalOverflow: Math.max(rootWidth, bodyWidth) > viewport.width + 1,
-      cut: controls.filter(
-        (item) => item.left < -1 || item.right > viewport.width + 1
-      ),
-      undersized: controls.filter(
-        (item) => item.width < 43 || item.height < 43
-      )
+      cut: controls.filter((item) => item.left < -1 || item.right > viewport.width + 1),
+      undersized: controls.filter((item) => item.width < 43 || item.height < 43)
     };
   });
   if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal`);
-  if (result.cut.length) {
-    failures.push(
-      `${label}: contrôles coupés horizontalement: ${result.cut
-        .slice(0, 4)
-        .map((item) => item.label)
-        .join(", ")}`
-    );
-  }
-  if (result.undersized.length) {
-    failures.push(
-      `${label}: cibles sous 44 px: ${result.undersized
-        .slice(0, 5)
-        .map((item) => `${item.label} (${Math.round(item.width)}x${Math.round(item.height)})`)
-        .join(", ")}`
-    );
-  }
+  if (result.cut.length) failures.push(`${label}: contrôles coupés horizontalement: ${result.cut.slice(0, 4).map((item) => item.label).join(", ")}`);
+  if (result.undersized.length) failures.push(`${label}: cibles sous 44 px: ${result.undersized.slice(0, 5).map((item) => `${item.label} (${Math.round(item.width)}x${Math.round(item.height)})`).join(", ")}`);
 }
 
 async function expectVisible(locator, label) {
@@ -168,66 +142,61 @@ async function pageDiagnostic(page) {
     url: window.location.href,
     text: document.body.innerText.replace(/\s+/g, " ").trim().slice(0, 500),
     controls: [...document.querySelectorAll("button, [role='button'], a, input")]
-      .map((element) =>
-        element.getAttribute("aria-label") || element.textContent?.replace(/\s+/g, " ").trim()
-      )
+      .map((element) => element.getAttribute("aria-label") || element.textContent?.replace(/\s+/g, " ").trim())
       .filter(Boolean)
       .slice(0, 30)
   }));
 }
 
-async function run() {
-  if (!fs.existsSync(path.join(root, "index.html"))) {
-    throw new Error("Le build web-product-audit-dist est absent.");
+async function closeConversationMenu(page) {
+  const closeOptions = page.getByLabel("Fermer les options de conversation");
+  await expectVisible(closeOptions, "fermeture du menu de conversation");
+  if (!(await closeOptions.isVisible().catch(() => false))) return;
+  await closeOptions.click();
+  try {
+    await closeOptions.waitFor({ state: "hidden", timeout: 2500 });
+  } catch {
+    await page.keyboard.press("Escape").catch(() => undefined);
+    await page.waitForTimeout(250);
   }
+}
+
+async function openQuickCreate(page) {
+  const create = page.getByLabel("Créer", { exact: true });
+  await expectVisible(create, "bouton + central");
+  if (await create.isVisible().catch(() => false)) {
+    await create.click();
+    await page.waitForTimeout(180);
+  }
+}
+
+async function run() {
+  if (!fs.existsSync(path.join(root, "index.html"))) throw new Error("Le build web-product-audit-dist est absent.");
   await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
   const executablePath = browserExecutable();
   if (!executablePath) throw new Error("Chromium est introuvable.");
 
-  const browser = await chromium.launch({
-    executablePath,
-    headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage"]
-  });
+  const browser = await chromium.launch({ executablePath, headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 
   try {
-    const sizes = [
-      [280, 568],
-      [320, 568],
-      [390, 844],
-      [430, 720],
-      [768, 1024],
-      [1024, 768]
-    ];
+    const sizes = [[280, 568], [320, 568], [390, 844], [430, 720], [768, 1024], [1024, 768]];
     for (const [width, height] of sizes) {
-      const page = await browser.newPage({
-        viewport: { width, height },
-        reducedMotion: "reduce"
-      });
+      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: "reduce" });
       const pageErrors = [];
       page.on("pageerror", (error) => pageErrors.push(error.message));
-      page.on("console", (message) => {
-        if (message.type() === "error") pageErrors.push(message.text());
-      });
-      await page.goto(`http://127.0.0.1:${port}/`, {
-        waitUntil: "domcontentloaded",
-        timeout: 30000
-      });
+      page.on("console", (message) => { if (message.type() === "error") pageErrors.push(message.text()); });
+      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
       await page.waitForTimeout(800);
       await expectVisible(page.getByText("Messages", { exact: true }).first(), `${width}x${height} Messages`);
       await checkGeometry(page, `${width}x${height} Messages`);
-      if (pageErrors.length) {
-        failures.push(`${width}x${height}: erreurs runtime: ${pageErrors.slice(0, 3).join(" | ")}`);
-      }
+      if (pageErrors.length) failures.push(`${width}x${height}: erreurs runtime: ${pageErrors.slice(0, 3).join(" | ")}`);
       await page.close();
     }
 
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     const runtimeErrors = [];
     page.on("pageerror", (error) => runtimeErrors.push(error.message));
-    page.on("console", (message) => {
-      if (message.type() === "error") runtimeErrors.push(message.text());
-    });
+    page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(message.text()); });
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(800);
 
@@ -245,24 +214,22 @@ async function run() {
         await page.waitForTimeout(650);
         await page.mouse.up();
         await expectVisible(page.getByText(/Mettre en sourdine|Réactiver les notifications/).first(), "menu maintien long");
-        const closeOptions = page.getByLabel("Fermer les options de conversation");
-        await expectVisible(closeOptions, "fermeture du menu de conversation");
-        if (await closeOptions.isVisible().catch(() => false)) {
-          await closeOptions.click();
-          await page.waitForTimeout(180);
-        }
+        await closeConversationMenu(page);
       }
     } else {
       failures.push("maintien long: aucune conversation de groupe visible");
     }
 
-    const createConversation = page.getByLabel("Créer une nouvelle conversation");
-    await expectVisible(createConversation, "bouton nouvelle conversation");
-    if (await createConversation.isVisible().catch(() => false)) {
-      await createConversation.click();
+    await openQuickCreate(page);
+    const newConversationAction = page.getByLabel("Nouvelle conversation", { exact: true });
+    await expectVisible(newConversationAction, "action nouvelle conversation");
+    if (await newConversationAction.isVisible().catch(() => false)) {
+      await newConversationAction.click();
       await expectVisible(page.getByText("Nouvelle conversation", { exact: true }), "écran nouvelle conversation");
       await checkGeometry(page, "Nouvelle conversation");
-      await page.getByLabel("Fermer la création").click();
+      const closeCreation = page.getByLabel("Fermer la création");
+      await expectVisible(closeCreation, "fermeture création conversation");
+      if (await closeCreation.isVisible().catch(() => false)) await closeCreation.click();
     }
 
     await clickText(page, "Temps forts", "onglet Temps forts");
@@ -271,12 +238,16 @@ async function run() {
     await clickText(page, "Map", "onglet Map");
     await expectVisible(page.locator("iframe[title='Carte Neptune']"), "carte Leaflet");
     await checkGeometry(page, "Map");
-    const createHighlight = page.getByLabel("Publier un Temps fort");
+
+    await openQuickCreate(page);
+    const createHighlight = page.getByLabel("Publier un Temps fort", { exact: true });
+    await expectVisible(createHighlight, "action publier Temps fort");
     if (await createHighlight.isVisible().catch(() => false)) {
       await createHighlight.click();
       await expectVisible(page.getByText("Nouveau Temps fort", { exact: true }), "création Temps fort");
       await checkGeometry(page, "Nouveau Temps fort");
-      await page.getByLabel("Fermer").click();
+      const closeHighlight = page.getByLabel("Fermer").first();
+      if (await closeHighlight.isVisible().catch(() => false)) await closeHighlight.click();
     }
 
     await clickText(page, "Appels", "onglet Appels");
@@ -302,9 +273,7 @@ async function run() {
       }
     }
 
-    if (runtimeErrors.length) {
-      failures.push(`parcours complet: erreurs runtime: ${runtimeErrors.slice(0, 5).join(" | ")}`);
-    }
+    if (runtimeErrors.length) failures.push(`parcours complet: erreurs runtime: ${runtimeErrors.slice(0, 5).join(" | ")}`);
     await page.close();
   } finally {
     await browser.close();
