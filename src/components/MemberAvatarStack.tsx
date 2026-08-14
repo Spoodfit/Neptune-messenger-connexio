@@ -58,7 +58,7 @@ export function MemberAvatarStack({
             <StatusAvatar
               user={member}
               size={size}
-              ringWidth={2}
+              ringWidth={Math.max(2, size * 0.08)}
               accessible={false}
             />
           </View>
@@ -70,7 +70,7 @@ export function MemberAvatarStack({
               {
                 width: size,
                 height: size,
-                borderRadius: Math.round(size * 0.38)
+                borderRadius: size / 2
               }
             ]}
           >
@@ -84,7 +84,7 @@ export function MemberAvatarStack({
               {
                 width: size,
                 height: size,
-                borderRadius: Math.round(size * 0.38),
+                borderRadius: size / 2,
                 marginLeft: -overlap
               }
             ]}
