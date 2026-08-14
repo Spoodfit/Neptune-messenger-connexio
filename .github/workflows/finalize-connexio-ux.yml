@@ -1,0 +1,74 @@
+name: Finalize Connexio UX migration
+
+on:
+  pull_request:
+    branches:
+      - release/connexio-rc1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: connexio-ux-finalizer-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/connexio-ux-20260814
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate remaining Light mode surfaces
+        run: |
+          node scripts/migrate-light-theme-surfaces.cjs
+          node scripts/migrate-light-theme-admin-surfaces.cjs
+
+      - name: Verify generated application
+        run: npm run verify --silent
+
+      - name: Align Expo SDK patch versions
+        run: |
+          npx expo install --fix
+          npx expo install --check
+
+      - name: Verify release policy after dependency alignment
+        run: |
+          npm run audit:dependencies --silent
+          npm run audit:rc --silent
+          npx expo config --type public >/dev/null
+
+      - name: Restore official CI and remove temporary migration machinery
+        run: |
+          git fetch origin release/connexio-rc1 --depth=1
+          git show FETCH_HEAD:.github/workflows/ci.yml > .github/workflows/ci.yml
+          rm -f scripts/migrate-light-theme-surfaces.cjs
+          rm -f scripts/migrate-light-theme-admin-surfaces.cjs
+          rm -f .github/workflows/finalize-connexio-ux.yml
+
+      - name: Commit verified final application state
+        run: |
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "No finalization changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: finalize Connexio UX polish and light theme"
+          git push origin HEAD:fix/connexio-ux-20260814
