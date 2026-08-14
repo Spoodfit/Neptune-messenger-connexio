@@ -19,7 +19,11 @@ export function ThemeModeButton() {
         pressed && styles.pressed
       ]}
     >
-      <Ionicons name={theme.isLight ? "moon-outline" : "sunny-outline"} size={21} color={theme.pageText} />
+      <Ionicons
+        name={theme.isLight ? "moon-outline" : "sunny-outline"}
+        size={21}
+        color={theme.pageText}
+      />
     </Pressable>
   );
 }
@@ -28,6 +32,7 @@ const styles = StyleSheet.create({
   button: {
     width: 48,
     height: 48,
+    marginHorizontal: 8,
     borderRadius: 16,
     borderWidth: 1,
     alignItems: "center",
