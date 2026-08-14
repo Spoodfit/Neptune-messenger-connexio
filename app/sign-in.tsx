@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -46,7 +47,10 @@ function getSignInErrorMessage(error: unknown): string {
     : "Connexion impossible. Réessayez avec vos identifiants Neptune.";
 }
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function SignInScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { loginWithNeptune, exchangeOneTimeCode } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -108,7 +112,7 @@ export default function SignInScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={gradients.screen} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={theme.pageGradient} style={StyleSheet.absoluteFill} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboard}
@@ -136,7 +140,7 @@ export default function SignInScreen() {
 
             <Text style={styles.label}>Adresse email Neptune</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="mail-outline" size={19} color={colors.textMuted} />
+              <Ionicons name="mail-outline" size={19} color={theme.pageTextMuted} />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -147,7 +151,7 @@ export default function SignInScreen() {
                 keyboardType="email-address"
                 accessibilityLabel="Adresse email Neptune"
                 placeholder="vous@entreprise.fr"
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={theme.pageTextMuted}
                 style={styles.input}
                 returnKeyType="next"
               />
@@ -155,7 +159,7 @@ export default function SignInScreen() {
 
             <Text style={styles.label}>Mot de passe Neptune</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={19} color={colors.textMuted} />
+              <Ionicons name="lock-closed-outline" size={19} color={theme.pageTextMuted} />
               <TextInput
                 value={password}
                 onChangeText={setPassword}
@@ -166,7 +170,7 @@ export default function SignInScreen() {
                 secureTextEntry={!passwordVisible}
                 accessibilityLabel="Mot de passe Neptune"
                 placeholder="Votre mot de passe"
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={theme.pageTextMuted}
                 style={styles.input}
                 returnKeyType="go"
                 onSubmitEditing={() => void submit()}
@@ -184,7 +188,7 @@ export default function SignInScreen() {
                 <Ionicons
                   name={passwordVisible ? "eye-off-outline" : "eye-outline"}
                   size={20}
-                  color={colors.textMuted}
+                  color={theme.pageTextMuted}
                 />
               </Pressable>
             </View>
@@ -264,7 +268,7 @@ export default function SignInScreen() {
 
             <View style={styles.registerCard}>
               <View style={styles.registerIcon}>
-                <Ionicons name="person-add-outline" size={21} color={colors.orange} />
+                <Ionicons name="person-add-outline" size={21} color={theme.orange} />
               </View>
               <View style={styles.registerContent}>
                 <Text style={styles.registerTitle}>Pas encore de compte Neptune ?</Text>
@@ -300,14 +304,14 @@ export default function SignInScreen() {
                     loading && styles.disabled
                   ]}
                 >
-                  <Ionicons name="sparkles" size={19} color={colors.text} />
+                  <Ionicons name="sparkles" size={19} color={theme.pageText} />
                   <Text style={styles.demoText}>Entrer en démonstration</Text>
                 </Pressable>
               </>
             ) : null}
 
             <View style={styles.securityNote}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={colors.success} />
+              <Ionicons name="shield-checkmark-outline" size={18} color={theme.success} />
               <Text style={styles.securityText}>
                 La session est protégée par un cookie httpOnly Neptune. Le mot de passe n’est jamais conservé dans Connexio.
               </Text>
@@ -319,8 +323,8 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: theme.pageBackground },
   keyboard: { flex: 1 },
   content: { flexGrow: 1, justifyContent: "center", padding: spacing.lg },
   form: { width: "100%", maxWidth: 520, alignSelf: "center" },
@@ -332,14 +336,14 @@ const styles = StyleSheet.create({
   },
   brandText: { minWidth: 0 },
   brandName: {
-    color: colors.text,
+    color: theme.pageText,
     fontSize: 24,
     lineHeight: 27,
     fontWeight: "900",
     letterSpacing: 1.7
   },
   brandSignature: {
-    color: colors.orange,
+    color: theme.orange,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 1
@@ -347,12 +351,12 @@ const styles = StyleSheet.create({
   title: { ...typography.display, color: colors.white },
   description: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: theme.pageTextSecondary,
     marginTop: spacing.sm,
     marginBottom: spacing.lg
   },
   label: {
-    color: colors.textSecondary,
+    color: theme.pageTextSecondary,
     fontSize: 11,
     fontWeight: "900",
     marginBottom: 6,
@@ -362,8 +366,8 @@ const styles = StyleSheet.create({
     minHeight: 54,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     paddingLeft: spacing.md,
     flexDirection: "row",
     alignItems: "center",
@@ -373,7 +377,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: 52,
-    color: colors.text,
+    color: theme.pageText,
     ...typography.body
   },
   eyeButton: {
@@ -388,8 +392,8 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: spacing.sm
@@ -405,7 +409,7 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: colors.textMuted,
+    borderColor: theme.pageTextMuted,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -415,7 +419,7 @@ const styles = StyleSheet.create({
   },
   termsCopy: { flex: 1, minWidth: 0 },
   termsText: {
-    color: colors.textSecondary,
+    color: theme.pageTextSecondary,
     fontSize: 14,
     lineHeight: 20
   },
@@ -426,14 +430,14 @@ const styles = StyleSheet.create({
     paddingRight: spacing.sm
   },
   termsLinkText: {
-    color: colors.orange,
+    color: theme.orange,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "900",
     textDecorationLine: "underline"
   },
   error: {
-    color: colors.danger,
+    color: theme.danger,
     marginTop: spacing.sm,
     ...typography.bodySmall
   },
@@ -465,8 +469,8 @@ const styles = StyleSheet.create({
     padding: 11,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 10
@@ -480,9 +484,9 @@ const styles = StyleSheet.create({
     justifyContent: "center"
   },
   registerContent: { flex: 1, minWidth: 0 },
-  registerTitle: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  registerTitle: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
   registerText: {
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     fontSize: 11,
     lineHeight: 13,
     marginTop: 3
@@ -491,12 +495,12 @@ const styles = StyleSheet.create({
     minWidth: 58,
     minHeight: 48,
     borderRadius: 14,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: theme.accentSoft,
     alignItems: "center",
     justifyContent: "center"
   },
   registerButtonText: {
-    color: colors.orange,
+    color: theme.orange,
     fontSize: 11,
     fontWeight: "900"
   },
@@ -506,32 +510,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10
   },
-  separatorLine: { flex: 1, height: 1, backgroundColor: colors.borderSoft },
-  separatorText: { color: colors.textMuted, fontSize: 11, fontWeight: "700" },
+  separatorLine: { flex: 1, height: 1, backgroundColor: theme.borderSoft },
+  separatorText: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "700" },
   demoButton: {
     minHeight: 50,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8
   },
-  demoText: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  demoText: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
   securityNote: {
     marginTop: spacing.lg,
     padding: 12,
     borderRadius: 16,
-    backgroundColor: colors.successSoft,
+    backgroundColor: theme.successSoft,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 9
   },
   securityText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: theme.pageTextSecondary,
     flex: 1
   }
 });

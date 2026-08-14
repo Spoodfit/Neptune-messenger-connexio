@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { createElement } from "react";
 import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
@@ -10,11 +11,14 @@ function sourceUri({ attachment }: Pick<InAppAttachmentViewerProps, "attachment"
   return attachment.downloadUrl ?? attachment.uri ?? "";
 }
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function InAppAttachmentViewer({
   attachment,
   visible,
   onClose
 }: InAppAttachmentViewerProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const uri = sourceUri({ attachment });
   const isImage = attachment.kind === "photo";
   const isVideo = attachment.kind === "video";
@@ -34,7 +38,7 @@ export default function InAppAttachmentViewer({
             onPress={onClose}
             style={styles.closeButton}
           >
-            <Ionicons name="close" size={25} color={colors.text} />
+            <Ionicons name="close" size={25} color={theme.pageText} />
           </Pressable>
           <View style={styles.headerText}>
             <Text numberOfLines={1} style={styles.title}>
@@ -89,23 +93,23 @@ export default function InAppAttachmentViewer({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.pageBackground },
   header: {
     minHeight: 68,
     paddingHorizontal: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-    backgroundColor: colors.navyLight,
+    borderBottomColor: theme.borderSoft,
+    backgroundColor: theme.border,
     flexDirection: "row",
     alignItems: "center"
   },
   closeButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   headerText: { flex: 1, minWidth: 0, alignItems: "center" },
-  title: { ...typography.heading3, color: colors.text, maxWidth: "100%" },
-  subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  title: { ...typography.heading3, color: theme.pageText, maxWidth: "100%" },
+  subtitle: { ...typography.caption, color: theme.pageTextMuted, marginTop: 2 },
   content: { flex: 1, minHeight: 0, padding: spacing.sm },
   image: { width: "100%", height: "100%" },
   videoWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
-  empty: { ...typography.body, color: colors.textMuted, textAlign: "center", marginTop: spacing.xl }
+  empty: { ...typography.body, color: theme.pageTextMuted, textAlign: "center", marginTop: spacing.xl }
 });

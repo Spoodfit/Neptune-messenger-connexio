@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -11,7 +12,10 @@ import { colors, gradients, radii, spacing, typography } from "@/theme";
 
 const GITHUB_PAGES_ROOT = "/Neptune-messenger-connexio";
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function NotFoundScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const { isAuthenticated, sessionReady } = useSession();
 
@@ -34,7 +38,7 @@ export default function NotFoundScreen() {
 
   return (
     <LinearGradient
-      colors={gradients.screen}
+      colors={theme.pageGradient}
       style={[
         styles.screen,
         {
@@ -47,7 +51,7 @@ export default function NotFoundScreen() {
     >
       <NeptuneMark size={76} />
       <View style={styles.iconWrap}>
-        <Ionicons name="compass-outline" size={31} color={colors.orange} />
+        <Ionicons name="compass-outline" size={31} color={theme.orange} />
       </View>
       <Text accessibilityRole="header" style={styles.title}>
         Cette destination n’existe pas
@@ -77,13 +81,13 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   screen: { flex: 1, alignItems: "center", justifyContent: "center" },
-  iconWrap: { width: 66, height: 66, marginTop: spacing.lg, borderRadius: 23, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
-  title: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: spacing.md },
-  description: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430, marginTop: 7 },
+  iconWrap: { width: 66, height: 66, marginTop: spacing.lg, borderRadius: 23, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
+  title: { ...typography.heading2, color: theme.pageText, textAlign: "center", marginTop: spacing.md },
+  description: { ...typography.body, color: theme.pageTextMuted, textAlign: "center", maxWidth: 430, marginTop: 7 },
   primaryButton: { minHeight: 52, minWidth: 210, marginTop: spacing.lg, paddingHorizontal: spacing.lg, borderRadius: radii.lg, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   primaryText: { color: colors.white, fontWeight: "900" },
   secondaryButton: { minHeight: 48, minWidth: 100, alignItems: "center", justifyContent: "center" },
-  secondaryText: { color: colors.orange, fontSize: 14, fontWeight: "800" }
+  secondaryText: { color: theme.orange, fontSize: 14, fontWeight: "800" }
 });

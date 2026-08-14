@@ -48,6 +48,7 @@ const AVATAR_SIZE = 44;
 const MAX_BUBBLE_WIDTH = 520;
 const REPLY_THRESHOLD = 54;
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export function MessageBubble({
   message,
   reactions = message.reactions ?? [],
@@ -58,6 +59,8 @@ export function MessageBubble({
   onVotePoll,
   centered = false
 }: MessageBubbleProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { width: viewportWidth } = useWindowDimensions();
   const [reactionOpen, setReactionOpen] = useState(false);
   const translateX = useRef(new Animated.Value(0)).current;
@@ -214,7 +217,7 @@ export function MessageBubble({
         pointerEvents="none"
         style={[styles.replyIndicator, { opacity: replyOpacity }]}
       >
-        <Ionicons name="return-up-forward" size={19} color={colors.orange} />
+        <Ionicons name="return-up-forward" size={19} color={theme.orange} />
       </Animated.View>
 
       <Animated.View
@@ -298,7 +301,7 @@ export function MessageBubble({
             >
               {message.isMine ? (
                 <LinearGradient
-                  colors={[colors.primary, colors.violet]}
+                  colors={[colors.primary, theme.violet]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[styles.bubble, styles.mine]}
@@ -307,7 +310,7 @@ export function MessageBubble({
                 </LinearGradient>
               ) : (
                 <LinearGradient
-                  colors={gradients.glass}
+                  colors={theme.isLight ? [theme.surface, theme.surfaceStrong] as const : gradients.glass}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 0.85, y: 1 }}
                   style={[
@@ -404,7 +407,7 @@ export function MessageBubble({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   gestureStage: {
     width: "100%",
     position: "relative",
@@ -420,9 +423,9 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: theme.surfaceStrong,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.border
   },
   row: {
     width: "100%",
@@ -447,7 +450,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     flexShrink: 0,
-    shadowColor: colors.violet,
+    shadowColor: theme.violet,
     shadowOpacity: 0.22,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 }
@@ -458,12 +461,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: theme.surfaceStrong,
     borderWidth: 1,
-    borderColor: colors.surface
+    borderColor: theme.surface
   },
   avatarImage: { width: "100%", height: "100%" },
-  avatarText: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  avatarText: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
   wrapper: { minWidth: 0, flexShrink: 1, position: "relative", overflow: "visible" },
   mineWrapper: { alignItems: "flex-end" },
   otherWrapper: { alignItems: "flex-start" },
@@ -492,7 +495,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     maxWidth: "100%",
     minHeight: 24,
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     fontSize: 11,
     fontWeight: "800",
     textAlignVertical: "center"
@@ -507,14 +510,14 @@ const styles = StyleSheet.create({
   },
   mine: {
     borderBottomRightRadius: 5,
-    shadowColor: colors.violet,
+    shadowColor: theme.violet,
     shadowOpacity: 0.18,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 }
   },
   other: {
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: theme.borderSoft,
     borderBottomLeftRadius: 5
   },
   centeredBubble: {
@@ -526,17 +529,17 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
     padding: 8,
     borderRadius: 11,
-    backgroundColor: "rgba(2,7,19,0.28)",
+    backgroundColor: theme.isLight ? theme.surfaceMuted : "rgba(2,7,19,0.28)",
     flexDirection: "row",
     gap: 8
   },
-  replyAccent: { width: 3, borderRadius: 2, backgroundColor: colors.orange },
+  replyAccent: { width: 3, borderRadius: 2, backgroundColor: theme.orange },
   replyContent: { flex: 1, minWidth: 0 },
-  replyAuthor: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  replyBody: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  replyAuthor: { color: theme.orange, fontSize: 11, fontWeight: "900" },
+  replyBody: { color: theme.pageTextSecondary, fontSize: 11, marginTop: 2 },
   body: { ...typography.body, flexShrink: 1, fontSize: 14, lineHeight: 19 },
   mineBody: { color: colors.white },
-  otherBody: { color: colors.text },
+  otherBody: { color: theme.pageText },
   metadata: {
     maxWidth: "100%",
     flexDirection: "row",
@@ -548,7 +551,7 @@ const styles = StyleSheet.create({
   },
   time: { fontSize: 11, lineHeight: 12, fontWeight: "600", flexShrink: 0 },
   mineTime: { color: colors.whiteMuted },
-  otherTime: { color: colors.textMuted },
+  otherTime: { color: theme.pageTextMuted },
   status: {
     color: colors.whiteMuted,
     fontSize: 11,
@@ -574,8 +577,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "rgba(8,18,38,0.98)",
+    borderColor: theme.border,
+    backgroundColor: theme.shellBackground,
     flexDirection: "row",
     flexWrap: "nowrap",
     alignItems: "center",
@@ -603,8 +606,8 @@ const styles = StyleSheet.create({
   },
   reactionChoiceActive: {
     borderWidth: 1,
-    borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.22)"
+    borderColor: theme.violet,
+    backgroundColor: theme.violetSoft
   },
   reactionChoiceEmoji: { fontSize: 19 },
   reactionLine: {
@@ -627,18 +630,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surfaceStrong,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
     gap: 8
   },
   reactionPillActive: {
-    borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.22)"
+    borderColor: theme.violet,
+    backgroundColor: theme.violetSoft
   },
   reactionEmoji: { fontSize: 14 },
-  reactionCount: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
+  reactionCount: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "800" },
   reactionAdd: {
     width: 48,
     height: 48,
@@ -652,8 +655,8 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: "rgba(174,184,210,0.32)",
-    backgroundColor: "rgba(8,18,38,0.96)",
+    borderColor: theme.border,
+    backgroundColor: theme.shellBackground,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000000",
@@ -662,5 +665,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
   },
   retry: { minHeight: 48, justifyContent: "center", paddingHorizontal: 8 },
-  retryText: { color: colors.danger, fontSize: 14, fontWeight: "900" }
+  retryText: { color: theme.danger, fontSize: 14, fontWeight: "900" }
 });

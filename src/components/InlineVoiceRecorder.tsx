@@ -37,11 +37,14 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export function InlineVoiceRecorder({
   onCancel,
   onRecorded,
   maxDurationSeconds = 300
 }: InlineVoiceRecorderProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const recorder = useAudioRecorder(RECORDING_OPTIONS);
   const recorderState = useAudioRecorderState(recorder, 90);
   const [preparing, setPreparing] = useState(true);
@@ -151,7 +154,7 @@ export function InlineVoiceRecorder({
         onPress={() => void cancel()}
         style={styles.action}
       >
-        <Ionicons name="trash-outline" size={20} color={colors.danger} />
+        <Ionicons name="trash-outline" size={20} color={theme.danger} />
       </Pressable>
       <View style={styles.recordingContent}>
         <View style={styles.recordingHeader}>
@@ -187,7 +190,7 @@ export function InlineVoiceRecorder({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   shell: {
     width: "100%",
     alignSelf: "stretch",
@@ -195,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(107,79,234,0.42)",
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: theme.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -219,10 +222,10 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.danger
+    backgroundColor: theme.danger
   },
-  timer: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  status: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  timer: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
+  status: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "800" },
   waveform: {
     width: "100%",
     height: 31,
@@ -231,7 +234,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     overflow: "hidden"
   },
-  waveBar: { width: 2.5, borderRadius: 2, backgroundColor: colors.orange },
+  waveBar: { width: 2.5, borderRadius: 2, backgroundColor: theme.orange },
   sendTarget: {
     width: 50,
     height: 50,
