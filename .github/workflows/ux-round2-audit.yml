@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Legacy light-theme token report
+      - name: Legacy light-theme and interaction report
         shell: bash
         run: |
           set +e
@@ -18,6 +18,8 @@ jobs:
           grep -RIn --include='*.ts' --include='*.tsx' -E 'colors\.(background|surface|surfaceStrong|text|textMuted)|gradients\.screen|#020713|#050B1C|#081226|#0B1630|rgba\(2,[[:space:]]*7,[[:space:]]*19|rgba\(5,[[:space:]]*11,[[:space:]]*28' app src/components src/screens || true
           echo '=== NATIVE DIALOG / SCREEN GESTURE PRIMITIVES ==='
           grep -RIn --include='*.ts' --include='*.tsx' -E '(^|[^A-Za-z0-9_])Alert\.alert|ToastAndroid|ActionSheetIOS|SwipeTabShell|EdgeSwipeBack' app src || true
+          echo '=== CALL ROUTES / LAUNCHERS ==='
+          grep -RIn --include='*.ts' --include='*.tsx' -E '/call/|call/\[id\]|pathname:[[:space:]]*["'"']/call' app src || true
           echo '=== PRESSABLES WITHOUT OBVIOUS PRESS CALLBACK (heuristic) ==='
           python3 - <<'PY'
           from pathlib import Path
@@ -27,7 +29,7 @@ jobs:
                   s=p.read_text(errors='ignore')
                   for m in re.finditer(r'<Pressable\b([^>]*)>',s,re.S):
                       attrs=m.group(1)
-                      if 'onPress=' not in attrs and 'disabled' not in attrs:
+                      if 'onPress=' not in attrs and 'onLongPress=' not in attrs and 'disabled' not in attrs:
                           line=s[:m.start()].count('\n')+1
-                          print(f'{p}:{line}: Pressable without onPress in opening tag')
+                          print(f'{p}:{line}: Pressable without onPress/onLongPress in opening tag')
           PY
