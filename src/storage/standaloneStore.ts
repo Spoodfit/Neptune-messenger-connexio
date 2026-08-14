@@ -6,6 +6,13 @@ import type {
 } from "./standaloneStore.types";
 
 const PREFIX = "connexio.standalone.";
+const ALL_KEYS: StandaloneStateKey[] = [
+  "messaging",
+  "experience",
+  "group-admin",
+  "scheduled-calls",
+  "appearance"
+];
 
 function fullKey(key: StandaloneStateKey): string {
   return `${PREFIX}${key}`;
@@ -29,7 +36,7 @@ export function createStandaloneStateStore(): StandaloneStateStore {
       await Storage.removeItem(fullKey(key));
     },
     async purge(): Promise<void> {
-      for (const key of ["messaging", "experience", "group-admin"] as StandaloneStateKey[]) {
+      for (const key of ALL_KEYS) {
         await Storage.removeItem(fullKey(key));
       }
     }
