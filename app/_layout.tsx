@@ -8,7 +8,9 @@ import {
   SafeAreaProvider
 } from "react-native-safe-area-context";
 
+import { EdgeSwipeBackGesture } from "../src/components/EdgeSwipeBackGesture";
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
+import { CallAppointmentsProvider } from "../src/providers/CallAppointmentsProvider";
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
 import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
@@ -207,9 +209,12 @@ function AuthenticatedApp() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
-          animation: Platform.OS === "web" ? "fade" : "default"
+          animation: Platform.OS === "web" ? "fade" : "default",
+          gestureEnabled: Platform.OS === "ios",
+          fullScreenGestureEnabled: Platform.OS === "ios"
         }}
       />
+      <EdgeSwipeBackGesture />
     </>
   );
 
@@ -225,7 +230,9 @@ function AuthenticatedApp() {
   return (
     <MessagingProvider key={`user:${currentUser.id}`}>
       <GroupAdminProvider>
-        <ExperienceProvider>{applicationStack}</ExperienceProvider>
+        <ExperienceProvider>
+          <CallAppointmentsProvider>{applicationStack}</CallAppointmentsProvider>
+        </ExperienceProvider>
       </GroupAdminProvider>
     </MessagingProvider>
   );
