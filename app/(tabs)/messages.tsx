@@ -2,9 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { ConnexioConfirmDialog } from "@/components/ConnexioConfirmDialog";
 import { ConversationRow } from "@/components/ConversationRow";
 import { SwipeableConversationRow } from "@/components/SwipeableConversationRow";
 import { useExperience } from "@/providers/ExperienceProvider";
@@ -32,6 +33,7 @@ export default function MessagesScreen() {
   const presentationRevision = useConversationPresentationRevision();
   const [filter, setFilter] = useState<ConversationFilter>("groups");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
 
   const mentionAliases = useMemo(() => {
     const [firstName = "", ...lastNameParts] = currentUser.name.toLocaleLowerCase("fr").split(/\s+/);
@@ -63,10 +65,12 @@ export default function MessagesScreen() {
     if (mentioned) markConversationMentionSeen(conversation);
     router.push({ pathname: "/chat/[id]", params: { id: conversation.id, ...(mentioned ? { focusMention: "1" } : {}) } });
   };
-  const confirmDeletePrivate = (conversation: Conversation) => Alert.alert(`Supprimer « ${conversation.name} » ?`, "La discussion disparaîtra de votre liste. Un nouveau message ou une nouvelle prise de contact pourra la faire réapparaître.", [
-    { text: "Annuler", style: "cancel" },
-    { text: "Supprimer", style: "destructive", onPress: () => removePrivateConversation(conversation.id) }
-  ]);
+  const confirmDeletePrivate = (conversation: Conversation) => setPendingDelete(conversation);
+  const deletePendingConversation = () => {
+    if (!pendingDelete) return;
+    removePrivateConversation(pendingDelete.id);
+    setPendingDelete(null);
+  };
   const openDetails = () => {
     if (!selectedConversation) return;
     const route = isPrivateConversation(selectedConversation) ? `/conversation/${encodeURIComponent(selectedConversation.id)}` : `/group/${encodeURIComponent(selectedConversation.id)}`;
@@ -119,6 +123,16 @@ export default function MessagesScreen() {
           ListEmptyComponent={<View style={styles.emptyState}><Ionicons name={filter === "groups" ? "people-outline" : "chatbubbles-outline"} size={34} color={colors.textMuted} /><Text style={styles.feedbackTitle}>{filter === "groups" ? "Aucun groupe visible" : "Aucune discussion privée"}</Text><Text style={styles.feedbackText}>{filter === "groups" ? "Les groupes apparaissent selon votre statut." : "Utilisez le bouton + au centre de la barre pour démarrer une conversation."}</Text></View>}
         />
       )}
+
+      <ConnexioConfirmDialog
+        visible={Boolean(pendingDelete)}
+        title={pendingDelete ? `Supprimer « ${pendingDelete.name} » ?` : "Supprimer cette conversation ?"}
+        body="La discussion disparaîtra de votre liste. Un nouveau message ou une nouvelle prise de contact pourra la faire réapparaître."
+        confirmLabel="Supprimer"
+        destructive
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={deletePendingConversation}
+      />
 
       <Modal transparent animationType="fade" visible={Boolean(selectedConversation)} onRequestClose={closeMenu}>
         <Pressable style={styles.modalBackdrop} onPress={closeMenu}><Pressable style={styles.sheet} onPress={() => undefined}>

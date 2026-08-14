@@ -1,31 +1,101 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+
 import { colors } from "../theme";
 import type { AppUser, Conversation } from "../types/messaging";
+import { StatusAvatar } from "./StatusAvatar";
 
-export function PrivateConversationAvatar({ conversation, members, currentUserId, size = 50 }: { conversation: Conversation; members: readonly AppUser[]; currentUserId: string; size?: number }) {
-  const participants = (conversation.memberIds ?? []).map((id) => members.find((member) => member.id === id)).filter((member): member is AppUser => Boolean(member));
-  const visible = conversation.type === "direct" ? [participants.find((member) => member.id !== currentUserId) ?? participants[0]].filter((member): member is AppUser => Boolean(member)) : participants.slice(0, 4);
-  const grid = visible.length > 1;
-  const half = size / 2;
+function positions(count: number, size: number, avatarSize: number) {
+  const max = size - avatarSize;
+  if (count <= 1) return [{ left: 0, top: 0 }];
+  if (count === 2) return [
+    { left: 0, top: Math.round(max * 0.08) },
+    { left: max, top: Math.round(max * 0.92) }
+  ];
+  if (count === 3) return [
+    { left: Math.round(max * 0.48), top: 0 },
+    { left: 0, top: max },
+    { left: max, top: max }
+  ];
+  return [
+    { left: 0, top: 0 },
+    { left: max, top: 0 },
+    { left: 0, top: max },
+    { left: max, top: max }
+  ];
+}
+
+export function PrivateConversationAvatar({
+  conversation,
+  members,
+  currentUserId,
+  size = 50
+}: {
+  conversation: Conversation;
+  members: readonly AppUser[];
+  currentUserId: string;
+  size?: number;
+}) {
+  const participants = (conversation.memberIds ?? [])
+    .map((id) => members.find((member) => member.id === id))
+    .filter((member): member is AppUser => Boolean(member));
+  const visible = conversation.type === "direct"
+    ? [participants.find((member) => member.id !== currentUserId) ?? participants[0]].filter(
+        (member): member is AppUser => Boolean(member)
+      )
+    : participants.filter((member) => member.id !== currentUserId).slice(0, 4);
+  const singleMember = visible[0];
+
+  if (visible.length === 1 && singleMember) {
+    return <StatusAvatar user={singleMember} size={size} ringWidth={2.5} accessible={false} />;
+  }
+
+  if (visible.length === 0) {
+    return (
+      <View
+        accessibilityElementsHidden
+        style={[styles.fallback, { width: size, height: size, borderRadius: size / 2 }]}
+      >
+        <Text style={styles.initials}>N</Text>
+      </View>
+    );
+  }
+
+  const avatarSize = Math.max(27, Math.round(size * (visible.length === 2 ? 0.68 : 0.58)));
+  const avatarPositions = positions(visible.length, size, avatarSize);
+
   return (
-    <View accessibilityElementsHidden style={[styles.shell, grid && styles.grid, { width: size, height: size, borderRadius: Math.round(size * 0.3) }]}>
+    <View accessibilityElementsHidden style={[styles.cluster, { width: size, height: size }]}>
       {visible.map((member, index) => (
-        <View key={member.id} style={[styles.cell, grid ? { width: half, height: visible.length === 2 ? size : half } : styles.full, grid && (index === 0 || index === 2) && styles.rightDivider, visible.length > 2 && index < 2 && styles.bottomDivider]}>
-          {member.avatarUrl ? <Image source={{ uri: member.avatarUrl }} resizeMode="cover" style={styles.image} /> : <Text style={styles.initials}>{member.initials}</Text>}
+        <View
+          key={member.id}
+          style={[
+            styles.clusterItem,
+            avatarPositions[index],
+            { zIndex: visible.length - index }
+          ]}
+        >
+          <StatusAvatar user={member} size={avatarSize} ringWidth={2} accessible={false} />
         </View>
       ))}
-      {visible.length === 3 ? <View style={[styles.cell, { width: half, height: half }]}><Text style={styles.initials}>+</Text></View> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: { overflow: "hidden", flexShrink: 0, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  grid: { flexDirection: "row", flexWrap: "wrap" },
-  cell: { overflow: "hidden", backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  full: { width: "100%", height: "100%" },
-  image: { width: "100%", height: "100%" },
-  initials: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  rightDivider: { borderRightWidth: 1, borderRightColor: colors.background },
-  bottomDivider: { borderBottomWidth: 1, borderBottomColor: colors.background }
+  cluster: {
+    position: "relative",
+    flexShrink: 0
+  },
+  clusterItem: {
+    position: "absolute"
+  },
+  fallback: {
+    flexShrink: 0,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  initials: { color: colors.text, fontSize: 11, fontWeight: "900" }
 });
