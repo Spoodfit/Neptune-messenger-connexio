@@ -4,7 +4,6 @@
     "appVersionSource": "remote"
   },
   "build": {
-
     "development": {
       "developmentClient": true,
       "distribution": "internal",
@@ -15,8 +14,8 @@
       "channel": "preview"
     },
     "standalone": {
+      "developmentClient": false,
       "distribution": "internal",
-      "channel": "standalone",
       "env": {
         "EXPO_PUBLIC_MOCK_MODE": "true",
         "EXPO_PUBLIC_BACKEND_CONTRACT": "connexio-v1",
@@ -26,7 +25,8 @@
         "image": "sdk-57"
       },
       "android": {
-        "image": "sdk-57"
+        "image": "sdk-57",
+        "buildType": "apk"
       }
     },
     "release-candidate": {
