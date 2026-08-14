@@ -39,7 +39,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   }, [store]);
 
   useEffect(() => {
-    Appearance.setColorScheme(mode === "system" ? "unspecified" : mode);
+    Appearance.setColorScheme(mode === "system" ? null : mode);
   }, [mode]);
 
   const setMode = (next: ConnexioAppearanceMode) => {
