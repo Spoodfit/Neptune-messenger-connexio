@@ -3,7 +3,8 @@ export type StandaloneStateKey =
   | "experience"
   | "group-admin"
   | "scheduled-calls"
-  | "appearance";
+  | "appearance"
+  | "app-language";
 
 export interface StandaloneStateStore {
   load<T>(key: StandaloneStateKey): Promise<T | null>;

@@ -2,8 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { StatusAvatar } from "@/components/StatusAvatar";
 import { ThemeModeButton } from "@/components/ThemeModeButton";
@@ -27,17 +28,17 @@ export default function BlockedUsersScreen() {
     if (!api) return;
     let cancelled = false;
     setLoading(true);
-    void api.listBlockedMembers().then((members) => { if (!cancelled) setBlockedMembers(members); }).catch((error: unknown) => { if (!cancelled) Alert.alert("Liste indisponible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }).finally(() => { if (!cancelled) setLoading(false); });
+    void api.listBlockedMembers().then((members) => { if (!cancelled) setBlockedMembers(members); }).catch((error: unknown) => { if (!cancelled) AppAlert.alert("Liste indisponible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [api]);
 
   const unblock = (member: AppUser) => {
-    Alert.alert(`Débloquer ${member.name} ?`, "Cette personne pourra de nouveau vous contacter, vous mentionner et vous inviter selon vos autres réglages.", [
+    AppAlert.alert(`Débloquer ${member.name} ?`, "Cette personne pourra de nouveau vous contacter, vous mentionner et vous inviter selon vos autres réglages.", [
       { text: "Annuler", style: "cancel" },
       { text: "Débloquer", onPress: () => {
         setUnblockingId(member.id);
         if (!api) { setBlockedMembers((previous) => previous.filter((item) => item.id !== member.id)); setUnblockingId(null); return; }
-        void api.unblockMember(member.id).then(() => setBlockedMembers((previous) => previous.filter((item) => item.id !== member.id))).catch((error: unknown) => Alert.alert("Déblocage impossible", error instanceof Error ? error.message : "Réessayez ultérieurement.")).finally(() => setUnblockingId(null));
+        void api.unblockMember(member.id).then(() => setBlockedMembers((previous) => previous.filter((item) => item.id !== member.id))).catch((error: unknown) => AppAlert.alert("Déblocage impossible", error instanceof Error ? error.message : "Réessayez ultérieurement.")).finally(() => setUnblockingId(null));
       } }
     ]);
   };

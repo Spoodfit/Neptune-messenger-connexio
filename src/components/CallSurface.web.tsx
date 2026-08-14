@@ -6,12 +6,15 @@ import { injectLiveCaptionRuntime } from "../services/calls/liveCaptions";
 import { colors } from "../theme";
 import type { CallSurfaceProps } from "./CallSurface.types";
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function CallSurface({
   session,
   displayName,
   onClose,
   onUnanswered
 }: CallSurfaceProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const html = useMemo(
     () =>
       injectLiveCaptionRuntime(
@@ -66,13 +69,13 @@ export default function CallSurface({
           width: "100%",
           height: "100%",
           border: 0,
-          background: colors.background
+          background: theme.pageBackground
         }
       })}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background, position: "relative" }
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.pageBackground, position: "relative" }
 });

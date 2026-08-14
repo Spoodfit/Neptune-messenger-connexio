@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -6,11 +7,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function MembershipRequiredScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.screen}>
+    <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <View
         style={[
           styles.header,
@@ -27,7 +31,7 @@ export default function MembershipRequiredScreen() {
           onPress={() => router.back()}
           style={styles.headerButton}
         >
-          <Ionicons name="chevron-back" size={25} color={colors.text} />
+          <Ionicons name="chevron-back" size={25} color={theme.pageText} />
         </Pressable>
         <Text accessibilityRole="header" style={styles.headerTitle}>
           Accès membre
@@ -43,7 +47,7 @@ export default function MembershipRequiredScreen() {
       >
         <View style={styles.hero}>
           <View style={styles.iconShell}>
-            <Ionicons name="lock-closed" size={30} color={colors.orange} />
+            <Ionicons name="lock-closed" size={30} color={theme.orange} />
           </View>
           <Text style={styles.title}>Fonction réservée à votre niveau d’adhésion</Text>
           <Text style={styles.body}>
@@ -52,7 +56,7 @@ export default function MembershipRequiredScreen() {
         </View>
 
         <View style={styles.card}>
-          <Ionicons name="information-circle-outline" size={22} color={colors.textSecondary} />
+          <Ionicons name="information-circle-outline" size={22} color={theme.pageTextSecondary} />
           <View style={styles.cardContent}>
             <Text style={styles.cardTitle}>Aucun achat dans Connexio</Text>
             <Text style={styles.cardText}>
@@ -84,7 +88,7 @@ export default function MembershipRequiredScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   screen: { flex: 1 },
   header: {
     minHeight: 58,
@@ -100,7 +104,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...typography.heading3,
-    color: colors.text,
+    color: theme.pageText,
     flex: 1,
     textAlign: "center"
   },
@@ -116,20 +120,20 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center"
   },
   title: {
     ...typography.heading2,
-    color: colors.text,
+    color: theme.pageText,
     textAlign: "center",
     marginTop: spacing.md
   },
   body: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: theme.pageTextSecondary,
     textAlign: "center",
     marginTop: spacing.sm
   },
@@ -138,17 +142,17 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: spacing.sm
   },
   cardContent: { flex: 1, minWidth: 0 },
-  cardTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  cardTitle: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
   cardText: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     marginTop: 4
   },
   primaryButton: {
@@ -169,5 +173,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  secondaryText: { color: colors.textSecondary, fontSize: 14, fontWeight: "800" }
+  secondaryText: { color: theme.pageTextSecondary, fontSize: 14, fontWeight: "800" }
 });

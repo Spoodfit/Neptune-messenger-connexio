@@ -70,6 +70,7 @@ interface ExperienceContextValue {
   ) => Promise<boolean>;
   toggleConversationMuted: (conversationId: string) => void;
   leaveConversation: (conversationId: string) => void;
+  joinConversation: (conversationId: string) => Promise<void>;
   updateGroup: (conversationId: string, draft: GroupDraft) => void;
   getMessageReactions: (message: ChatMessage) => MessageReactionSummary[];
   toggleMessageReaction: (message: ChatMessage, emoji: string) => void;
@@ -214,7 +215,10 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
   );
 
   const isConversationVisible = useCallback(
-    (conversation: Conversation) => !leftConversationIds.has(conversation.id),
+    (conversation: Conversation) => {
+      if (!leftConversationIds.has(conversation.id)) return true;
+      return conversation.type !== "direct" && conversation.type !== "small_group";
+    },
     [leftConversationIds]
   );
 
@@ -390,6 +394,26 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       }
     },
     [api]
+  );
+
+  const joinConversation = useCallback(
+    async (conversationId: string) => {
+      const wasLeft = leftConversationIds.has(conversationId);
+      setLeftConversationIds((previous) => {
+        const next = new Set(previous);
+        next.delete(conversationId);
+        return next;
+      });
+      if (api && !isLocalId(conversationId)) {
+        try {
+          await api.joinGroup(conversationId);
+        } catch (error) {
+          if (wasLeft) setLeftConversationIds((previous) => new Set(previous).add(conversationId));
+          throw error;
+        }
+      }
+    },
+    [api, leftConversationIds]
   );
 
   const updateGroup = useCallback(
@@ -623,6 +647,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       sendLocalMessage,
       toggleConversationMuted,
       leaveConversation,
+      joinConversation,
       updateGroup,
       getMessageReactions,
       toggleMessageReaction,
@@ -643,6 +668,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       getConversationMessages,
       getMessageReactions,
       isConversationVisible,
+      joinConversation,
       localConversations,
       localMessagesByConversation,
       mapMoments,

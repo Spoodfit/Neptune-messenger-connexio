@@ -105,3 +105,4 @@ jobs:
             sleep 1
           done
           node scripts/visual-audit.cjs
+          node scripts/interaction-audit.cjs

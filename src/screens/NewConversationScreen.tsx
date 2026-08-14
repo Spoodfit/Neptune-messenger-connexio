@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Linking,
   Pressable,
@@ -17,6 +16,7 @@ import {
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { env } from "../config/env";
 import {
@@ -150,7 +150,7 @@ export default function NewConversationScreen() {
         return previous.filter((id) => id !== memberId);
       }
       if (previous.length >= MAX_PRIVATE_CONTACTS) {
-        Alert.alert(
+        AppAlert.alert(
           "Limite atteinte",
           `${MAX_PRIVATE_PARTICIPANTS} participants maximum, vous compris.`
         );
@@ -173,7 +173,7 @@ export default function NewConversationScreen() {
       const selected = await pickGroupAvatar();
       if (selected) setAvatarUri(selected);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Image indisponible",
         error instanceof Error
           ? error.message
@@ -190,7 +190,7 @@ export default function NewConversationScreen() {
     if (creating) return;
     if (mode === "private") {
       if (!canInitiatePrivate) {
-        Alert.alert(
+        AppAlert.alert(
           "Passez Triton",
           "Un compte Free peut recevoir une invitation privée, mais doit passer Triton pour démarrer une conversation.",
           [
@@ -204,11 +204,11 @@ export default function NewConversationScreen() {
         return;
       }
       if (selectedIds.length === 0) {
-        Alert.alert("Contact requis", "Sélectionnez au moins un membre.");
+        AppAlert.alert("Contact requis", "Sélectionnez au moins un membre.");
         return;
       }
       if (existingPrivateConversation) {
-        Alert.alert(
+        AppAlert.alert(
           "Conversation déjà ouverte",
           "Une conversation existe déjà avec exactement ces participants.",
           [
@@ -225,18 +225,18 @@ export default function NewConversationScreen() {
 
     if (mode === "group") {
       if (!canCreateOfficialGroup) {
-        Alert.alert(
+        AppAlert.alert(
           "Réservé aux Visionnaires",
           "Seuls les Visionnaires peuvent créer ou administrer un groupe officiel."
         );
         return;
       }
       if (!groupName.trim()) {
-        Alert.alert("Nom requis", "Indiquez le nom du groupe.");
+        AppAlert.alert("Nom requis", "Indiquez le nom du groupe.");
         return;
       }
       if (allowedRoles.length === 0) {
-        Alert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
+        AppAlert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
         return;
       }
     }
@@ -274,7 +274,7 @@ export default function NewConversationScreen() {
       if (api) await refreshConversations();
       router.replace(`/group/${encodeURIComponent(group.id)}`);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Création impossible",
         error instanceof Error ? error.message : "La création a échoué."
       );

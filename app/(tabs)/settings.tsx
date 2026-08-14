@@ -6,13 +6,16 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { LanguagePickerModal } from "@/components/LanguagePickerModal";
 import { StatusAvatar } from "@/components/StatusAvatar";
 import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
 import { env } from "@/config/env";
 import { useExperience } from "@/providers/ExperienceProvider";
+import { useAppLanguage } from "@/providers/LanguageProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { type ConnexioAppearanceMode, useAppTheme } from "@/providers/ThemeProvider";
 import { colors, gradients, spacing, typography } from "@/theme";
+import { SUPPORTED_LANGUAGES } from "@/i18n/languages";
 
 const MAX_CONTENT_WIDTH = 720;
 const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
@@ -44,6 +47,8 @@ export default function SettingsScreen() {
   const { currentUser, signOut } = useSession();
   const { posts } = useExperience();
   const theme = useAppTheme();
+  const { mode: languageMode, language } = useAppLanguage();
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const businessItems = useMemo(() => {
@@ -107,6 +112,9 @@ export default function SettingsScreen() {
             })}
           </View>
 
+          <View style={styles.sectionHeading}><Text style={[styles.sectionTitle, { color: theme.pageText }]}>Langue</Text><Text style={[styles.sectionSubtitle, { color: theme.pageTextMuted }]}>Choisissez la langue par défaut de Connexio et des traductions automatiques.</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Changer la langue de Connexio" onPress={() => setLanguagePickerOpen(true)} style={({ pressed }) => [styles.languageCard, { backgroundColor: theme.surface, borderColor: theme.borderSoft }, pressed && styles.pressed]}><View style={[styles.rowIcon, { backgroundColor: theme.accentSoft }]}><Ionicons name="language-outline" size={22} color={theme.accent} /></View><View style={styles.rowContent}><Text style={[styles.rowTitle, { color: theme.pageText }]}>{languageMode === "system" ? "Langue du téléphone" : SUPPORTED_LANGUAGES.find((item) => item.code === language)?.nativeName ?? language.toLocaleUpperCase()}</Text><Text style={[styles.rowSubtitle, { color: theme.pageTextMuted }]}>Langue active : {SUPPORTED_LANGUAGES.find((item) => item.code === language)?.frenchName ?? language.toLocaleUpperCase()}</Text></View><Ionicons name="chevron-forward" size={19} color={theme.pageTextMuted} /></Pressable>
+
           <View style={styles.sectionHeading}><Text style={[styles.sectionTitle, { color: theme.pageText }]}>Réglages</Text><Text style={[styles.sectionSubtitle, { color: theme.pageTextMuted }]}>Les fonctions sont classées par usage pour retrouver rapidement ce que vous cherchez.</Text></View>
           <View style={styles.settingsList}>
             {settingsEntries.map((item) => <Pressable key={item.title} accessibilityRole="button" onPress={() => router.push(item.route)} style={({ pressed }) => [styles.row, { backgroundColor: theme.surface, borderColor: theme.borderSoft }, pressed && styles.pressed]}><View style={[styles.rowIcon, { backgroundColor: theme.surfaceStrong }]}><Ionicons name={item.icon} size={21} color={theme.pageText} /></View><View style={styles.rowContent}><Text style={[styles.rowTitle, { color: theme.pageText }]}>{item.title}</Text><Text style={[styles.rowSubtitle, { color: theme.pageTextMuted }]}>{item.subtitle}</Text></View><Ionicons name="chevron-forward" size={19} color={theme.pageTextMuted} /></Pressable>)}
@@ -119,6 +127,7 @@ export default function SettingsScreen() {
           <Text style={[styles.version, { color: theme.pageTextMuted }]}>Connexio {Constants.expoConfig?.version ?? "1.0.0"} · {getEnvironmentLabel()}</Text>
         </View>
       </ScrollView>
+      <LanguagePickerModal visible={languagePickerOpen} onClose={() => setLanguagePickerOpen(false)} />
     </LinearGradient>
   );
 }
@@ -130,6 +139,7 @@ const styles = StyleSheet.create({
   businessGrid: { marginHorizontal: spacing.md, flexDirection: "row", flexWrap: "wrap", gap: 10 }, businessCard: { flexGrow: 1, flexBasis: 210, minHeight: 158, padding: 14, borderRadius: 20, borderWidth: 1 }, businessIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" }, businessTitle: { ...typography.heading3, marginTop: 10 }, businessDescription: { fontSize: 14, lineHeight: 20, marginTop: 5, flex: 1 }, businessFooter: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, businessKind: { fontSize: 11, fontWeight: "900" },
   recentPosts: { marginHorizontal: spacing.md, gap: 8 }, postCard: { minHeight: 70, padding: 12, borderRadius: 17, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10 }, postKind: { fontSize: 11, fontWeight: "900" }, postText: { flex: 1, fontSize: 14, lineHeight: 20 },
   appearanceCard: { marginHorizontal: spacing.md, padding: 5, borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 5 }, appearanceOption: { flex: 1, minHeight: 56, paddingHorizontal: 8, borderRadius: 16, alignItems: "center", justifyContent: "center", gap: 3 }, appearanceText: { fontSize: 11, fontWeight: "900" },
+  languageCard: { minHeight: 70, marginHorizontal: spacing.md, padding: 10, borderRadius: 19, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10 },
   settingsList: { marginHorizontal: spacing.md, gap: 8 }, row: { minHeight: 72, padding: 12, borderRadius: 18, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 12 }, rowIcon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" }, rowContent: { flex: 1, minWidth: 0 }, rowTitle: { ...typography.heading3 }, rowSubtitle: { fontSize: 14, lineHeight: 20, marginTop: 3 }, pressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
   signOutError: { margin: spacing.md, borderRadius: 14, padding: 12 }, signOutButton: { minHeight: 68, marginHorizontal: spacing.md, marginTop: spacing.lg, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 12 }, signOutContent: { flex: 1 }, signOutText: { fontSize: 14, fontWeight: "900" }, signOutHint: { fontSize: 14, lineHeight: 19, marginTop: 2 }, disabled: { opacity: 0.5 }, systemSettings: { minHeight: 48, marginTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }, systemSettingsText: { fontSize: 14, fontWeight: "800" }, version: { fontSize: 11, textAlign: "center", marginBottom: 8 }
 });

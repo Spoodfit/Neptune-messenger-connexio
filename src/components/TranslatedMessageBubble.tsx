@@ -8,7 +8,10 @@ import { MessageBubble as BaseMessageBubble } from "./BaseMessageBubble";
 
 type MessageBubbleProps = ComponentProps<typeof BaseMessageBubble>;
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export function MessageBubble(props: MessageBubbleProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { message, centered = false } = props;
   const [showOriginal, setShowOriginal] = useState(false);
   const translation = message.translation;
@@ -74,7 +77,7 @@ export function MessageBubble(props: MessageBubbleProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   container: { width: "100%" },
   translationMeta: {
     minHeight: 32,
@@ -87,8 +90,8 @@ const styles = StyleSheet.create({
   },
   otherMeta: { marginLeft: 56 + spacing.sm },
   centeredMeta: { justifyContent: "center", marginHorizontal: spacing.md },
-  translationLabel: { color: colors.textMuted, fontSize: 11, lineHeight: 15, fontWeight: "700" },
-  separator: { color: colors.textMuted, fontSize: 11 },
+  translationLabel: { color: theme.pageTextMuted, fontSize: 11, lineHeight: 15, fontWeight: "700" },
+  separator: { color: theme.pageTextMuted, fontSize: 11 },
   toggleTarget: { minHeight: 32, justifyContent: "center", paddingHorizontal: 4 },
-  toggleText: { color: colors.violet, fontSize: 11, lineHeight: 15, fontWeight: "900" }
+  toggleText: { color: theme.violet, fontSize: 11, lineHeight: 15, fontWeight: "900" }
 });

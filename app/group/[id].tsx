@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -15,6 +14,7 @@ import {
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { MemberAvatarStack } from "@/components/MemberAvatarStack";
 import { MemberStatusBadge } from "@/components/MemberStatusBadge";
@@ -76,6 +76,7 @@ export default function GroupSettingsScreen() {
     decorateConversation,
     toggleConversationMuted,
     leaveConversation,
+    joinConversation,
     updateGroup
   } = useExperience();
   const { getCreatedGroup, updateCreatedGroup, removeCreatedGroup } = useGroupAdmin();
@@ -145,7 +146,7 @@ export default function GroupSettingsScreen() {
     return role === "amiral" || role === "capitaine";
   });
   const exactMemberCount = groupMembers.length || conversation?.memberCount || 0;
-  const activeMemberIds = (conversation?.activeMemberIds ?? []).filter(
+  const activeMemberIds = (conversation?.activeMemberIds?.length ? conversation.activeMemberIds : conversation?.memberIds ?? []).filter(
     (memberId) => !removedMemberIds.includes(memberId)
   );
 
@@ -223,7 +224,7 @@ export default function GroupSettingsScreen() {
         setSavedAt(null);
       }
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Image indisponible",
         error instanceof Error ? error.message : "L’image n’a pas pu être sélectionnée."
       );
@@ -233,11 +234,11 @@ export default function GroupSettingsScreen() {
   const save = async () => {
     if (!canEditSettings || saving) return;
     if (!name.trim()) {
-      Alert.alert("Nom requis", "Le groupe doit conserver un nom.");
+      AppAlert.alert("Nom requis", "Le groupe doit conserver un nom.");
       return;
     }
     if (allowedRoles.length === 0) {
-      Alert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
+      AppAlert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
       return;
     }
     setSaving(true);
@@ -258,9 +259,9 @@ export default function GroupSettingsScreen() {
       setSavedAt(
         new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
       );
-      Alert.alert("Paramètres enregistrés", "Les règles du groupe sont actives.");
+      AppAlert.alert("Paramètres enregistrés", "Les règles du groupe sont actives.");
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Enregistrement impossible",
         error instanceof Error ? error.message : "Les paramètres n’ont pas été enregistrés."
       );
@@ -272,7 +273,7 @@ export default function GroupSettingsScreen() {
   const toggleResponsible = async (member: AppUser) => {
     if (!canManageMembers || busyMemberId) return;
     if (!canBeGroupResponsible(member.role)) {
-      Alert.alert(
+      AppAlert.alert(
         "Statut non éligible",
         "Un responsable de groupe doit être Amiral ou Capitaine."
       );
@@ -293,7 +294,7 @@ export default function GroupSettingsScreen() {
       }
     } catch (error) {
       setResponsibleIds(responsibleIds);
-      Alert.alert(
+      AppAlert.alert(
         "Gestion impossible",
         error instanceof Error ? error.message : "Le responsable n’a pas été modifié."
       );
@@ -304,7 +305,7 @@ export default function GroupSettingsScreen() {
 
   const removeMember = (member: AppUser) => {
     if (!canManageMembers || busyMemberId || member.id === currentUser.id) return;
-    Alert.alert(
+    AppAlert.alert(
       `Retirer ${member.name} ?`,
       "Cette personne perdra immédiatement l’accès au groupe.",
       [
@@ -325,7 +326,7 @@ export default function GroupSettingsScreen() {
                 }
               } catch (error) {
                 setRemovedMemberIds((previous) => previous.filter((value) => value !== member.id));
-                Alert.alert(
+                AppAlert.alert(
                   "Retrait impossible",
                   error instanceof Error ? error.message : "Le membre n’a pas été retiré."
                 );
@@ -356,7 +357,7 @@ export default function GroupSettingsScreen() {
       }
     } catch (error) {
       setPublisherIds(publisherIds);
-      Alert.alert(
+      AppAlert.alert(
         "Autorisation impossible",
         error instanceof Error ? error.message : "L’autorisation n’a pas été modifiée."
       );
@@ -366,48 +367,42 @@ export default function GroupSettingsScreen() {
   };
 
   const leave = () => {
-    Alert.alert("Quitter le groupe ?", "Le groupe disparaîtra de vos discussions.", [
+    AppAlert.alert("Quitter le groupe ?", "Vous pourrez le rejoindre à nouveau depuis vos groupes.", [
       { text: "Annuler", style: "cancel" },
-      {
-        text: "Quitter",
-        style: "destructive",
-        onPress: () => {
-          void (async () => {
-            try {
-              if (api && !id.startsWith("local-")) {
-                await api.leaveGroup(id);
-                await refreshConversations();
-              } else if (getCreatedGroup(id)) removeCreatedGroup(id);
-              else leaveConversation(id);
-              router.replace("/(tabs)/messages");
-            } catch (error) {
-              Alert.alert(
-                "Départ impossible",
-                error instanceof Error ? error.message : "Réessayez ultérieurement."
-              );
-            }
-          })();
-        }
-      }
+      { text: "Quitter", style: "destructive", onPress: () => {
+        if (getCreatedGroup(id)) removeCreatedGroup(id);
+        else leaveConversation(id);
+        router.replace("/(tabs)/messages");
+      } }
     ]);
   };
 
+  const rejoin = async () => {
+    try {
+      await joinConversation(id);
+      await refreshConversations();
+      router.replace(`/chat/${encodeURIComponent(id)}`);
+    } catch (error) {
+      AppAlert.alert("Impossible de rejoindre le groupe", error instanceof Error ? error.message : "Réessayez ultérieurement.");
+    }
+  };
+
   const reportGroup = () => {
-    Alert.alert("Signaler ce groupe", "Le signalement sera envoyé à Neptune.", [
+    AppAlert.alert("Signaler ce groupe", "Le signalement sera envoyé à Neptune.", [
       { text: "Annuler", style: "cancel" },
       {
         text: "Signaler",
         style: "destructive",
         onPress: () => {
           if (!api) {
-            Alert.alert("Signalement enregistré", "Mode démonstration.");
+            AppAlert.alert("Signalement enregistré", "Mode démonstration.");
             return;
           }
           void api
             .reportContent("group", id, "Groupe signalé depuis Connexio")
-            .then(() => Alert.alert("Signalement transmis"))
+            .then(() => AppAlert.alert("Signalement transmis"))
             .catch((error: unknown) =>
-              Alert.alert(
+              AppAlert.alert(
                 "Signalement impossible",
                 error instanceof Error ? error.message : "Réessayez ultérieurement."
               )
@@ -506,10 +501,7 @@ export default function GroupSettingsScreen() {
               <Text style={styles.quickLabel}>Automatisations</Text>
             </Pressable>
           ) : null}
-          <Pressable accessibilityRole="button" onPress={leave} style={styles.quickAction}>
-            <Ionicons name="exit-outline" size={21} color={theme.danger} />
-            <Text style={[styles.quickLabel, styles.dangerText]}>Quitter</Text>
-          </Pressable>
+          {conversation.left ? <Pressable accessibilityRole="button" onPress={() => void rejoin()} style={[styles.quickAction, { backgroundColor: theme.successSoft }]}><Ionicons name="enter-outline" size={21} color={theme.success} /><Text style={[styles.quickLabel, { color: theme.success }]}>Rejoindre</Text></Pressable> : <Pressable accessibilityRole="button" onPress={leave} style={styles.quickAction}><Ionicons name="exit-outline" size={21} color={theme.danger} /><Text style={[styles.quickLabel, styles.dangerText]}>Quitter</Text></Pressable>}
         </View>
 
         <View style={styles.governanceNote}>

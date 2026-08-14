@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Linking, Pressable, Text, View } from "react-native";
 
 import { useReducedMotion } from "../hooks/useReducedMotion";
+import { useAppTheme } from "../providers/ThemeProvider";
 import { colors } from "../theme";
 import type { MessagePoll, PollVoter } from "../types/messaging";
-import { pollStyles as styles } from "./PollMessageCard.styles";
+import { createPollStyles } from "./PollMessageCard.styles";
 import { StatusAvatar } from "./StatusAvatar";
 
 interface PollMessageCardProps {
@@ -14,6 +15,8 @@ interface PollMessageCardProps {
 }
 
 function VoterStack({ voters }: { voters: readonly PollVoter[] }) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createPollStyles(theme), [theme]);
   const visible = voters.slice(0, 6);
   const remaining = Math.max(0, voters.length - visible.length);
   if (!voters.length) return null;
@@ -36,17 +39,15 @@ function PollOption({ option, maximum, poll, closed, onVote }: {
   closed: boolean;
   onVote: PollMessageCardProps["onVote"];
 }) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createPollStyles(theme), [theme]);
   const reducedMotion = useReducedMotion();
   const target = option.voteCount / maximum;
   const progress = useRef(new Animated.Value(target)).current;
   const [voting, setVoting] = useState(false);
 
   useEffect(() => {
-    Animated.timing(progress, {
-      toValue: target,
-      duration: reducedMotion ? 0 : 220,
-      useNativeDriver: false
-    }).start();
+    Animated.timing(progress, { toValue: target, duration: reducedMotion ? 0 : 220, useNativeDriver: false }).start();
   }, [progress, reducedMotion, target]);
 
   const vote = async () => {
@@ -57,19 +58,10 @@ function PollOption({ option, maximum, poll, closed, onVote }: {
 
   const voters = poll.anonymous ? [] : option.voters ?? [];
   return (
-    <Pressable
-      accessibilityRole={poll.allowMultiple ? "checkbox" : "radio"}
-      accessibilityState={{ checked: option.votedByCurrentUser, disabled: closed || voting, busy: voting }}
-      disabled={closed || voting}
-      onPress={() => void vote()}
-      style={({ pressed }) => [styles.option, option.votedByCurrentUser && styles.optionActive, pressed && styles.pressed, voting && styles.busy]}
-    >
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.progress, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }) }]}
-      />
+    <Pressable accessibilityRole={poll.allowMultiple ? "checkbox" : "radio"} accessibilityState={{ checked: option.votedByCurrentUser, disabled: closed || voting, busy: voting }} disabled={closed || voting} onPress={() => void vote()} style={({ pressed }) => [styles.option, option.votedByCurrentUser && styles.optionActive, pressed && styles.pressed, voting && styles.busy]}>
+      <Animated.View pointerEvents="none" style={[styles.progress, { width: progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }) }]} />
       <View style={styles.optionMain}>
-        <View style={[styles.choice, poll.allowMultiple && styles.choiceMultiple]}>
+        <View style={[styles.choice, poll.allowMultiple && styles.choiceMultiple, option.votedByCurrentUser && styles.choiceSelected]}>
           {option.votedByCurrentUser ? <Ionicons name="checkmark" size={15} color={colors.white} /> : null}
         </View>
         <Text style={styles.optionLabel}>{option.label}</Text>
@@ -81,6 +73,8 @@ function PollOption({ option, maximum, poll, closed, onVote }: {
 }
 
 export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createPollStyles(theme), [theme]);
   const closed = Boolean(poll.closedAt) || Boolean(poll.closesAt && new Date(poll.closesAt).getTime() <= Date.now());
   const maximum = Math.max(1, ...poll.options.map((option) => option.voteCount));
   const totalVoters = poll.totalVoters ?? new Set(poll.options.flatMap((option) => option.voterIds ?? [])).size;
@@ -88,25 +82,16 @@ export function PollMessageCard({ poll, onVote }: PollMessageCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.titleRow}>
-        <View style={styles.icon}><Ionicons name="stats-chart" size={18} color={colors.orange} /></View>
+        <View style={styles.icon}><Ionicons name="stats-chart" size={18} color={theme.orange} /></View>
         <View style={styles.titleContent}>
           <Text style={styles.question}>{poll.question}</Text>
-          <Text style={styles.meta}>
-            {totalVoters > 0 ? `${totalVoters} participant${totalVoters > 1 ? "s" : ""}` : `${poll.totalVotes} vote${poll.totalVotes > 1 ? "s" : ""}`}
-            {poll.allowMultiple ? " · plusieurs réponses possibles" : ""}{poll.anonymous ? " · anonyme" : ""}
-          </Text>
+          <Text style={styles.meta}>{totalVoters > 0 ? `${totalVoters} participant${totalVoters > 1 ? "s" : ""}` : `${poll.totalVotes} vote${poll.totalVotes > 1 ? "s" : ""}`}{poll.allowMultiple ? " · plusieurs réponses possibles" : ""}{poll.anonymous ? " · anonyme" : ""}</Text>
         </View>
       </View>
-      <View style={styles.options}>
-        {poll.options.map((option) => <PollOption key={option.id} option={option} maximum={maximum} poll={poll} closed={closed} onVote={onVote} />)}
-      </View>
+      <View style={styles.options}>{poll.options.map((option) => <PollOption key={option.id} option={option} maximum={maximum} poll={poll} closed={closed} onVote={onVote} />)}</View>
       <View style={styles.footer}>
         <Text style={styles.footerText}>{closed ? "Sondage terminé" : poll.allowMultiple ? "Sélectionnez toutes les réponses utiles" : "Sélectionnez une réponse"}</Text>
-        {poll.eventVoteUrl ? (
-          <Pressable accessibilityRole="link" accessibilityLabel="Ouvrir le vote d’évènement Neptune" onPress={() => void Linking.openURL(poll.eventVoteUrl!)} style={styles.eventLink}>
-            <Text style={styles.eventLinkText}>Voir dans Neptune</Text><Ionicons name="open-outline" size={14} color={colors.orange} />
-          </Pressable>
-        ) : null}
+        {poll.eventVoteUrl ? <Pressable accessibilityRole="link" accessibilityLabel="Ouvrir le vote d’évènement Neptune" onPress={() => void Linking.openURL(poll.eventVoteUrl!)} style={styles.eventLink}><Text style={styles.eventLinkText}>Voir dans Neptune</Text><Ionicons name="open-outline" size={14} color={theme.orange} /></Pressable> : null}
       </View>
     </View>
   );

@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -18,6 +18,7 @@ import {
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { EventVoteBanner } from "../../src/components/EventVoteBanner";
 import { MemberAvatarStack } from "../../src/components/MemberAvatarStack";
@@ -101,13 +102,15 @@ function updateLocalPoll(
 }
 
 export default function ChatScreen() {
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; focusMention?: string; focusMessageId?: string }>();
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const conversationId = Array.isArray(params.id)
     ? (params.id[0] ?? "")
     : (params.id ?? "");
+  const focusMention = (Array.isArray(params.focusMention) ? params.focusMention[0] : params.focusMention) === "1";
+  const requestedFocusMessageId = Array.isArray(params.focusMessageId) ? params.focusMessageId[0] : params.focusMessageId;
   const { currentUser, accessToken } = useSession();
   const {
     getConversation: getServerConversation,
@@ -191,6 +194,9 @@ export default function ChatScreen() {
   const mountedRef = useRef(true);
   const submitUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedReadMessageId = useRef<string | null>(null);
+  const messageListRef = useRef<FlatList<ChatMessage>>(null);
+  const spotlightProgress = useRef(new Animated.Value(0)).current;
+  const [spotlightMessageId, setSpotlightMessageId] = useState<string | null>(null);
 
   const messages = useMemo(() => {
     const byId = new Map<string, ChatMessage>();
@@ -233,6 +239,10 @@ export default function ChatScreen() {
       )
       .slice(0, 5);
   }, [currentUser.id, members, mentionQuery]);
+  const mentionAliases = useMemo(() => {
+    const parts = currentUser.name.toLocaleLowerCase("fr").split(/\s+/).filter(Boolean);
+    return [parts[0] ?? "", currentUser.name.toLocaleLowerCase("fr"), currentUser.company.toLocaleLowerCase("fr")].filter(Boolean);
+  }, [currentUser.company, currentUser.name]);
   const latestIncomingMessage = messages.find((message) => !message.isMine);
   const smartReplies = useMemo(
     () => buildSmartReplySuggestions(latestIncomingMessage, currentUser),
@@ -277,6 +287,26 @@ export default function ChatScreen() {
     lastMarkedReadMessageId.current = latestMessageId;
     void markConversationRead(conversationId);
   }, [conversationId, latestMessageId, localOnly, markConversationRead]);
+
+  useEffect(() => {
+    if (!focusMention && !requestedFocusMessageId) return;
+    const targetId = requestedFocusMessageId && messages.some((message) => message.id === requestedFocusMessageId)
+      ? requestedFocusMessageId
+      : messages.find((message) => message.mentionedUserIds?.includes(currentUser.id) || (!message.isMine && mentionAliases.some((alias) => alias && message.body.toLocaleLowerCase("fr").includes(`@${alias}`))))?.id;
+    if (!targetId) return;
+    const index = messages.findIndex((message) => message.id === targetId);
+    if (index < 0) return;
+    setSpotlightMessageId(targetId);
+    spotlightProgress.stopAnimation();
+    spotlightProgress.setValue(0);
+    requestAnimationFrame(() => messageListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }));
+    Animated.sequence([
+      Animated.timing(spotlightProgress, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(spotlightProgress, { toValue: 0.35, duration: 520, useNativeDriver: true }),
+      Animated.timing(spotlightProgress, { toValue: 1, duration: 520, useNativeDriver: true }),
+      Animated.timing(spotlightProgress, { toValue: 0, duration: 900, useNativeDriver: true })
+    ]).start(({ finished }) => { if (finished) setSpotlightMessageId(null); });
+  }, [currentUser.id, focusMention, mentionAliases, messages, requestedFocusMessageId, spotlightProgress]);
 
   if (!conversation) {
     return (
@@ -333,7 +363,7 @@ export default function ChatScreen() {
       assertAttachmentBatch(next);
       setPendingAttachments(next);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Vocal indisponible",
         error instanceof Error
           ? error.message
@@ -379,7 +409,7 @@ export default function ChatScreen() {
       setReplyingTo(null);
     } catch (error) {
       appendPendingAttachment({ ...attachment, status: "failed" });
-      Alert.alert(
+      AppAlert.alert(
         "Envoi du vocal impossible",
         `${error instanceof Error ? error.message : "Le vocal n’a pas été envoyé."} Il reste disponible dans le brouillon.`
       );
@@ -393,7 +423,7 @@ export default function ChatScreen() {
     try {
       const remaining = MAX_MESSAGE_ATTACHMENTS - pendingAttachments.length;
       if (remaining <= 0) {
-        Alert.alert(
+        AppAlert.alert(
           "Limite atteinte",
           `${MAX_MESSAGE_ATTACHMENTS} contenus maximum par message.`
         );
@@ -405,7 +435,7 @@ export default function ChatScreen() {
       assertAttachmentBatch(next);
       setPendingAttachments(next);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Pièce jointe indisponible",
         error instanceof Error
           ? error.message
@@ -520,7 +550,7 @@ export default function ChatScreen() {
             current.length > 0 ? current : originalAttachments
           );
           setReplyingTo(originalReply);
-          Alert.alert(
+          AppAlert.alert(
             "Envoi impossible",
             error instanceof Error
               ? error.message
@@ -574,7 +604,7 @@ export default function ChatScreen() {
       setEphemeralMessages((previous) => [message, ...previous]);
       if (!localOnly && !env.mockMode) void loadMessages(conversation.id);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Sondage impossible",
         error instanceof Error ? error.message : "Le sondage n’a pas été publié."
       );
@@ -645,7 +675,7 @@ export default function ChatScreen() {
           ? { ...previous, [message.id]: currentPoll }
           : previous
       );
-      Alert.alert(
+      AppAlert.alert(
         "Vote impossible",
         error instanceof Error
           ? error.message
@@ -733,7 +763,7 @@ export default function ChatScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/call/[id]",
-                  params: { id: conversation.id, mode: "audio" }
+                  params: { id: conversation.id, mode: "audio", returnTo: `/chat/${encodeURIComponent(conversation.id)}` }
                 })
               }
               style={styles.callButton}
@@ -746,7 +776,7 @@ export default function ChatScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/call/[id]",
-                  params: { id: conversation.id, mode: "video" }
+                  params: { id: conversation.id, mode: "video", returnTo: `/chat/${encodeURIComponent(conversation.id)}` }
                 })
               }
               style={styles.callButton}
@@ -802,21 +832,19 @@ export default function ChatScreen() {
         </View>
       ) : (
         <FlatList
+          ref={messageListRef}
           accessibilityLabel={`Messages de ${conversation.name}`}
           data={messages}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              reactions={getMessageReactions(item)}
-              onRetry={(clientMessageId) => void retryMessage(clientMessageId)}
-              onReact={(message, emoji) => toggleMessageReaction(message, emoji)}
-              onReply={announcement ? undefined : setReplyingTo}
-              centered={announcement}
-              onOpenProfile={openMemberProfile}
-              onVotePoll={votePoll}
-            />
-          )}
+          renderItem={({ item }) => {
+            const spotlight = item.id === spotlightMessageId;
+            return (
+              <Animated.View style={[styles.messageSpotlight, spotlight && { borderColor: theme.orange, borderWidth: 2, backgroundColor: theme.orangeSoft, shadowColor: theme.violet, opacity: spotlightProgress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [1, 0.96, 1] }), transform: [{ scale: spotlightProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] }) }] }]}>
+                <MessageBubble message={item} reactions={getMessageReactions(item)} onRetry={(clientMessageId) => void retryMessage(clientMessageId)} onReact={(message, emoji) => toggleMessageReaction(message, emoji)} onReply={announcement ? undefined : setReplyingTo} centered={announcement} onOpenProfile={openMemberProfile} onVotePoll={votePoll} />
+              </Animated.View>
+            );
+          }}
+          onScrollToIndexFailed={({ index }) => setTimeout(() => messageListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }), 180)}
           style={styles.messageList}
           contentContainerStyle={styles.messages}
           inverted
@@ -1120,6 +1148,20 @@ export default function ChatScreen() {
               </Pressable>
               <Pressable
                 accessibilityRole="button"
+                accessibilityLabel="Recommander un contact"
+                onPress={() => {
+                  setAttachmentMenuOpen(false);
+                  router.push({ pathname: "/contact-actions", params: { intent: "message", conversationId: conversation.id } });
+                }}
+                style={styles.attachmentChoice}
+              >
+                <LinearGradient colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab} style={styles.attachmentChoiceIcon}>
+                  <Ionicons name="person-add-outline" size={23} color={theme.pageText} />
+                </LinearGradient>
+                <Text style={styles.attachmentChoiceText}>Recommander</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
                 accessibilityLabel="Créer un sondage"
                 onPress={() => {
                   setAttachmentMenuOpen(false);
@@ -1221,6 +1263,7 @@ const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
     paddingVertical: spacing.md,
     gap: 3
   },
+  messageSpotlight: { borderRadius: 20, padding: 0, shadowOpacity: 0.82, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: 5 },
   historyLoader: { minHeight: 52, alignItems: "center", justifyContent: "center" },
   empty: {
     ...typography.bodySmall,

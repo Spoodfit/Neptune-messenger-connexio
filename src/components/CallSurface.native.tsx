@@ -39,7 +39,10 @@ const NATIVE_CALL_BRIDGE = `
 true;
 `;
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function CallSurface({ session, displayName, onClose, onUnanswered }: CallSurfaceProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const html = useMemo(() => buildIntegratedCallHtml(session, displayName), [displayName, session]);
   const captionBootstrap = useMemo(() => buildLiveCaptionBootstrapScript(session, displayName), [displayName, session]);
   const injectedBootstrap = useMemo(() => `${captionBootstrap}\n${NATIVE_CALL_BRIDGE}`, [captionBootstrap]);
@@ -115,7 +118,7 @@ export default function CallSurface({ session, displayName, onClose, onUnanswere
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
-  webView: { flex: 1, backgroundColor: colors.background }
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.pageBackground },
+  webView: { flex: 1, backgroundColor: theme.pageBackground }
 });

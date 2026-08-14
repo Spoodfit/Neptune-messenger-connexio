@@ -90,7 +90,8 @@ export default function CallsScreen() {
           id: conversation.id,
           mode,
           ...(reason ? { reason } : {}),
-          ...(scheduled ? { scheduled: "1" } : {})
+          ...(scheduled ? { scheduled: "1" } : {}),
+          returnTo: "/(tabs)/calls"
         }
       });
     } finally {
