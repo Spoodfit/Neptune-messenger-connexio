@@ -46,7 +46,10 @@ jobs:
             package.json
             package-lock.json
             app/new-highlight.tsx
+            app/conversation/[id].tsx
+            app/highlight/[id].tsx
             src/screens/ChatConversationScreen.tsx
+            src/screens/NewConversationScreen.tsx
           retention-days: 1
 
   verify:
