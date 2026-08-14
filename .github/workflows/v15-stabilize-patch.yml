@@ -22,21 +22,26 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           calls = Path('app/(tabs)/calls.tsx')
           text = calls.read_text()
-          old = 'newAppointment: { minHeight: 38,'
-          if old not in text:
-              raise SystemExit('Calls target pattern not found')
-          calls.write_text(text.replace(old, 'newAppointment: { minHeight: 48,', 1))
+          patched, count = re.subn(r'(newAppointment\s*:\s*\{\s*minHeight\s*:\s*)38(\s*,)', r'\g<1>48\2', text, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one Calls target patch, got {count}')
+          calls.write_text(patched)
 
           audit = Path('scripts/visual-audit.cjs')
           text = audit.read_text()
-          old_case = '{ name: "Highlights 390", width: 390, height: 844, navigateLabel: "Temps forts", clickLabel: "Afficher la carte" },'
-          new_case = '{ name: "Highlights 390", width: 390, height: 844, navigateLabel: "Temps forts", clickText: "Map" },'
-          if old_case not in text:
-              raise SystemExit('Visual audit Map case not found')
-          text = text.replace(old_case, new_case, 1)
+          patched, count = re.subn(
+              r'(name:\s*"Highlights 390"[\s\S]*?navigateLabel:\s*"Temps forts"[\s\S]*?)clickLabel:\s*"Afficher la carte"',
+              r'\1clickText: "Map"',
+              text,
+              count=1
+          )
+          if count != 1:
+              raise SystemExit(f'Expected one visual Map case patch, got {count}')
+          text = patched
           old_runner = '''      if (testCase.clickLabel) {\n        await page.getByLabel(testCase.clickLabel).click();\n        await page.waitForTimeout(180);\n      }\n'''
           new_runner = '''      if (testCase.clickLabel) {\n        await page.getByLabel(testCase.clickLabel).click();\n        await page.waitForTimeout(180);\n      }\n      if (testCase.clickText) {\n        await page.getByText(testCase.clickText, { exact: true }).click();\n        await page.waitForTimeout(180);\n      }\n'''
           if old_runner not in text:
