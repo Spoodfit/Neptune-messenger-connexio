@@ -1,0 +1,49 @@
+name: V15 product audit diagnostic
+
+on:
+  push:
+    branches:
+      - feat/v15-ux-navigation-calls
+    paths:
+      - .github/workflows/v15-product-diagnostic.yml
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v15-ux-navigation-calls
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Build mock web application
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_BACKEND_CONTRACT: "connexio-v1"
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: "https://neptunebusiness.com"
+        run: npx expo export -p web --output-dir web-product-audit-dist
+      - name: Capture product audit output
+        run: |
+          set +e
+          node scripts/product-audit.cjs > v15-product-audit-diagnostic.log 2>&1
+          code=$?
+          echo "EXIT_CODE=$code" >> v15-product-audit-diagnostic.log
+          cat v15-product-audit-diagnostic.log
+          exit 0
+      - name: Commit diagnostic log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v15-product-audit-diagnostic.log
+          git commit -m "chore: capture V15 product audit output"
+          git push origin HEAD:feat/v15-ux-navigation-calls
