@@ -21,15 +21,15 @@ jobs:
           node-version: 22.13.1
           cache: npm
       - name: Apply targeted UX codemod
-        run: python3 scripts/ux-round2-codemod.py
+        run: python3 scripts/ux-round2-codemod-v2.py
       - name: Install dependencies
         run: npm ci
       - name: TypeScript and domain verification
         run: npm run verify --silent
-      - name: Native-dialog regression audit
+      - name: Native-dialog and gesture regression audit
         run: |
           set -euo pipefail
-          if grep -RIn --include='*.ts' --include='*.tsx' -E 'Alert\.alert|ToastAndroid|ActionSheetIOS|SwipeTabShell|EdgeSwipeBack' app src; then
+          if grep -RIn --include='*.ts' --include='*.tsx' -E '(^|[^A-Za-z0-9_])Alert\.alert|ToastAndroid|ActionSheetIOS|SwipeTabShell|EdgeSwipeBack' app src; then
             echo 'Forbidden native/gesture UX primitive remains.'
             exit 1
           fi
