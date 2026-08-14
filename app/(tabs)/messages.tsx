@@ -2,9 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { ConversationRow } from "@/components/ConversationRow";
 import { SwipeableConversationRow } from "@/components/SwipeableConversationRow";
 import { useExperience } from "@/providers/ExperienceProvider";
@@ -32,6 +33,7 @@ export default function MessagesScreen() {
   const presentationRevision = useConversationPresentationRevision();
   const [filter, setFilter] = useState<ConversationFilter>("groups");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<Conversation | null>(null);
 
   const mentionAliases = useMemo(() => {
     const [firstName = "", ...lastNameParts] = currentUser.name.toLocaleLowerCase("fr").split(/\s+/);
@@ -63,10 +65,6 @@ export default function MessagesScreen() {
     if (mentioned) markConversationMentionSeen(conversation);
     router.push({ pathname: "/chat/[id]", params: { id: conversation.id, ...(mentioned ? { focusMention: "1" } : {}) } });
   };
-  const confirmDeletePrivate = (conversation: Conversation) => Alert.alert(`Supprimer « ${conversation.name} » ?`, "La discussion disparaîtra de votre liste. Un nouveau message ou une nouvelle prise de contact pourra la faire réapparaître.", [
-    { text: "Annuler", style: "cancel" },
-    { text: "Supprimer", style: "destructive", onPress: () => removePrivateConversation(conversation.id) }
-  ]);
   const openDetails = () => {
     if (!selectedConversation) return;
     const route = isPrivateConversation(selectedConversation) ? `/conversation/${encodeURIComponent(selectedConversation.id)}` : `/group/${encodeURIComponent(selectedConversation.id)}`;
@@ -81,6 +79,11 @@ export default function MessagesScreen() {
     if (!selectedConversation) return;
     if (selectedConversation.id.startsWith("local-group-")) removeCreatedGroup(selectedConversation.id); else leaveConversation(selectedConversation.id);
     closeMenu();
+  };
+  const deletePrivateConversation = () => {
+    if (!deleteCandidate) return;
+    removePrivateConversation(deleteCandidate.id);
+    setDeleteCandidate(null);
   };
 
   if (!serviceAvailable) return (
@@ -109,7 +112,7 @@ export default function MessagesScreen() {
             const privateConversation = isPrivateConversation(item);
             const mentioned = matchesMention(item, mentionAliases) && !isConversationMentionSeen(item);
             const row = <ConversationRow conversation={item} members={members} mentioned={mentioned} muted={item.muted} onPress={() => openConversation(item)} onLongPress={() => setSelectedConversation(item)} />;
-            return privateConversation ? <SwipeableConversationRow enabled onDelete={() => confirmDeletePrivate(item)} onHide={() => hidePrivateConversation(item)}>{row}</SwipeableConversationRow> : row;
+            return privateConversation ? <SwipeableConversationRow enabled onDelete={() => setDeleteCandidate(item)} onHide={() => hidePrivateConversation(item)}>{row}</SwipeableConversationRow> : row;
           }}
           style={styles.listViewport}
           contentContainerStyle={[styles.list, sortedConversations.length === 0 && styles.emptyList]}
@@ -129,6 +132,17 @@ export default function MessagesScreen() {
           {selectedConversation && selectedConversation.type !== "direct" && selectedConversation.type !== "announcement" ? <Pressable style={[styles.sheetAction, styles.dangerAction]} onPress={leaveSelectedGroup}><Ionicons name="exit-outline" size={21} color={colors.danger} /><Text style={[styles.sheetActionText, styles.dangerText]}>Quitter le groupe</Text></Pressable> : null}
         </Pressable></Pressable>
       </Modal>
+
+      <ConfirmationDialog
+        visible={Boolean(deleteCandidate)}
+        icon="trash-outline"
+        destructive
+        title={deleteCandidate ? `Supprimer « ${deleteCandidate.name} » ?` : "Supprimer la conversation ?"}
+        message="La discussion disparaîtra de votre liste. Elle réapparaîtra si un nouveau message arrive ou si vous reprenez contact avec cette personne."
+        confirmLabel="Supprimer"
+        onCancel={() => setDeleteCandidate(null)}
+        onConfirm={deletePrivateConversation}
+      />
     </LinearGradient>
   );
 }
