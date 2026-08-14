@@ -2,6 +2,13 @@ import type { StandaloneStateKey, StandaloneStateStore } from "./standaloneStore
 
 const prefix = "connexio.standalone.";
 const memory = new Map<StandaloneStateKey, string>();
+const ALL_KEYS: StandaloneStateKey[] = [
+  "messaging",
+  "experience",
+  "group-admin",
+  "scheduled-calls",
+  "appearance"
+];
 
 function getStorage(): Storage | null {
   try {
@@ -37,7 +44,7 @@ export function createStandaloneStateStore(): StandaloneStateStore {
       memory.delete(key);
     },
     async purge(): Promise<void> {
-      for (const key of ["messaging", "experience", "group-admin"] as StandaloneStateKey[]) {
+      for (const key of ALL_KEYS) {
         getStorage()?.removeItem(keyFor(key));
         memory.delete(key);
       }
