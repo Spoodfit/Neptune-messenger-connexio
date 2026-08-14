@@ -15,6 +15,21 @@ Cette branche vise une candidate technique installable sur TestFlight et sur la 
 - absence de scripts, fragments Base64 et workflows de staging temporaires ;
 - contrats de traduction et de sous-titrage testés sans fournisseur secret embarqué dans l'application.
 
+## V15 — périmètre gelé avant fusion
+
+La passe V15 est considérée fonctionnellement gelée. Le candidat final doit conserver :
+
+- avatars circulaires et anneaux de statut cohérents sur les surfaces principales ;
+- navigation tactile, actions rapides et swipes sans collision avec les gestes locaux ;
+- hub Appels, programmation, objet obligatoire et rappels ;
+- sélection explicite d'un contact appareil sans écriture dans le carnet ;
+- modes Système, Sombre et Clair persistants ;
+- icônes natives complètes, dont les variantes iOS et l'icône de notification Android ;
+- safe-zone de l'icône adaptive Android contrôlée automatiquement ;
+- aucune ressource ou workflow temporaire de diagnostic dans l'arbre final.
+
+Aucune nouvelle fonctionnalité ne doit être ajoutée avant fusion. Seules les corrections nécessaires pour obtenir CI, responsive-audit et Product Audit verts sont autorisées.
+
 ## Validations externes obligatoires avant soumission publique
 
 - environnement Neptune de préproduction réel ;
