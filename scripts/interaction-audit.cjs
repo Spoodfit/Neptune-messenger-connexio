@@ -65,10 +65,10 @@ async function run() {
     check((await groupTab.getAttribute("aria-selected")) === "true", "Onglet Groupes actif");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
-    const mapTab = page.getByRole("tab", { name: "Map" });
+    const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
     await mapTab.click();
     check((await mapTab.getAttribute("aria-selected")) === "true", "Onglet Map actif");
-    const feedTab = page.getByRole("tab", { name: "Feed" });
+    const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
     await feedTab.click();
     check((await feedTab.getAttribute("aria-selected")) === "true", "Onglet Feed actif");
 
