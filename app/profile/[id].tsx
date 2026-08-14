@@ -87,7 +87,7 @@ export default function MemberProfileScreen() {
   const startCall = async (mode: "audio" | "video") => {
     if (opening) return;
     setOpening(true);
-    try { const conversation = await ensureConversation(); router.push({ pathname: "/call/[id]", params: { id: conversation.id, mode } }); }
+    try { const conversation = await ensureConversation(); router.push({ pathname: "/call/[id]", params: { id: conversation.id, mode, returnTo: `/profile/${encodeURIComponent(member.id)}` } }); }
     catch (error) { AppAlert.alert("Appel impossible", error instanceof Error ? error.message : "Réessayez ultérieurement."); }
     finally { setOpening(false); }
   };

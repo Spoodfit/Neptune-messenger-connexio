@@ -81,7 +81,7 @@ export default function HighlightsScreen() {
     try {
       const conversation = await ensureSelectedConversation();
       if (action === "message") router.push(`/chat/${encodeURIComponent(conversation.id)}`);
-      else router.push({ pathname: "/call/[id]", params: { id: conversation.id, mode: action } });
+      else router.push({ pathname: "/call/[id]", params: { id: conversation.id, mode: action, returnTo: "/(tabs)/highlights" } });
     } finally { setOpeningAction(false); }
   };
   const openPost = (postId: string) => router.push(`/highlight/${encodeURIComponent(postId)}`);

@@ -763,7 +763,7 @@ export default function ChatScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/call/[id]",
-                  params: { id: conversation.id, mode: "audio" }
+                  params: { id: conversation.id, mode: "audio", returnTo: `/chat/${encodeURIComponent(conversation.id)}` }
                 })
               }
               style={styles.callButton}
@@ -776,7 +776,7 @@ export default function ChatScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/call/[id]",
-                  params: { id: conversation.id, mode: "video" }
+                  params: { id: conversation.id, mode: "video", returnTo: `/chat/${encodeURIComponent(conversation.id)}` }
                 })
               }
               style={styles.callButton}

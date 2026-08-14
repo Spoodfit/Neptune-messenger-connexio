@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 
-const HIDDEN_ROOTS = new Set(["(tabs)", "sign-in", "access-help"]);
+const HIDDEN_ROOTS = new Set(["(tabs)", "sign-in", "access-help", "call"]);
 
 function fallbackFor(root?: string): "/(tabs)/messages" | "/(tabs)/highlights" | "/(tabs)/calls" | "/(tabs)/settings" {
   if (root === "highlight" || root === "new-highlight") return "/(tabs)/highlights";

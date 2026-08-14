@@ -38,6 +38,7 @@ export default function CallRoomScreen() {
     callerName?: string;
     reason?: string;
     scheduled?: string;
+    returnTo?: string;
   }>();
   const { accessToken, currentUser } = useSession();
   const { getConversation, sendMessage } = useMessaging();
@@ -50,6 +51,10 @@ export default function CallRoomScreen() {
   const callerName = first(params.callerName) ?? "Un membre Neptune";
   const initialReason = first(params.reason) ?? "";
   const scheduled = first(params.scheduled) === "1" && initialReason.trim().length >= 3;
+  const requestedReturnTo = first(params.returnTo);
+  const returnTo = requestedReturnTo && requestedReturnTo.startsWith("/") && !requestedReturnTo.startsWith("/call/")
+    ? requestedReturnTo
+    : conversationId ? `/chat/${encodeURIComponent(conversationId)}` : "/(tabs)/calls";
   const conversation = getConversation(conversationId);
   const remoteMember = (conversation?.memberIds ?? [])
     .map((memberId) => members.find((member) => member.id === memberId))
@@ -87,7 +92,7 @@ export default function CallRoomScreen() {
     setSession(null);
     if (activeSession) playCallEnd();
     if (api && activeSession && !activeSession.mock) await api.endCall(activeSession.id).catch(() => undefined);
-    router.replace(conversationId ? `/chat/${encodeURIComponent(conversationId)}` : "/(tabs)/calls");
+    router.replace(returnTo as never);
   };
 
   const startOutgoingCall = async () => {

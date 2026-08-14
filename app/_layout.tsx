@@ -113,7 +113,7 @@ function AuthenticatedApp() {
       if (data.type === "scheduled_call_due" && typeof data.conversationId === "string") {
         processedNotificationResponseId.current = responseId;
         void Notifications.clearLastNotificationResponseAsync();
-        router.push({ pathname: "/call/[id]", params: { id: data.conversationId, mode: data.mode === "audio" ? "audio" : "video", reason: typeof data.reason === "string" ? data.reason : "Appel programmé", scheduled: "1", autoStart: env.mockMode ? "1" : "0" } });
+        router.push({ pathname: "/call/[id]", params: { id: data.conversationId, mode: data.mode === "audio" ? "audio" : "video", reason: typeof data.reason === "string" ? data.reason : "Appel programmé", scheduled: "1", autoStart: env.mockMode ? "1" : "0", returnTo: "/(tabs)/calls" } });
         return;
       }
       if (!BACKEND_CAPABILITIES.messaging) return;
