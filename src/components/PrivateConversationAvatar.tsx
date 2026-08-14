@@ -1,31 +1,107 @@
-import { Image, StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme";
-import type { AppUser, Conversation } from "../types/messaging";
+import { StyleSheet, Text, View } from "react-native";
 
-export function PrivateConversationAvatar({ conversation, members, currentUserId, size = 50 }: { conversation: Conversation; members: readonly AppUser[]; currentUserId: string; size?: number }) {
-  const participants = (conversation.memberIds ?? []).map((id) => members.find((member) => member.id === id)).filter((member): member is AppUser => Boolean(member));
-  const visible = conversation.type === "direct" ? [participants.find((member) => member.id !== currentUserId) ?? participants[0]].filter((member): member is AppUser => Boolean(member)) : participants.slice(0, 4);
-  const grid = visible.length > 1;
-  const half = size / 2;
+import { getRoleAppearance } from "../domain/roleAppearance";
+import type { AppUser, Conversation } from "../types/messaging";
+import { StatusAvatar } from "./StatusAvatar";
+
+interface Props {
+  conversation: Conversation;
+  members: readonly AppUser[];
+  currentUserId: string;
+  size?: number;
+}
+
+type AvatarSlot = { size: number; left: number; top: number; zIndex: number };
+
+function slotsFor(count: number, size: number): AvatarSlot[] {
+  if (count <= 1) return [{ size, left: 0, top: 0, zIndex: 4 }];
+  if (count === 2) {
+    const avatar = Math.round(size * 0.72);
+    return [
+      { size: avatar, left: 0, top: Math.round((size - avatar) / 2), zIndex: 3 },
+      { size: avatar, left: size - avatar, top: Math.round((size - avatar) / 2), zIndex: 4 }
+    ];
+  }
+  if (count === 3) {
+    const avatar = Math.round(size * 0.62);
+    return [
+      { size: avatar, left: Math.round((size - avatar) / 2), top: 0, zIndex: 5 },
+      { size: avatar, left: 0, top: size - avatar, zIndex: 3 },
+      { size: avatar, left: size - avatar, top: size - avatar, zIndex: 4 }
+    ];
+  }
+  const avatar = Math.round(size * 0.57);
+  return [
+    { size: avatar, left: 0, top: 0, zIndex: 3 },
+    { size: avatar, left: size - avatar, top: 0, zIndex: 4 },
+    { size: avatar, left: 0, top: size - avatar, zIndex: 5 },
+    { size: avatar, left: size - avatar, top: size - avatar, zIndex: 6 }
+  ];
+}
+
+export function PrivateConversationAvatar({ conversation, members, currentUserId, size = 52 }: Props) {
+  const participants = (conversation.memberIds ?? [])
+    .map((id) => members.find((member) => member.id === id))
+    .filter((member): member is AppUser => Boolean(member));
+
+  if (conversation.type === "direct") {
+    const member = participants.find((item) => item.id !== currentUserId) ?? participants[0];
+    if (member) return <StatusAvatar user={member} size={size} accessible={false} ringWidth={3} />;
+  }
+
+  const visible = participants.slice(0, 4);
+  const slots = slotsFor(visible.length, size);
+  if (visible.length === 0) {
+    const appearance = getRoleAppearance("free");
+    return (
+      <View accessibilityElementsHidden style={[styles.fallback, { width: size, height: size, borderRadius: size / 2, borderColor: appearance.foreground }]}>
+        <Text style={[styles.fallbackText, { color: appearance.foreground }]}>N</Text>
+      </View>
+    );
+  }
+
   return (
-    <View accessibilityElementsHidden style={[styles.shell, grid && styles.grid, { width: size, height: size, borderRadius: Math.round(size * 0.3) }]}>
-      {visible.map((member, index) => (
-        <View key={member.id} style={[styles.cell, grid ? { width: half, height: visible.length === 2 ? size : half } : styles.full, grid && (index === 0 || index === 2) && styles.rightDivider, visible.length > 2 && index < 2 && styles.bottomDivider]}>
-          {member.avatarUrl ? <Image source={{ uri: member.avatarUrl }} resizeMode="cover" style={styles.image} /> : <Text style={styles.initials}>{member.initials}</Text>}
-        </View>
-      ))}
-      {visible.length === 3 ? <View style={[styles.cell, { width: half, height: half }]}><Text style={styles.initials}>+</Text></View> : null}
+    <View
+      accessibilityElementsHidden
+      style={[styles.stage, { width: size, height: size }]}
+    >
+      {visible.map((member, index) => {
+        const slot = slots[index]!;
+        return (
+          <View
+            key={member.id}
+            style={[
+              styles.absolute,
+              {
+                left: slot.left,
+                top: slot.top,
+                zIndex: slot.zIndex
+              }
+            ]}
+          >
+            <StatusAvatar
+              user={member}
+              size={slot.size}
+              ringWidth={Math.max(2, slot.size * 0.07)}
+              accessible={false}
+            />
+          </View>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: { overflow: "hidden", flexShrink: 0, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  grid: { flexDirection: "row", flexWrap: "wrap" },
-  cell: { overflow: "hidden", backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  full: { width: "100%", height: "100%" },
-  image: { width: "100%", height: "100%" },
-  initials: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  rightDivider: { borderRightWidth: 1, borderRightColor: colors.background },
-  bottomDivider: { borderBottomWidth: 1, borderBottomColor: colors.background }
+  stage: {
+    position: "relative",
+    flexShrink: 0
+  },
+  absolute: { position: "absolute" },
+  fallback: {
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  fallbackText: { fontSize: 14, fontWeight: "900" }
 });
