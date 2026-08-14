@@ -17,6 +17,7 @@ export interface CallAppointment {
   status: CallAppointmentStatus;
   requestedByCurrentUser: boolean;
   invitedContactName?: string;
+  reminderIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
