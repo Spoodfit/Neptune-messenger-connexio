@@ -5,11 +5,12 @@ import { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 
-import { EdgeSwipeBack } from "../src/components/EdgeSwipeBack";
+import { FloatingBackButton } from "../src/components/FloatingBackButton";
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
 import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
+import { LanguageProvider } from "../src/providers/LanguageProvider";
 import { MessagingProvider } from "../src/providers/MessagingProvider";
 import { ScheduledCallsProvider } from "../src/providers/ScheduledCallsProvider";
 import { SessionProvider, useSession } from "../src/providers/SessionProvider";
@@ -22,6 +23,7 @@ import {
   registrationFromDevicePushToken,
   rememberRegisteredPushToken
 } from "../src/services/notifications/pushNotifications";
+import { AppAlertHost } from "../src/services/ui/AppAlert";
 import { colors } from "../src/theme";
 import type { PushTokenRegistration } from "../src/types/messaging";
 
@@ -32,15 +34,26 @@ const CALLS_AVAILABLE = env.mockMode || BACKEND_CAPABILITIES.calls;
 const PUBLIC_ROUTES = new Set(["sign-in", "access-help", "privacy"]);
 const MESSAGING_ROUTES = new Set(["chat", "conversation", "group", "new-conversation", "schedule-message"]);
 
-function chatPath(conversationId: string): `/chat/${string}` {
-  return `/chat/${encodeURIComponent(conversationId)}`;
+type PendingChatTarget = { conversationId: string; messageId?: string; focusMention?: boolean };
+
+function openChatTarget(target: PendingChatTarget, replace = false) {
+  const navigation = {
+    pathname: "/chat/[id]" as const,
+    params: {
+      id: target.conversationId,
+      ...(target.messageId ? { focusMessageId: target.messageId } : {}),
+      ...(target.focusMention ? { focusMention: "1" } : {})
+    }
+  };
+  if (replace) router.replace(navigation);
+  else router.push(navigation);
 }
 
 function AuthenticatedApp() {
   const { sessionReady, isAuthenticated, accessToken, currentUser, getAccessToken } = useSession();
   const theme = useAppTheme();
   const segments = useSegments();
-  const pendingConversationId = useRef<string | null>(null);
+  const pendingChatTarget = useRef<PendingChatTarget | null>(null);
   const processedNotificationResponseId = useRef<string | null>(null);
   const hasAccessToken = Boolean(accessToken);
   const currentRootSegment = segments[0];
@@ -52,10 +65,10 @@ function AuthenticatedApp() {
 
   useEffect(() => {
     if (!sessionReady || !isAuthenticated) return;
-    const conversationId = pendingConversationId.current;
-    if (conversationId) {
-      pendingConversationId.current = null;
-      router.replace(chatPath(conversationId));
+    const target = pendingChatTarget.current;
+    if (target) {
+      pendingChatTarget.current = null;
+      openChatTarget(target, true);
       return;
     }
     if (onSignInRoute) router.replace(MESSAGING_AVAILABLE ? "/(tabs)/messages" : "/(tabs)/highlights");
@@ -106,13 +119,18 @@ function AuthenticatedApp() {
       if (!BACKEND_CAPABILITIES.messaging) return;
       const conversationId = data.conversationId;
       if (typeof conversationId !== "string" || !conversationId.trim()) return;
+      const target: PendingChatTarget = {
+        conversationId: conversationId.trim(),
+        messageId: typeof data.messageId === "string" && data.messageId.trim() ? data.messageId.trim() : undefined,
+        focusMention: data.type === "mention" || data.type === "message_mention" || data.mention === true
+      };
       processedNotificationResponseId.current = responseId;
-      pendingConversationId.current = conversationId.trim();
+      pendingChatTarget.current = target;
       void Notifications.clearLastNotificationResponseAsync();
       if (!sessionReady) return;
       if (isAuthenticated) {
-        pendingConversationId.current = null;
-        router.push(chatPath(conversationId.trim()));
+        pendingChatTarget.current = null;
+        openChatTarget(target);
       } else router.replace("/sign-in");
     };
     void Notifications.getLastNotificationResponseAsync().then(openNotificationTarget).catch(() => undefined);
@@ -123,10 +141,12 @@ function AuthenticatedApp() {
   if (!sessionReady) return <View style={[styles.loading, { backgroundColor: theme.pageBackground }]} accessibilityLabel="Chargement de Connexio"><ActivityIndicator size="large" color={colors.primary} /></View>;
 
   const applicationStack = (
-    <EdgeSwipeBack>
+    <>
       <StatusBar style={theme.isLight ? "dark" : "light"} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: Platform.OS === "web" ? "fade" : "default" }} />
-    </EdgeSwipeBack>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: "fade" }} />
+      <FloatingBackButton />
+      <AppAlertHost />
+    </>
   );
 
   if (!isAuthenticated) {
@@ -139,7 +159,7 @@ function AuthenticatedApp() {
 }
 
 export default function RootLayout() {
-  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><ThemeProvider><SessionProvider><AuthenticatedApp /></SessionProvider></ThemeProvider></SafeAreaProvider>;
+  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><ThemeProvider><LanguageProvider><SessionProvider><AuthenticatedApp /></SessionProvider></LanguageProvider></ThemeProvider></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({ loading: { flex: 1, alignItems: "center", justifyContent: "center" } });
