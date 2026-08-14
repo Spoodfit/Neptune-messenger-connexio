@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useSegments } from "expo-router";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppTheme } from "../providers/ThemeProvider";
@@ -27,30 +27,64 @@ export function FloatingBackButton() {
   };
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Retour à l’écran précédent"
-      onPress={goBack}
-      style={({ pressed }) => [
-        styles.button,
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.dock,
         {
-          left: Math.max(12, insets.left + 12),
-          bottom: Math.max(92, insets.bottom + 86),
-          backgroundColor: theme.shellBackground,
-          borderColor: theme.border,
-          shadowColor: theme.shadow
-        },
-        pressed && styles.pressed
+          minHeight: 58 + Math.max(insets.bottom, 4),
+          paddingBottom: Math.max(insets.bottom, 4),
+          backgroundColor: theme.pageBackground,
+          borderTopColor: theme.borderSoft
+        }
       ]}
     >
-      <Ionicons name="arrow-back" size={18} color={theme.pageText} />
-      <Text style={[styles.label, { color: theme.pageText }]}>Retour</Text>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Retour à l’écran précédent"
+        onPress={goBack}
+        style={({ pressed }) => [
+          styles.button,
+          {
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+            shadowColor: theme.shadow
+          },
+          pressed && styles.pressed
+        ]}
+      >
+        <Ionicons name="arrow-back" size={18} color={theme.pageText} />
+        <Text style={[styles.label, { color: theme.pageText }]}>Retour</Text>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  button: { position: "absolute", zIndex: 5000, elevation: 32, minWidth: 94, height: 48, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
+  dock: {
+    flexShrink: 0,
+    width: "100%",
+    paddingHorizontal: 12,
+    paddingTop: 5,
+    borderTopWidth: 1,
+    alignItems: "flex-start",
+    justifyContent: "flex-start"
+  },
+  button: {
+    minWidth: 96,
+    height: 48,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    elevation: 4,
+    shadowOpacity: 0.11,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 3 }
+  },
   label: { fontSize: 12, fontWeight: "900" },
   pressed: { opacity: 0.78, transform: [{ scale: 0.97 }] }
 });
