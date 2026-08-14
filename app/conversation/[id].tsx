@@ -9,10 +9,14 @@ import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 import { StatusAvatar } from "@/components/StatusAvatar";
+import { ThemeModeButton } from "@/components/ThemeModeButton";
+import { type ConnexioTheme, useAppTheme } from "@/providers/ThemeProvider";
 
 export default function ConversationInfoScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const id = Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "");
   const { currentUser } = useSession();
   const { getConversation: getServerConversation } = useMessaging();
@@ -28,7 +32,7 @@ export default function ConversationInfoScreen() {
 
   if (!conversation) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.missing}>
+      <LinearGradient colors={theme.pageGradient} style={styles.missing}>
         <Text style={styles.title}>Conversation introuvable</Text>
         <Pressable onPress={() => router.replace("/(tabs)/messages")} style={styles.primaryButton}>
           <Text style={styles.primaryText}>Retour aux messages</Text>
@@ -68,7 +72,7 @@ export default function ConversationInfoScreen() {
   }
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.screen}>
+    <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <View
         style={[
           styles.header,
@@ -80,10 +84,10 @@ export default function ConversationInfoScreen() {
         ]}
       >
         <Pressable onPress={() => router.back()} style={styles.headerButton}>
-          <Ionicons name="chevron-back" size={25} color={colors.text} />
+          <Ionicons name="chevron-back" size={25} color={theme.pageText} />
         </Pressable>
         <Text style={styles.headerTitle}>Informations</Text>
-        <View style={styles.headerButton} />
+        <ThemeModeButton />
       </View>
 
       <ScrollView
@@ -94,7 +98,7 @@ export default function ConversationInfoScreen() {
       >
         <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
           <View style={styles.avatarInner}>
-            <Ionicons name="people" size={36} color={colors.text} />
+            <Ionicons name="people" size={36} color={theme.pageText} />
           </View>
         </LinearGradient>
         <Text style={styles.title}>{conversation.name}</Text>
@@ -107,7 +111,7 @@ export default function ConversationInfoScreen() {
             onPress={() => router.replace(`/chat/${encodeURIComponent(id)}`)}
             style={styles.action}
           >
-            <Ionicons name="chatbubble-outline" size={21} color={colors.text} />
+            <Ionicons name="chatbubble-outline" size={21} color={theme.pageText} />
             <Text style={styles.actionText}>Messages</Text>
           </Pressable>
           <Pressable
@@ -117,14 +121,14 @@ export default function ConversationInfoScreen() {
             <Ionicons
               name={conversation.muted ? "notifications" : "notifications-off"}
               size={21}
-              color={colors.text}
+              color={theme.pageText}
             />
             <Text style={styles.actionText}>
               {conversation.muted ? "Réactiver" : "Sourdine"}
             </Text>
           </Pressable>
           <Pressable onPress={leave} style={styles.action}>
-            <Ionicons name="exit-outline" size={21} color={colors.danger} />
+            <Ionicons name="exit-outline" size={21} color={theme.danger} />
             <Text style={[styles.actionText, styles.danger]}>Quitter</Text>
           </Pressable>
         </View>
@@ -147,13 +151,13 @@ export default function ConversationInfoScreen() {
                   {member.company} · {member.roleLabel}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={18} color={theme.pageTextMuted} />
             </Pressable>
           ))}
         </View>
 
         <View style={styles.note}>
-          <Ionicons name="lock-closed-outline" size={19} color={colors.success} />
+          <Ionicons name="lock-closed-outline" size={19} color={theme.success} />
           <Text style={styles.noteText}>
             La limite de quatre contacts, les invitations, les départs et les droits d’administration doivent être validés côté serveur.
           </Text>
@@ -163,32 +167,32 @@ export default function ConversationInfoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
   screen: { flex: 1 },
   header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
   headerButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, textAlign: "center" },
+  headerTitle: { ...typography.heading3, color: theme.pageText, flex: 1, textAlign: "center" },
   content: { width: "100%", maxWidth: 640, alignSelf: "center", paddingHorizontal: spacing.md, alignItems: "center" },
   avatarShell: { width: 84, height: 84, borderRadius: 29, padding: 3, marginTop: spacing.md },
-  avatarInner: { flex: 1, borderRadius: 26, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface },
-  title: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 12 },
-  subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3, textAlign: "center" },
+  avatarInner: { flex: 1, borderRadius: 26, backgroundColor: theme.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: theme.surface },
+  title: { ...typography.heading2, color: theme.pageText, textAlign: "center", marginTop: 12 },
+  subtitle: { ...typography.caption, color: theme.pageTextMuted, marginTop: 3, textAlign: "center" },
   actions: { width: "100%", marginTop: spacing.lg, flexDirection: "row", gap: 8 },
-  action: { flex: 1, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 8 },
-  actionText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
-  danger: { color: colors.danger },
-  sectionTitle: { ...typography.heading3, color: colors.text, alignSelf: "flex-start", marginTop: spacing.lg, marginBottom: 8 },
-  panel: { width: "100%", borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, overflow: "hidden" },
+  action: { flex: 1, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", gap: 8 },
+  actionText: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "800" },
+  danger: { color: theme.danger },
+  sectionTitle: { ...typography.heading3, color: theme.pageText, alignSelf: "flex-start", marginTop: spacing.lg, marginBottom: 8 },
+  panel: { width: "100%", borderRadius: radii.xl, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, overflow: "hidden" },
   memberRow: { minHeight: 68, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  divider: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  memberAvatar: { width: 42, height: 42, borderRadius: 14, overflow: "hidden", backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  divider: { borderBottomWidth: 1, borderBottomColor: theme.borderSoft },
+  memberAvatar: { width: 42, height: 42, borderRadius: 14, overflow: "hidden", backgroundColor: theme.accentSoft, alignItems: "center", justifyContent: "center" },
   image: { width: "100%", height: "100%" },
-  initials: { color: colors.text, fontWeight: "900" },
+  initials: { color: theme.pageText, fontWeight: "900" },
   memberContent: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 14, fontWeight: "900" },
-  memberMeta: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-  note: { width: "100%", marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.lg, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  noteText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
+  memberName: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  memberMeta: { color: theme.pageTextMuted, fontSize: 11, marginTop: 2 },
+  note: { width: "100%", marginTop: spacing.lg, padding: spacing.md, borderRadius: radii.lg, backgroundColor: theme.successSoft, flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  noteText: { ...typography.bodySmall, color: theme.pageTextSecondary, flex: 1 },
   missing: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
   primaryButton: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   primaryText: { color: colors.white, fontWeight: "900" }

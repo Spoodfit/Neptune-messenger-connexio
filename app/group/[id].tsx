@@ -19,6 +19,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MemberAvatarStack } from "@/components/MemberAvatarStack";
 import { MemberStatusBadge } from "@/components/MemberStatusBadge";
 import { StatusAvatar } from "@/components/StatusAvatar";
+import { ThemeModeButton } from "@/components/ThemeModeButton";
+import { type ConnexioTheme, useAppTheme } from "@/providers/ThemeProvider";
 import { SwipeableMemberRow } from "@/components/SwipeableMemberRow";
 import { env } from "@/config/env";
 import {
@@ -63,6 +65,8 @@ function first(value?: string | string[]): string {
 export default function GroupSettingsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const id = first(params.id);
   const { currentUser, accessToken } = useSession();
   const { getConversation: getServerConversation, refreshConversations } = useMessaging();
@@ -182,8 +186,8 @@ export default function GroupSettingsScreen() {
 
   if (!conversation) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.center}>
-        <Ionicons name="people-outline" size={42} color={colors.textMuted} />
+      <LinearGradient colors={theme.pageGradient} style={styles.center}>
+        <Ionicons name="people-outline" size={42} color={theme.pageTextMuted} />
         <Text style={styles.title}>Groupe introuvable</Text>
         <Text style={styles.mutedText}>
           Le groupe est supprimé, masqué ou votre statut ne permet plus d’y accéder.
@@ -414,7 +418,7 @@ export default function GroupSettingsScreen() {
   };
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.screen}>
+    <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <View
         style={[
           styles.header,
@@ -426,9 +430,10 @@ export default function GroupSettingsScreen() {
         ]}
       >
         <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={() => router.back()} style={styles.headerButton}>
-          <Ionicons name="chevron-back" size={25} color={colors.text} />
+          <Ionicons name="chevron-back" size={25} color={theme.pageText} />
         </Pressable>
         <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>Informations du groupe</Text>
+        <ThemeModeButton />
         {canEditSettings ? (
           <Pressable
             accessibilityRole="button"
@@ -438,11 +443,11 @@ export default function GroupSettingsScreen() {
             onPress={() => void save()}
             style={[styles.saveButton, !hasChanges && styles.saveDisabled]}
           >
-            {saving ? <ActivityIndicator size="small" color={colors.orange} /> : <Text style={styles.saveText}>Enregistrer</Text>}
+            {saving ? <ActivityIndicator size="small" color={theme.orange} /> : <Text style={styles.saveText}>Enregistrer</Text>}
           </Pressable>
         ) : (
           <Pressable accessibilityRole="button" accessibilityLabel="Signaler le groupe" onPress={reportGroup} style={styles.headerButton}>
-            <Ionicons name="flag-outline" size={21} color={colors.textMuted} />
+            <Ionicons name="flag-outline" size={21} color={theme.pageTextMuted} />
           </Pressable>
         )}
       </View>
@@ -460,7 +465,7 @@ export default function GroupSettingsScreen() {
       >
         {savedAt ? (
           <View style={styles.savedBanner}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+            <Ionicons name="checkmark-circle" size={18} color={theme.success} />
             <Text style={styles.savedText}>Enregistré à {savedAt}</Text>
           </View>
         ) : null}
@@ -474,13 +479,13 @@ export default function GroupSettingsScreen() {
           >
             <LinearGradient colors={gradients.primaryWarm} style={styles.avatarShell}>
               <View style={styles.avatarInner}>
-                {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <Ionicons name={isAnnouncement ? "megaphone" : iconName} size={34} color={colors.text} />}
+                {avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImage} /> : <Ionicons name={isAnnouncement ? "megaphone" : iconName} size={34} color={theme.pageText} />}
                 {canEditSettings ? <View style={styles.cropBadge}><Ionicons name="crop-outline" size={14} color={colors.white} /></View> : null}
               </View>
             </LinearGradient>
           </Pressable>
           <Text style={styles.groupName}>{conversation.name}</Text>
-          {isAnnouncement ? <View style={styles.announcementBadge}><Ionicons name="megaphone" size={14} color={colors.orange} /><Text style={styles.announcementText}>Annonces officielles · réactions autorisées</Text></View> : null}
+          {isAnnouncement ? <View style={styles.announcementBadge}><Ionicons name="megaphone" size={14} color={theme.orange} /><Text style={styles.announcementText}>Annonces officielles · réactions autorisées</Text></View> : null}
           <MemberAvatarStack memberIds={activeMemberIds} members={members} memberCount={exactMemberCount} maxVisible={7} size={28} />
           <Text style={styles.groupMeta}>{exactMemberCount} membre{exactMemberCount > 1 ? "s" : ""} · {conversation.categoryLabel}</Text>
           {conversation.description ? <Text style={styles.description}>{conversation.description}</Text> : null}
@@ -488,27 +493,27 @@ export default function GroupSettingsScreen() {
 
         <View style={styles.quickActions}>
           <Pressable accessibilityRole="button" onPress={() => toggleConversationMuted(id)} style={styles.quickAction}>
-            <Ionicons name={conversation.muted ? "notifications" : "notifications-off"} size={21} color={colors.text} />
+            <Ionicons name={conversation.muted ? "notifications" : "notifications-off"} size={21} color={theme.pageText} />
             <Text style={styles.quickLabel}>{conversation.muted ? "Réactiver" : "Sourdine"}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => router.replace(`/chat/${encodeURIComponent(id)}`)} style={styles.quickAction}>
-            <Ionicons name="chatbubble-outline" size={21} color={colors.text} />
+            <Ionicons name="chatbubble-outline" size={21} color={theme.pageText} />
             <Text style={styles.quickLabel}>Messages</Text>
           </Pressable>
           {canUseAutomations ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les automatisations du groupe" onPress={() => router.push(`/schedule-message/${encodeURIComponent(id)}`)} style={styles.quickAction}>
-              <Ionicons name="repeat-outline" size={21} color={colors.orange} />
+              <Ionicons name="repeat-outline" size={21} color={theme.orange} />
               <Text style={styles.quickLabel}>Automatisations</Text>
             </Pressable>
           ) : null}
           <Pressable accessibilityRole="button" onPress={leave} style={styles.quickAction}>
-            <Ionicons name="exit-outline" size={21} color={colors.danger} />
+            <Ionicons name="exit-outline" size={21} color={theme.danger} />
             <Text style={[styles.quickLabel, styles.dangerText]}>Quitter</Text>
           </Pressable>
         </View>
 
         <View style={styles.governanceNote}>
-          <Ionicons name="shield-checkmark" size={18} color={colors.orange} />
+          <Ionicons name="shield-checkmark" size={18} color={theme.orange} />
           <Text style={styles.governanceText}>
             Les Visionnaires administrent tous les groupes. Les Amiraux et Capitaines nommés responsables peuvent gérer les membres et les automatisations de ce groupe.
           </Text>
@@ -570,9 +575,9 @@ export default function GroupSettingsScreen() {
             <Text style={styles.sectionTitle}>Administration Visionnaire</Text>
             <View style={styles.panelForm}>
               <Text style={styles.fieldLabel}>Nom</Text>
-              <TextInput value={name} onChangeText={(value) => { setName(value); setSavedAt(null); }} style={styles.input} placeholderTextColor={colors.textMuted} maxLength={70} />
+              <TextInput value={name} onChangeText={(value) => { setName(value); setSavedAt(null); }} style={styles.input} placeholderTextColor={theme.pageTextMuted} maxLength={70} />
               <Text style={styles.fieldLabel}>Description</Text>
-              <TextInput value={description} onChangeText={(value) => { setDescription(value); setSavedAt(null); }} style={[styles.input, styles.multiline]} placeholder="Description du groupe" placeholderTextColor={colors.textMuted} multiline maxLength={240} />
+              <TextInput value={description} onChangeText={(value) => { setDescription(value); setSavedAt(null); }} style={[styles.input, styles.multiline]} placeholder="Description du groupe" placeholderTextColor={theme.pageTextMuted} multiline maxLength={240} />
 
               <Text style={styles.fieldLabel}>Icône de remplacement</Text>
               <View style={styles.iconGrid}>
@@ -580,7 +585,7 @@ export default function GroupSettingsScreen() {
                   const selected = iconName === icon;
                   return (
                     <Pressable key={icon} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => { setIconName(icon); setSavedAt(null); }} style={[styles.iconChoice, selected && styles.iconChoiceSelected]}>
-                      <Ionicons name={icon} size={22} color={selected ? colors.orange : colors.textMuted} />
+                      <Ionicons name={icon} size={22} color={selected ? theme.orange : theme.pageTextMuted} />
                     </Pressable>
                   );
                 })}
@@ -599,10 +604,10 @@ export default function GroupSettingsScreen() {
                       onPress={() => toggleRole(role)}
                       style={[
                         styles.roleChip,
-                        { borderColor: appearance.border, backgroundColor: selected ? appearance.background : colors.surfaceStrong }
+                        { borderColor: appearance.border, backgroundColor: selected ? appearance.background : theme.surfaceStrong }
                       ]}
                     >
-                      <Text style={[styles.roleText, { color: selected ? appearance.foreground : colors.textMuted }]}>{ROLE_LABELS[role]}</Text>
+                      <Text style={[styles.roleText, { color: selected ? appearance.foreground : theme.pageTextMuted }]}>{ROLE_LABELS[role]}</Text>
                     </Pressable>
                   );
                 })}
@@ -613,7 +618,7 @@ export default function GroupSettingsScreen() {
                   <Text style={styles.switchTitle}>Découverte par les comptes Free</Text>
                   <Text style={styles.switchSubtitle}>Ils peuvent voir le groupe, mais doivent passer Triton pour le rejoindre.</Text>
                 </View>
-                <Switch accessibilityLabel="Autoriser la découverte du groupe aux comptes Free" value={allowFreeDiscovery} onValueChange={(value) => { setAllowFreeDiscovery(value); setSavedAt(null); }} trackColor={{ false: colors.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
+                <Switch accessibilityLabel="Autoriser la découverte du groupe aux comptes Free" value={allowFreeDiscovery} onValueChange={(value) => { setAllowFreeDiscovery(value); setSavedAt(null); }} trackColor={{ false: theme.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
               </View>
 
               {!isAnnouncement ? (
@@ -622,11 +627,11 @@ export default function GroupSettingsScreen() {
                     <Text style={styles.switchTitle}>Les membres peuvent publier</Text>
                     <Text style={styles.switchSubtitle}>Sinon, l’écriture est limitée aux personnes autorisées par la gouvernance.</Text>
                   </View>
-                  <Switch accessibilityLabel="Autoriser les membres à publier" value={membersCanPost} onValueChange={(value) => { setMembersCanPost(value); setSavedAt(null); }} trackColor={{ false: colors.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
+                  <Switch accessibilityLabel="Autoriser les membres à publier" value={membersCanPost} onValueChange={(value) => { setMembersCanPost(value); setSavedAt(null); }} trackColor={{ false: theme.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
                 </View>
               ) : (
                 <View style={styles.lockedRule}>
-                  <Ionicons name="lock-closed" size={17} color={colors.orange} />
+                  <Ionicons name="lock-closed" size={17} color={theme.orange} />
                   <Text style={styles.lockedRuleText}>Les membres ne peuvent jamais répondre dans Annonces. Ils peuvent uniquement réagir.</Text>
                 </View>
               )}
@@ -638,64 +643,64 @@ export default function GroupSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
   screen: { flex: 1 },
   header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
   headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, minWidth: 0, textAlign: "center" },
+  headerTitle: { ...typography.heading3, color: theme.pageText, flex: 1, minWidth: 0, textAlign: "center" },
   saveButton: { minWidth: 88, minHeight: 48, alignItems: "center", justifyContent: "center" },
   saveDisabled: { opacity: 0.45 },
-  saveText: { color: colors.orange, fontSize: 14, fontWeight: "900" },
+  saveText: { color: theme.orange, fontSize: 14, fontWeight: "900" },
   content: { width: "100%", maxWidth: 760, alignSelf: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
-  title: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  mutedText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
+  title: { ...typography.heading2, color: theme.pageText, textAlign: "center" },
+  mutedText: { ...typography.body, color: theme.pageTextMuted, textAlign: "center", maxWidth: 430 },
   primaryAction: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   primaryActionText: { color: colors.white, fontWeight: "900" },
-  savedBanner: { minHeight: 42, marginBottom: 6, paddingHorizontal: 12, borderRadius: 15, backgroundColor: colors.successSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  savedText: { color: colors.success, fontSize: 11, fontWeight: "900" },
+  savedBanner: { minHeight: 42, marginBottom: 6, paddingHorizontal: 12, borderRadius: 15, backgroundColor: theme.successSoft, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  savedText: { color: theme.success, fontSize: 11, fontWeight: "900" },
   identityCard: { paddingVertical: spacing.lg, alignItems: "center", gap: 8 },
   avatarShell: { width: 84, height: 84, borderRadius: 29, padding: 3 },
-  avatarInner: { flex: 1, borderRadius: 26, overflow: "hidden", position: "relative", backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface },
+  avatarInner: { flex: 1, borderRadius: 26, overflow: "hidden", position: "relative", backgroundColor: theme.surfaceStrong, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: theme.surface },
   cropBadge: { position: "absolute", right: 4, bottom: 4, width: 28, height: 28, borderRadius: 10, backgroundColor: "rgba(2,7,19,0.80)", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: "100%", height: "100%" },
-  groupName: { ...typography.heading2, color: colors.text, textAlign: "center", marginTop: 6 },
+  groupName: { ...typography.heading2, color: theme.pageText, textAlign: "center", marginTop: 6 },
   announcementBadge: { minHeight: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: "rgba(244,177,131,0.12)", borderWidth: 1, borderColor: "rgba(244,177,131,0.28)", flexDirection: "row", alignItems: "center", gap: 8 },
-  announcementText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  groupMeta: { ...typography.caption, color: colors.textMuted },
-  description: { ...typography.bodySmall, color: colors.textSecondary, textAlign: "center", marginTop: 5, maxWidth: 440 },
+  announcementText: { color: theme.orange, fontSize: 11, fontWeight: "900" },
+  groupMeta: { ...typography.caption, color: theme.pageTextMuted },
+  description: { ...typography.bodySmall, color: theme.pageTextSecondary, textAlign: "center", marginTop: 5, maxWidth: 440 },
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
-  quickAction: { flexGrow: 1, flexBasis: 145, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", gap: 8 },
-  quickLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
-  dangerText: { color: colors.danger },
+  quickAction: { flexGrow: 1, flexBasis: 145, minHeight: 66, borderRadius: 18, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", gap: 8 },
+  quickLabel: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "800" },
+  dangerText: { color: theme.danger },
   governanceNote: { minHeight: 58, padding: 12, borderRadius: 18, backgroundColor: "rgba(244,177,131,0.09)", borderWidth: 1, borderColor: "rgba(244,177,131,0.20)", flexDirection: "row", alignItems: "center", gap: 9 },
-  governanceText: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 14, fontWeight: "700" },
-  sectionTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.lg, marginBottom: 8 },
-  sectionHelp: { color: colors.textMuted, fontSize: 11, lineHeight: 14, marginTop: -3, marginBottom: 8 },
-  panel: { borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, overflow: "hidden" },
-  emptyMembers: { color: colors.textMuted, textAlign: "center", padding: spacing.lg },
+  governanceText: { flex: 1, color: theme.pageTextSecondary, fontSize: 11, lineHeight: 14, fontWeight: "700" },
+  sectionTitle: { ...typography.heading3, color: theme.pageText, marginTop: spacing.lg, marginBottom: 8 },
+  sectionHelp: { color: theme.pageTextMuted, fontSize: 11, lineHeight: 14, marginTop: -3, marginBottom: 8 },
+  panel: { borderRadius: radii.xl, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, overflow: "hidden" },
+  emptyMembers: { color: theme.pageTextMuted, textAlign: "center", padding: spacing.lg },
   publisherRow: { minHeight: 72, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  divider: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  divider: { borderBottomWidth: 1, borderBottomColor: theme.borderSoft },
   publisherAvatar: { width: 48, height: 48, borderRadius: 15, borderWidth: 2, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   publisherInitials: { fontSize: 11, fontWeight: "900" },
   publisherContent: { flex: 1, minWidth: 0, alignItems: "flex-start", gap: 8 },
-  publisherName: { color: colors.text, fontSize: 14, fontWeight: "900" },
-  check: { width: 30, height: 30, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  checkSelected: { borderColor: colors.violet, backgroundColor: colors.violet },
-  panelForm: { padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface, marginBottom: spacing.lg },
-  fieldLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "900", marginTop: 10, marginBottom: 6 },
-  input: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, ...typography.bodySmall },
+  publisherName: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  check: { width: 30, height: 30, borderRadius: 10, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  checkSelected: { borderColor: theme.violet, backgroundColor: theme.violet },
+  panelForm: { padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, marginBottom: spacing.lg },
+  fieldLabel: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900", marginTop: 10, marginBottom: 6 },
+  input: { minHeight: 48, paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, color: theme.pageText, ...typography.bodySmall },
   multiline: { minHeight: 96, textAlignVertical: "top" },
   iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  iconChoice: { width: 48, height: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, alignItems: "center", justifyContent: "center" },
-  iconChoiceSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.2)" },
+  iconChoice: { width: 48, height: 48, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  iconChoiceSelected: { borderColor: theme.violet, backgroundColor: "rgba(107,79,234,0.2)" },
   roles: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   roleChip: { minHeight: 48, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   roleText: { fontSize: 11, fontWeight: "900" },
   switchRow: { minHeight: 76, marginTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md },
   switchContent: { flex: 1, minWidth: 0 },
-  switchTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
-  switchSubtitle: { color: colors.textMuted, fontSize: 11, lineHeight: 14, marginTop: 3 },
+  switchTitle: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  switchSubtitle: { color: theme.pageTextMuted, fontSize: 11, lineHeight: 14, marginTop: 3 },
   lockedRule: { minHeight: 56, marginTop: spacing.md, padding: 11, borderRadius: 16, backgroundColor: "rgba(244,177,131,0.09)", flexDirection: "row", alignItems: "center", gap: 8 },
-  lockedRuleText: { flex: 1, color: colors.textSecondary, fontSize: 11, lineHeight: 14 }
+  lockedRuleText: { flex: 1, color: theme.pageTextSecondary, fontSize: 11, lineHeight: 14 }
 });

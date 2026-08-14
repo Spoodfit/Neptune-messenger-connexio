@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EventVoteBanner } from "../../src/components/EventVoteBanner";
 import { MemberAvatarStack } from "../../src/components/MemberAvatarStack";
 import { StatusAvatar } from "../../src/components/StatusAvatar";
+import { ThemeModeButton } from "../../src/components/ThemeModeButton";
 import { MessageAttachmentsGrid } from "../../src/components/MessageAttachmentsGrid";
 import { InlineVoiceRecorder } from "../../src/components/InlineVoiceRecorder";
 import { MessageBubble } from "../../src/components/MessageBubble";
@@ -37,6 +38,7 @@ import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
 import { useMessaging } from "../../src/providers/MessagingProvider";
 import { useSession } from "../../src/providers/SessionProvider";
+import { type ConnexioTheme, useAppTheme } from "../../src/providers/ThemeProvider";
 import { NeptuneMessagingApi } from "../../src/services/api/neptuneApi";
 import { uploadMessageAttachment } from "../../src/services/api/uploadApi";
 import {
@@ -101,6 +103,8 @@ function updateLocalPoll(
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const conversationId = Array.isArray(params.id)
     ? (params.id[0] ?? "")
     : (params.id ?? "");
@@ -276,7 +280,7 @@ export default function ChatScreen() {
 
   if (!conversation) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.missing}>
+      <LinearGradient colors={theme.pageGradient} style={styles.missing}>
         <Text accessibilityRole="header" style={styles.missingTitle}>
           Conversation introuvable
         </Text>
@@ -667,7 +671,7 @@ export default function ChatScreen() {
       keyboardVerticalOffset={0}
     >
       <LinearGradient
-        colors={[colors.navyLight, colors.background]}
+        colors={theme.pageGradient}
         style={[
           styles.header,
           {
@@ -684,7 +688,7 @@ export default function ChatScreen() {
           onPress={goBackToDiscussions}
           style={styles.headerButton}
         >
-          <Ionicons name="chevron-back" size={25} color={colors.white} />
+          <Ionicons name="chevron-back" size={25} color={theme.pageText} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -720,6 +724,7 @@ export default function ChatScreen() {
             </View>
           )}
         </Pressable>
+        <ThemeModeButton />
         {conversation.type === "direct" ? (
           <View style={styles.callActions}>
             <Pressable
@@ -733,7 +738,7 @@ export default function ChatScreen() {
               }
               style={styles.callButton}
             >
-              <Ionicons name="call-outline" size={20} color={colors.text} />
+              <Ionicons name="call-outline" size={20} color={theme.pageText} />
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -746,7 +751,7 @@ export default function ChatScreen() {
               }
               style={styles.callButton}
             >
-              <Ionicons name="videocam-outline" size={21} color={colors.text} />
+              <Ionicons name="videocam-outline" size={21} color={theme.pageText} />
             </Pressable>
           </View>
         ) : (
@@ -759,7 +764,7 @@ export default function ChatScreen() {
             <Ionicons
               name="information-circle-outline"
               size={23}
-              color={colors.text}
+              color={theme.pageText}
             />
           </Pressable>
         )}
@@ -774,7 +779,7 @@ export default function ChatScreen() {
           style={styles.pinned}
           accessibilityLabel={`Message épinglé. ${conversation.pinnedMessage}`}
         >
-          <Ionicons name="pin" size={16} color={colors.orange} />
+          <Ionicons name="pin" size={16} color={theme.orange} />
           <Text style={styles.pinnedText} numberOfLines={2}>
             {conversation.pinnedMessage}
           </Text>
@@ -793,7 +798,7 @@ export default function ChatScreen() {
 
       {loading && messages.length === 0 ? (
         <View style={styles.loader} accessibilityLabel="Chargement des messages">
-          <ActivityIndicator color={colors.violet} />
+          <ActivityIndicator color={theme.violet} />
         </View>
       ) : (
         <FlatList
@@ -827,7 +832,7 @@ export default function ChatScreen() {
                 style={styles.historyLoader}
                 accessibilityLabel="Chargement des messages précédents"
               >
-                <ActivityIndicator size="small" color={colors.violet} />
+                <ActivityIndicator size="small" color={theme.violet} />
               </View>
             ) : null
           }
@@ -875,7 +880,7 @@ export default function ChatScreen() {
           {smartReplies.length > 0 && !draft.trim() && !voiceRecorderOpen ? (
   <View style={styles.smartReplyPanel}>
     <View style={styles.smartReplyHeading}>
-      <Ionicons name="sparkles" size={14} color={colors.orange} />
+      <Ionicons name="sparkles" size={14} color={theme.orange} />
       <Text style={styles.smartReplyLabel}>Réponses suggérées</Text>
     </View>
     <ScrollView
@@ -916,7 +921,7 @@ export default function ChatScreen() {
                 onPress={() => setReplyingTo(null)}
                 style={styles.smallButton}
               >
-                <Ionicons name="close" size={20} color={colors.textMuted} />
+                <Ionicons name="close" size={20} color={theme.pageTextMuted} />
               </Pressable>
             </View>
           ) : null}
@@ -941,7 +946,7 @@ export default function ChatScreen() {
                   onPress={() => setPendingAttachments([])}
                   style={styles.clearAttachments}
                 >
-                  <Ionicons name="trash-outline" size={17} color={colors.danger} />
+                  <Ionicons name="trash-outline" size={17} color={theme.danger} />
                 </Pressable>
               </View>
               <ScrollView
@@ -970,7 +975,7 @@ export default function ChatScreen() {
                     <Ionicons
                       name="close-circle"
                       size={17}
-                      color={colors.textMuted}
+                      color={theme.pageTextMuted}
                     />
                   </Pressable>
                 ))}
@@ -991,7 +996,7 @@ export default function ChatScreen() {
       onPress={() => setAttachmentMenuOpen(true)}
       style={styles.attachButton}
     >
-      <Ionicons name="add" size={24} color={colors.text} />
+      <Ionicons name="add" size={24} color={theme.pageText} />
     </Pressable>
     <TextInput
       ref={composerInputRef}
@@ -1000,7 +1005,7 @@ export default function ChatScreen() {
       accessibilityLabel="Écrire un message"
       accessibilityHint="Utilisez arobase pour mentionner un membre"
       placeholder="Écrire un message…"
-      placeholderTextColor={colors.textMuted}
+      placeholderTextColor={theme.pageTextMuted}
       multiline
       style={styles.input}
       maxLength={4_000}
@@ -1034,8 +1039,8 @@ export default function ChatScreen() {
         onPress={() => setVoiceRecorderOpen(true)}
         style={styles.voiceButton}
       >
-        <LinearGradient colors={gradients.activeTab} style={styles.sendGradient}>
-          <Ionicons name="mic" size={21} color={colors.text} />
+        <LinearGradient colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab} style={styles.sendGradient}>
+          <Ionicons name="mic" size={21} color={theme.pageText} />
         </LinearGradient>
       </Pressable>
     )}
@@ -1055,7 +1060,7 @@ export default function ChatScreen() {
             }
           ]}
         >
-          <Ionicons name="lock-closed" size={17} color={colors.textMuted} />
+          <Ionicons name="lock-closed" size={17} color={theme.pageTextMuted} />
           <Text style={styles.readOnlyText}>
             Lecture seule — seuls les responsables autorisés peuvent publier.
           </Text>
@@ -1084,13 +1089,13 @@ export default function ChatScreen() {
                   style={styles.attachmentChoice}
                 >
                   <LinearGradient
-                    colors={gradients.activeTab}
+                    colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab}
                     style={styles.attachmentChoiceIcon}
                   >
                     <Ionicons
                       name={attachment.icon}
                       size={23}
-                      color={colors.text}
+                      color={theme.pageText}
                     />
                   </LinearGradient>
                   <Text style={styles.attachmentChoiceText}>{attachment.label}</Text>
@@ -1106,10 +1111,10 @@ export default function ChatScreen() {
                 style={styles.attachmentChoice}
               >
                 <LinearGradient
-                  colors={gradients.activeTab}
+                  colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab}
                   style={styles.attachmentChoiceIcon}
                 >
-                  <Ionicons name="mic-outline" size={23} color={colors.text} />
+                  <Ionicons name="mic-outline" size={23} color={theme.pageText} />
                 </LinearGradient>
                 <Text style={styles.attachmentChoiceText}>Vocal</Text>
               </Pressable>
@@ -1123,10 +1128,10 @@ export default function ChatScreen() {
                 style={styles.attachmentChoice}
               >
                 <LinearGradient
-                  colors={gradients.activeTab}
+                  colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab}
                   style={styles.attachmentChoiceIcon}
                 >
-                  <Ionicons name="stats-chart" size={23} color={colors.text} />
+                  <Ionicons name="stats-chart" size={23} color={theme.pageText} />
                 </LinearGradient>
                 <Text style={styles.attachmentChoiceText}>Sondage</Text>
               </Pressable>
@@ -1149,15 +1154,15 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.pageBackground },
   header: {
     minHeight: 72,
     paddingBottom: spacing.sm,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft
+    borderBottomColor: theme.borderSoft
   },
   headerButton: {
     width: 48,
@@ -1173,8 +1178,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 5
   },
-  headerTitle: { ...typography.heading3, color: colors.text },
-  headerSubtitle: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  headerTitle: { ...typography.heading3, color: theme.pageText },
+  headerSubtitle: { color: theme.pageTextMuted, fontSize: 11, marginTop: 2 },
   headerMembers: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 8 },
   callActions: { flexDirection: "row", gap: 8 },
   callButton: {
@@ -1183,27 +1188,27 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: colors.borderSoft
+    borderColor: theme.borderSoft
   },
   pinned: {
     minHeight: 48,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
-    backgroundColor: colors.surface,
+    backgroundColor: theme.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
+    borderBottomColor: theme.borderSoft,
     flexDirection: "row",
     alignItems: "center",
     gap: 9
   },
-  pinnedText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
+  pinnedText: { ...typography.bodySmall, color: theme.pageTextSecondary, flex: 1 },
   errorBanner: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
-    color: colors.danger,
-    backgroundColor: colors.dangerSoft,
+    color: theme.danger,
+    backgroundColor: theme.dangerSoft,
     fontSize: 11,
     fontWeight: "800",
     textAlign: "center"
@@ -1219,19 +1224,19 @@ const styles = StyleSheet.create({
   historyLoader: { minHeight: 52, alignItems: "center", justifyContent: "center" },
   empty: {
     ...typography.bodySmall,
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     textAlign: "center",
     marginVertical: spacing.xl
   },
   composerArea: {
     paddingTop: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: theme.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.borderSoft
+    borderTopColor: theme.borderSoft
   },
   smartReplyPanel: { marginBottom: 7 },
   smartReplyHeading: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 8 },
-  smartReplyLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
+  smartReplyLabel: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900" },
   smartReplyRow: { gap: 8, paddingRight: 10 },
   smartReplyChip: {
     minHeight: 38,
@@ -1240,17 +1245,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "rgba(107,79,234,0.34)",
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: theme.surfaceStrong,
     alignItems: "center",
     justifyContent: "center"
   },
-  smartReplyText: { color: colors.text, fontSize: 11, fontWeight: "800" },
+  smartReplyText: { color: theme.pageText, fontSize: 11, fontWeight: "800" },
   mentionSuggestions: {
     marginBottom: 6,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceStrong,
     overflow: "hidden"
   },
   mentionRow: {
@@ -1264,19 +1269,19 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 11,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: theme.accentSoft,
     alignItems: "center",
     justifyContent: "center"
   },
-  mentionInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  mentionInitials: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
   mentionContent: { flex: 1, minWidth: 0 },
-  mentionName: { color: colors.text, fontSize: 14, fontWeight: "900" },
-  mentionCompany: { color: colors.textMuted, fontSize: 11, marginTop: 1 },
+  mentionName: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  mentionCompany: { color: theme.pageTextMuted, fontSize: 11, marginTop: 1 },
   replyComposer: {
     marginBottom: 6,
     padding: 8,
     borderRadius: 13,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: theme.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
     gap: 8
@@ -1285,11 +1290,11 @@ const styles = StyleSheet.create({
     width: 3,
     alignSelf: "stretch",
     borderRadius: 2,
-    backgroundColor: colors.orange
+    backgroundColor: theme.orange
   },
   replyComposerContent: { flex: 1, minWidth: 0 },
-  replyComposerTitle: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  replyComposerText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  replyComposerTitle: { color: theme.orange, fontSize: 11, fontWeight: "900" },
+  replyComposerText: { color: theme.pageTextSecondary, fontSize: 11, marginTop: 2 },
   smallButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   pendingPreview: {
     maxHeight: 270,
@@ -1297,8 +1302,8 @@ const styles = StyleSheet.create({
     padding: 7,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surfaceStrong
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surfaceStrong
   },
   pendingHeader: {
     minHeight: 34,
@@ -1307,7 +1312,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8
   },
-  pendingSummary: { flex: 1, color: colors.textMuted, fontSize: 11, fontWeight: "800" },
+  pendingSummary: { flex: 1, color: theme.pageTextMuted, fontSize: 11, fontWeight: "800" },
   clearAttachments: { width: 36, height: 34, alignItems: "center", justifyContent: "center" },
   pendingAttachments: { gap: 8, paddingTop: 4 },
   pendingChip: {
@@ -1315,20 +1320,20 @@ const styles = StyleSheet.create({
     minHeight: 34,
     paddingHorizontal: 9,
     borderRadius: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 8
   },
-  pendingText: { color: colors.textSecondary, fontSize: 11, flexShrink: 1 },
+  pendingText: { color: theme.pageTextSecondary, fontSize: 11, flexShrink: 1 },
   composer: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   attachButton: {
     width: 48,
     height: 48,
     borderRadius: 17,
-    backgroundColor: colors.surfaceStrong,
+    backgroundColor: theme.surfaceStrong,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
+    borderColor: theme.borderSoft,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -1341,9 +1346,9 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surfaceStrong,
-    color: colors.text,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surfaceStrong,
+    color: theme.pageText,
     ...typography.bodySmall,
     fontSize: 16,
     lineHeight: 22
@@ -1355,7 +1360,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: colors.borderSoft
+    borderColor: theme.borderSoft
   },
   sendGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
   sendDisabled: { opacity: 0.4 },
@@ -1363,15 +1368,15 @@ const styles = StyleSheet.create({
   readOnly: {
     minHeight: 56,
     paddingTop: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: theme.surface,
     borderTopWidth: 1,
-    borderTopColor: colors.borderSoft,
+    borderTopColor: theme.borderSoft,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8
   },
-  readOnlyText: { ...typography.bodySmall, color: colors.textMuted, flexShrink: 1 },
+  readOnlyText: { ...typography.bodySmall, color: theme.pageTextMuted, flexShrink: 1 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.65)",
@@ -1382,19 +1387,19 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    backgroundColor: colors.surface,
+    backgroundColor: theme.surface,
     borderTopWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.border
   },
   sheetHandle: {
     width: 42,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.textMuted,
+    backgroundColor: theme.pageTextMuted,
     alignSelf: "center",
     marginBottom: 14
   },
-  sheetTitle: { ...typography.heading3, color: colors.text, textAlign: "center" },
+  sheetTitle: { ...typography.heading3, color: theme.pageText, textAlign: "center" },
   attachmentGrid: {
     marginTop: spacing.md,
     flexDirection: "row",
@@ -1417,10 +1422,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  attachmentChoiceText: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
+  attachmentChoiceText: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "800" },
   backendHint: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     textAlign: "center",
     marginTop: spacing.md
   },
@@ -1431,8 +1436,8 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.md
   },
-  missingTitle: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  missingText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
+  missingTitle: { ...typography.heading2, color: theme.pageText, textAlign: "center" },
+  missingText: { ...typography.body, color: theme.pageTextMuted, textAlign: "center", maxWidth: 430 },
   missingButton: {
     minHeight: 48,
     paddingHorizontal: spacing.lg,

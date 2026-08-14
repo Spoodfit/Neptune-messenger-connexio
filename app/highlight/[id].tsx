@@ -24,6 +24,8 @@ import { useExperience } from "@/providers/ExperienceProvider";
 import { colors, gradients, radii, spacing, typography } from "@/theme";
 import type { HighlightComment, QuickReaction } from "@/types/experience";
 import { StatusAvatar } from "@/components/StatusAvatar";
+import { ThemeModeButton } from "@/components/ThemeModeButton";
+import { type ConnexioTheme, useAppTheme } from "@/providers/ThemeProvider";
 
 const REACTIONS: QuickReaction[] = ["❤️", "🔥", "👏", "💡", "🤝", "😂"];
 const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
@@ -31,6 +33,8 @@ const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract)
 export default function HighlightDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const id = Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "");
   const {
     posts,
@@ -62,7 +66,7 @@ export default function HighlightDetailScreen() {
 
   if (!post) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.missing}>
+      <LinearGradient colors={theme.pageGradient} style={styles.missing}>
         <Text style={styles.missingTitle}>Publication introuvable</Text>
         <Text style={styles.missingText}>
           Elle a été supprimée, masquée ou n’est plus accessible.
@@ -173,7 +177,7 @@ export default function HighlightDetailScreen() {
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <LinearGradient colors={gradients.screen} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={theme.pageGradient} style={StyleSheet.absoluteFill} />
       <View
         style={[
           styles.header,
@@ -185,12 +189,12 @@ export default function HighlightDetailScreen() {
         ]}
       >
         <Pressable onPress={() => router.back()} style={styles.headerButton}>
-          <Ionicons name="chevron-back" size={25} color={colors.text} />
+          <Ionicons name="chevron-back" size={25} color={theme.pageText} />
         </Pressable>
         <Text accessibilityRole="header" style={styles.headerTitle}>
           Publication
         </Text>
-        <HighlightShareButton post={post} />
+        <View style={styles.headerActions}><ThemeModeButton /><HighlightShareButton post={post} /></View>
       </View>
 
       <FlatList
@@ -219,7 +223,7 @@ export default function HighlightDetailScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyComments}>
-            <Ionicons name="chatbubbles-outline" size={27} color={colors.textMuted} />
+            <Ionicons name="chatbubbles-outline" size={27} color={theme.pageTextMuted} />
             <Text style={styles.emptyText}>Soyez le premier à commenter.</Text>
           </View>
         }
@@ -267,7 +271,7 @@ export default function HighlightDetailScreen() {
               </Text>
             </View>
             <Pressable onPress={() => setReplyingTo(null)} style={styles.closeReply}>
-              <Ionicons name="close" size={20} color={colors.textMuted} />
+              <Ionicons name="close" size={20} color={theme.pageTextMuted} />
             </Pressable>
           </View>
         ) : null}
@@ -277,7 +281,7 @@ export default function HighlightDetailScreen() {
             value={body}
             onChangeText={setBody}
             placeholder={replyingTo ? "Écrire une réponse…" : "Ajouter un commentaire…"}
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={theme.pageTextMuted}
             multiline
             maxLength={1_000}
             style={styles.input}
@@ -299,57 +303,58 @@ export default function HighlightDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.pageBackground },
   header: { minHeight: 58, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 2 },
   headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  headerTitle: { ...typography.heading3, color: colors.text, flex: 1, textAlign: "center" },
+  headerTitle: { ...typography.heading3, color: theme.pageText, flex: 1, textAlign: "center" },
   list: { width: "100%", maxWidth: 680, alignSelf: "center", paddingBottom: spacing.lg },
   postWrap: { paddingTop: spacing.sm },
-  commentsTitle: { ...typography.heading3, color: colors.text, marginTop: spacing.lg, marginBottom: 8 },
+  commentsTitle: { ...typography.heading3, color: theme.pageText, marginTop: spacing.lg, marginBottom: 8 },
   comment: { minHeight: 74, paddingVertical: 9, flexDirection: "row", alignItems: "flex-start", gap: 10 },
   replyComment: { marginLeft: 32 },
   commentAvatarPressable: { width: 38, height: 38 },
   avatarImage: { width: "100%", height: "100%" },
-  avatarInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  commentContent: { flex: 1, minWidth: 0, padding: 10, borderRadius: 16, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surface },
-  commentName: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  commentBody: { ...typography.bodySmall, color: colors.textSecondary, marginTop: 4 },
+  avatarInitials: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
+  commentContent: { flex: 1, minWidth: 0, padding: 10, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface },
+  commentName: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
+  commentBody: { ...typography.bodySmall, color: theme.pageTextSecondary, marginTop: 4 },
   commentActions: { marginTop: 7, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 12 },
-  commentDate: { color: colors.textMuted, fontSize: 11 },
-  commentActionText: { color: colors.orange, fontSize: 11, fontWeight: "800" },
-  commentReactionPicker: { marginTop: 7, minHeight: 48, paddingHorizontal: 4, borderRadius: 22, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "space-around" },
+  commentDate: { color: theme.pageTextMuted, fontSize: 11 },
+  commentActionText: { color: theme.orange, fontSize: 11, fontWeight: "800" },
+  commentReactionPicker: { marginTop: 7, minHeight: 48, paddingHorizontal: 4, borderRadius: 22, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "space-around" },
   commentReactionChoice: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
   commentReactionEmoji: { fontSize: 20 },
   commentReactionSummary: { marginTop: 7, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  commentReactionPill: { minHeight: 25, paddingHorizontal: 7, borderRadius: 13, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 8 },
-  commentReactionPillActive: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.22)" },
+  commentReactionPill: { minHeight: 25, paddingHorizontal: 7, borderRadius: 13, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 8 },
+  commentReactionPillActive: { borderColor: theme.violet, backgroundColor: "rgba(107,79,234,0.22)" },
   smallEmoji: { fontSize: 11 },
-  smallCount: { color: colors.textSecondary, fontSize: 11, fontWeight: "800" },
+  smallCount: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "800" },
   emptyComments: { minHeight: 130, alignItems: "center", justifyContent: "center", gap: 8 },
-  emptyText: { ...typography.bodySmall, color: colors.textMuted },
-  composerArea: { paddingTop: 6, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderSoft },
-  suggestions: { marginBottom: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceStrong, overflow: "hidden" },
+  emptyText: { ...typography.bodySmall, color: theme.pageTextMuted },
+  composerArea: { paddingTop: 6, backgroundColor: theme.surface, borderTopWidth: 1, borderTopColor: theme.borderSoft },
+  suggestions: { marginBottom: 6, borderRadius: 16, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surfaceStrong, overflow: "hidden" },
   suggestionRow: { minHeight: 50, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
-  suggestionAvatar: { width: 32, height: 32, borderRadius: 11, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  suggestionInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  suggestionAvatar: { width: 32, height: 32, borderRadius: 11, backgroundColor: theme.accentSoft, alignItems: "center", justifyContent: "center" },
+  suggestionInitials: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
   suggestionContent: { flex: 1, minWidth: 0 },
-  suggestionName: { color: colors.text, fontSize: 14, fontWeight: "900" },
-  suggestionCompany: { color: colors.textMuted, fontSize: 11, marginTop: 1 },
-  replyingBar: { marginBottom: 6, padding: 8, borderRadius: 13, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 8 },
-  replyAccent: { width: 3, alignSelf: "stretch", borderRadius: 2, backgroundColor: colors.orange },
+  suggestionName: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  suggestionCompany: { color: theme.pageTextMuted, fontSize: 11, marginTop: 1 },
+  replyingBar: { marginBottom: 6, padding: 8, borderRadius: 13, backgroundColor: theme.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 8 },
+  replyAccent: { width: 3, alignSelf: "stretch", borderRadius: 2, backgroundColor: theme.orange },
   replyingContent: { flex: 1, minWidth: 0 },
-  replyingTitle: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  replyingText: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+  replyingTitle: { color: theme.orange, fontSize: 11, fontWeight: "900" },
+  replyingText: { color: theme.pageTextSecondary, fontSize: 11, marginTop: 2 },
   closeReply: { width: 38, height: 38, alignItems: "center", justifyContent: "center" },
   composer: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
-  input: { flex: 1, minWidth: 0, minHeight: 48, maxHeight: 118, paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 20, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, ...typography.bodySmall },
+  input: { flex: 1, minWidth: 0, minHeight: 48, maxHeight: 118, paddingHorizontal: spacing.md, paddingVertical: 11, borderRadius: 20, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, color: theme.pageText, ...typography.bodySmall },
   sendButton: { width: 48, height: 48, borderRadius: 17, overflow: "hidden" },
   sendGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
   sendDisabled: { opacity: 0.4 },
   missing: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
-  missingTitle: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  missingText: { ...typography.body, color: colors.textMuted, textAlign: "center", maxWidth: 430 },
+  missingTitle: { ...typography.heading2, color: theme.pageText, textAlign: "center" },
+  missingText: { ...typography.body, color: theme.pageTextMuted, textAlign: "center", maxWidth: 430 },
   primaryButton: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   primaryText: { color: colors.white, fontWeight: "900" }
 });
