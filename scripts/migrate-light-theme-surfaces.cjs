@@ -76,7 +76,7 @@ function migrateConversationInfo() {
   let source = fs.readFileSync(path, "utf8");
   source = replaceRequired(source, 'import { StatusAvatar } from "@/components/StatusAvatar";', 'import { StatusAvatar } from "@/components/StatusAvatar";\nimport { ThemeModeButton } from "@/components/ThemeModeButton";\nimport { type ConnexioTheme, useAppTheme } from "@/providers/ThemeProvider";', "conversation info theme imports");
   source = replaceRequired(source, "export default function ConversationInfoScreen() {\n  const params = useLocalSearchParams<{ id: string }>();\n  const insets = useSafeAreaInsets();", "export default function ConversationInfoScreen() {\n  const params = useLocalSearchParams<{ id: string }>();\n  const insets = useSafeAreaInsets();\n  const theme = useAppTheme();\n  const styles = createStyles(theme);", "conversation info theme state");
-  source = replaceRequired(source, '        <View style={styles.headerSpacer} />', '        <ThemeModeButton />', "conversation info topbar theme button");
+  source = replaceRequired(source, '        <View style={styles.headerButton} />', '        <ThemeModeButton />', "conversation info topbar theme button");
   source = replaceRequired(source, "const styles = StyleSheet.create({", "const createStyles = (theme: ConnexioTheme) => StyleSheet.create({", "conversation info style factory");
   source = semanticize(source);
   fs.writeFileSync(path, source);
