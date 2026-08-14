@@ -21,7 +21,9 @@ jobs:
           node-version: 22.13.1
           cache: npm
       - name: Apply targeted UX codemod
-        run: python3 scripts/ux-round2-codemod-v2.py
+        run: |
+          python3 scripts/ux-round2-codemod-v2.py
+          python3 scripts/ux-round2-postfix.py
       - name: Install dependencies
         run: npm ci
       - name: TypeScript and domain verification
