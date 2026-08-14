@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colors, gradients, spacing, typography } from "../theme";
+import { useAppTheme } from "../providers/ThemeProvider";
+import { colors, spacing, typography } from "../theme";
 
 interface ConfirmationDialogProps {
   visible: boolean;
@@ -27,25 +27,26 @@ export function ConfirmationDialog({
   onCancel,
   onConfirm
 }: ConfirmationDialogProps) {
+  const theme = useAppTheme();
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel} statusBarTranslucent>
-      <Pressable accessibilityRole="none" onPress={onCancel} style={styles.backdrop}>
+      <Pressable accessibilityRole="none" onPress={onCancel} style={[styles.backdrop, { backgroundColor: theme.overlay }]}>
         <Pressable accessibilityRole="alert" onPress={() => undefined} style={styles.cardHitbox}>
-          <LinearGradient colors={gradients.glass} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
-            <View style={[styles.iconShell, destructive && styles.iconShellDanger]}>
-              <Ionicons name={icon} size={25} color={destructive ? colors.danger : colors.violet} />
+          <View style={[styles.card, { borderColor: theme.border, backgroundColor: theme.surface, shadowColor: theme.shadow }]}>
+            <View style={[styles.iconShell, { backgroundColor: destructive ? theme.dangerSoft : theme.violetSoft, borderColor: destructive ? theme.danger : theme.violet }]}>
+              <Ionicons name={icon} size={25} color={destructive ? theme.danger : theme.violet} />
             </View>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.message}>{message}</Text>
+            <Text style={[styles.title, { color: theme.pageText }]}>{title}</Text>
+            <Text style={[styles.message, { color: theme.pageTextMuted }]}>{message}</Text>
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" accessibilityLabel={cancelLabel} onPress={onCancel} style={({ pressed }) => [styles.button, styles.cancelButton, pressed && styles.pressed]}>
-                <Text style={styles.cancelText}>{cancelLabel}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel={cancelLabel} onPress={onCancel} style={({ pressed }) => [styles.button, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }, pressed && styles.pressed]}>
+                <Text style={[styles.cancelText, { color: theme.pageTextSecondary }]}>{cancelLabel}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={confirmLabel} onPress={onConfirm} style={({ pressed }) => [styles.button, destructive ? styles.dangerButton : styles.confirmButton, pressed && styles.pressed]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={confirmLabel} onPress={onConfirm} style={({ pressed }) => [styles.button, { backgroundColor: destructive ? theme.danger : colors.primary, borderColor: destructive ? theme.danger : colors.primary }, pressed && styles.pressed]}>
                 <Text style={styles.confirmText}>{confirmLabel}</Text>
               </Pressable>
             </View>
-          </LinearGradient>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -53,49 +54,15 @@ export function ConfirmationDialog({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    padding: spacing.lg,
-    backgroundColor: "rgba(0,0,0,0.72)",
-    alignItems: "center",
-    justifyContent: "center"
-  },
+  backdrop: { flex: 1, padding: spacing.lg, alignItems: "center", justifyContent: "center" },
   cardHitbox: { width: "100%", maxWidth: 420 },
-  card: {
-    width: "100%",
-    padding: spacing.lg,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "rgba(8,18,38,0.98)",
-    shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowRadius: 26,
-    shadowOffset: { width: 0, height: 16 },
-    elevation: 24
-  },
-  iconShell: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: "rgba(107,79,234,0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(107,79,234,0.34)",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  iconShellDanger: {
-    backgroundColor: colors.dangerSoft,
-    borderColor: "rgba(255,123,134,0.35)"
-  },
-  title: { ...typography.heading2, color: colors.text, marginTop: spacing.md },
-  message: { ...typography.body, color: colors.textMuted, marginTop: 8 },
+  card: { width: "100%", padding: spacing.lg, borderRadius: 28, borderWidth: 1, shadowOpacity: 0.18, shadowRadius: 26, shadowOffset: { width: 0, height: 16 }, elevation: 24 },
+  iconShell: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  title: { ...typography.heading2, marginTop: spacing.md },
+  message: { ...typography.body, marginTop: 8 },
   actions: { marginTop: spacing.lg, flexDirection: "row", gap: 10 },
-  button: { flex: 1, minHeight: 50, borderRadius: 17, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
-  cancelButton: { backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.borderSoft },
-  confirmButton: { backgroundColor: colors.primary },
-  dangerButton: { backgroundColor: colors.danger },
-  cancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: "900" },
+  button: { flex: 1, minHeight: 50, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  cancelText: { fontSize: 14, fontWeight: "900" },
   confirmText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] }
 });

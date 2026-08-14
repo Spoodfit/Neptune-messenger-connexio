@@ -41,6 +41,8 @@ import type {
 } from "@/types/experience";
 import type { MessageAttachment } from "@/types/messaging";
 import { StatusAvatar } from "@/components/StatusAvatar";
+import { ThemeModeButton } from "@/components/ThemeModeButton";
+import { type ConnexioTheme, useAppTheme } from "@/providers/ThemeProvider";
 
 const KINDS: Array<{
   value: HighlightKind;
@@ -98,6 +100,8 @@ const DEMO_PLACES: PlaceSuggestion[] = [
 
 export default function NewHighlightScreen() {
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { accessToken, currentUser } = useSession();
   const { members, createPost, refreshExperience } = useExperience();
   const api = useMemo(
@@ -381,7 +385,7 @@ export default function NewHighlightScreen() {
   };
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.screen}>
+    <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <View
         style={[
           styles.header,
@@ -398,11 +402,12 @@ export default function NewHighlightScreen() {
           onPress={() => router.back()}
           style={styles.headerButton}
         >
-          <Ionicons name="close" size={25} color={colors.text} />
+          <Ionicons name="close" size={25} color={theme.pageText} />
         </Pressable>
         <Text accessibilityRole="header" style={styles.headerTitle}>
           Nouveau Temps fort
         </Text>
+        <ThemeModeButton />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Publier"
@@ -412,7 +417,7 @@ export default function NewHighlightScreen() {
           style={styles.publishButton}
         >
           {publishing ? (
-            <ActivityIndicator size="small" color={colors.orange} />
+            <ActivityIndicator size="small" color={theme.orange} />
           ) : (
             <Text style={styles.publishText}>Partager ✦</Text>
           )}
@@ -484,7 +489,7 @@ style={[
                 <Ionicons
                   name={item.icon}
                   size={18}
-                  color={selected ? colors.orange : colors.textMuted}
+                  color={selected ? theme.orange : theme.pageTextMuted}
                 />
                 <Text
                   style={[
@@ -501,7 +506,7 @@ style={[
 
         {kind === "besoin" || kind === "offre" ? (
           <View style={styles.syncNote}>
-            <Ionicons name="sync" size={19} color={colors.success} />
+            <Ionicons name="sync" size={19} color={theme.success} />
             <Text style={styles.syncNoteText}>
               {kind === "besoin"
                 ? "Ce Besoin sera synchronisé avec Neptune Business dans les deux sens."
@@ -520,7 +525,7 @@ style={[
     onPress={() => setBody((current) => current.trim() ? current : `${starter} `)}
     style={styles.starterChip}
   >
-    <Ionicons name="flash-outline" size={14} color={colors.orange} />
+    <Ionicons name="flash-outline" size={14} color={theme.orange} />
     <Text style={styles.starterText}>{starter}</Text>
   </Pressable>
 ))}
@@ -529,7 +534,7 @@ style={[
           value={body}
           onChangeText={setBody}
           placeholder="Partagez un moment, une offre ou un besoin… Utilisez @ pour mentionner."
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={theme.pageTextMuted}
           multiline
           maxLength={2_000}
           style={styles.editor}
@@ -564,7 +569,7 @@ style={[
             onPress={() => void selectMedia("photo")}
             style={styles.mediaButton}
           >
-            <Ionicons name="image-outline" size={21} color={colors.text} />
+            <Ionicons name="image-outline" size={21} color={theme.pageText} />
             <Text style={styles.mediaLabel}>Photo</Text>
           </Pressable>
           <Pressable
@@ -573,7 +578,7 @@ style={[
             onPress={() => void selectMedia("video")}
             style={styles.mediaButton}
           >
-            <Ionicons name="videocam-outline" size={22} color={colors.text} />
+            <Ionicons name="videocam-outline" size={22} color={theme.pageText} />
             <Text style={styles.mediaLabel}>Vidéo</Text>
           </Pressable>
           <Pressable
@@ -582,7 +587,7 @@ style={[
             onPress={() => setVoiceRecorderOpen(true)}
             style={styles.mediaButton}
           >
-            <Ionicons name="mic-outline" size={22} color={colors.text} />
+            <Ionicons name="mic-outline" size={22} color={theme.pageText} />
             <Text style={styles.mediaLabel}>Vocal</Text>
           </Pressable>
         </View>
@@ -626,7 +631,7 @@ style={[
 
         <Text style={styles.sectionTitle}>Lieu du Temps fort</Text>
         <View style={styles.locationSearch}>
-          <Ionicons name="search-outline" size={19} color={colors.textMuted} />
+          <Ionicons name="search-outline" size={19} color={theme.pageTextMuted} />
           <TextInput
             value={locationQuery}
             onChangeText={(value) => {
@@ -634,11 +639,11 @@ style={[
               if (value !== selectedLocation?.label) setSelectedLocation(null);
             }}
             placeholder="Ex. Téléski nautique de Bram"
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={theme.pageTextMuted}
             style={styles.locationInput}
           />
           {searchingPlace ? (
-            <ActivityIndicator size="small" color={colors.violet} />
+            <ActivityIndicator size="small" color={theme.violet} />
           ) : null}
         </View>
 
@@ -654,7 +659,7 @@ style={[
                 <Ionicons
                   name="location-outline"
                   size={19}
-                  color={colors.orange}
+                  color={theme.orange}
                 />
                 <View style={styles.placeContent}>
                   <Text style={styles.placeLabel}>{place.label}</Text>
@@ -676,7 +681,7 @@ style={[
           onPress={() => void useCurrentLocation()}
           style={styles.currentLocationButton}
         >
-          <Ionicons name="locate-outline" size={20} color={colors.text} />
+          <Ionicons name="locate-outline" size={20} color={theme.pageText} />
           <Text style={styles.currentLocationText}>
             {locating
               ? "Localisation…"
@@ -686,7 +691,7 @@ style={[
 
         {selectedLocation ? (
           <View style={styles.selectedLocation}>
-            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <Ionicons name="checkmark-circle" size={20} color={theme.success} />
             <View style={styles.selectedLocationText}>
               <Text style={styles.selectedLocationTitle}>
                 {selectedLocation.label}
@@ -706,7 +711,7 @@ style={[
               }}
               style={styles.removeLocation}
             >
-              <Ionicons name="close" size={19} color={colors.textMuted} />
+              <Ionicons name="close" size={19} color={theme.pageTextMuted} />
             </Pressable>
           </View>
         ) : null}
@@ -716,7 +721,7 @@ style={[
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
   screen: { flex: 1 },
   header: {
     minHeight: 58,
@@ -733,7 +738,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...typography.heading3,
-    color: colors.text,
+    color: theme.pageText,
     flex: 1,
     textAlign: "center"
   },
@@ -743,7 +748,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  publishText: { color: colors.orange, fontSize: 14, fontWeight: "900" },
+  publishText: { color: theme.orange, fontSize: 14, fontWeight: "900" },
   content: { width: "100%", maxWidth: 680, alignSelf: "center" },
   animatedContent: { width: "100%" },
   momentumCard: {
@@ -752,7 +757,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(244,177,131,0.24)",
-    backgroundColor: colors.surface
+    backgroundColor: theme.surface
   },
   momentumGradient: { minHeight: 138, padding: spacing.md, flexDirection: "row", alignItems: "center", gap: 12 },
   momentumCopy: { flex: 1, minWidth: 0 },
@@ -763,7 +768,7 @@ const styles = StyleSheet.create({
   progressValue: { color: colors.white, fontSize: 16, fontWeight: "900" },
   progressLabel: { color: colors.whiteMuted, fontSize: 11, fontWeight: "800", marginTop: 1 },
   progressTrack: { height: 4, backgroundColor: "rgba(255,255,255,0.08)" },
-  progressFill: { height: 4, borderRadius: 2, backgroundColor: colors.orange },
+  progressFill: { height: 4, borderRadius: 2, backgroundColor: theme.orange },
   starterRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -776,17 +781,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 11,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surfaceStrong,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surfaceStrong,
     flexDirection: "row",
     alignItems: "center",
     gap: 8
   },
-  starterText: { color: colors.textSecondary, fontSize: 14, fontWeight: "800" },
+  starterText: { color: theme.pageTextSecondary, fontSize: 14, fontWeight: "800" },
   inlineRecorderWrap: { marginTop: 9 },
   sectionTitle: {
     ...typography.heading3,
-    color: colors.text,
+    color: theme.pageText,
     marginTop: spacing.md,
     marginBottom: 8
   },
@@ -796,30 +801,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 8
   },
   kindButtonSelected: {
-    borderColor: colors.violet,
+    borderColor: theme.violet,
     backgroundColor: "rgba(107,79,234,0.22)"
   },
-  kindLabel: { color: colors.textMuted, fontSize: 11, fontWeight: "800" },
-  kindLabelSelected: { color: colors.text },
+  kindLabel: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "800" },
+  kindLabelSelected: { color: theme.pageText },
   syncNote: {
     marginTop: 10,
     padding: 12,
     borderRadius: 16,
-    backgroundColor: colors.successSoft,
+    backgroundColor: theme.successSoft,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 9
   },
   syncNoteText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: theme.pageTextSecondary,
     flex: 1
   },
   editor: {
@@ -827,13 +832,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    color: colors.text,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
+    color: theme.pageText,
     ...typography.body
   },
   counter: {
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     fontSize: 11,
     textAlign: "right",
     marginTop: 4
@@ -842,8 +847,8 @@ const styles = StyleSheet.create({
     marginTop: 7,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceStrong,
     overflow: "hidden"
   },
   suggestionRow: {
@@ -857,14 +862,14 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 12,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: theme.accentSoft,
     alignItems: "center",
     justifyContent: "center"
   },
-  suggestionInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  suggestionInitials: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
   suggestionContent: { flex: 1, minWidth: 0 },
-  suggestionName: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  suggestionCompany: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  suggestionName: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
+  suggestionCompany: { color: theme.pageTextMuted, fontSize: 11, marginTop: 2 },
   mediaActions: { marginTop: 9, flexDirection: "row", gap: 8 },
   mediaButton: {
     flex: 1,
@@ -872,15 +877,15 @@ const styles = StyleSheet.create({
     minHeight: 52,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center",
     gap: 8
   },
-  mediaLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "900" },
+  mediaLabel: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900" },
   mediaHint: {
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
@@ -923,8 +928,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 8
@@ -933,7 +938,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: 50,
-    color: colors.text,
+    color: theme.pageText,
     ...typography.bodySmall,
     fontSize: 16,
     lineHeight: 22
@@ -942,8 +947,8 @@ const styles = StyleSheet.create({
     marginTop: 7,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceStrong,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceStrong,
     overflow: "hidden"
   },
   placeRow: {
@@ -953,25 +958,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 9,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft
+    borderBottomColor: theme.borderSoft
   },
   placeContent: { flex: 1, minWidth: 0 },
-  placeLabel: { color: colors.text, fontSize: 11, fontWeight: "900" },
-  placeAddress: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  placeLabel: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
+  placeAddress: { color: theme.pageTextMuted, fontSize: 11, marginTop: 2 },
   currentLocationButton: {
     minHeight: 50,
     marginTop: 8,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8
   },
   currentLocationText: {
-    color: colors.textSecondary,
+    color: theme.pageTextSecondary,
     fontSize: 11,
     fontWeight: "900"
   },
@@ -980,19 +985,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 11,
     borderRadius: 17,
-    backgroundColor: colors.successSoft,
+    backgroundColor: theme.successSoft,
     flexDirection: "row",
     alignItems: "center",
     gap: 9
   },
   selectedLocationText: { flex: 1, minWidth: 0 },
   selectedLocationTitle: {
-    color: colors.text,
+    color: theme.pageText,
     fontSize: 11,
     fontWeight: "900"
   },
   selectedLocationAddress: {
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     fontSize: 11,
     marginTop: 2
   },

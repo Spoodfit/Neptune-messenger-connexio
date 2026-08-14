@@ -2,6 +2,7 @@ import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, 
 import { useColorScheme } from "react-native";
 
 import { createStandaloneStateStore } from "../storage/standaloneStore";
+import { darkSemanticPalette, lightSemanticPalette } from "../theme/semanticPalette";
 
 export type ConnexioAppearanceMode = "system" | "dark" | "light";
 
@@ -14,12 +15,32 @@ export interface ConnexioTheme {
   pageText: string;
   pageTextSecondary: string;
   pageTextMuted: string;
+  surface: string;
+  surfaceStrong: string;
+  surfaceMuted: string;
+  border: string;
+  borderSoft: string;
+  inputBackground: string;
+  chipBackground: string;
   shellBackground: string;
   shellBorder: string;
   navBackground: string;
   navBorder: string;
   navInactive: string;
   overlay: string;
+  accent: string;
+  accentSoft: string;
+  violet: string;
+  violetSoft: string;
+  orange: string;
+  orangeSoft: string;
+  success: string;
+  successSoft: string;
+  warning: string;
+  warningSoft: string;
+  danger: string;
+  dangerSoft: string;
+  shadow: string;
   setMode: (mode: ConnexioAppearanceMode) => void;
 }
 
@@ -44,23 +65,44 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   };
 
   const isLight = mode === "light" || (mode === "system" && systemScheme === "light");
+  const palette = isLight ? lightSemanticPalette : darkSemanticPalette;
   const value = useMemo<ConnexioTheme>(() => ({
     mode,
     isLight,
-    pageBackground: isLight ? "#F2F5FA" : "#020713",
-    pageRaised: isLight ? "#FFFFFF" : "#050B1C",
-    pageGradient: isLight ? ["#FFFFFF", "#EDF2F8"] : ["#050B1C", "#020713"],
-    pageText: isLight ? "#08152D" : "#F4F7FF",
-    pageTextSecondary: isLight ? "#33415C" : "#D2DBEF",
-    pageTextMuted: isLight ? "#66738C" : "#AEB8D2",
-    shellBackground: isLight ? "rgba(255,255,255,0.96)" : "rgba(8,18,38,0.98)",
-    shellBorder: isLight ? "rgba(8,21,45,0.12)" : "rgba(255,255,255,0.14)",
-    navBackground: isLight ? "rgba(255,255,255,0.98)" : "rgba(8,18,38,0.98)",
-    navBorder: isLight ? "rgba(8,21,45,0.14)" : "rgba(255,255,255,0.14)",
-    navInactive: isLight ? "#65728B" : "#7F8DAB",
-    overlay: isLight ? "rgba(13,25,48,0.40)" : "rgba(0,0,0,0.68)",
+    pageBackground: palette.background,
+    pageRaised: palette.raised,
+    pageGradient: palette.gradient,
+    pageText: palette.text,
+    pageTextSecondary: palette.textSecondary,
+    pageTextMuted: palette.textMuted,
+    surface: palette.surface,
+    surfaceStrong: palette.surfaceStrong,
+    surfaceMuted: palette.surfaceMuted,
+    border: palette.border,
+    borderSoft: palette.borderSoft,
+    inputBackground: palette.input,
+    chipBackground: palette.chip,
+    shellBackground: palette.shell,
+    shellBorder: palette.border,
+    navBackground: palette.nav,
+    navBorder: palette.border,
+    navInactive: palette.navInactive,
+    overlay: palette.overlay,
+    accent: palette.accent,
+    accentSoft: palette.accentSoft,
+    violet: palette.violet,
+    violetSoft: palette.violetSoft,
+    orange: palette.orange,
+    orangeSoft: palette.orangeSoft,
+    success: palette.success,
+    successSoft: palette.successSoft,
+    warning: palette.warning,
+    warningSoft: palette.warningSoft,
+    danger: palette.danger,
+    dangerSoft: palette.dangerSoft,
+    shadow: palette.shadow,
     setMode
-  }), [isLight, mode]);
+  }), [isLight, mode, palette]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
