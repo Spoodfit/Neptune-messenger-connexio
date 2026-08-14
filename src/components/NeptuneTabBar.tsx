@@ -80,13 +80,13 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       </View>
 
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickMessage, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Créer une conversation" onPress={openNewConversation} style={styles.quickPressable}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Nouvelle conversation" onPress={openNewConversation} style={styles.quickPressable}>
           <Ionicons name="chatbubble-ellipses" size={22} color={colors.white} />
-          <Text style={styles.quickLabel}>Nouvelle conversation</Text>
+          <Text style={styles.quickLabel}>Conversation</Text>
         </Pressable>
       </Animated.View>
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickHighlight, { opacity: menuProgress, transform: [{ translateY: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [28, -70] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Partager un Temps fort" onPress={openNewHighlight} style={styles.quickPressable}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Publier un Temps fort" onPress={openNewHighlight} style={styles.quickPressable}>
           <Ionicons name="star" size={22} color={colors.white} />
           <Text style={styles.quickLabel}>Temps fort</Text>
         </Pressable>
@@ -95,7 +95,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       <Animated.View style={[styles.createShell, { transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "45deg"] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={menuOpen ? "Fermer la création" : "Créer une nouvelle conversation ou un Temps fort"}
+          accessibilityLabel={menuOpen ? "Fermer la création" : "Créer"}
           accessibilityState={{ expanded: menuOpen }}
           onPress={() => setMenuOpen((value) => !value)}
           style={({ pressed }) => [styles.createPressable, pressed && styles.createPressed]}
@@ -113,9 +113,9 @@ const styles = StyleSheet.create({
   outer: { paddingHorizontal: 8, paddingTop: 4, backgroundColor: colors.background, position: "relative", zIndex: 40 },
   dismissLayer: { position: "absolute", left: -20, right: -20, top: -180, bottom: 0, zIndex: 1 },
   bar: { height: 72, padding: 5, overflow: "visible", position: "relative", borderRadius: radii.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,18,38,0.98)", flexDirection: "row", alignItems: "center", elevation: 18, zIndex: 2 },
-  sideGroup: { flex: 1, height: "100%", flexDirection: "row" },
-  centerSlot: { width: 56 },
-  item: { flex: 1, minWidth: 48, minHeight: 62, borderRadius: 18, alignItems: "center", justifyContent: "center", gap: 6, overflow: "hidden" },
+  sideGroup: { flex: 1, minWidth: 0, height: "100%", flexDirection: "row" },
+  centerSlot: { width: 48, flexShrink: 0 },
+  item: { flex: 1, minWidth: 0, minHeight: 62, borderRadius: 18, alignItems: "center", justifyContent: "center", gap: 6, overflow: "hidden" },
   activePill: { ...StyleSheet.absoluteFillObject, borderRadius: 18, borderWidth: 1, borderColor: colors.borderSoft },
   pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
   iconWrap: { position: "relative", width: 28, alignItems: "center" },
@@ -123,13 +123,13 @@ const styles = StyleSheet.create({
   labelActive: { color: colors.text },
   badge: { position: "absolute", right: -13, top: -8, minWidth: 21, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.magenta, borderWidth: 2, borderColor: colors.surface },
   badgeText: { color: colors.white, fontSize: 11, fontWeight: "900" },
-  createShell: { position: "absolute", left: "50%", marginLeft: -28, top: -10, width: 56, height: 56, borderRadius: 28, padding: 4, backgroundColor: colors.background, zIndex: 6, elevation: 24 },
-  createPressable: { flex: 1, borderRadius: 24 },
+  createShell: { position: "absolute", left: "50%", marginLeft: -27, top: -9, width: 54, height: 54, borderRadius: 27, padding: 4, backgroundColor: colors.background, zIndex: 6, elevation: 24 },
+  createPressable: { flex: 1, borderRadius: 23 },
   createPressed: { opacity: 0.86 },
-  createGradient: { flex: 1, borderRadius: 24, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
-  quickAction: { position: "absolute", top: 0, zIndex: 5, minWidth: 112, height: 52, borderRadius: 18, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.border, elevation: 22, shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-  quickMessage: { left: "50%", marginLeft: -132 },
-  quickHighlight: { left: "50%", marginLeft: 12 },
+  createGradient: { flex: 1, borderRadius: 23, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  quickAction: { position: "absolute", top: 0, zIndex: 5, minWidth: 108, height: 52, borderRadius: 18, backgroundColor: colors.surfaceStrong, borderWidth: 1, borderColor: colors.border, elevation: 22, shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+  quickMessage: { left: "50%", marginLeft: -122 },
+  quickHighlight: { left: "50%", marginLeft: 14 },
   quickPressable: { flex: 1, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900" }
 });
