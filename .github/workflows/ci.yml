@@ -17,7 +17,7 @@ concurrency:
 jobs:
   dependency-lock-refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,17 +30,23 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
+      - name: Generate remaining light-mode migrations
+        run: node scripts/migrate-light-theme-surfaces.cjs
+      - name: Verify migrated source
+        run: npm run verify --silent
       - name: Refresh Expo-compatible patch versions
         run: npx expo install --fix
       - name: Verify refreshed compatibility
         run: npx expo install --check
-      - name: Upload refreshed manifests
+      - name: Upload generated source and manifests
         uses: actions/upload-artifact@v4
         with:
-          name: expo-compatible-lockfiles
+          name: connexio-migration-output
           path: |
             package.json
             package-lock.json
+            app/new-highlight.tsx
+            src/screens/ChatConversationScreen.tsx
           retention-days: 1
 
   verify:
