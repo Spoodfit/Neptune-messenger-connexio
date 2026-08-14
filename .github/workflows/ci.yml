@@ -31,7 +31,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Generate remaining light-mode migrations
-        run: node scripts/migrate-light-theme-surfaces.cjs
+        run: |
+          node scripts/migrate-light-theme-surfaces.cjs
+          node scripts/migrate-light-theme-admin-surfaces.cjs
       - name: Verify migrated source
         run: npm run verify --silent
       - name: Refresh Expo-compatible patch versions
@@ -48,6 +50,8 @@ jobs:
             app/new-highlight.tsx
             app/conversation/[id].tsx
             app/highlight/[id].tsx
+            app/group/[id].tsx
+            app/schedule-message/[id].tsx
             src/screens/ChatConversationScreen.tsx
             src/screens/NewConversationScreen.tsx
           retention-days: 1
