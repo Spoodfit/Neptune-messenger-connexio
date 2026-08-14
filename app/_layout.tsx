@@ -141,12 +141,14 @@ function AuthenticatedApp() {
   if (!sessionReady) return <View style={[styles.loading, { backgroundColor: theme.pageBackground }]} accessibilityLabel="Chargement de Connexio"><ActivityIndicator size="large" color={colors.primary} /></View>;
 
   const applicationStack = (
-    <>
+    <View style={[styles.application, { backgroundColor: theme.pageBackground }]}>
       <StatusBar style={theme.isLight ? "dark" : "light"} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: "fade" }} />
+      <View style={styles.stackArea}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: "fade" }} />
+      </View>
       <FloatingBackButton />
       <AppAlertHost />
-    </>
+    </View>
   );
 
   if (!isAuthenticated) {
@@ -162,4 +164,8 @@ export default function RootLayout() {
   return <SafeAreaProvider initialMetrics={initialWindowMetrics}><ThemeProvider><LanguageProvider><SessionProvider><AuthenticatedApp /></SessionProvider></LanguageProvider></ThemeProvider></SafeAreaProvider>;
 }
 
-const styles = StyleSheet.create({ loading: { flex: 1, alignItems: "center", justifyContent: "center" } });
+const styles = StyleSheet.create({
+  application: { flex: 1 },
+  stackArea: { flex: 1, minHeight: 0 },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center" }
+});
