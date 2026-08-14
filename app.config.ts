@@ -182,7 +182,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       icon: "./assets/icon.png",
       blockedPermissions: ["android.permission.ACCESS_FINE_LOCATION"],
       adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
+        foregroundImage: "./assets/splash-icon.png",
         backgroundColor: "#FFFFFF"
       },
       softwareKeyboardLayoutMode: "resize",
@@ -201,7 +201,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           image: "./assets/splash-icon.png",
           imageWidth: 220,
           resizeMode: "contain",
-          backgroundColor: "#020713"
+          backgroundColor: "#FFFFFF"
         }
       ],
       "expo-audio",
@@ -266,20 +266,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       backendContract,
       mockMode,
       buildProfile,
-      releaseStage: isProduction
-        ? "production"
-        : isReleaseCandidate
-          ? "release-candidate"
-          : buildProfile === "preview"
-            ? "preview"
-            : "development",
-      ...(easProjectId
-        ? {
-            eas: {
-              projectId: easProjectId
-            }
-          }
-        : {})
+      eas: {
+        projectId: easProjectId
+      }
     }
   };
 };
