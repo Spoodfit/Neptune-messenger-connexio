@@ -63,8 +63,11 @@ if (packageJson.version !== "1.0.0-rc.1") {
 }
 
 const appConfig = fs.readFileSync(path.join(root, "app.config.ts"), "utf8");
+const appVersionMatch = appConfig.match(/const APP_VERSION = "(\d+\.\d+\.\d+)";/);
+if (!appVersionMatch) {
+  throw new Error("Configuration store incomplète : APP_VERSION sémantique introuvable");
+}
 for (const marker of [
-  'const APP_VERSION = "1.0.0"',
   "privacyManifests",
   "connexio_notification.mp3",
   "EXPO_PUBLIC_ACCOUNT_DELETION_URL",
@@ -138,4 +141,4 @@ for (const marker of ["Contenus générés par les utilisateurs", "Signalement, 
   }
 }
 
-console.log(`Audit RC/store réussi : ${repositoryFiles.length} fichiers contrôlés.`);
+console.log(`Audit RC/store réussi : ${repositoryFiles.length} fichiers contrôlés. Version app ${appVersionMatch[1]}.`);
