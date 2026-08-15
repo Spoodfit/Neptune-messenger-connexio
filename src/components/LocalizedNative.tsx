@@ -6,7 +6,7 @@ import {
   type PressableProps
 } from "react-native";
 
-import { translateUiText } from "../i18n/uiTranslations";
+import { translateConnexioUiText } from "../i18n/uiTranslator";
 import { useAppLanguage } from "../providers/LanguageProvider";
 import { Text } from "./LocalizedText";
 import { TextInput } from "./LocalizedTextInput";
@@ -14,7 +14,7 @@ import { TextInput } from "./LocalizedTextInput";
 export { Text, TextInput };
 
 function localize(value: unknown, language: string) {
-  return typeof value === "string" ? translateUiText(value, language) : value;
+  return typeof value === "string" ? translateConnexioUiText(value, language) : value;
 }
 
 type PressableRef = ElementRef<typeof NativePressable>;
@@ -39,7 +39,7 @@ export function Button({ title, accessibilityLabel, ...props }: ButtonProps) {
   return (
     <NativeButton
       {...props}
-      title={translateUiText(title, uiLanguage)}
+      title={translateConnexioUiText(title, uiLanguage)}
       accessibilityLabel={localize(accessibilityLabel, uiLanguage) as ButtonProps["accessibilityLabel"]}
     />
   );
