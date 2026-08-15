@@ -1,6 +1,13 @@
-import { useMemo } from "react";
+import { Text } from "@/components/LocalizedText";
+import {
+  useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 

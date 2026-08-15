@@ -1,11 +1,19 @@
-import { StatusBar } from "expo-status-bar";
+import {
+  StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
-import { Redirect, router, Stack, useSegments } from "expo-router";
-import { useEffect, useRef } from "react";
-import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { Redirect,
+  router,
+  Stack,
+  useSegments } from "expo-router";
+import { useEffect,
+  useRef } from "react";
+import { ActivityIndicator,
+  Platform,
+  StyleSheet,
+  View
+} from "react-native";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 
-import { FloatingBackButton } from "../src/components/FloatingBackButton";
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
@@ -146,7 +154,6 @@ function AuthenticatedApp() {
       <View style={styles.stackArea}>
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: "fade" }} />
       </View>
-      <FloatingBackButton />
       <AppAlertHost />
     </View>
   );

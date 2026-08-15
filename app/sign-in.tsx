@@ -1,8 +1,12 @@
-import { useMemo } from "react";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,8 +15,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";

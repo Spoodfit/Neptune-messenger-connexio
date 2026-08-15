@@ -1,9 +1,18 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo,
+  useState } from "react";
+import { ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { LanguagePickerModal } from "@/components/LanguagePickerModal";

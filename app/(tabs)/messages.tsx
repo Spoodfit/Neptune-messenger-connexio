@@ -1,8 +1,17 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo,
+  useState } from "react";
+import { ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";

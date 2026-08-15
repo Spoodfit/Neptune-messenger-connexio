@@ -1,7 +1,17 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-import { useMemo, useState } from "react";
-import { Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer,
+  useAudioPlayerStatus } from "expo-audio";
+import { useMemo,
+  useState } from "react";
+import { Image,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 import { AppAlert } from "../services/ui/AppAlert";

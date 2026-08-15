@@ -1,4 +1,4 @@
-import { strictEqual, throws } from "node:assert";
+import { deepStrictEqual, strictEqual, throws } from "node:assert";
 import test from "node:test";
 
 import {
@@ -92,6 +92,25 @@ test("normalise conversations et compteurs snake_case en lecture seule par défa
   strictEqual(conversations[0]?.unreadCount, 5);
   strictEqual(conversations[0]?.lastMessage, "Bonjour");
   strictEqual(conversations[0]?.canPost, false);
+});
+
+test("conserve les participants et membres actifs d’une conversation privée", () => {
+  const conversations = normalizeConversationList([
+    {
+      id: "direct-1",
+      name: "Aurore Martin",
+      type: "direct",
+      participants: [
+        { id: "user-current", name: "Johan" },
+        { user_id: "user-aurore", name: "Aurore Martin" }
+      ],
+      active_member_ids: ["user-aurore"],
+      member_count: 2
+    }
+  ]);
+
+  deepStrictEqual(conversations[0]?.memberIds, ["user-current", "user-aurore"]);
+  deepStrictEqual(conversations[0]?.activeMemberIds, ["user-aurore"]);
 });
 
 test("refuse un type de conversation absent ou inconnu", () => {

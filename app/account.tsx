@@ -1,8 +1,20 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect,
+  useMemo,
+  useState } from "react";
+import { ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppAlert } from "@/services/ui/AppAlert";
 

@@ -1,6 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import { StyleSheet, View } from "react-native";
 
 import { getRoleAppearance } from "../domain/roleAppearance";
+import { useAppTheme } from "../providers/ThemeProvider";
 import type { UserRole } from "../types/messaging";
 
 interface MemberStatusBadgeProps {
@@ -14,7 +16,8 @@ export function MemberStatusBadge({
   compact = false,
   accessibilityLabel
 }: MemberStatusBadgeProps) {
-  const appearance = getRoleAppearance(role);
+  const theme = useAppTheme();
+  const appearance = getRoleAppearance(role, theme.isLight);
   return (
     <View
       accessible

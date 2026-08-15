@@ -1,7 +1,16 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Slot, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { Slot,
+  useLocalSearchParams } from "expo-router";
+import { useMemo,
+  useState } from "react";
+import { Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { StatusAvatar } from "@/components/StatusAvatar";

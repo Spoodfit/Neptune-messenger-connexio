@@ -1,6 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import { StyleSheet, View } from "react-native";
 
 import { getRoleAppearance } from "../domain/roleAppearance";
+import { useAppTheme } from "../providers/ThemeProvider";
 import type { AppUser, Conversation } from "../types/messaging";
 import { StatusAvatar } from "./StatusAvatar";
 
@@ -40,19 +42,31 @@ function slotsFor(count: number, size: number): AvatarSlot[] {
 }
 
 export function PrivateConversationAvatar({ conversation, members, currentUserId, size = 52 }: Props) {
-  const participants = (conversation.memberIds ?? [])
+  const theme = useAppTheme();
+  const participantIds = conversation.memberIds?.length
+    ? conversation.memberIds
+    : conversation.activeMemberIds ?? [];
+  const participants = participantIds
     .map((id) => members.find((member) => member.id === id))
     .filter((member): member is AppUser => Boolean(member));
 
   if (conversation.type === "direct") {
-    const member = participants.find((item) => item.id !== currentUserId) ?? participants[0];
+    const normalizedConversationName = conversation.name.trim().toLocaleLowerCase();
+    const member =
+      participants.find((item) => item.id !== currentUserId) ??
+      participants[0] ??
+      members.find((item) => item.id !== currentUserId && item.name.trim().toLocaleLowerCase() === normalizedConversationName);
     if (member) return <StatusAvatar user={member} size={size} accessible={false} ringWidth={3} />;
+    if (conversation.avatarUrl) {
+      const initials = conversation.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "N";
+      return <StatusAvatar user={{ name: conversation.name, initials, avatarUrl: conversation.avatarUrl, role: "free" }} size={size} accessible={false} ringWidth={3} />;
+    }
   }
 
   const visible = participants.slice(0, 4);
   const slots = slotsFor(visible.length, size);
   if (visible.length === 0) {
-    const appearance = getRoleAppearance("free");
+    const appearance = getRoleAppearance("free", theme.isLight);
     return (
       <View accessibilityElementsHidden style={[styles.fallback, { width: size, height: size, borderRadius: size / 2, borderColor: appearance.foreground }]}>
         <Text style={[styles.fallbackText, { color: appearance.foreground }]}>N</Text>

@@ -1,7 +1,8 @@
+import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { useMessaging } from "@/providers/MessagingProvider";

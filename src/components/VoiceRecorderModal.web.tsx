@@ -1,13 +1,16 @@
-import { useMemo } from "react";
+import { Text } from "@/components/LocalizedText";
+import {
+  useMemo } from "react";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { AppAlert } from "@/services/ui/AppAlert";

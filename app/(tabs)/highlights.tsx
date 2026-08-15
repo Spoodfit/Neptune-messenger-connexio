@@ -1,8 +1,20 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router,
+  useLocalSearchParams } from "expo-router";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import { ActivityIndicator,
+  Animated,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { AdvantageAdCard } from "@/components/AdvantageAdCard";
 import { BrandHeader } from "@/components/BrandHeader";

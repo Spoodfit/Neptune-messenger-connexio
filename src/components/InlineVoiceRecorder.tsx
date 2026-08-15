@@ -1,4 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
@@ -8,12 +10,14 @@ import {
 } from "expo-audio";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 import { AppAlert } from "@/services/ui/AppAlert";

@@ -1,6 +1,13 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef } from "react";
-import { Animated, Modal, StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { useEffect,
+  useRef } from "react";
+import { Animated,
+  Modal,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useAppTheme } from "../providers/ThemeProvider";

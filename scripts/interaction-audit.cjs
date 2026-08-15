@@ -48,29 +48,30 @@ async function run() {
     check(await page.getByLabel("Publier un Temps fort").isVisible(), "Bouton + : action Temps fort visible");
     await page.getByLabel("Nouvelle conversation").click();
     await waitRoute(page, "/new-conversation", "Bouton + : nouvelle conversation");
-    check(await page.getByLabel("Retour à l’écran précédent").isVisible(), "Retour secondaire présent sur un écran de détail");
+    check((await page.getByLabel("Retour à l’écran précédent").count()) === 0, "Aucun bouton Retour secondaire en bas");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     await page.getByLabel("Créer").click();
     await page.getByLabel("Publier un Temps fort").click();
     await waitRoute(page, "/new-highlight", "Bouton + : nouveau Temps fort");
 
-    // Segmented controls must stay interactive after the swipe-navigation removal.
+    // Segmented controls must change rendered content. React Native Web does not
+    // consistently expose aria-selected for accessibilityState across versions.
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     const privateTab = page.getByRole("tab", { name: "Privées" });
     await privateTab.click();
-    check((await privateTab.getAttribute("aria-selected")) === "true", "Onglet Privées actif");
+    check(await page.getByText("Discussions privées", { exact: true }).isVisible(), "Onglet Privées actif");
     const groupTab = page.getByRole("tab", { name: "Groupes" });
     await groupTab.click();
-    check((await groupTab.getAttribute("aria-selected")) === "true", "Onglet Groupes actif");
+    check(await page.getByText("Discussions de groupe", { exact: true }).isVisible(), "Onglet Groupes actif");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
     await mapTab.click();
-    check((await mapTab.getAttribute("aria-selected")) === "true", "Onglet Map actif");
+    check(await page.locator("iframe[title='Carte Neptune']").isVisible(), "Onglet Map actif");
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
     await feedTab.click();
-    check((await feedTab.getAttribute("aria-selected")) === "true", "Onglet Feed actif");
+    check(await page.getByLabel("Options de la publication").first().isVisible(), "Onglet Feed actif");
 
     // Publication ellipsis must open the Connexio action sheet.
     const postOptions = page.getByLabel("Options de la publication").first();
@@ -84,30 +85,32 @@ async function run() {
     check(await profileButton.isVisible(), "Accès profil depuis un Temps fort visible");
     await profileButton.click();
     check(pathOf(page).includes("/profile/"), "Ouverture du profil membre", `route obtenue: ${pathOf(page)}`);
-    check(await page.getByLabel("Retour à l’écran précédent").isVisible(), "Retour secondaire présent sur le profil membre");
+    check((await page.getByLabel("Retour à l’écran précédent").count()) === 0, "Aucun bouton Retour secondaire sur le profil membre");
 
-    const lightToggle = page.getByLabel("Passer en mode clair");
+    // Expo Router can keep the previous route mounted on web; use the visible/topmost
+    // theme control from the current profile rather than a strict global locator.
+    const lightToggle = page.getByLabel("Passer en mode clair").last();
     check(await lightToggle.isVisible(), "Bouton Light/Dark du profil visible");
     await lightToggle.click();
-    check(await page.getByLabel("Passer en mode sombre").isVisible(), "Bouton Light/Dark du profil fonctionnel");
+    check(await page.getByLabel("Passer en mode sombre").last().isVisible(), "Bouton Light/Dark du profil fonctionnel");
 
-    const profileMore = page.getByLabel("Plus d’options");
+    const profileMore = page.getByLabel("Plus d’options").last();
     check(await profileMore.isVisible(), "Trois points du profil visibles");
     await profileMore.click();
     check((await page.locator('[role="menu"]').count()) > 0, "Trois points du profil fonctionnels");
     await page.getByLabel("Fermer").last().click();
 
-    const topBack = page.getByLabel("Retour", { exact: true });
+    const topBack = page.getByLabel("Retour", { exact: true }).last();
     check(await topBack.isVisible(), "Retour haut gauche du profil visible");
     await topBack.click();
     await waitRoute(page, "/highlights", "Retour haut gauche du profil fonctionnel");
 
     // App language selector must be discoverable and use Connexio UI rather than an OS dialog.
     await page.goto(`${BASE_URL}/settings`, { waitUntil: "networkidle" });
-    const languageButton = page.getByLabel("Changer la langue de Connexio");
+    const languageButton = page.getByLabel("Changer la langue de Connexio").last();
     check(await languageButton.isVisible(), "Réglage langue visible");
     await languageButton.click();
-    check(await page.getByText("Langue de Connexio", { exact: true }).isVisible(), "Sélecteur de langue fonctionnel");
+    check(await page.getByText("Langue de Connexio", { exact: true }).last().isVisible(), "Sélecteur de langue fonctionnel");
     await page.getByLabel("Fermer").last().click();
 
     check(pageErrors.length === 0, "Aucune erreur JavaScript pendant les interactions", pageErrors.join(" | "));
@@ -121,7 +124,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: navigation, +, segmented controls, menus, theme, back controls and language picker.");
+  console.log("Interaction audit passed: navigation, +, segmented controls, menus, theme, single top back control and language picker.");
 }
 
 run().catch((error) => {

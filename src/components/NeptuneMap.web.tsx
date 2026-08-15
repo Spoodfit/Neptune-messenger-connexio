@@ -1,5 +1,11 @@
-import { createElement, useEffect, useMemo, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import {
+  createElement,
+  useEffect,
+  useMemo,
+  useRef } from "react";
+import { StyleSheet,
+  View
+} from "react-native";
 
 import { getRoleAppearance } from "../domain/roleAppearance";
 import { useAppTheme } from "../providers/ThemeProvider";

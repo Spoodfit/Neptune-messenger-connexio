@@ -1,5 +1,12 @@
-import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, useState } from "react";
-import { useColorScheme } from "react-native";
+import {
+  createContext,
+  type PropsWithChildren,
+  useContext,
+  useEffect,
+  useMemo,
+  useState } from "react";
+import { useColorScheme
+} from "react-native";
 
 import { createStandaloneStateStore } from "../storage/standaloneStore";
 import { darkSemanticPalette, lightSemanticPalette } from "../theme/semanticPalette";

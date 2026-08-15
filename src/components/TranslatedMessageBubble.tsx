@@ -1,5 +1,13 @@
-import { type ComponentProps, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import {
+  type ComponentProps,
+  useEffect,
+  useMemo,
+  useState } from "react";
+import { Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { getLanguageFrenchName, isSameLanguage } from "../i18n/languages";
 import { getTranslationRequestLanguage } from "../i18n/translationLocale";

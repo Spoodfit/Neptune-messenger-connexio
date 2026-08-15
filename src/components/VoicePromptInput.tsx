@@ -1,10 +1,17 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent
 } from "expo-speech-recognition";
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useMemo,
+  useState } from "react";
+import { Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 import { AppAlert } from "../services/ui/AppAlert";

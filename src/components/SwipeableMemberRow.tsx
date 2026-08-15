@@ -1,6 +1,14 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useRef } from "react";
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { useMemo,
+  useRef } from "react";
+import { Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { canBeGroupResponsible } from "../domain/accessPolicy";
 import { colors } from "../theme";
 import type { AppUser } from "../types/messaging";

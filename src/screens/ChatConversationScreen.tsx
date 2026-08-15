@@ -1,8 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { router,
+  useLocalSearchParams } from "expo-router";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -13,8 +20,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -167,9 +172,21 @@ export default function ChatScreen() {
   const loading = loadingConversationIds.has(conversationId);
   const loadingMore = loadingMoreConversationIds.has(conversationId);
   const hasMore = hasMoreMessages(conversationId);
-  const directMemberId = conversation?.memberIds?.find(
+  const directParticipantIds = conversation?.memberIds?.length
+    ? conversation.memberIds
+    : conversation?.activeMemberIds ?? [];
+  const directMemberId = directParticipantIds.find(
     (memberId) => memberId !== currentUser.id
   );
+  const directMember = conversation?.type === "direct"
+    ? members.find((member) => member.id === directMemberId) ??
+      members.find(
+        (member) =>
+          member.id !== currentUser.id &&
+          member.name.trim().toLocaleLowerCase() ===
+            conversation.name.trim().toLocaleLowerCase()
+      )
+    : undefined;
   const canPost = conversation
     ? canPublishInConversation(currentUser, conversation)
     : false;
@@ -201,8 +218,13 @@ export default function ChatScreen() {
   const messages = useMemo(() => {
     const byId = new Map<string, ChatMessage>();
     for (const message of [...ephemeralMessages, ...baseMessages]) {
+      const member = members.find((item) => item.id === message.senderId);
       byId.set(message.id, {
         ...message,
+        senderName: member?.name ?? message.senderName,
+        senderInitials: member?.initials ?? message.senderInitials,
+        senderAvatarUrl: message.senderAvatarUrl ?? member?.avatarUrl,
+        senderRole: message.senderRole ?? member?.role,
         poll: pollOverrides[message.id] ?? message.poll
       });
     }
@@ -210,7 +232,7 @@ export default function ChatScreen() {
       (first, second) =>
         Date.parse(second.createdAt) - Date.parse(first.createdAt)
     );
-  }, [baseMessages, ephemeralMessages, pollOverrides]);
+  }, [baseMessages, ephemeralMessages, members, pollOverrides]);
   const latestMessageId = messages[0]?.id;
   const memberCount =
     conversation?.memberIds?.length ?? conversation?.memberCount ?? 0;
@@ -726,33 +748,43 @@ export default function ChatScreen() {
           onPress={openConversationDetails}
           style={styles.headerContent}
         >
-          <Text
-            accessibilityRole="header"
-            style={styles.headerTitle}
-            numberOfLines={1}
-          >
-            {conversation.name}
-          </Text>
-          {conversation.type === "direct" && canInitiateCalls ? (
-            <Text numberOfLines={1} style={styles.headerSubtitle}>
-              {connectionLabel}
+          {conversation.type === "direct" && directMember ? (
+            <StatusAvatar
+              user={directMember}
+              size={38}
+              ringWidth={2.5}
+              accessible={false}
+            />
+          ) : null}
+          <View style={styles.headerCopy}>
+            <Text
+              accessibilityRole="header"
+              style={styles.headerTitle}
+              numberOfLines={1}
+            >
+              {conversation.name}
             </Text>
-          ) : (
-            <View style={styles.headerMembers}>
-              <MemberAvatarStack
-                memberIds={activeMemberIds}
-                members={members}
-                memberCount={memberCount}
-                maxVisible={4}
-                size={20}
-              />
-              {connectionState !== "online" && !localOnly ? (
-                <Text numberOfLines={1} style={styles.headerSubtitle}>
-                  {connectionLabel}
-                </Text>
-              ) : null}
-            </View>
-          )}
+            {conversation.type === "direct" && canInitiateCalls ? (
+              <Text numberOfLines={1} style={styles.headerSubtitle}>
+                {connectionLabel}
+              </Text>
+            ) : (
+              <View style={styles.headerMembers}>
+                <MemberAvatarStack
+                  memberIds={activeMemberIds}
+                  members={members}
+                  memberCount={memberCount}
+                  maxVisible={4}
+                  size={20}
+                />
+                {connectionState !== "online" && !localOnly ? (
+                  <Text numberOfLines={1} style={styles.headerSubtitle}>
+                    {connectionLabel}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          </View>
         </Pressable>
         <ThemeModeButton />
         {conversation.type === "direct" ? (
@@ -839,7 +871,7 @@ export default function ChatScreen() {
           renderItem={({ item }) => {
             const spotlight = item.id === spotlightMessageId;
             return (
-              <Animated.View style={[styles.messageSpotlight, spotlight && { borderColor: theme.orange, borderWidth: 2, backgroundColor: theme.orangeSoft, shadowColor: theme.violet, opacity: spotlightProgress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [1, 0.96, 1] }), transform: [{ scale: spotlightProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] }) }] }]}>
+              <Animated.View style={[styles.messageSpotlight, spotlight && { borderColor: theme.orange, borderWidth: 2, backgroundColor: theme.orangeSoft, shadowColor: theme.violet, shadowOpacity: theme.isLight ? 0.34 : 0.82, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: theme.isLight ? 2 : 5, opacity: spotlightProgress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [1, 0.96, 1] }), transform: [{ scale: spotlightProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] }) }] }]}>
                 <MessageBubble message={item} reactions={getMessageReactions(item)} onRetry={(clientMessageId) => void retryMessage(clientMessageId)} onReact={(message, emoji) => toggleMessageReaction(message, emoji)} onReply={announcement ? undefined : setReplyingTo} centered={announcement} onOpenProfile={openMemberProfile} onVotePoll={votePoll} />
               </Animated.View>
             );
@@ -1217,9 +1249,12 @@ const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: 52,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     paddingHorizontal: 5
   },
+  headerCopy: { flex: 1, minWidth: 0, justifyContent: "center" },
   headerTitle: { ...typography.heading3, color: theme.pageText },
   headerSubtitle: { color: theme.pageTextMuted, fontSize: 11, marginTop: 2 },
   headerMembers: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 8 },
@@ -1263,7 +1298,7 @@ const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
     paddingVertical: spacing.md,
     gap: 3
   },
-  messageSpotlight: { borderRadius: 20, padding: 0, shadowOpacity: 0.82, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: 5 },
+  messageSpotlight: { borderRadius: 20, padding: 0, shadowOpacity: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, elevation: 0 },
   historyLoader: { minHeight: 52, alignItems: "center", justifyContent: "center" },
   empty: {
     ...typography.bodySmall,

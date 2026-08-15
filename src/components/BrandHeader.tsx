@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import { Image, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { NEPTUNE_LOGO_DATA_URI } from "@/assets/neptuneLogo";

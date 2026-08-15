@@ -1,12 +1,16 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   Animated,
   PanResponder,
   Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View
 } from "react-native";
@@ -79,7 +83,7 @@ export function MessageBubble({
     (reaction) => reaction.reactedByCurrentUser
   )?.emoji;
   const canReactWithLongPress = Boolean(onReact) && !message.isMine;
-  const senderRoleAppearance = getRoleAppearance(message.senderRole ?? "triton");
+  const senderRoleAppearance = getRoleAppearance(message.senderRole ?? "triton", theme.isLight);
 
   useEffect(() => {
     Animated.spring(reactionProgress, {
@@ -511,9 +515,10 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.creat
   mine: {
     borderBottomRightRadius: 5,
     shadowColor: theme.violet,
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 }
+    shadowOpacity: theme.isLight ? 0 : 0.18,
+    shadowRadius: theme.isLight ? 0 : 12,
+    shadowOffset: { width: 0, height: theme.isLight ? 0 : 8 },
+    elevation: theme.isLight ? 0 : 3
   },
   other: {
     borderWidth: 1,

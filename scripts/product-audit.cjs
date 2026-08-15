@@ -177,7 +177,7 @@ async function run() {
   try {
     const sizes = [[280, 568], [320, 568], [390, 844], [430, 720], [768, 1024], [1024, 768]];
     for (const [width, height] of sizes) {
-      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: "reduce" });
+      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: "reduce", locale: "fr-FR" });
       const pageErrors = [];
       page.on("pageerror", (error) => pageErrors.push(error.message));
       page.on("console", (message) => { if (message.type() === "error") pageErrors.push(message.text()); });
@@ -189,7 +189,7 @@ async function run() {
       await page.close();
     }
 
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: "fr-FR" });
     const runtimeErrors = [];
     page.on("pageerror", (error) => runtimeErrors.push(error.message));
     page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(message.text()); });
@@ -215,8 +215,6 @@ async function run() {
       failures.push("maintien long: aucune conversation de groupe visible");
     }
 
-    // Isole la suite du parcours : la feuille ouverte par le maintien long ne doit
-    // jamais intercepter les contrôles testés ensuite.
     await resetToMessages(page);
 
     await openQuickCreate(page);
@@ -256,6 +254,29 @@ async function run() {
     await clickText(page, "Profil", "onglet Profil");
     await expectVisible(page.getByText("Compte et sécurité", { exact: true }).first(), "profil fonctionnel");
     await checkGeometry(page, "Profil");
+
+    // Regression: selecting an app language must immediately change visible UI,
+    // not only the Accept-Language header used for message translation.
+    const languageButton = page.getByLabel("Changer la langue de Connexio", { exact: true });
+    await expectVisible(languageButton, "sélecteur de langue");
+    if (await languageButton.isVisible().catch(() => false)) {
+      await languageButton.click();
+      const english = page.getByRole("radio").filter({ hasText: "English" }).first();
+      await expectVisible(english, "langue English");
+      if (await english.isVisible().catch(() => false)) {
+        await english.click();
+        await expectVisible(page.getByText("Profile", { exact: true }).first(), "navigation traduite en anglais");
+        await expectVisible(page.getByText("Appearance", { exact: true }).first(), "profil traduit en anglais");
+        const reopenLanguage = page.getByLabel("Changer la langue de Connexio", { exact: true });
+        if (await reopenLanguage.isVisible().catch(() => false)) {
+          await reopenLanguage.click();
+          const french = page.getByRole("radio").filter({ hasText: "Français" }).first();
+          await expectVisible(french, "retour langue Français");
+          if (await french.isVisible().catch(() => false)) await french.click();
+          await expectVisible(page.getByText("Profil", { exact: true }).first(), "retour interface française");
+        }
+      }
+    }
 
     const signOut = page.getByLabel("Se déconnecter de Connexio");
     await expectVisible(signOut, "bouton de déconnexion");
