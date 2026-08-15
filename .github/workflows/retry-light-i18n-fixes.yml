@@ -1,0 +1,52 @@
+name: Retry light and i18n fixes
+
+on:
+  push:
+    branches:
+      - fix/connexio-light-i18n-20260815
+    paths:
+      - .github/workflows/retry-light-i18n-fixes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/connexio-light-i18n-20260815
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Reuse migration with typed wire helper
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          src = Path('.github/workflows/apply-light-i18n-fixes.yml').read_text()
+          start = src.index("          node <<'NODE'\n") + len("          node <<'NODE'\n")
+          end = src.index("\n          NODE", start)
+          block = src[start:end]
+          lines = []
+          for line in block.splitlines():
+              lines.append(line[10:] if line.startswith('          ') else line)
+          code = '\n'.join(lines)
+          code = code.replace(
+              'function participantIds(record) {',
+              'function participantIds(record: Record<string, unknown>): string[] | undefined {'
+          )
+          Path('/tmp/apply-light-i18n.js').write_text(code)
+          PY
+          node /tmp/apply-light-i18n.js
+      - name: Verify application
+        run: npm run verify
+      - name: Commit source migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: clean light conversations and localize application UI'
+          git push origin HEAD:fix/connexio-light-i18n-20260815
