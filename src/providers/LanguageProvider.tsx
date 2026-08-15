@@ -99,7 +99,14 @@ export function LanguageProvider({ children }: PropsWithChildren) {
     // race where a pending async load could overwrite a language just selected.
     persistMode(normalized);
     setMode(normalized);
-  }, [language]);
+
+    // Keep the already-working message translation behaviour intact. UI locale
+    // rendering is separate, but the selected language remains the translation
+    // target unless the user follows the phone language.
+    setTranslationRequestLanguage(
+      normalized === "system" ? systemLanguage : normalizeLanguageCode(normalized, systemLanguage)
+    );
+  }, [language, systemLanguage]);
 
   const t = useCallback((text: string) => translateUiText(text, uiLanguage), [uiLanguage]);
   const value = useMemo(
