@@ -1,12 +1,17 @@
-const path = require("node:path");
-
 const LOCALIZED_IMPORT = "@/components/LocalizedNative";
+const UI_LOCALE_IMPORT = "@/i18n/uiLocale";
+const UI_LOCALE_LOCAL = "__connexioUiLocaleTag";
 const TARGETS = new Set(["Text", "TextInput", "Pressable", "Button"]);
+const DATE_METHODS = new Set(["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]);
 const EXCLUDED_FILES = new Set([
   "src/components/LocalizedNative.tsx",
   "src/components/LocalizedText.tsx",
   "src/components/LocalizedTextInput.tsx"
 ]);
+
+function isFrenchLocaleLiteral(t, node) {
+  return t.isStringLiteral(node) && /^(fr|fr-FR)$/i.test(node.value);
+}
 
 module.exports = function connexioI18nPlugin({ types: t }) {
   return {
@@ -50,9 +55,7 @@ module.exports = function connexioI18nPlugin({ types: t }) {
               continue;
             }
             if (!existingLocalizedLocals.has(specifier.local.name)) {
-              localizedSpecifiers.push(
-                t.importSpecifier(t.identifier(specifier.local.name), t.identifier(imported))
-              );
+              localizedSpecifiers.push(t.importSpecifier(t.identifier(specifier.local.name), t.identifier(imported)));
               existingLocalizedLocals.add(specifier.local.name);
             }
           }
@@ -62,9 +65,41 @@ module.exports = function connexioI18nPlugin({ types: t }) {
         }
 
         if (localizedSpecifiers.length > 0) {
+          programPath.unshiftContainer("body", t.importDeclaration(localizedSpecifiers, t.stringLiteral(LOCALIZED_IMPORT)));
+        }
+
+        let needsLocaleImport = false;
+        const localeCall = () => {
+          needsLocaleImport = true;
+          return t.callExpression(t.identifier(UI_LOCALE_LOCAL), []);
+        };
+
+        programPath.traverse({
+          CallExpression(callPath) {
+            const callee = callPath.node.callee;
+            if (!t.isMemberExpression(callee) || callee.computed || !t.isIdentifier(callee.property) || !DATE_METHODS.has(callee.property.name)) return;
+            if (!isFrenchLocaleLiteral(t, callPath.node.arguments[0])) return;
+            callPath.node.arguments[0] = localeCall();
+          },
+          NewExpression(newPath) {
+            const callee = newPath.node.callee;
+            if (
+              !t.isMemberExpression(callee) || callee.computed ||
+              !t.isIdentifier(callee.object, { name: "Intl" }) ||
+              !t.isIdentifier(callee.property, { name: "DateTimeFormat" }) ||
+              !isFrenchLocaleLiteral(t, newPath.node.arguments[0])
+            ) return;
+            newPath.node.arguments[0] = localeCall();
+          }
+        });
+
+        if (needsLocaleImport) {
           programPath.unshiftContainer(
             "body",
-            t.importDeclaration(localizedSpecifiers, t.stringLiteral(LOCALIZED_IMPORT))
+            t.importDeclaration(
+              [t.importSpecifier(t.identifier(UI_LOCALE_LOCAL), t.identifier("getCurrentUiLocaleTag"))],
+              t.stringLiteral(UI_LOCALE_IMPORT)
+            )
           );
         }
       }
