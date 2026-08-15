@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 
+import { translatedContentField } from "../i18n/contentTranslation";
 import { colors, spacing } from "../theme";
 import type { EventVoteAlert } from "../types/messaging";
 
@@ -14,10 +15,11 @@ import { useAppTheme } from "@/providers/ThemeProvider";
 export function EventVoteBanner({ alert }: EventVoteBannerProps) {
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const translatedTitle = translatedContentField(alert.title, alert.translation, "title") ?? alert.title;
   return (
     <View
       accessible
-      accessibilityLabel={`${alert.pendingCount} évènement${alert.pendingCount > 1 ? "s" : ""} à voter pour ${alert.clubName}`}
+      accessibilityLabel={`${alert.pendingCount} évènement${alert.pendingCount > 1 ? "s" : ""} à voter pour ${alert.clubName}. ${translatedTitle}`}
       style={styles.banner}
     >
       <View style={styles.icon}>
@@ -25,7 +27,7 @@ export function EventVoteBanner({ alert }: EventVoteBannerProps) {
       </View>
       <View style={styles.content}>
         <Text style={styles.eyebrow}>VOTE DU CLUB</Text>
-        <Text style={styles.title} numberOfLines={1}>{alert.title}</Text>
+        <Text style={styles.title} numberOfLines={1}>{translatedTitle}</Text>
         <Text style={styles.subtitle} numberOfLines={2}>
           {alert.pendingCount} vote{alert.pendingCount > 1 ? "s" : ""} en attente · {alert.clubName}
           {alert.city ? ` · ${alert.city}` : ""}
