@@ -101,7 +101,7 @@ async function run() {
     await clickExact(page, "Profile", "retour Profile EN");
     const languageChecks = [
       ["Español", "Idioma", "Apariencia"],
-      ["Deutsch", "Sprache", "Erscheinungsbild"],
+      ["Deutsch", "Sprache", "Darstellung"],
       ["Italiano", "Lingua", "Aspetto"],
       ["Português", "Idioma", "Aparência"]
     ];
@@ -110,7 +110,7 @@ async function run() {
       if (await openLanguagePicker(page, currentA11y)) await chooseLanguage(page, option);
       await expectText(page, languageText, `${option}: langue traduite`);
       await expectText(page, appearanceText, `${option}: apparence traduite`);
-      currentA11y = option === "Español" ? "Cambiar el idioma de Connexio" : option === "Deutsch" ? "Connexio-Sprache ändern" : option === "Italiano" ? "Cambia lingua di Connexio" : "Alterar idioma do Connexio";
+      currentA11y = option === "Español" ? "Cambiar idioma de Connexio" : option === "Deutsch" ? "Connexio-Sprache ändern" : option === "Italiano" ? "Cambia lingua di Connexio" : "Alterar idioma do Connexio";
     }
 
     if (await openLanguagePicker(page, currentA11y)) await chooseLanguage(page, "Français");
