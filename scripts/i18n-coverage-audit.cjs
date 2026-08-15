@@ -13,8 +13,16 @@ const UI_PROP_NAMES = new Set([
 ]);
 const NON_TRANSLATABLE = new Set([
   "Connexio", "Neptune", "Neptune Business", "Visionnaire", "Amiral", "Capitaine", "Moussaillon", "Triton",
-  "iOS", "Android", "YouTube", "WhatsApp", "EAS", "Expo"
+  "iOS", "Android", "YouTube", "WhatsApp", "EAS", "Expo", "OK"
 ]);
+const IGNORED_PATH_PREFIXES = [
+  "src/i18n/",
+  "src/data/",
+  "src/domain/",
+  "src/types/",
+  "src/theme/",
+  "src/config/"
+];
 
 function walk(dir) {
   if (!fs.existsSync(dir)) return [];
@@ -48,10 +56,9 @@ function clean(value) {
 function shouldIgnore(value) {
   if (!value || value.length < 2) return true;
   if (NON_TRANSLATABLE.has(value)) return true;
-  if (/^(https?:\/\/|mailto:|tel:|wss?:\/\/|\/|#|[A-Za-z0-9_.-]+\.(png|jpg|jpeg|svg|mp3|mp4|pdf))/.test(value)) return true;
-  if (/^[A-Z0-9_.:@/+-]+$/.test(value) && !/[À-ÿ]/.test(value)) return true;
+  if (/^(https?:\/\/|mailto:|tel:|wss?:\/\/|file:|blob:|data:|about:|\/|#)/i.test(value)) return true;
   if (/^[0-9\s.,:+%€$-]+$/.test(value)) return true;
-  if (/^[a-z0-9-]+-(outline|sharp)$/i.test(value)) return true;
+  if (/^(rgba?|hsla?)\(/i.test(value)) return true;
   return !/[A-Za-zÀ-ÿ]/.test(value);
 }
 
@@ -77,19 +84,33 @@ function stringValue(node) {
   return null;
 }
 
-function isInsideJsxExpression(node) {
+// Only capture string literals from a JSX expression when that expression is
+// itself rendered as a child. Strings used for icon names, styles, enum props,
+// locale codes, accessibility roles, etc. are JSX attributes and are therefore
+// deliberately excluded unless the attribute is explicitly listed above.
+function isRenderedJsxExpression(node) {
   let current = node.parent;
   while (current) {
-    if (ts.isJsxExpression(current)) return true;
+    if (ts.isJsxExpression(current)) {
+      return ts.isJsxElement(current.parent) || ts.isJsxFragment(current.parent);
+    }
     if (ts.isStatement(current) || ts.isSourceFile(current)) return false;
     current = current.parent;
   }
   return false;
 }
 
+function objectCopyIsInUiFile(relative) {
+  return relative.startsWith("app/") ||
+    relative.startsWith("src/components/") ||
+    relative.startsWith("src/screens/") ||
+    relative.startsWith("src/services/ui/") ||
+    relative.startsWith("src/providers/");
+}
+
 for (const file of SOURCE_ROOTS.flatMap(walk)) {
   const relative = path.relative(ROOT, file).replace(/\\/g, "/");
-  if (relative.startsWith("src/i18n/")) continue;
+  if (IGNORED_PATH_PREFIXES.some((prefix) => relative.startsWith(prefix))) continue;
   const text = fs.readFileSync(file, "utf8");
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
 
@@ -100,12 +121,12 @@ for (const file of SOURCE_ROOTS.flatMap(walk)) {
       if (node.initializer && ts.isStringLiteral(node.initializer)) addCandidate(node.initializer.text, file, node, `prop:${node.name.text}`);
     }
 
-    if (ts.isPropertyAssignment(node) && UI_PROP_NAMES.has(propName(node.name))) {
+    if (objectCopyIsInUiFile(relative) && ts.isPropertyAssignment(node) && UI_PROP_NAMES.has(propName(node.name))) {
       const value = stringValue(node.initializer);
       if (value !== null) addCandidate(value, file, node, `object:${propName(node.name)}`);
     }
 
-    if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && isInsideJsxExpression(node)) {
+    if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && isRenderedJsxExpression(node)) {
       addCandidate(node.text, file, node, "jsx-expression");
     }
 
