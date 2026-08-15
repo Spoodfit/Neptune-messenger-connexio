@@ -38,16 +38,26 @@ async function clickExact(page, text, label = text) {
   const locator = page.getByText(text, { exact: true }).first();
   try {
     await locator.waitFor({ state: "visible", timeout: 7000 });
-    await locator.click();
+    await locator.click({ force: true });
     await page.waitForTimeout(250);
   } catch { failures.push(`${label}: impossible de cliquer ${JSON.stringify(text)}`); }
 }
 
 async function openLanguagePicker(page, currentLabel) {
   const byA11y = page.getByLabel(currentLabel, { exact: true });
-  if (await byA11y.isVisible().catch(() => false)) { await byA11y.click(); return true; }
+  if (await byA11y.isVisible().catch(() => false)) {
+    await byA11y.scrollIntoViewIfNeeded().catch(() => undefined);
+    await byA11y.click({ force: true });
+    await page.waitForTimeout(200);
+    return true;
+  }
   const languageRow = page.getByText(/Langue|Language|Idioma|Sprache|Lingua/, { exact: true }).first();
-  if (await languageRow.isVisible().catch(() => false)) { await languageRow.click(); return true; }
+  if (await languageRow.isVisible().catch(() => false)) {
+    await languageRow.scrollIntoViewIfNeeded().catch(() => undefined);
+    await languageRow.click({ force: true });
+    await page.waitForTimeout(200);
+    return true;
+  }
   failures.push("sélecteur de langue introuvable");
   return false;
 }
@@ -56,7 +66,7 @@ async function chooseLanguage(page, label) {
   const option = page.getByRole("radio").filter({ hasText: label }).first();
   try {
     await option.waitFor({ state: "visible", timeout: 7000 });
-    await option.click();
+    await option.click({ force: true });
     await page.waitForTimeout(300);
   } catch { failures.push(`langue ${label}: option introuvable`); }
 }
