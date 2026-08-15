@@ -1,0 +1,48 @@
+name: Patch message shadow
+
+on:
+  push:
+    branches:
+      - fix/connexio-light-i18n-20260815
+    paths:
+      - .github/workflows/patch-message-shadow.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/connexio-light-i18n-20260815
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Remove shadow from ordinary message wrappers
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const file = 'src/screens/ChatConversationScreen.tsx';
+          let source = fs.readFileSync(file, 'utf8');
+          const oldRender = '<Animated.View style={[styles.messageSpotlight, spotlight && { borderColor: theme.orange, borderWidth: 2, backgroundColor: theme.orangeSoft, shadowColor: theme.violet, opacity: spotlightProgress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [1, 0.96, 1] }), transform: [{ scale: spotlightProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] }) }] }]}>';
+          const newRender = '<Animated.View style={[styles.messageSpotlight, spotlight && { borderColor: theme.orange, borderWidth: 2, backgroundColor: theme.orangeSoft, shadowColor: theme.violet, shadowOpacity: theme.isLight ? 0.34 : 0.82, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: theme.isLight ? 2 : 5, opacity: spotlightProgress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [1, 0.96, 1] }), transform: [{ scale: spotlightProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] }) }] }]}>';
+          const oldStyle = '  messageSpotlight: { borderRadius: 20, padding: 0, shadowOpacity: 0.82, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: 5 },';
+          const newStyle = '  messageSpotlight: { borderRadius: 20, padding: 0, shadowOpacity: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, elevation: 0 },';
+          if (!source.includes(oldRender)) throw new Error('message spotlight render anchor missing');
+          if (!source.includes(oldStyle)) throw new Error('message spotlight style anchor missing');
+          source = source.replace(oldRender, newRender).replace(oldStyle, newStyle);
+          fs.writeFileSync(file, source);
+          NODE
+      - name: Verify
+        run: npm run verify
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/screens/ChatConversationScreen.tsx
+          git commit -m 'fix: remove residual message halo in light conversations'
+          git push origin HEAD:fix/connexio-light-i18n-20260815
