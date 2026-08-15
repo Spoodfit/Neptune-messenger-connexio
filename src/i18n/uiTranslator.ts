@@ -5,11 +5,14 @@ import { translateUiTextV17 } from "./uiTranslationsV17";
 import { translateUiTextV17B } from "./uiTranslationsV17b";
 import { translateUiTextV17C } from "./uiTranslationsV17c";
 import { translateUiTextV17D } from "./uiTranslationsV17d";
+import { translateUiTextV18 } from "./uiTranslationsV18";
 
 export function translateConnexioUiText(value: string, language: SupportedLanguage | string): string {
   if (!value || language === "fr") return value;
   const dynamic = translateConnexioUiPattern(value, language);
   if (dynamic !== value) return dynamic;
+  const v18 = translateUiTextV18(value, language);
+  if (v18 !== value) return v18;
   const fourthBatch = translateUiTextV17D(value, language);
   if (fourthBatch !== value) return fourthBatch;
   const thirdBatch = translateUiTextV17C(value, language);
