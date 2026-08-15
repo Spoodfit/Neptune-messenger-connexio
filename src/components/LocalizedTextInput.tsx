@@ -6,8 +6,12 @@ import { useAppLanguage } from "../providers/LanguageProvider";
 
 export type TextInput = ElementRef<typeof NativeTextInput>;
 
+function localize(value: unknown, language: string) {
+  return typeof value === "string" ? translateUiText(value, language) : value;
+}
+
 export const TextInput = forwardRef<TextInput, TextInputProps>(function LocalizedTextInput(
-  { placeholder, ...props },
+  { placeholder, accessibilityLabel, accessibilityHint, ...props },
   ref
 ) {
   const { uiLanguage } = useAppLanguage();
@@ -15,7 +19,9 @@ export const TextInput = forwardRef<TextInput, TextInputProps>(function Localize
     <NativeTextInput
       {...props}
       ref={ref}
-      placeholder={typeof placeholder === "string" ? translateUiText(placeholder, uiLanguage) : placeholder}
+      placeholder={localize(placeholder, uiLanguage) as TextInputProps["placeholder"]}
+      accessibilityLabel={localize(accessibilityLabel, uiLanguage) as TextInputProps["accessibilityLabel"]}
+      accessibilityHint={localize(accessibilityHint, uiLanguage) as TextInputProps["accessibilityHint"]}
     />
   );
 });
