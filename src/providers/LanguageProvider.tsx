@@ -4,7 +4,8 @@ import { AppState } from "react-native";
 import { readLanguagePreference, writeLanguagePreference } from "../i18n/languagePreference";
 import { detectSystemLanguage, normalizeLanguageCode, type SupportedLanguage } from "../i18n/languages";
 import { setTranslationRequestLanguage } from "../i18n/translationLocale";
-import { normalizeUiLanguageCode, translateUiText, type SupportedUiLanguage } from "../i18n/uiTranslations";
+import { normalizeUiLanguageCode, type SupportedUiLanguage } from "../i18n/uiTranslations";
+import { translateConnexioUiText } from "../i18n/uiTranslator";
 
 export type ConnexioLanguageMode = "system" | SupportedLanguage;
 
@@ -66,18 +67,15 @@ export function LanguageProvider({ children }: PropsWithChildren) {
           language === "fr" ? "fr" : "en"
         );
 
-    // Native storage writes synchronously before publishing the React state.
-    // Web uses an independent browser implementation and never bundles SQLite.
     writeLanguagePreference(normalized);
     setMode(normalized);
 
-    // Keep the already-working automatic message translation behaviour intact.
     setTranslationRequestLanguage(
       normalized === "system" ? systemLanguage : normalizeLanguageCode(normalized, systemLanguage)
     );
   }, [language, systemLanguage]);
 
-  const t = useCallback((text: string) => translateUiText(text, uiLanguage), [uiLanguage]);
+  const t = useCallback((text: string) => translateConnexioUiText(text, uiLanguage), [uiLanguage]);
   const value = useMemo(
     () => ({ mode, language, uiLanguage, setLanguageMode, t }),
     [language, mode, setLanguageMode, t, uiLanguage]
