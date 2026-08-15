@@ -1,16 +1,20 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router,
+  useLocalSearchParams } from "expo-router";
+import { useEffect,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

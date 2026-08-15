@@ -1,9 +1,16 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { useMemo,
+  useState } from "react";
+import { Pressable,
+  Share,
+  StyleSheet,
+  View
+} from "react-native";
 import { AppAlert } from "@/services/ui/AppAlert";
 
 import { capabilitiesForBackendContract } from "../config/backendCapabilities";

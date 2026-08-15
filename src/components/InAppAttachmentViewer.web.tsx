@@ -1,7 +1,14 @@
-import { useMemo } from "react";
+import { Text } from "@/components/LocalizedText";
+import {
+  useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { createElement } from "react";
-import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { colors, spacing, typography } from "../theme";
 import type { InAppAttachmentViewerProps } from "./InAppAttachmentViewer.types";

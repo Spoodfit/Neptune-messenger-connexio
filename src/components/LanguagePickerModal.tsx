@@ -1,6 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { useMemo,
+  useState } from "react";
+import { Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { SUPPORTED_UI_LANGUAGES } from "../i18n/uiTranslations";
 import { useAppLanguage } from "../providers/LanguageProvider";

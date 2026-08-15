@@ -1,8 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { router,
+  useLocalSearchParams } from "expo-router";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -13,8 +20,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -201,8 +206,13 @@ export default function ChatScreen() {
   const messages = useMemo(() => {
     const byId = new Map<string, ChatMessage>();
     for (const message of [...ephemeralMessages, ...baseMessages]) {
+      const member = members.find((item) => item.id === message.senderId);
       byId.set(message.id, {
         ...message,
+        senderName: member?.name ?? message.senderName,
+        senderInitials: member?.initials ?? message.senderInitials,
+        senderAvatarUrl: message.senderAvatarUrl ?? member?.avatarUrl,
+        senderRole: message.senderRole ?? member?.role,
         poll: pollOverrides[message.id] ?? message.poll
       });
     }
@@ -210,7 +220,7 @@ export default function ChatScreen() {
       (first, second) =>
         Date.parse(second.createdAt) - Date.parse(first.createdAt)
     );
-  }, [baseMessages, ephemeralMessages, pollOverrides]);
+  }, [baseMessages, ephemeralMessages, members, pollOverrides]);
   const latestMessageId = messages[0]?.id;
   const memberCount =
     conversation?.memberIds?.length ?? conversation?.memberCount ?? 0;

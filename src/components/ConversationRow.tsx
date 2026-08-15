@@ -1,8 +1,17 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect,
+  useRef,
+  useState } from "react";
+import { Animated,
+  Image,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 
 import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";

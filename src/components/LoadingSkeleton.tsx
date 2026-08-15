@@ -1,5 +1,12 @@
-import { useContext, useEffect, useRef } from "react";
-import { Animated, type DimensionValue, type StyleProp, type ViewStyle } from "react-native";
+import {
+  useContext,
+  useEffect,
+  useRef } from "react";
+import { Animated,
+  type DimensionValue,
+  type StyleProp,
+  type ViewStyle
+} from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 import { radii } from "../theme";

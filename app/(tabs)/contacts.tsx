@@ -1,4 +1,5 @@
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import { FlatList, StyleSheet, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { StatusAvatar } from "@/components/StatusAvatar";

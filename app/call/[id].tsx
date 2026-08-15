@@ -1,9 +1,19 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { router,
+  useLocalSearchParams } from "expo-router";
+import { useEffect,
+  useMemo,
+  useState } from "react";
+import { ActivityIndicator,
+  Linking,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { AppAlert } from "@/services/ui/AppAlert";
 
 import CallSurface from "@/components/CallSurface";

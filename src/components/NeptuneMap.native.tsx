@@ -1,7 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState } from "react";
+import { ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { getRoleAppearance } from "../domain/roleAppearance";

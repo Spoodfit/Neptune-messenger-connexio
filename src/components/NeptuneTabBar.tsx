@@ -1,8 +1,19 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import {
+  Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, Tabs } from "expo-router";
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { router,
+  Tabs } from "expo-router";
+import { useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps } from "react";
+import { Animated,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { capabilitiesForBackendContract } from "@/config/backendCapabilities";

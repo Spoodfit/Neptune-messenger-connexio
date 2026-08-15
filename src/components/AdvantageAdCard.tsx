@@ -1,6 +1,7 @@
+import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 
 import { env } from "../config/env";
 import { colors, gradients, typography } from "../theme";

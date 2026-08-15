@@ -1,14 +1,16 @@
-import { useMemo } from "react";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect,
+  useState } from "react";
 import {
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { AppAlert } from "@/services/ui/AppAlert";

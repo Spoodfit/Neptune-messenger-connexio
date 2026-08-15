@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text } from "@/components/LocalizedText";
+import { StyleSheet, View } from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 import type { AppUser } from "../types/messaging";

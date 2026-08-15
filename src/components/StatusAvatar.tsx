@@ -1,6 +1,7 @@
+import { Text } from "@/components/LocalizedText";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 
 import { getRoleAppearance } from "../domain/roleAppearance";
 import { useAppTheme } from "../providers/ThemeProvider";

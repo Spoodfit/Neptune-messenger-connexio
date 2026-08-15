@@ -210,6 +210,19 @@ function optionalStringArray(
   return normalized.length ? [...new Set(normalized)] : undefined;
 }
 
+function participantIds(record: Record<string, unknown>): string[] | undefined {
+  const explicit = optionalStringArray(record, 10_000, 256, "memberIds", "member_ids");
+  if (explicit?.length) return explicit;
+  const raw = readUnknown(record, "members", "participants", "participantUsers", "participant_users");
+  if (!Array.isArray(raw)) return undefined;
+  const ids = raw.map((item) => {
+    if (typeof item === "string") return item.trim();
+    if (!isRecord(item)) return "";
+    return optionalBoundedString(item, 256, "id", "user_id", "member_id") ?? "";
+  }).filter(Boolean);
+  return ids.length ? [...new Set(ids)] : undefined;
+}
+
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return (
@@ -504,7 +517,8 @@ export function normalizeConversation(value: unknown): Conversation {
     canManage: booleanOrDefault(value, false, "canManage", "can_manage"),
     avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url"),
     iconName: optionalBoundedString(value, 80, "iconName", "icon_name"),
-    memberIds: optionalStringArray(value, 10_000, 256, "memberIds", "member_ids"),
+    memberIds: participantIds(value),
+    activeMemberIds: optionalStringArray(value, 500, 256, "activeMemberIds", "active_member_ids"),
     ownerId: optionalBoundedString(value, 256, "ownerId", "owner_id"),
     adminIds: optionalStringArray(value, 500, 256, "adminIds", "admin_ids"),
     muted: booleanOrDefault(value, false, "muted", "is_muted"),

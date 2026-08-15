@@ -1,5 +1,12 @@
-import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo, useRef } from "react";
-import { Animated } from "react-native";
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef } from "react";
+import { Animated
+} from "react-native";
 import { useReducedMotion } from "../hooks/useReducedMotion";
 
 type PulseController = {
