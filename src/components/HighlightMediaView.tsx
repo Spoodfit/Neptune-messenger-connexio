@@ -16,9 +16,11 @@ import { useAppTheme } from "../providers/ThemeProvider";
 import { AppAlert } from "../services/ui/AppAlert";
 import { colors } from "../theme";
 import type { HighlightMedia } from "../types/experience";
+import type { ContentTranslation } from "../types/messaging";
 import { TranslatedContentText } from "./TranslatedContentText";
 
 interface HighlightMediaViewProps { media: HighlightMedia; compact?: boolean; }
+type HighlightMediaWire = HighlightMedia & { transcript_translation?: ContentTranslation };
 
 function formatDuration(durationSeconds?: number): string {
   const total = Math.max(0, Math.round(durationSeconds ?? 0));
@@ -46,6 +48,7 @@ function AudioMedia({ media, compact = false }: HighlightMediaViewProps) {
   const [transcriptVisible, setTranscriptVisible] = useState(false);
   const waveform = [8, 14, 23, 11, 19, 27, 9, 17, 25, 12, 21, 15, 28, 10, 18, 24, 13];
   const transcriptReady = Boolean(media.transcript?.trim());
+  const transcriptTranslation = media.transcriptTranslation ?? (media as HighlightMediaWire).transcript_translation;
 
   return (
     <View style={[styles.audioCard, compact && styles.audioCompact]}>
@@ -57,7 +60,7 @@ function AudioMedia({ media, compact = false }: HighlightMediaViewProps) {
           <Text style={styles.audioMeta}>{media.status === "uploading" ? `Envoi · ${Math.round((media.uploadProgress ?? 0) * 100)} %` : formatDuration(media.durationSeconds)}</Text>
         </View>
       </View>
-      {media.transcriptStatus === "pending" ? <View style={styles.transcriptPending}><Ionicons name="sparkles-outline" size={15} color={theme.orange} /><Text style={styles.transcriptPendingText}>Transcription en cours…</Text></View> : transcriptReady ? <><Pressable accessibilityRole="button" accessibilityLabel={transcriptVisible ? "Masquer la transcription du vocal" : "Afficher la transcription du vocal"} accessibilityState={{ expanded: transcriptVisible }} onPress={() => setTranscriptVisible((current) => !current)} style={styles.transcriptToggle}><Ionicons name="document-text-outline" size={16} color={theme.orange} /><Text style={styles.transcriptToggleText}>{transcriptVisible ? "Masquer la transcription" : "Afficher la transcription"}</Text><Ionicons name={transcriptVisible ? "chevron-up" : "chevron-down"} size={16} color={theme.pageTextMuted} /></Pressable>{transcriptVisible ? <TranslatedContentText original={media.transcript ?? ""} translation={media.transcriptTranslation} field="transcript" selectable style={styles.transcript} /> : null}</> : null}
+      {media.transcriptStatus === "pending" ? <View style={styles.transcriptPending}><Ionicons name="sparkles-outline" size={15} color={theme.orange} /><Text style={styles.transcriptPendingText}>Transcription en cours…</Text></View> : transcriptReady ? <><Pressable accessibilityRole="button" accessibilityLabel={transcriptVisible ? "Masquer la transcription du vocal" : "Afficher la transcription du vocal"} accessibilityState={{ expanded: transcriptVisible }} onPress={() => setTranscriptVisible((current) => !current)} style={styles.transcriptToggle}><Ionicons name="document-text-outline" size={16} color={theme.orange} /><Text style={styles.transcriptToggleText}>{transcriptVisible ? "Masquer la transcription" : "Afficher la transcription"}</Text><Ionicons name={transcriptVisible ? "chevron-up" : "chevron-down"} size={16} color={theme.pageTextMuted} /></Pressable>{transcriptVisible ? <TranslatedContentText original={media.transcript ?? ""} translation={transcriptTranslation} field="transcript" selectable style={styles.transcript} /> : null}</> : null}
     </View>
   );
 }
