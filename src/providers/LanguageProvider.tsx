@@ -3,6 +3,7 @@ import { AppState } from "react-native";
 
 import { readLanguagePreference, writeLanguagePreference } from "../i18n/languagePreference";
 import { detectSystemLanguage, normalizeLanguageCode, type SupportedLanguage } from "../i18n/languages";
+import { setCurrentUiLocale, uiLocaleTagFor } from "../i18n/uiLocale";
 import { setTranslationRequestLanguage } from "../i18n/translationLocale";
 import { normalizeUiLanguageCode, type SupportedUiLanguage } from "../i18n/uiTranslations";
 import { translateConnexioUiText } from "../i18n/uiTranslator";
@@ -15,6 +16,8 @@ interface LanguageContextValue {
   language: SupportedLanguage;
   /** Bundled UI locale used only to render Connexio's own interface. */
   uiLanguage: SupportedUiLanguage;
+  /** BCP-47 locale used by dates, times and numbers displayed by the UI. */
+  localeTag: string;
   setLanguageMode: (mode: ConnexioLanguageMode) => void;
   t: (text: string) => string;
 }
@@ -54,6 +57,11 @@ export function LanguageProvider({ children }: PropsWithChildren) {
 
   const language = mode === "system" ? systemLanguage : normalizeLanguageCode(mode, systemLanguage);
   const uiLanguage = normalizeUiLanguageCode(language, language === "fr" ? "fr" : "en");
+  const localeTag = uiLocaleTagFor(uiLanguage);
+
+  // Formatting helpers are module-level by design; update their locale before
+  // descendants render so dates/times change in the same render as UI strings.
+  setCurrentUiLocale(uiLanguage);
 
   useEffect(() => {
     setTranslationRequestLanguage(language);
@@ -77,8 +85,8 @@ export function LanguageProvider({ children }: PropsWithChildren) {
 
   const t = useCallback((text: string) => translateConnexioUiText(text, uiLanguage), [uiLanguage]);
   const value = useMemo(
-    () => ({ mode, language, uiLanguage, setLanguageMode, t }),
-    [language, mode, setLanguageMode, t, uiLanguage]
+    () => ({ mode, language, uiLanguage, localeTag, setLanguageMode, t }),
+    [language, localeTag, mode, setLanguageMode, t, uiLanguage]
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
