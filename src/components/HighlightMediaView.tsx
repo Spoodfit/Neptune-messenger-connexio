@@ -16,6 +16,7 @@ import { useAppTheme } from "../providers/ThemeProvider";
 import { AppAlert } from "../services/ui/AppAlert";
 import { colors } from "../theme";
 import type { HighlightMedia } from "../types/experience";
+import { TranslatedContentText } from "./TranslatedContentText";
 
 interface HighlightMediaViewProps { media: HighlightMedia; compact?: boolean; }
 
@@ -56,7 +57,7 @@ function AudioMedia({ media, compact = false }: HighlightMediaViewProps) {
           <Text style={styles.audioMeta}>{media.status === "uploading" ? `Envoi · ${Math.round((media.uploadProgress ?? 0) * 100)} %` : formatDuration(media.durationSeconds)}</Text>
         </View>
       </View>
-      {media.transcriptStatus === "pending" ? <View style={styles.transcriptPending}><Ionicons name="sparkles-outline" size={15} color={theme.orange} /><Text style={styles.transcriptPendingText}>Transcription en cours…</Text></View> : transcriptReady ? <><Pressable accessibilityRole="button" accessibilityLabel={transcriptVisible ? "Masquer la transcription du vocal" : "Afficher la transcription du vocal"} accessibilityState={{ expanded: transcriptVisible }} onPress={() => setTranscriptVisible((current) => !current)} style={styles.transcriptToggle}><Ionicons name="document-text-outline" size={16} color={theme.orange} /><Text style={styles.transcriptToggleText}>{transcriptVisible ? "Masquer la transcription" : "Afficher la transcription"}</Text><Ionicons name={transcriptVisible ? "chevron-up" : "chevron-down"} size={16} color={theme.pageTextMuted} /></Pressable>{transcriptVisible ? <Text selectable style={styles.transcript}>{media.transcript}</Text> : null}</> : null}
+      {media.transcriptStatus === "pending" ? <View style={styles.transcriptPending}><Ionicons name="sparkles-outline" size={15} color={theme.orange} /><Text style={styles.transcriptPendingText}>Transcription en cours…</Text></View> : transcriptReady ? <><Pressable accessibilityRole="button" accessibilityLabel={transcriptVisible ? "Masquer la transcription du vocal" : "Afficher la transcription du vocal"} accessibilityState={{ expanded: transcriptVisible }} onPress={() => setTranscriptVisible((current) => !current)} style={styles.transcriptToggle}><Ionicons name="document-text-outline" size={16} color={theme.orange} /><Text style={styles.transcriptToggleText}>{transcriptVisible ? "Masquer la transcription" : "Afficher la transcription"}</Text><Ionicons name={transcriptVisible ? "chevron-up" : "chevron-down"} size={16} color={theme.pageTextMuted} /></Pressable>{transcriptVisible ? <TranslatedContentText original={media.transcript ?? ""} translation={media.transcriptTranslation} field="transcript" selectable style={styles.transcript} /> : null}</> : null}
     </View>
   );
 }
