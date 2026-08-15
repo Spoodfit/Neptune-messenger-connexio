@@ -1,9 +1,10 @@
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { AppState } from "react-native";
 
+import { readLanguagePreference, writeLanguagePreference } from "../i18n/languagePreference";
 import { detectSystemLanguage, normalizeLanguageCode, type SupportedLanguage } from "../i18n/languages";
 import { setTranslationRequestLanguage } from "../i18n/translationLocale";
 import { normalizeUiLanguageCode, translateUiText, type SupportedUiLanguage } from "../i18n/uiTranslations";
-import { createStandaloneStateStore } from "../storage/standaloneStore";
 
 export type ConnexioLanguageMode = "system" | SupportedLanguage;
 
@@ -11,7 +12,7 @@ interface LanguageContextValue {
   mode: ConnexioLanguageMode;
   /** Target language used by automatic message translation. */
   language: SupportedLanguage;
-  /** Bundled UI locale. Unsupported legacy/system locales fall back to English. */
+  /** Bundled UI locale used only to render Connexio's own interface. */
   uiLanguage: SupportedUiLanguage;
   setLanguageMode: (mode: ConnexioLanguageMode) => void;
   t: (text: string) => string;
@@ -19,19 +20,36 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
+function decodeStoredMode(raw: string | null, systemLanguage: SupportedLanguage): ConnexioLanguageMode | null {
+  if (!raw) return null;
+  let value: unknown = raw;
+  try {
+    value = JSON.parse(raw) as unknown;
+  } catch {
+    // Current preference is a plain mode; the previous store used JSON.stringify.
+  }
+  if (value === "system") return "system";
+  if (typeof value !== "string" || !value.trim()) return null;
+  const normalized = normalizeLanguageCode(value, systemLanguage);
+  return normalizeUiLanguageCode(normalized, normalized === "fr" ? "fr" : "en");
+}
+
+function readInitialMode(systemLanguage: SupportedLanguage): ConnexioLanguageMode {
+  return decodeStoredMode(readLanguagePreference(), systemLanguage) ?? "system";
+}
+
 export function LanguageProvider({ children }: PropsWithChildren) {
-  const store = useMemo(() => createStandaloneStateStore(), []);
-  const systemLanguage = detectSystemLanguage("fr");
-  const [mode, setMode] = useState<ConnexioLanguageMode>("system");
+  const [systemLanguage, setSystemLanguage] = useState<SupportedLanguage>(() => detectSystemLanguage("fr"));
+  const [mode, setMode] = useState<ConnexioLanguageMode>(() => readInitialMode(systemLanguage));
 
   useEffect(() => {
-    let cancelled = false;
-    void store.load<string>("app-language").then((saved) => {
-      if (cancelled || !saved) return;
-      setMode(saved === "system" ? "system" : normalizeLanguageCode(saved, systemLanguage));
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
+      const next = detectSystemLanguage("fr");
+      setSystemLanguage((current) => current === next ? current : next);
     });
-    return () => { cancelled = true; };
-  }, [store, systemLanguage]);
+    return () => subscription.remove();
+  }, []);
 
   const language = mode === "system" ? systemLanguage : normalizeLanguageCode(mode, systemLanguage);
   const uiLanguage = normalizeUiLanguageCode(language, language === "fr" ? "fr" : "en");
@@ -41,17 +59,30 @@ export function LanguageProvider({ children }: PropsWithChildren) {
   }, [language]);
 
   const setLanguageMode = useCallback((next: ConnexioLanguageMode) => {
-    const normalized = next === "system" ? "system" : normalizeLanguageCode(next, language);
+    const normalized: ConnexioLanguageMode = next === "system"
+      ? "system"
+      : normalizeUiLanguageCode(
+          normalizeLanguageCode(next, language),
+          language === "fr" ? "fr" : "en"
+        );
+
+    // Native storage writes synchronously before publishing the React state.
+    // Web uses an independent browser implementation and never bundles SQLite.
+    writeLanguagePreference(normalized);
     setMode(normalized);
-    void store.save("app-language", normalized);
-    setTranslationRequestLanguage(normalized === "system" ? detectSystemLanguage("fr") : normalized);
-  }, [language, store]);
+
+    // Keep the already-working automatic message translation behaviour intact.
+    setTranslationRequestLanguage(
+      normalized === "system" ? systemLanguage : normalizeLanguageCode(normalized, systemLanguage)
+    );
+  }, [language, systemLanguage]);
 
   const t = useCallback((text: string) => translateUiText(text, uiLanguage), [uiLanguage]);
   const value = useMemo(
     () => ({ mode, language, uiLanguage, setLanguageMode, t }),
     [language, mode, setLanguageMode, t, uiLanguage]
   );
+
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 

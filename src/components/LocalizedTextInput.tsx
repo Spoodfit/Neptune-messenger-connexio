@@ -10,12 +10,12 @@ export const TextInput = forwardRef<TextInput, TextInputProps>(function Localize
   { placeholder, ...props },
   ref
 ) {
-  const { language } = useAppLanguage();
+  const { uiLanguage } = useAppLanguage();
   return (
     <NativeTextInput
       {...props}
       ref={ref}
-      placeholder={typeof placeholder === "string" ? translateUiText(placeholder, language) : placeholder}
+      placeholder={typeof placeholder === "string" ? translateUiText(placeholder, uiLanguage) : placeholder}
     />
   );
 });
