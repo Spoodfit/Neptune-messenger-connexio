@@ -1,6 +1,10 @@
 import { getLanguageFrenchName, isSameLanguage } from "./languages";
 import { getTranslationRequestLanguage } from "./translationLocale";
-import type { ContentTranslation, PollTranslation } from "../types/messaging";
+import type {
+  ContentTranslation,
+  MessageTranslation,
+  PollTranslation
+} from "../types/messaging";
 
 export function contentTranslationTargetsViewer(
   translation?: ContentTranslation,
@@ -24,7 +28,8 @@ export function translatedContentField(
   if (!original || showOriginal || !contentTranslationTargetsViewer(translation, viewerLanguage)) {
     return original;
   }
-  const translated = translation?.fields?.[field]?.trim();
+  const legacyBody = field === "body" ? (translation as MessageTranslation).body?.trim() : undefined;
+  const translated = translation?.fields?.[field]?.trim() ?? legacyBody;
   return translated && translated !== original.trim() ? translated : original;
 }
 
@@ -62,8 +67,7 @@ export function hasTranslatedContentField(
   viewerLanguage = getTranslationRequestLanguage()
 ): boolean {
   if (!original || !contentTranslationTargetsViewer(translation, viewerLanguage)) return false;
-  const translated = translation?.fields?.[field]?.trim();
-  return Boolean(translated && translated !== original.trim());
+  return translatedContentField(original, translation, field, viewerLanguage) !== original;
 }
 
 export function hasTranslatedPoll(
