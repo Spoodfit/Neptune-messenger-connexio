@@ -34,14 +34,13 @@ export const Pressable = forwardRef<PressableRef, PressableProps>(function Local
   );
 });
 
-export function Button({ title, accessibilityLabel, accessibilityHint, ...props }: ButtonProps) {
+export function Button({ title, accessibilityLabel, ...props }: ButtonProps) {
   const { uiLanguage } = useAppLanguage();
   return (
     <NativeButton
       {...props}
       title={translateUiText(title, uiLanguage)}
       accessibilityLabel={localize(accessibilityLabel, uiLanguage) as ButtonProps["accessibilityLabel"]}
-      accessibilityHint={localize(accessibilityHint, uiLanguage) as ButtonProps["accessibilityHint"]}
     />
   );
 }
