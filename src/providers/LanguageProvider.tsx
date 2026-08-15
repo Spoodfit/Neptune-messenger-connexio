@@ -12,7 +12,7 @@ export type ConnexioLanguageMode = "system" | SupportedLanguage;
 
 interface LanguageContextValue {
   mode: ConnexioLanguageMode;
-  /** Target language used by automatic message translation. */
+  /** Target language used by automatic content translation. */
   language: SupportedLanguage;
   /** Bundled UI locale used only to render Connexio's own interface. */
   uiLanguage: SupportedUiLanguage;
@@ -59,13 +59,11 @@ export function LanguageProvider({ children }: PropsWithChildren) {
   const uiLanguage = normalizeUiLanguageCode(language, language === "fr" ? "fr" : "en");
   const localeTag = uiLocaleTagFor(uiLanguage);
 
-  // Formatting helpers are module-level by design; update their locale before
-  // descendants render so dates/times change in the same render as UI strings.
+  // UI formatting and content translation helpers are module-level by design.
+  // Synchronize both before descendants render so a cold start/reload never
+  // paints content in the previous/default language before a later effect.
   setCurrentUiLocale(uiLanguage);
-
-  useEffect(() => {
-    setTranslationRequestLanguage(language);
-  }, [language]);
+  setTranslationRequestLanguage(language);
 
   const setLanguageMode = useCallback((next: ConnexioLanguageMode) => {
     const normalized: ConnexioLanguageMode = next === "system"
