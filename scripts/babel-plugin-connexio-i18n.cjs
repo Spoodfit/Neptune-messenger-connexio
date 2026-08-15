@@ -5,7 +5,7 @@ const UI_LOCALE_LOCAL = "__connexioUiLocaleTag";
 const CONTENT_TEXT_LOCAL = "__connexioTranslateContentText";
 const TARGETS = new Set(["Text", "TextInput", "Pressable", "Button"]);
 const DATE_METHODS = new Set(["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]);
-const CONTENT_FIELDS = new Set(["body", "transcript"]);
+const CONTENT_FIELDS = new Set(["body", "description", "lastMessage", "pinnedMessage", "title", "transcript"]);
 const EXCLUDED_FILES = new Set([
   "src/components/LocalizedNative.tsx",
   "src/components/LocalizedText.tsx",
