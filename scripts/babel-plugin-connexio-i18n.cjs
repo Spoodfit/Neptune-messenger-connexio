@@ -1,12 +1,16 @@
 const LOCALIZED_IMPORT = "@/components/LocalizedNative";
 const UI_LOCALE_IMPORT = "@/i18n/uiLocale";
+const CONTENT_TEXT_IMPORT = "@/i18n/runtimeContentText";
 const UI_LOCALE_LOCAL = "__connexioUiLocaleTag";
+const CONTENT_TEXT_LOCAL = "__connexioTranslateContentText";
 const TARGETS = new Set(["Text", "TextInput", "Pressable", "Button"]);
 const DATE_METHODS = new Set(["toLocaleString", "toLocaleDateString", "toLocaleTimeString"]);
+const CONTENT_FIELDS = new Set(["body", "transcript"]);
 const EXCLUDED_FILES = new Set([
   "src/components/LocalizedNative.tsx",
   "src/components/LocalizedText.tsx",
-  "src/components/LocalizedTextInput.tsx"
+  "src/components/LocalizedTextInput.tsx",
+  "src/i18n/runtimeContentText.ts"
 ]);
 
 function isFrenchLocaleLiteral(t, node) {
@@ -69,6 +73,7 @@ module.exports = function connexioI18nPlugin({ types: t }) {
         }
 
         let needsLocaleImport = false;
+        let needsContentTextImport = false;
         const localeCall = () => {
           needsLocaleImport = true;
           return t.callExpression(t.identifier(UI_LOCALE_LOCAL), []);
@@ -90,6 +95,25 @@ module.exports = function connexioI18nPlugin({ types: t }) {
               !isFrenchLocaleLiteral(t, newPath.node.arguments[0])
             ) return;
             newPath.node.arguments[0] = localeCall();
+          },
+          JSXExpressionContainer(expressionPath) {
+            if (!expressionPath.parentPath?.isJSXElement() && !expressionPath.parentPath?.isJSXFragment()) return;
+            const expression = expressionPath.node.expression;
+            if (!t.isMemberExpression(expression) || expression.computed || !t.isIdentifier(expression.property)) return;
+            if (!CONTENT_FIELDS.has(expression.property.name)) return;
+            if (!(t.isIdentifier(expression.object) || t.isMemberExpression(expression.object))) return;
+
+            const object = t.cloneNode(expression.object, true);
+            const original = t.cloneNode(expression, true);
+            const translation = t.memberExpression(t.cloneNode(object, true), t.identifier("translation"));
+            const sourceLanguage = t.memberExpression(t.cloneNode(object, true), t.identifier("sourceLanguage"));
+            expressionPath.node.expression = t.callExpression(t.identifier(CONTENT_TEXT_LOCAL), [
+              original,
+              translation,
+              t.stringLiteral(expression.property.name),
+              sourceLanguage
+            ]);
+            needsContentTextImport = true;
           }
         });
 
@@ -99,6 +123,16 @@ module.exports = function connexioI18nPlugin({ types: t }) {
             t.importDeclaration(
               [t.importSpecifier(t.identifier(UI_LOCALE_LOCAL), t.identifier("getCurrentUiLocaleTag"))],
               t.stringLiteral(UI_LOCALE_IMPORT)
+            )
+          );
+        }
+
+        if (needsContentTextImport) {
+          programPath.unshiftContainer(
+            "body",
+            t.importDeclaration(
+              [t.importSpecifier(t.identifier(CONTENT_TEXT_LOCAL), t.identifier("translateRuntimeContentText"))],
+              t.stringLiteral(CONTENT_TEXT_IMPORT)
             )
           );
         }
