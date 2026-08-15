@@ -16,10 +16,19 @@ function FragmentNode({ node, language }: { node: ReactNode; language: string })
 
 /**
  * Drop-in React Native Text replacement for bundled interface copy.
- * Only exact, known UI strings are translated, so member messages, names and
- * other user-generated content are never machine-mutated by this layer.
+ *
+ * The component listens to uiLanguage (not to the message-translation locale)
+ * and keys the native host node by locale. The key deliberately forces React
+ * Native to recreate the native text node when the app language changes, which
+ * avoids stale host-text rendering on a physical Android/iOS build.
+ *
+ * Only exact, known UI strings are translated by the bundled catalogue.
  */
 export function Text({ children, ...props }: TextProps) {
-  const { language } = useAppLanguage();
-  return <NativeText {...props}>{translateNode(children, language)}</NativeText>;
+  const { uiLanguage } = useAppLanguage();
+  return (
+    <NativeText key={`connexio-ui-text:${uiLanguage}`} {...props}>
+      {translateNode(children, uiLanguage)}
+    </NativeText>
+  );
 }
