@@ -84,18 +84,47 @@ function stringValue(node) {
   return null;
 }
 
-// Only capture string literals from a JSX expression when that expression is
-// itself rendered as a child. Strings used for icon names, styles, enum props,
-// locale codes, accessibility roles, etc. are JSX attributes and are therefore
-// deliberately excluded unless the attribute is explicitly listed above.
-function isRenderedJsxExpression(node) {
-  let current = node.parent;
-  while (current) {
-    if (ts.isJsxExpression(current)) {
-      return ts.isJsxElement(current.parent) || ts.isJsxFragment(current.parent);
+/*
+ * A string literal counts as visible JSX only when it is the value actually
+ * rendered by the expression (directly, or through a ternary / fallback).
+ * Strings nested in calls, format options, icon props, style objects, enum
+ * values, locale tags, etc. are implementation details and must not pollute
+ * the translation catalogue.
+ */
+function isVisibleExpressionLiteral(node) {
+  let current = node;
+  while (current.parent) {
+    const parent = current.parent;
+
+    if (ts.isJsxAttribute(parent)) return false;
+
+    if (ts.isJsxExpression(parent)) {
+      return (
+        parent.expression === current &&
+        (ts.isJsxElement(parent.parent) || ts.isJsxFragment(parent.parent))
+      );
     }
-    if (ts.isStatement(current) || ts.isSourceFile(current)) return false;
-    current = current.parent;
+
+    if (ts.isParenthesizedExpression(parent)) {
+      current = parent;
+      continue;
+    }
+
+    if (ts.isConditionalExpression(parent)) {
+      if (parent.whenTrue !== current && parent.whenFalse !== current) return false;
+      current = parent;
+      continue;
+    }
+
+    if (ts.isBinaryExpression(parent)) {
+      const kind = parent.operatorToken.kind;
+      const fallbackOperator = kind === ts.SyntaxKind.QuestionQuestionToken || kind === ts.SyntaxKind.BarBarToken;
+      if (!fallbackOperator || (parent.left !== current && parent.right !== current)) return false;
+      current = parent;
+      continue;
+    }
+
+    return false;
   }
   return false;
 }
@@ -126,7 +155,7 @@ for (const file of SOURCE_ROOTS.flatMap(walk)) {
       if (value !== null) addCandidate(value, file, node, `object:${propName(node.name)}`);
     }
 
-    if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && isRenderedJsxExpression(node)) {
+    if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && isVisibleExpressionLiteral(node)) {
       addCandidate(node.text, file, node, "jsx-expression");
     }
 
