@@ -1,0 +1,182 @@
+name: Apply light and i18n fixes
+
+on:
+  push:
+    branches:
+      - fix/connexio-light-i18n-20260815
+    paths:
+      - .github/workflows/apply-light-i18n-fixes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/connexio-light-i18n-20260815
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Apply targeted source fixes and localization wiring
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          function patch(file, before, after) {
+            const source = fs.readFileSync(file, 'utf8');
+            if (!source.includes(before)) throw new Error(`Anchor not found in ${file}: ${before.slice(0, 120)}`);
+            fs.writeFileSync(file, source.replace(before, after));
+          }
+
+          // Bottom back dock: keep only each screen's real top-left back affordance.
+          patch('app/_layout.tsx', 'import { FloatingBackButton } from "../src/components/FloatingBackButton";\n', '');
+          patch('app/_layout.tsx', '      <FloatingBackButton />\n', '');
+          if (fs.existsSync('src/components/FloatingBackButton.tsx')) fs.rmSync('src/components/FloatingBackButton.tsx');
+
+          // Sent bubbles must be visually flat in light mode; no gray/dirty halo.
+          patch(
+            'src/components/BaseMessageBubble.tsx',
+            '  const senderRoleAppearance = getRoleAppearance(message.senderRole ?? "triton");',
+            '  const senderRoleAppearance = getRoleAppearance(message.senderRole ?? "triton", theme.isLight);'
+          );
+          patch(
+            'src/components/BaseMessageBubble.tsx',
+            '  mine: {\n    borderBottomRightRadius: 5,\n    shadowColor: theme.violet,\n    shadowOpacity: 0.18,\n    shadowRadius: 12,\n    shadowOffset: { width: 0, height: 8 }\n  },',
+            '  mine: {\n    borderBottomRightRadius: 5,\n    shadowColor: theme.violet,\n    shadowOpacity: theme.isLight ? 0 : 0.18,\n    shadowRadius: theme.isLight ? 0 : 12,\n    shadowOffset: { width: 0, height: theme.isLight ? 0 : 8 },\n    elevation: theme.isLight ? 0 : 3\n  },'
+          );
+
+          // Private conversation avatar fallback: member IDs, active IDs, then exact member name,
+          // and finally conversation avatar instead of a blank generic circle.
+          patch(
+            'src/components/PrivateConversationAvatar.tsx',
+            'import { getRoleAppearance } from "../domain/roleAppearance";\nimport type { AppUser, Conversation } from "../types/messaging";',
+            'import { getRoleAppearance } from "../domain/roleAppearance";\nimport { useAppTheme } from "../providers/ThemeProvider";\nimport type { AppUser, Conversation } from "../types/messaging";'
+          );
+          patch(
+            'src/components/PrivateConversationAvatar.tsx',
+            'export function PrivateConversationAvatar({ conversation, members, currentUserId, size = 52 }: Props) {\n  const participants = (conversation.memberIds ?? [])\n    .map((id) => members.find((member) => member.id === id))\n    .filter((member): member is AppUser => Boolean(member));\n\n  if (conversation.type === "direct") {\n    const member = participants.find((item) => item.id !== currentUserId) ?? participants[0];\n    if (member) return <StatusAvatar user={member} size={size} accessible={false} ringWidth={3} />;\n  }',
+            'export function PrivateConversationAvatar({ conversation, members, currentUserId, size = 52 }: Props) {\n  const theme = useAppTheme();\n  const participantIds = conversation.memberIds?.length\n    ? conversation.memberIds\n    : conversation.activeMemberIds ?? [];\n  const participants = participantIds\n    .map((id) => members.find((member) => member.id === id))\n    .filter((member): member is AppUser => Boolean(member));\n\n  if (conversation.type === "direct") {\n    const normalizedConversationName = conversation.name.trim().toLocaleLowerCase();\n    const member =\n      participants.find((item) => item.id !== currentUserId) ??\n      participants[0] ??\n      members.find((item) => item.id !== currentUserId && item.name.trim().toLocaleLowerCase() === normalizedConversationName);\n    if (member) return <StatusAvatar user={member} size={size} accessible={false} ringWidth={3} />;\n    if (conversation.avatarUrl) {\n      const initials = conversation.name.split(/\\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "N";\n      return <StatusAvatar user={{ name: conversation.name, initials, avatarUrl: conversation.avatarUrl, role: "free" }} size={size} accessible={false} ringWidth={3} />;\n    }\n  }'
+          );
+          patch(
+            'src/components/PrivateConversationAvatar.tsx',
+            '    const appearance = getRoleAppearance("free");',
+            '    const appearance = getRoleAppearance("free", theme.isLight);'
+          );
+
+          // Wire format: retain active member IDs and tolerate participant objects supplied by APIs.
+          patch(
+            'src/services/api/wire.ts',
+            'function initialsFromName(name: string): string {',
+            `function participantIds(record) {\n  const explicit = optionalStringArray(record, 10_000, 256, "memberIds", "member_ids");\n  if (explicit?.length) return explicit;\n  const raw = readUnknown(record, "members", "participants", "participantUsers", "participant_users");\n  if (!Array.isArray(raw)) return undefined;\n  const ids = raw.map((item) => {\n    if (typeof item === "string") return item.trim();\n    if (!isRecord(item)) return "";\n    return optionalBoundedString(item, 256, "id", "user_id", "member_id") ?? "";\n  }).filter(Boolean);\n  return ids.length ? [...new Set(ids)] : undefined;\n}\n\nfunction initialsFromName(name: string): string {`
+          );
+          patch(
+            'src/services/api/wire.ts',
+            '    memberIds: optionalStringArray(value, 10_000, 256, "memberIds", "member_ids"),\n    ownerId:',
+            '    memberIds: participantIds(value),\n    activeMemberIds: optionalStringArray(value, 500, 256, "activeMemberIds", "active_member_ids"),\n    ownerId:'
+          );
+
+          // Always enrich message sender presentation from the loaded Neptune member directory.
+          patch(
+            'src/screens/ChatConversationScreen.tsx',
+            `    for (const message of [...ephemeralMessages, ...baseMessages]) {\n      byId.set(message.id, {\n        ...message,\n        poll: pollOverrides[message.id] ?? message.poll\n      });\n    }`,
+            `    for (const message of [...ephemeralMessages, ...baseMessages]) {\n      const member = members.find((item) => item.id === message.senderId);\n      byId.set(message.id, {\n        ...message,\n        senderName: member?.name ?? message.senderName,\n        senderInitials: member?.initials ?? message.senderInitials,\n        senderAvatarUrl: message.senderAvatarUrl ?? member?.avatarUrl,\n        senderRole: message.senderRole ?? member?.role,\n        poll: pollOverrides[message.id] ?? message.poll\n      });\n    }`
+          );
+          patch(
+            'src/screens/ChatConversationScreen.tsx',
+            '  }, [baseMessages, ephemeralMessages, pollOverrides]);',
+            '  }, [baseMessages, ephemeralMessages, members, pollOverrides]);'
+          );
+
+          // Replace React Native Text/TextInput with localized drop-ins across the product.
+          // Exact-string translation protects member-generated content from accidental mutation.
+          const files = [];
+          function walk(dir) {
+            for (const entry of fs.readdirSync(dir)) {
+              const full = path.join(dir, entry);
+              const stat = fs.statSync(full);
+              if (stat.isDirectory()) walk(full);
+              else if (full.endsWith('.tsx')) files.push(full);
+            }
+          }
+          walk('app'); walk('src');
+          const skip = new Set(['src/components/LocalizedText.tsx', 'src/components/LocalizedTextInput.tsx']);
+          for (const file of files) {
+            if (skip.has(file)) continue;
+            let source = fs.readFileSync(file, 'utf8');
+            let needText = false;
+            let needTextInput = false;
+            source = source.replace(/import\s*\{([\s\S]*?)\}\s*from\s*["']react-native["'];/g, (whole, body) => {
+              const parts = body.split(',').map((part) => part.trim()).filter(Boolean);
+              const next = [];
+              for (const part of parts) {
+                if (part === 'Text') { needText = true; continue; }
+                if (part === 'TextInput') { needTextInput = true; continue; }
+                next.push(part);
+              }
+              const pretty = next.length > 4
+                ? `import {\n  ${next.join(',\n  ')}\n} from "react-native";`
+                : `import { ${next.join(', ')} } from "react-native";`;
+              return pretty;
+            });
+            const additions = [];
+            if (needText) additions.push('import { Text } from "@/components/LocalizedText";');
+            if (needTextInput) additions.push('import { TextInput } from "@/components/LocalizedTextInput";');
+            if (additions.length) source = `${additions.join('\n')}\n${source}`;
+            fs.writeFileSync(file, source);
+          }
+          NODE
+      - name: Add regression tests
+        run: |
+          cat > tests/uiTranslations.test.ts <<'EOF'
+          import assert from "node:assert/strict";
+          import test from "node:test";
+          import { normalizeUiLanguageCode, translateUiText } from "../src/i18n/uiTranslations";
+
+          test("application UI language changes visible navigation copy", () => {
+            assert.equal(translateUiText("Temps forts", "en"), "Highlights");
+            assert.equal(translateUiText("Groupes", "es"), "Grupos");
+            assert.equal(translateUiText("Écrire un message…", "de"), "Nachricht schreiben…");
+            assert.equal(translateUiText("Apparence", "it"), "Aspetto");
+            assert.equal(translateUiText("Appels", "pt"), "Chamadas");
+          });
+
+          test("unknown UI text and user content are never rewritten", () => {
+            assert.equal(translateUiText("Rendez-vous client Alpha 14h", "en"), "Rendez-vous client Alpha 14h");
+          });
+
+          test("unsupported legacy UI locale falls back to English catalog", () => {
+            assert.equal(normalizeUiLanguageCode("ja"), "en");
+            assert.equal(translateUiText("Groupes", "ja"), "Groups");
+          });
+          EOF
+          cat > tests/roleAppearance.test.ts <<'EOF'
+          import assert from "node:assert/strict";
+          import test from "node:test";
+          import { getRoleAppearance } from "../src/domain/roleAppearance";
+
+          test("light role surfaces are not dark badges", () => {
+            for (const role of ["free", "triton", "moussaillon", "capitaine", "amiral", "allie", "visionnaire", "admin"] as const) {
+              const light = getRoleAppearance(role, true);
+              const dark = getRoleAppearance(role, false);
+              assert.notEqual(light.background, dark.background);
+              const hex = light.background.replace("#", "");
+              const rgb = [0, 2, 4].map((index) => parseInt(hex.slice(index, index + 2), 16));
+              assert.ok(rgb.reduce((sum, channel) => sum + channel, 0) > 450, `${role} light background must stay visually light`);
+            }
+          });
+          EOF
+      - name: Verify application
+        run: npm run verify
+      - name: Commit generated changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: clean light conversations and localize application UI'
+          git push origin HEAD:fix/connexio-light-i18n-20260815
