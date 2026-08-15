@@ -871,7 +871,7 @@ export default function ChatScreen() {
           renderItem={({ item }) => {
             const spotlight = item.id === spotlightMessageId;
             return (
-              <Animated.View style={[styles.messageSpotlight, spotlight && { borderColor: theme.orange, borderWidth: 2, backgroundColor: theme.orangeSoft, shadowColor: theme.violet, opacity: spotlightProgress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [1, 0.96, 1] }), transform: [{ scale: spotlightProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] }) }] }]}>
+              <Animated.View style={[styles.messageSpotlight, spotlight && { borderColor: theme.orange, borderWidth: 2, backgroundColor: theme.orangeSoft, shadowColor: theme.violet, shadowOpacity: theme.isLight ? 0.34 : 0.82, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: theme.isLight ? 2 : 5, opacity: spotlightProgress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [1, 0.96, 1] }), transform: [{ scale: spotlightProgress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.015] }) }] }]}>
                 <MessageBubble message={item} reactions={getMessageReactions(item)} onRetry={(clientMessageId) => void retryMessage(clientMessageId)} onReact={(message, emoji) => toggleMessageReaction(message, emoji)} onReply={announcement ? undefined : setReplyingTo} centered={announcement} onOpenProfile={openMemberProfile} onVotePoll={votePoll} />
               </Animated.View>
             );
@@ -1298,7 +1298,7 @@ const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
     paddingVertical: spacing.md,
     gap: 3
   },
-  messageSpotlight: { borderRadius: 20, padding: 0, shadowOpacity: 0.82, shadowRadius: 18, shadowOffset: { width: 0, height: 0 }, elevation: 5 },
+  messageSpotlight: { borderRadius: 20, padding: 0, shadowOpacity: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, elevation: 0 },
   historyLoader: { minHeight: 52, alignItems: "center", justifyContent: "center" },
   empty: {
     ...typography.bodySmall,
