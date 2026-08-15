@@ -3,7 +3,10 @@ const path = require("node:path");
 const ts = require("typescript");
 
 const ROOT = process.cwd();
-const CATALOG_PATH = path.join(ROOT, "src/i18n/uiTranslations.ts");
+const CATALOG_PATHS = [
+  path.join(ROOT, "src/i18n/uiTranslations.ts"),
+  path.join(ROOT, "src/i18n/uiTranslationsV17.ts")
+];
 const SOURCE_ROOTS = [path.join(ROOT, "app"), path.join(ROOT, "src")];
 const REQUIRED_LOCALES = ["en", "es", "de", "it", "pt"];
 const UI_PROP_NAMES = new Set([
@@ -41,12 +44,17 @@ function decodeQuoted(value) {
   try { return JSON.parse(`"${value}"`); } catch { return value; }
 }
 
-const catalogSource = fs.readFileSync(CATALOG_PATH, "utf8");
 const catalog = new Map();
-for (const match of catalogSource.matchAll(/^\s*"((?:\\.|[^"\\])+)"\s*:\s*\{([^}]*)\}/gm)) {
-  const key = decodeQuoted(match[1]);
-  const body = match[2];
-  catalog.set(key, new Set(REQUIRED_LOCALES.filter((locale) => new RegExp(`\\b${locale}\\s*:`).test(body))));
+for (const catalogPath of CATALOG_PATHS) {
+  const catalogSource = fs.readFileSync(catalogPath, "utf8");
+  for (const match of catalogSource.matchAll(/^\s*"((?:\\.|[^"\\])+)"\s*:\s*\{([^}]*)\}/gm)) {
+    const key = decodeQuoted(match[1]);
+    const body = match[2];
+    const locales = new Set(REQUIRED_LOCALES.filter((locale) => new RegExp(`\\b${locale}\\s*:`).test(body)));
+    const existing = catalog.get(key);
+    if (existing) for (const locale of locales) existing.add(locale);
+    else catalog.set(key, locales);
+  }
 }
 
 function clean(value) {
@@ -84,38 +92,23 @@ function stringValue(node) {
   return null;
 }
 
-/*
- * A string literal counts as visible JSX only when it is the value actually
- * rendered by the expression (directly, or through a ternary / fallback).
- * Strings nested in calls, format options, icon props, style objects, enum
- * values, locale tags, etc. are implementation details and must not pollute
- * the translation catalogue.
- */
 function isVisibleExpressionLiteral(node) {
   let current = node;
   while (current.parent) {
     const parent = current.parent;
-
     if (ts.isJsxAttribute(parent)) return false;
-
     if (ts.isJsxExpression(parent)) {
-      return (
-        parent.expression === current &&
-        (ts.isJsxElement(parent.parent) || ts.isJsxFragment(parent.parent))
-      );
+      return parent.expression === current && (ts.isJsxElement(parent.parent) || ts.isJsxFragment(parent.parent));
     }
-
     if (ts.isParenthesizedExpression(parent)) {
       current = parent;
       continue;
     }
-
     if (ts.isConditionalExpression(parent)) {
       if (parent.whenTrue !== current && parent.whenFalse !== current) return false;
       current = parent;
       continue;
     }
-
     if (ts.isBinaryExpression(parent)) {
       const kind = parent.operatorToken.kind;
       const fallbackOperator = kind === ts.SyntaxKind.QuestionQuestionToken || kind === ts.SyntaxKind.BarBarToken;
@@ -123,7 +116,6 @@ function isVisibleExpressionLiteral(node) {
       current = parent;
       continue;
     }
-
     return false;
   }
   return false;
