@@ -1,4 +1,4 @@
-import { getLanguageFrenchName, isSameLanguage } from "./languages";
+import { isSameLanguage, SUPPORTED_LANGUAGES } from "./languages";
 import { getTranslationRequestLanguage } from "./translationLocale";
 import type {
   ContentTranslation,
@@ -114,7 +114,7 @@ export function hasTranslatedPoll(
 export function translationSourceLabel(translation?: ContentTranslation): string {
   const runtime = translation as RuntimeTranslation | undefined;
   const source = runtime?.sourceLanguage ?? runtime?.source_language;
-  return source
-    ? getLanguageFrenchName(source).toLocaleLowerCase("fr")
-    : "la langue d’origine";
+  if (!source) return "langue d’origine";
+  const base = source.trim().toLocaleLowerCase().replace("_", "-").split("-")[0];
+  return SUPPORTED_LANGUAGES.find((language) => language.code === base)?.nativeName ?? source.trim();
 }
