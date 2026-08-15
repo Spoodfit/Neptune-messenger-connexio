@@ -177,7 +177,7 @@ async function run() {
   try {
     const sizes = [[280, 568], [320, 568], [390, 844], [430, 720], [768, 1024], [1024, 768]];
     for (const [width, height] of sizes) {
-      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: "reduce" });
+      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: "reduce", locale: "fr-FR" });
       const pageErrors = [];
       page.on("pageerror", (error) => pageErrors.push(error.message));
       page.on("console", (message) => { if (message.type() === "error") pageErrors.push(message.text()); });
@@ -189,7 +189,7 @@ async function run() {
       await page.close();
     }
 
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: "fr-FR" });
     const runtimeErrors = [];
     page.on("pageerror", (error) => runtimeErrors.push(error.message));
     page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(message.text()); });
