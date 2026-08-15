@@ -10,10 +10,12 @@ import { AppAlert } from "@/services/ui/AppAlert";
 import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import { env } from "../config/env";
 import {
+  contentTranslationTargetsViewer,
   hasTranslatedContentField,
   translatedContentField,
   translationSourceLabel
 } from "../i18n/contentTranslation";
+import { mockContentTranslation } from "../i18n/mockContentLookup";
 import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { NeptuneExperienceApi } from "../services/api/experienceApi";
@@ -39,9 +41,14 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
   const totalReactions = post.reactions.reduce((total, reaction) => total + reaction.count, 0);
   const locationLabel = post.location?.label ?? post.locationLabel;
   const synchronized = post.kind === "offre" ? post.syncedWithAdvantagesCommittee || post.syncedWithBusinessApp : post.syncedWithBusinessApp;
-  const translationReady = hasTranslatedContentField(post.body, post.translation, "body");
-  const renderedBody = translatedContentField(post.body, post.translation, "body", undefined, showOriginal) ?? post.body;
-  const sourceLabel = translationSourceLabel(post.translation);
+  const effectiveTranslation = contentTranslationTargetsViewer(post.translation)
+    ? post.translation
+    : env.mockMode
+      ? mockContentTranslation(post.body, "body", post.sourceLanguage ?? "fr")
+      : post.translation;
+  const translationReady = hasTranslatedContentField(post.body, effectiveTranslation, "body");
+  const renderedBody = translatedContentField(post.body, effectiveTranslation, "body", undefined, showOriginal) ?? post.body;
+  const sourceLabel = translationSourceLabel(effectiveTranslation);
 
   const sharePost = async () => {
     if (sharing) return;
