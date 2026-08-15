@@ -1,24 +1,15 @@
-import {
-  StatusBar } from "expo-status-bar";
+import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
-import { Redirect,
-  router,
-  Stack,
-  useSegments } from "expo-router";
-import { useEffect,
-  useRef } from "react";
-import { ActivityIndicator,
-  Platform,
-  StyleSheet,
-  View
-} from "react-native";
+import { Redirect, router, Stack, useSegments } from "expo-router";
+import { useEffect, useRef } from "react";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
 import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
-import { LanguageProvider } from "../src/providers/LanguageProvider";
+import { LanguageProvider, useAppLanguage } from "../src/providers/LanguageProvider";
 import { MessagingProvider } from "../src/providers/MessagingProvider";
 import { ScheduledCallsProvider } from "../src/providers/ScheduledCallsProvider";
 import { SessionProvider, useSession } from "../src/providers/SessionProvider";
@@ -167,8 +158,19 @@ function AuthenticatedApp() {
   return <MessagingProvider key={`user:${currentUser.id}`}><GroupAdminProvider><ExperienceProvider><ScheduledCallsProvider>{applicationStack}</ScheduledCallsProvider></ExperienceProvider></GroupAdminProvider></MessagingProvider>;
 }
 
+/**
+ * Language changes need a full screen-tree refresh so values formatted before
+ * reaching LocalizedText (dates, times, counts) are recomputed in the new UI
+ * locale. SessionProvider remains mounted, so changing language never logs the
+ * member out or discards the authenticated session.
+ */
+function LanguageAwareAuthenticatedApp() {
+  const { uiLanguage } = useAppLanguage();
+  return <AuthenticatedApp key={`ui-language:${uiLanguage}`} />;
+}
+
 export default function RootLayout() {
-  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><ThemeProvider><LanguageProvider><SessionProvider><AuthenticatedApp /></SessionProvider></LanguageProvider></ThemeProvider></SafeAreaProvider>;
+  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><ThemeProvider><LanguageProvider><SessionProvider><LanguageAwareAuthenticatedApp /></SessionProvider></LanguageProvider></ThemeProvider></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({
