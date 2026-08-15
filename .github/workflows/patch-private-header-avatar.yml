@@ -1,0 +1,55 @@
+name: Patch private header avatar
+
+on:
+  push:
+    branches:
+      - fix/connexio-light-i18n-20260815
+    paths:
+      - .github/workflows/patch-private-header-avatar.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/connexio-light-i18n-20260815
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Add direct member avatar and role ring to chat header
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const file = 'src/screens/ChatConversationScreen.tsx';
+          let s = fs.readFileSync(file, 'utf8');
+          const beforeMember = `  const directMemberId = conversation?.memberIds?.find(\n    (memberId) => memberId !== currentUser.id\n  );`;
+          const afterMember = `  const directParticipantIds = conversation?.memberIds?.length\n    ? conversation.memberIds\n    : conversation?.activeMemberIds ?? [];\n  const directMemberId = directParticipantIds.find(\n    (memberId) => memberId !== currentUser.id\n  );\n  const directMember = conversation?.type === "direct"\n    ? members.find((member) => member.id === directMemberId) ??\n      members.find(\n        (member) =>\n          member.id !== currentUser.id &&\n          member.name.trim().toLocaleLowerCase() ===\n            conversation.name.trim().toLocaleLowerCase()\n      )\n    : undefined;`;
+          if (!s.includes(beforeMember)) throw new Error('direct member anchor missing');
+          s = s.replace(beforeMember, afterMember);
+
+          const beforeHeader = `        <Pressable\n          accessibilityRole="button"\n          accessibilityLabel={\`Ouvrir les informations de \${conversation.name}\`}\n          onPress={openConversationDetails}\n          style={styles.headerContent}\n        >\n          <Text\n            accessibilityRole="header"\n            style={styles.headerTitle}\n            numberOfLines={1}\n          >\n            {conversation.name}\n          </Text>\n          {conversation.type === "direct" && canInitiateCalls ? (\n            <Text numberOfLines={1} style={styles.headerSubtitle}>\n              {connectionLabel}\n            </Text>\n          ) : (\n            <View style={styles.headerMembers}>\n              <MemberAvatarStack\n                memberIds={activeMemberIds}\n                members={members}\n                memberCount={memberCount}\n                maxVisible={4}\n                size={20}\n              />\n              {connectionState !== "online" && !localOnly ? (\n                <Text numberOfLines={1} style={styles.headerSubtitle}>\n                  {connectionLabel}\n                </Text>\n              ) : null}\n            </View>\n          )}\n        </Pressable>`;
+          const afterHeader = `        <Pressable\n          accessibilityRole="button"\n          accessibilityLabel={\`Ouvrir les informations de \${conversation.name}\`}\n          onPress={openConversationDetails}\n          style={styles.headerContent}\n        >\n          {conversation.type === "direct" && directMember ? (\n            <StatusAvatar\n              user={directMember}\n              size={38}\n              ringWidth={2.5}\n              accessible={false}\n            />\n          ) : null}\n          <View style={styles.headerCopy}>\n            <Text\n              accessibilityRole="header"\n              style={styles.headerTitle}\n              numberOfLines={1}\n            >\n              {conversation.name}\n            </Text>\n            {conversation.type === "direct" && canInitiateCalls ? (\n              <Text numberOfLines={1} style={styles.headerSubtitle}>\n                {connectionLabel}\n              </Text>\n            ) : (\n              <View style={styles.headerMembers}>\n                <MemberAvatarStack\n                  memberIds={activeMemberIds}\n                  members={members}\n                  memberCount={memberCount}\n                  maxVisible={4}\n                  size={20}\n                />\n                {connectionState !== "online" && !localOnly ? (\n                  <Text numberOfLines={1} style={styles.headerSubtitle}>\n                    {connectionLabel}\n                  </Text>\n                ) : null}\n              </View>\n            )}\n          </View>\n        </Pressable>`;
+          if (!s.includes(beforeHeader)) throw new Error('header anchor missing');
+          s = s.replace(beforeHeader, afterHeader);
+
+          const beforeStyle = `  headerContent: {\n    flex: 1,\n    minWidth: 0,\n    minHeight: 52,\n    justifyContent: "center",\n    paddingHorizontal: 5\n  },\n  headerTitle:`;
+          const afterStyle = `  headerContent: {\n    flex: 1,\n    minWidth: 0,\n    minHeight: 52,\n    flexDirection: "row",\n    alignItems: "center",\n    gap: 8,\n    paddingHorizontal: 5\n  },\n  headerCopy: { flex: 1, minWidth: 0, justifyContent: "center" },\n  headerTitle:`;
+          if (!s.includes(beforeStyle)) throw new Error('header style anchor missing');
+          s = s.replace(beforeStyle, afterStyle);
+          fs.writeFileSync(file, s);
+          NODE
+      - name: Verify
+        run: npm run verify
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/screens/ChatConversationScreen.tsx
+          git commit -m 'fix: show status avatar in private chat header'
+          git push origin HEAD:fix/connexio-light-i18n-20260815
