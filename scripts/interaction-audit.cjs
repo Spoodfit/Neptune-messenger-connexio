@@ -55,22 +55,23 @@ async function run() {
     await page.getByLabel("Publier un Temps fort").click();
     await waitRoute(page, "/new-highlight", "Bouton + : nouveau Temps fort");
 
-    // Segmented controls must stay interactive after the swipe-navigation removal.
+    // Segmented controls must change rendered content. React Native Web does not
+    // consistently expose aria-selected for accessibilityState across versions.
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     const privateTab = page.getByRole("tab", { name: "Privées" });
     await privateTab.click();
-    check((await privateTab.getAttribute("aria-selected")) === "true", "Onglet Privées actif");
+    check(await page.getByText("Discussions privées", { exact: true }).isVisible(), "Onglet Privées actif");
     const groupTab = page.getByRole("tab", { name: "Groupes" });
     await groupTab.click();
-    check((await groupTab.getAttribute("aria-selected")) === "true", "Onglet Groupes actif");
+    check(await page.getByText("Discussions de groupe", { exact: true }).isVisible(), "Onglet Groupes actif");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
     await mapTab.click();
-    check((await mapTab.getAttribute("aria-selected")) === "true", "Onglet Map actif");
+    check(await page.locator("iframe[title='Carte Neptune']").isVisible(), "Onglet Map actif");
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
     await feedTab.click();
-    check((await feedTab.getAttribute("aria-selected")) === "true", "Onglet Feed actif");
+    check(await page.getByLabel("Options de la publication").first().isVisible(), "Onglet Feed actif");
 
     // Publication ellipsis must open the Connexio action sheet.
     const postOptions = page.getByLabel("Options de la publication").first();
