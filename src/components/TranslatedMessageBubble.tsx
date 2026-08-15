@@ -11,7 +11,9 @@ import {
   View
 } from "react-native";
 
+import { env } from "../config/env";
 import {
+  contentTranslationTargetsViewer,
   hasTranslatedContentField,
   hasTranslatedPoll,
   translatedContentField,
@@ -19,6 +21,7 @@ import {
   translatedPollQuestion,
   translationSourceLabel
 } from "../i18n/contentTranslation";
+import { mockContentTranslation, mockPollTranslation } from "../i18n/mockContentLookup";
 import { getTranslationRequestLanguage } from "../i18n/translationLocale";
 import { spacing } from "../theme";
 import { MessageBubble as BaseMessageBubble } from "./BaseMessageBubble";
@@ -33,9 +36,33 @@ export function MessageBubble(props: MessageBubbleProps) {
   const [showOriginal, setShowOriginal] = useState(false);
   const viewerLanguage = getTranslationRequestLanguage();
 
+  const bodyTranslation = contentTranslationTargetsViewer(message.translation, viewerLanguage)
+    ? message.translation
+    : env.mockMode
+      ? mockContentTranslation(message.body, "body", message.sourceLanguage ?? "fr")
+      : message.translation;
+  const replyTranslation = message.replyPreview
+    ? contentTranslationTargetsViewer(message.replyPreview.translation, viewerLanguage)
+      ? message.replyPreview.translation
+      : env.mockMode
+        ? mockContentTranslation(
+            message.replyPreview.body,
+            "body",
+            message.replyPreview.sourceLanguage ?? "fr"
+          )
+        : message.replyPreview.translation
+    : undefined;
+  const pollTranslation = message.poll
+    ? contentTranslationTargetsViewer(message.poll.translation, viewerLanguage)
+      ? message.poll.translation
+      : env.mockMode
+        ? mockPollTranslation(message.poll)
+        : message.poll.translation
+    : undefined;
+
   const translatedBody = translatedContentField(
     message.body,
-    message.translation,
+    bodyTranslation,
     "body",
     viewerLanguage,
     showOriginal
@@ -47,7 +74,7 @@ export function MessageBubble(props: MessageBubbleProps) {
         body:
           translatedContentField(
             message.replyPreview.body,
-            message.replyPreview.translation,
+            replyTranslation,
             "body",
             viewerLanguage,
             showOriginal
@@ -60,7 +87,7 @@ export function MessageBubble(props: MessageBubbleProps) {
         ...message.poll,
         question: translatedPollQuestion(
           message.poll.question,
-          message.poll.translation,
+          pollTranslation,
           viewerLanguage,
           showOriginal
         ),
@@ -70,7 +97,7 @@ export function MessageBubble(props: MessageBubbleProps) {
             option.id,
             index,
             option.label,
-            message.poll?.translation,
+            pollTranslation,
             viewerLanguage,
             showOriginal
           )
@@ -78,25 +105,31 @@ export function MessageBubble(props: MessageBubbleProps) {
       }
     : undefined;
 
-  const translatedAttachments = message.attachments?.map((attachment) => ({
-    ...attachment,
-    transcript: attachment.transcript
-      ? translatedContentField(
-          attachment.transcript,
-          attachment.transcriptTranslation,
-          "transcript",
-          viewerLanguage,
-          showOriginal
-        ) ?? attachment.transcript
-      : attachment.transcript
-  }));
+  const translatedAttachments = message.attachments?.map((attachment) => {
+    const transcriptTranslation = attachment.transcript && env.mockMode &&
+      !contentTranslationTargetsViewer(attachment.transcriptTranslation, viewerLanguage)
+      ? mockContentTranslation(attachment.transcript, "transcript")
+      : attachment.transcriptTranslation;
+    return {
+      ...attachment,
+      transcript: attachment.transcript
+        ? translatedContentField(
+            attachment.transcript,
+            transcriptTranslation,
+            "transcript",
+            viewerLanguage,
+            showOriginal
+          ) ?? attachment.transcript
+        : attachment.transcript
+    };
+  });
 
   const translationReady = Boolean(
-    hasTranslatedContentField(message.body, message.translation, "body", viewerLanguage) ||
+    hasTranslatedContentField(message.body, bodyTranslation, "body", viewerLanguage) ||
       (message.replyPreview &&
         hasTranslatedContentField(
           message.replyPreview.body,
-          message.replyPreview.translation,
+          replyTranslation,
           "body",
           viewerLanguage
         )) ||
@@ -104,25 +137,29 @@ export function MessageBubble(props: MessageBubbleProps) {
         hasTranslatedPoll(
           message.poll.question,
           message.poll.options,
-          message.poll.translation,
+          pollTranslation,
           viewerLanguage
         )) ||
-      message.attachments?.some((attachment) =>
-        attachment.transcript
-          ? hasTranslatedContentField(
-              attachment.transcript,
-              attachment.transcriptTranslation,
-              "transcript",
-              viewerLanguage
-            )
-          : false
-      )
+      message.attachments?.some((attachment) => {
+        if (!attachment.transcript) return false;
+        const translation = contentTranslationTargetsViewer(attachment.transcriptTranslation, viewerLanguage)
+          ? attachment.transcriptTranslation
+          : env.mockMode
+            ? mockContentTranslation(attachment.transcript, "transcript")
+            : attachment.transcriptTranslation;
+        return hasTranslatedContentField(
+          attachment.transcript,
+          translation,
+          "transcript",
+          viewerLanguage
+        );
+      })
   );
 
   const sourceTranslation =
-    message.translation ??
-    message.poll?.translation ??
-    message.replyPreview?.translation ??
+    bodyTranslation ??
+    pollTranslation ??
+    replyTranslation ??
     message.attachments?.find((attachment) => attachment.transcriptTranslation)
       ?.transcriptTranslation;
 
