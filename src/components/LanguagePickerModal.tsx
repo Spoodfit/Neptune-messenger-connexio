@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { SUPPORTED_LANGUAGES } from "../i18n/languages";
+import { SUPPORTED_UI_LANGUAGES } from "../i18n/uiTranslations";
 import { useAppLanguage } from "../providers/LanguageProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { spacing, typography } from "../theme";
@@ -14,12 +14,12 @@ export function LanguagePickerModal({ visible, onClose }: LanguagePickerModalPro
   const { mode, setLanguageMode } = useAppLanguage();
   const [query, setQuery] = useState("");
   const results = useMemo(() => {
-    const clean = query.trim().toLocaleLowerCase("fr");
-    if (!clean) return SUPPORTED_LANGUAGES;
-    return SUPPORTED_LANGUAGES.filter((item) => `${item.nativeName} ${item.frenchName} ${item.code}`.toLocaleLowerCase("fr").includes(clean));
+    const clean = query.trim().toLocaleLowerCase();
+    if (!clean) return SUPPORTED_UI_LANGUAGES;
+    return SUPPORTED_UI_LANGUAGES.filter((item) => `${item.nativeName} ${item.frenchName} ${item.code}`.toLocaleLowerCase().includes(clean));
   }, [query]);
 
-  const select = (next: "system" | (typeof SUPPORTED_LANGUAGES)[number]["code"]) => {
+  const select = (next: "system" | (typeof SUPPORTED_UI_LANGUAGES)[number]["code"]) => {
     setLanguageMode(next);
     onClose();
   };
