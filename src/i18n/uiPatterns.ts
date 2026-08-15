@@ -4,11 +4,11 @@ import { normalizeUiLanguageCode, type SupportedUiLanguage } from "./uiTranslati
 type DynamicTranslator = (match: RegExpMatchArray, locale: SupportedUiLanguage) => string;
 
 const WORDS = {
-  en: { profileOf: "Profile of", call: "Call", scheduleWith: "Schedule with", openProfileOf: "Open profile of", recommendTo: "Recommend a contact to", calls: "calls", members: "members", participants: "participants", min: "min", video: "Video" },
-  es: { profileOf: "Perfil de", call: "Llamar a", scheduleWith: "Programar con", openProfileOf: "Abrir el perfil de", recommendTo: "Recomendar un contacto a", calls: "llamadas", members: "miembros", participants: "participantes", min: "min", video: "Vídeo" },
-  de: { profileOf: "Profil von", call: "Anrufen:", scheduleWith: "Planen mit", openProfileOf: "Profil öffnen von", recommendTo: "Kontakt empfehlen an", calls: "Anrufe", members: "Mitglieder", participants: "Teilnehmende", min: "Min.", video: "Video" },
-  it: { profileOf: "Profilo di", call: "Chiama", scheduleWith: "Programma con", openProfileOf: "Apri il profilo di", recommendTo: "Consiglia un contatto a", calls: "chiamate", members: "membri", participants: "partecipanti", min: "min", video: "Video" },
-  pt: { profileOf: "Perfil de", call: "Ligar a", scheduleWith: "Agendar com", openProfileOf: "Abrir o perfil de", recommendTo: "Recomendar um contacto a", calls: "chamadas", members: "membros", participants: "participantes", min: "min", video: "Vídeo" }
+  en: { profileOf: "Profile of", call: "Call", scheduleWith: "Schedule with", openProfileOf: "Open profile of", recommendTo: "Recommend a contact to", calls: "calls", members: "members", participants: "participants", min: "min", video: "Video", translatedFrom: "Translated from" },
+  es: { profileOf: "Perfil de", call: "Llamar a", scheduleWith: "Programar con", openProfileOf: "Abrir el perfil de", recommendTo: "Recomendar un contacto a", calls: "llamadas", members: "miembros", participants: "participantes", min: "min", video: "Vídeo", translatedFrom: "Traducido del" },
+  de: { profileOf: "Profil von", call: "Anrufen:", scheduleWith: "Planen mit", openProfileOf: "Profil öffnen von", recommendTo: "Kontakt empfehlen an", calls: "Anrufe", members: "Mitglieder", participants: "Teilnehmende", min: "Min.", video: "Video", translatedFrom: "Übersetzt aus" },
+  it: { profileOf: "Profilo di", call: "Chiama", scheduleWith: "Programma con", openProfileOf: "Apri il profilo di", recommendTo: "Consiglia un contatto a", calls: "chiamate", members: "membri", participants: "partecipanti", min: "min", video: "Video", translatedFrom: "Tradotto da" },
+  pt: { profileOf: "Perfil de", call: "Ligar a", scheduleWith: "Agendar com", openProfileOf: "Abrir o perfil de", recommendTo: "Recomendar um contacto a", calls: "chamadas", members: "membros", participants: "participantes", min: "min", video: "Vídeo", translatedFrom: "Traduzido de" }
 } as const;
 
 type DynamicLocale = keyof typeof WORDS;
@@ -23,6 +23,7 @@ const patterns: Array<[RegExp, DynamicTranslator]> = [
   [/^Programmer avec (.+)$/u, (m, l) => `${words(l).scheduleWith} ${m[1]}`],
   [/^Ouvrir le profil de (.+)$/u, (m, l) => `${words(l).openProfileOf} ${m[1]}`],
   [/^Recommander un contact à (.+)$/u, (m, l) => `${words(l).recommendTo} ${m[1]}`],
+  [/^Traduit de (.+)$/u, (m, l) => `${words(l).translatedFrom} ${m[1]}`],
   [/^(\d+) appels$/u, (m, l) => `${m[1]} ${words(l).calls}`],
   [/^(\d+) membres$/u, (m, l) => `${m[1]} ${words(l).members}`],
   [/^(\d+) membres ·$/u, (m, l) => `${m[1]} ${words(l).members} ·`],
