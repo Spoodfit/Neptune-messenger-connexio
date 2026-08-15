@@ -1,6 +1,6 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 const EAS_PROJECT_ID = "d2288b09-8249-4879-810f-7cb0072baeeb";
 const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
 const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
@@ -33,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const backendContract = process.env.EXPO_PUBLIC_BACKEND_CONTRACT ?? "neptune-web-v1";
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
+  const buildRef = process.env.EAS_BUILD_GIT_COMMIT_HASH ?? process.env.GITHUB_SHA ?? "local";
   const isProduction = buildProfile === "production";
   const isReleaseCandidate = buildProfile === "release-candidate";
   const isStoreBuild = isProduction || isReleaseCandidate;
@@ -120,6 +121,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ["expo-location", { locationWhenInUsePermission: "Connexio utilise votre position uniquement à votre demande." }],
       "expo-document-picker"
     ],
-    extra: { apiBaseUrl, realtimeUrl, businessWebBaseUrl, privacyPolicyUrl, termsUrl, accountDeletionUrl, supportUrl, backendContract, mockMode, buildProfile, eas: { projectId: easProjectId } }
+    extra: { apiBaseUrl, realtimeUrl, businessWebBaseUrl, privacyPolicyUrl, termsUrl, accountDeletionUrl, supportUrl, backendContract, mockMode, buildProfile, buildRef, eas: { projectId: easProjectId } }
   };
 };

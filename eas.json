@@ -16,6 +16,7 @@
     "standalone": {
       "developmentClient": false,
       "distribution": "internal",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_MOCK_MODE": "true",
         "EXPO_PUBLIC_BACKEND_CONTRACT": "connexio-v1",
