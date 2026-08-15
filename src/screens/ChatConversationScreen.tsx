@@ -172,9 +172,21 @@ export default function ChatScreen() {
   const loading = loadingConversationIds.has(conversationId);
   const loadingMore = loadingMoreConversationIds.has(conversationId);
   const hasMore = hasMoreMessages(conversationId);
-  const directMemberId = conversation?.memberIds?.find(
+  const directParticipantIds = conversation?.memberIds?.length
+    ? conversation.memberIds
+    : conversation?.activeMemberIds ?? [];
+  const directMemberId = directParticipantIds.find(
     (memberId) => memberId !== currentUser.id
   );
+  const directMember = conversation?.type === "direct"
+    ? members.find((member) => member.id === directMemberId) ??
+      members.find(
+        (member) =>
+          member.id !== currentUser.id &&
+          member.name.trim().toLocaleLowerCase() ===
+            conversation.name.trim().toLocaleLowerCase()
+      )
+    : undefined;
   const canPost = conversation
     ? canPublishInConversation(currentUser, conversation)
     : false;
@@ -736,33 +748,43 @@ export default function ChatScreen() {
           onPress={openConversationDetails}
           style={styles.headerContent}
         >
-          <Text
-            accessibilityRole="header"
-            style={styles.headerTitle}
-            numberOfLines={1}
-          >
-            {conversation.name}
-          </Text>
-          {conversation.type === "direct" && canInitiateCalls ? (
-            <Text numberOfLines={1} style={styles.headerSubtitle}>
-              {connectionLabel}
+          {conversation.type === "direct" && directMember ? (
+            <StatusAvatar
+              user={directMember}
+              size={38}
+              ringWidth={2.5}
+              accessible={false}
+            />
+          ) : null}
+          <View style={styles.headerCopy}>
+            <Text
+              accessibilityRole="header"
+              style={styles.headerTitle}
+              numberOfLines={1}
+            >
+              {conversation.name}
             </Text>
-          ) : (
-            <View style={styles.headerMembers}>
-              <MemberAvatarStack
-                memberIds={activeMemberIds}
-                members={members}
-                memberCount={memberCount}
-                maxVisible={4}
-                size={20}
-              />
-              {connectionState !== "online" && !localOnly ? (
-                <Text numberOfLines={1} style={styles.headerSubtitle}>
-                  {connectionLabel}
-                </Text>
-              ) : null}
-            </View>
-          )}
+            {conversation.type === "direct" && canInitiateCalls ? (
+              <Text numberOfLines={1} style={styles.headerSubtitle}>
+                {connectionLabel}
+              </Text>
+            ) : (
+              <View style={styles.headerMembers}>
+                <MemberAvatarStack
+                  memberIds={activeMemberIds}
+                  members={members}
+                  memberCount={memberCount}
+                  maxVisible={4}
+                  size={20}
+                />
+                {connectionState !== "online" && !localOnly ? (
+                  <Text numberOfLines={1} style={styles.headerSubtitle}>
+                    {connectionLabel}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          </View>
         </Pressable>
         <ThemeModeButton />
         {conversation.type === "direct" ? (
@@ -1227,9 +1249,12 @@ const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: 52,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     paddingHorizontal: 5
   },
+  headerCopy: { flex: 1, minWidth: 0, justifyContent: "center" },
   headerTitle: { ...typography.heading3, color: theme.pageText },
   headerSubtitle: { color: theme.pageTextMuted, fontSize: 11, marginTop: 2 },
   headerMembers: { minHeight: 24, flexDirection: "row", alignItems: "center", gap: 8 },
