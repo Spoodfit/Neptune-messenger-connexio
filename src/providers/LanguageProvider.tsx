@@ -1,7 +1,7 @@
-import NativeStorage from "expo-sqlite/kv-store";
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { AppState } from "react-native";
 
+import { readLanguagePreference, writeLanguagePreference } from "../i18n/languagePreference";
 import { detectSystemLanguage, normalizeLanguageCode, type SupportedLanguage } from "../i18n/languages";
 import { setTranslationRequestLanguage } from "../i18n/translationLocale";
 import { normalizeUiLanguageCode, translateUiText, type SupportedUiLanguage } from "../i18n/uiTranslations";
@@ -20,48 +20,13 @@ interface LanguageContextValue {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-/*
- * App language is a device preference, not session data. Keep it outside the
- * standalone session store so signing out never resets the interface language.
- * The legacy key is read once to migrate users who already selected a language.
- */
-const UI_LANGUAGE_PREFERENCE_KEY = "connexio.preferences.ui-language.v2";
-const LEGACY_APP_LANGUAGE_KEY = "connexio.standalone.app-language";
-
-type BrowserStorage = {
-  getItem: (key: string) => string | null;
-  setItem: (key: string, value: string) => void;
-};
-
-function getBrowserStorage(): BrowserStorage | null {
-  if (Platform.OS !== "web" || typeof globalThis === "undefined") return null;
-  try {
-    return (globalThis as { localStorage?: BrowserStorage }).localStorage ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function readPreference(key: string): string | null {
-  if (Platform.OS === "web") return getBrowserStorage()?.getItem(key) ?? null;
-  return NativeStorage.getItemSync(key);
-}
-
-function writePreference(key: string, value: string): void {
-  if (Platform.OS === "web") {
-    getBrowserStorage()?.setItem(key, value);
-    return;
-  }
-  NativeStorage.setItemSync(key, value);
-}
-
 function decodeStoredMode(raw: string | null, systemLanguage: SupportedLanguage): ConnexioLanguageMode | null {
   if (!raw) return null;
   let value: unknown = raw;
   try {
     value = JSON.parse(raw) as unknown;
   } catch {
-    // v2 stores the plain mode; legacy storage used JSON.stringify.
+    // Current preference is a plain mode; the previous store used JSON.stringify.
   }
   if (value === "system") return "system";
   if (typeof value !== "string" || !value.trim()) return null;
@@ -70,32 +35,7 @@ function decodeStoredMode(raw: string | null, systemLanguage: SupportedLanguage)
 }
 
 function readInitialMode(systemLanguage: SupportedLanguage): ConnexioLanguageMode {
-  try {
-    const current = decodeStoredMode(readPreference(UI_LANGUAGE_PREFERENCE_KEY), systemLanguage);
-    if (current) return current;
-
-    // The legacy value exists in the SQLite KV store used by native standalone
-    // builds. On web we do not attempt to instantiate SQLite during static export.
-    if (Platform.OS !== "web") {
-      const legacy = decodeStoredMode(readPreference(LEGACY_APP_LANGUAGE_KEY), systemLanguage);
-      if (legacy) {
-        writePreference(UI_LANGUAGE_PREFERENCE_KEY, legacy);
-        return legacy;
-      }
-    }
-  } catch {
-    // A storage failure must never prevent Connexio from starting.
-  }
-  return "system";
-}
-
-function persistMode(mode: ConnexioLanguageMode): void {
-  try {
-    writePreference(UI_LANGUAGE_PREFERENCE_KEY, mode);
-  } catch {
-    // The in-memory change still applies immediately; the next launch falls back
-    // to the previous persisted preference instead of breaking the application.
-  }
+  return decodeStoredMode(readLanguagePreference(), systemLanguage) ?? "system";
 }
 
 export function LanguageProvider({ children }: PropsWithChildren) {
@@ -126,14 +66,12 @@ export function LanguageProvider({ children }: PropsWithChildren) {
           language === "fr" ? "fr" : "en"
         );
 
-    // Native builds persist synchronously with SQLite before publishing the
-    // React state change. This removes the startup race seen on the APK.
-    persistMode(normalized);
+    // Native storage writes synchronously before publishing the React state.
+    // Web uses an independent browser implementation and never bundles SQLite.
+    writeLanguagePreference(normalized);
     setMode(normalized);
 
-    // Keep the already-working message translation behaviour intact. UI locale
-    // rendering is separate, but the selected language remains the translation
-    // target unless the user follows the phone language.
+    // Keep the already-working automatic message translation behaviour intact.
     setTranslationRequestLanguage(
       normalized === "system" ? systemLanguage : normalizeLanguageCode(normalized, systemLanguage)
     );
