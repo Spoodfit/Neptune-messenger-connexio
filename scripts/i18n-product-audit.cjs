@@ -29,13 +29,13 @@ function browserExecutable() {
 }
 
 async function expectText(page, text, label = text) {
-  const locator = page.getByText(text, { exact: true }).first();
+  const locator = page.getByText(text, { exact: true }).last();
   try { await locator.waitFor({ state: "visible", timeout: 7000 }); }
   catch { failures.push(`${label}: texte attendu absent (${JSON.stringify(text)})`); }
 }
 
 async function clickExact(page, text, label = text) {
-  const locator = page.getByText(text, { exact: true }).first();
+  const locator = page.getByText(text, { exact: true }).last();
   try {
     await locator.waitFor({ state: "visible", timeout: 7000 });
     await locator.click({ force: true });
@@ -44,14 +44,14 @@ async function clickExact(page, text, label = text) {
 }
 
 async function openLanguagePicker(page, currentLabel) {
-  const byA11y = page.getByLabel(currentLabel, { exact: true });
+  const byA11y = page.getByLabel(currentLabel, { exact: true }).last();
   if (await byA11y.isVisible().catch(() => false)) {
     await byA11y.scrollIntoViewIfNeeded().catch(() => undefined);
     await byA11y.click({ force: true });
     await page.waitForTimeout(200);
     return true;
   }
-  const languageRow = page.getByText(/Langue|Language|Idioma|Sprache|Lingua/, { exact: true }).first();
+  const languageRow = page.getByText(/Langue|Language|Idioma|Sprache|Lingua/, { exact: true }).last();
   if (await languageRow.isVisible().catch(() => false)) {
     await languageRow.scrollIntoViewIfNeeded().catch(() => undefined);
     await languageRow.click({ force: true });
@@ -63,7 +63,7 @@ async function openLanguagePicker(page, currentLabel) {
 }
 
 async function chooseLanguage(page, label) {
-  const option = page.getByRole("radio").filter({ hasText: label }).first();
+  const option = page.getByRole("radio").filter({ hasText: label }).last();
   try {
     await option.waitFor({ state: "visible", timeout: 7000 });
     await option.click({ force: true });
