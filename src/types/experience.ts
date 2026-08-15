@@ -1,6 +1,7 @@
 import type {
   AppUser,
   AttachmentKind,
+  ContentTranslation,
   Conversation,
   UserRole
 } from "./messaging";
@@ -52,6 +53,7 @@ export interface HighlightMedia {
   status?: "local" | "uploading" | "ready" | "failed";
   transcript?: string;
   transcriptStatus?: "pending" | "ready" | "failed";
+  transcriptTranslation?: ContentTranslation;
 }
 
 export interface HighlightReactionSummary {
@@ -69,6 +71,9 @@ export interface HighlightComment {
   parentCommentId?: string;
   mentionedUserIds?: string[];
   reactions: HighlightReactionSummary[];
+  sourceLanguage?: string;
+  /** Champs traduisibles: body. */
+  translation?: ContentTranslation;
 }
 
 export interface HighlightLocation {
@@ -101,6 +106,9 @@ export interface HighlightPost {
   syncedWithBusinessApp?: boolean;
   syncedWithAdvantagesCommittee?: boolean;
   syncState?: "local" | "queued" | "synced" | "failed";
+  sourceLanguage?: string;
+  /** Champs traduisibles: body. Les noms/lieux restent canoniques. */
+  translation?: ContentTranslation;
 }
 
 export interface PlaceSuggestion {

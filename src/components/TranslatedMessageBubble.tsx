@@ -3,55 +3,182 @@ import {
   type ComponentProps,
   useEffect,
   useMemo,
-  useState } from "react";
-import { Pressable,
+  useState
+} from "react";
+import {
+  Pressable,
   StyleSheet,
   View
 } from "react-native";
 
-import { getLanguageFrenchName, isSameLanguage } from "../i18n/languages";
+import { env } from "../config/env";
+import {
+  contentTranslationTargetsViewer,
+  hasTranslatedContentField,
+  hasTranslatedPoll,
+  translatedContentField,
+  translatedPollOption,
+  translatedPollQuestion,
+  translationSourceLabel
+} from "../i18n/contentTranslation";
+import { mockContentTranslation, mockPollTranslation } from "../i18n/mockContentLookup";
 import { getTranslationRequestLanguage } from "../i18n/translationLocale";
-import { colors, spacing } from "../theme";
+import { spacing } from "../theme";
 import { MessageBubble as BaseMessageBubble } from "./BaseMessageBubble";
+import { useAppTheme } from "@/providers/ThemeProvider";
 
 type MessageBubbleProps = ComponentProps<typeof BaseMessageBubble>;
 
-import { useAppTheme } from "@/providers/ThemeProvider";
 export function MessageBubble(props: MessageBubbleProps) {
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { message, centered = false } = props;
   const [showOriginal, setShowOriginal] = useState(false);
-  const translation = message.translation;
-  const translatedBody = translation?.body?.trim() ?? "";
   const viewerLanguage = getTranslationRequestLanguage();
-  const translationTargetsViewer = Boolean(
-    !translation?.targetLanguage ||
-      isSameLanguage(translation.targetLanguage, viewerLanguage)
-  );
+
+  const bodyTranslation = contentTranslationTargetsViewer(message.translation, viewerLanguage)
+    ? message.translation
+    : env.mockMode
+      ? mockContentTranslation(message.body, "body", message.sourceLanguage ?? "fr")
+      : message.translation;
+  const replyTranslation = message.replyPreview
+    ? contentTranslationTargetsViewer(message.replyPreview.translation, viewerLanguage)
+      ? message.replyPreview.translation
+      : env.mockMode
+        ? mockContentTranslation(
+            message.replyPreview.body,
+            "body",
+            message.replyPreview.sourceLanguage ?? "fr"
+          )
+        : message.replyPreview.translation
+    : undefined;
+  const pollTranslation = message.poll
+    ? contentTranslationTargetsViewer(message.poll.translation, viewerLanguage)
+      ? message.poll.translation
+      : env.mockMode
+        ? mockPollTranslation(message.poll)
+        : message.poll.translation
+    : undefined;
+
+  const translatedBody = translatedContentField(
+    message.body,
+    bodyTranslation,
+    "body",
+    viewerLanguage,
+    showOriginal
+  ) ?? message.body;
+
+  const translatedReplyPreview = message.replyPreview
+    ? {
+        ...message.replyPreview,
+        body:
+          translatedContentField(
+            message.replyPreview.body,
+            replyTranslation,
+            "body",
+            viewerLanguage,
+            showOriginal
+          ) ?? message.replyPreview.body
+      }
+    : undefined;
+
+  const translatedPoll = message.poll
+    ? {
+        ...message.poll,
+        question: translatedPollQuestion(
+          message.poll.question,
+          pollTranslation,
+          viewerLanguage,
+          showOriginal
+        ),
+        options: message.poll.options.map((option, index) => ({
+          ...option,
+          label: translatedPollOption(
+            option.id,
+            index,
+            option.label,
+            pollTranslation,
+            viewerLanguage,
+            showOriginal
+          )
+        }))
+      }
+    : undefined;
+
+  const translatedAttachments = message.attachments?.map((attachment) => {
+    const transcriptTranslation = attachment.transcript && env.mockMode &&
+      !contentTranslationTargetsViewer(attachment.transcriptTranslation, viewerLanguage)
+      ? mockContentTranslation(attachment.transcript, "transcript")
+      : attachment.transcriptTranslation;
+    return {
+      ...attachment,
+      transcript: attachment.transcript
+        ? translatedContentField(
+            attachment.transcript,
+            transcriptTranslation,
+            "transcript",
+            viewerLanguage,
+            showOriginal
+          ) ?? attachment.transcript
+        : attachment.transcript
+    };
+  });
+
   const translationReady = Boolean(
-    !message.isMine &&
-      translationTargetsViewer &&
-      translation?.status === "ready" &&
-      translatedBody &&
-      translatedBody !== message.body.trim()
+    hasTranslatedContentField(message.body, bodyTranslation, "body", viewerLanguage) ||
+      (message.replyPreview &&
+        hasTranslatedContentField(
+          message.replyPreview.body,
+          replyTranslation,
+          "body",
+          viewerLanguage
+        )) ||
+      (message.poll &&
+        hasTranslatedPoll(
+          message.poll.question,
+          message.poll.options,
+          pollTranslation,
+          viewerLanguage
+        )) ||
+      message.attachments?.some((attachment) => {
+        if (!attachment.transcript) return false;
+        const translation = contentTranslationTargetsViewer(attachment.transcriptTranslation, viewerLanguage)
+          ? attachment.transcriptTranslation
+          : env.mockMode
+            ? mockContentTranslation(attachment.transcript, "transcript")
+            : attachment.transcriptTranslation;
+        return hasTranslatedContentField(
+          attachment.transcript,
+          translation,
+          "transcript",
+          viewerLanguage
+        );
+      })
   );
+
+  const sourceTranslation =
+    bodyTranslation ??
+    pollTranslation ??
+    replyTranslation ??
+    message.attachments?.find((attachment) => attachment.transcriptTranslation)
+      ?.transcriptTranslation;
 
   useEffect(() => {
     setShowOriginal(false);
-  }, [message.id, translation?.targetLanguage, translatedBody]);
+  }, [message.id, viewerLanguage, sourceTranslation?.generatedAt]);
 
   const renderedMessage = useMemo(
     () => ({
       ...message,
-      body: translationReady && !showOriginal ? translatedBody : message.body
+      body: translatedBody,
+      replyPreview: translatedReplyPreview,
+      poll: translatedPoll,
+      attachments: translatedAttachments
     }),
-    [message, showOriginal, translatedBody, translationReady]
+    [message, translatedAttachments, translatedBody, translatedPoll, translatedReplyPreview]
   );
 
-  const sourceLabel = translation?.sourceLanguage
-    ? getLanguageFrenchName(translation.sourceLanguage).toLocaleLowerCase("fr")
-    : "la langue d’origine";
+  const sourceLabel = translationSourceLabel(sourceTranslation);
 
   return (
     <View style={styles.container}>
@@ -66,12 +193,12 @@ export function MessageBubble(props: MessageBubbleProps) {
       {translationReady ? (
         <View style={[styles.translationMeta, centered ? styles.centeredMeta : styles.otherMeta]}>
           <Text style={styles.translationLabel}>
-            {showOriginal ? "Message original" : `Traduit de ${sourceLabel}`}
+            {showOriginal ? "Contenu original" : `Traduit de ${sourceLabel}`}
           </Text>
           <Text style={styles.separator}>·</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={showOriginal ? "Afficher la traduction" : "Afficher le message original"}
+            accessibilityLabel={showOriginal ? "Afficher la traduction" : "Afficher le contenu original"}
             onPress={() => setShowOriginal((current) => !current)}
             style={styles.toggleTarget}
           >

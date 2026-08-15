@@ -37,12 +37,27 @@ export type MessageStatus =
 
 export type MessageTranslationStatus = "pending" | "ready" | "failed";
 
-export interface MessageTranslation {
+/**
+ * Traduction dérivée d'un contenu utilisateur. Les valeurs originales restent
+ * toujours dans leurs champs canoniques ; `fields` ne sert qu'à l'affichage.
+ */
+export interface ContentTranslation {
   targetLanguage: string;
   sourceLanguage?: string;
-  body?: string;
   status: MessageTranslationStatus;
   generatedAt?: string;
+  fields?: Record<string, string>;
+}
+
+/** Compatibilité avec le contrat historique de traduction des messages. */
+export interface MessageTranslation extends ContentTranslation {
+  body?: string;
+}
+
+export interface PollTranslation extends ContentTranslation {
+  question?: string;
+  /** Traductions indexées par l'identifiant stable de l'option. */
+  options?: Record<string, string>;
 }
 
 export type AttachmentKind =
@@ -78,6 +93,8 @@ export interface EventVoteAlert {
   pendingCount: number;
   webUrl: string;
   closesAt?: string;
+  sourceLanguage?: string;
+  translation?: ContentTranslation;
 }
 
 export interface Conversation {
@@ -112,6 +129,9 @@ export interface Conversation {
   archived?: boolean;
   left?: boolean;
   eventVoteAlert?: EventVoteAlert;
+  sourceLanguage?: string;
+  /** Champs traduisibles: description, lastMessage, pinnedMessage. */
+  translation?: ContentTranslation;
 }
 
 export interface MessageAttachment {
@@ -133,6 +153,7 @@ export interface MessageAttachment {
   status?: "local" | "uploading" | "ready" | "failed";
   transcript?: string;
   transcriptStatus?: "pending" | "ready" | "failed";
+  transcriptTranslation?: ContentTranslation;
 }
 
 export interface MessageReactionSummary {
@@ -146,6 +167,8 @@ export interface ReplyPreview {
   messageId: string;
   senderName: string;
   body: string;
+  sourceLanguage?: string;
+  translation?: MessageTranslation;
 }
 
 export interface PollVoter {
@@ -177,6 +200,8 @@ export interface MessagePoll {
   closedAt?: string;
   eventVoteId?: string;
   eventVoteUrl?: string;
+  sourceLanguage?: string;
+  translation?: PollTranslation;
 }
 
 export interface CreatePollInput {

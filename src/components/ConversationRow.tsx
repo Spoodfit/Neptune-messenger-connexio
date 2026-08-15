@@ -13,6 +13,12 @@ import { Animated,
   View
 } from "react-native";
 
+import { env } from "../config/env";
+import {
+  contentTranslationTargetsViewer,
+  translatedContentField
+} from "../i18n/contentTranslation";
+import { mockContentTranslation } from "../i18n/mockContentLookup";
 import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { colors, gradients, radii, spacing, typography } from "../theme";
@@ -35,6 +41,16 @@ export function ConversationRow({ conversation, members = [], mentioned = false,
   const theme = useAppTheme();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const pulse = useRef(new Animated.Value(0)).current;
+  const previewTranslation = contentTranslationTargetsViewer(conversation.translation)
+    ? conversation.translation
+    : env.mockMode
+      ? mockContentTranslation(conversation.lastMessage, "lastMessage", conversation.sourceLanguage ?? "fr")
+      : conversation.translation;
+  const translatedLastMessage = translatedContentField(
+    conversation.lastMessage,
+    previewTranslation,
+    "lastMessage"
+  ) ?? conversation.lastMessage;
   const unreadLabel = conversation.unreadCount ? `${conversation.unreadCount} message${conversation.unreadCount > 1 ? "s" : ""} non lu${conversation.unreadCount > 1 ? "s" : ""}` : "Aucun message non lu";
   const privateConversation = conversation.type === "direct" || conversation.type === "small_group";
   const activeMemberIds = conversation.activeMemberIds?.length ? conversation.activeMemberIds : conversation.memberIds ?? [];
@@ -66,7 +82,7 @@ export function ConversationRow({ conversation, members = [], mentioned = false,
       <LinearGradient colors={rowBorder} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.border}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${conversation.name}. ${conversation.lastMessage ?? "Aucun message"}. ${unreadLabel}${mentioned ? ". Vous avez été mentionné" : ""}${muted ? ". Conversation en sourdine" : ""}`}
+          accessibilityLabel={`${conversation.name}. ${translatedLastMessage ?? "Aucun message"}. ${unreadLabel}${mentioned ? ". Vous avez été mentionné" : ""}${muted ? ". Conversation en sourdine" : ""}`}
           accessibilityHint={onLongPress ? "Ouvre la conversation. Maintenir pour les paramètres rapides." : "Ouvre la conversation"}
           onPress={onPress ?? (() => router.push(`/chat/${encodeURIComponent(conversation.id)}`))}
           onLongPress={onLongPress}
@@ -90,7 +106,7 @@ export function ConversationRow({ conversation, members = [], mentioned = false,
               <Text style={[styles.time, { color: theme.pageTextMuted }]} numberOfLines={1}>{formatConversationTime(conversation.lastMessageAt)}</Text>
             </View>
             <View style={styles.bottomLine}>
-              <Text style={[styles.preview, { color: theme.pageTextMuted }]} numberOfLines={1}>{conversation.lastMessage ?? "Aucun message"}</Text>
+              <Text style={[styles.preview, { color: theme.pageTextMuted }]} numberOfLines={1}>{translatedLastMessage ?? "Aucun message"}</Text>
               {conversation.unreadCount > 0 ? <LinearGradient colors={[colors.primary, theme.violet]} style={styles.unread} accessibilityElementsHidden><Text style={styles.unreadText}>{conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}</Text></LinearGradient> : conversation.restricted ? <Ionicons accessibilityElementsHidden name="lock-closed" size={14} color={theme.pageTextMuted} /> : null}
             </View>
             {!privateConversation ? <View style={styles.memberLine}><MemberAvatarStack memberIds={activeMemberIds} members={members} memberCount={exactMemberCount} maxVisible={4} size={22} /><Text style={[styles.memberActivity, { color: theme.pageTextMuted }]} numberOfLines={1}>actifs récemment</Text></View> : null}

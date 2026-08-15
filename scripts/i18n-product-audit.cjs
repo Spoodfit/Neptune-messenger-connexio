@@ -71,6 +71,11 @@ async function chooseLanguage(page, label) {
   } catch { failures.push(`langue ${label}: option introuvable`); }
 }
 
+async function gotoApp(page, pathname) {
+  await page.goto(`http://127.0.0.1:${port}${pathname}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForTimeout(700);
+}
+
 async function run() {
   if (!fs.existsSync(path.join(root, "index.html"))) throw new Error("Build web Product Audit absent.");
   await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
@@ -84,8 +89,7 @@ async function run() {
     page.on("pageerror", (error) => runtimeErrors.push(error.message));
     page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(message.text()); });
 
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await page.waitForTimeout(800);
+    await gotoApp(page, "/");
     await clickExact(page, "Profil", "ouvrir Profil FR");
     await expectText(page, "Apparence", "profil FR avant changement");
 
@@ -100,15 +104,27 @@ async function run() {
     await expectText(page, "Private", "onglet privé anglais");
     await expectText(page, "Groups", "onglet groupes anglais");
 
-    await clickExact(page, "Calls", "ouvrir Calls EN");
+    // V18: le contenu échangé doit suivre la langue du lecteur, pas uniquement le chrome UI.
+    await gotoApp(page, "/chat/carcassonne");
+    await expectText(page, "Which time slot do you prefer for the next afterwork?", "question de sondage traduite en anglais");
+    await expectText(page, "Thursday 20 August · 6:30 p.m.", "option 1 du sondage traduite en anglais");
+    await expectText(page, "Friday 21 August · 7 p.m.", "option 2 du sondage traduite en anglais");
+    await expectText(page, "Who will be at the next afterwork? I can welcome the new members.", "message étranger conservé/affiché dans la langue cible");
+
+    await gotoApp(page, "/highlights");
+    await expectText(page, "Highlights", "titre Temps forts anglais");
+    await expectText(page, "First studio session approved. We’re refining the hooks, shots and 24-hour delivery. The result looks excellent.", "Temps fort traduit en anglais");
+
+    await gotoApp(page, "/highlight/post-lea-studio");
+    await expectText(page, "The result really looks premium.", "commentaire traduit en anglais");
+
+    await gotoApp(page, "/calls");
     await expectText(page, "Recent", "appels récents anglais");
     await expectText(page, "Upcoming appointments", "rendez-vous anglais");
     await expectText(page, "Invite a contact", "invitation contact anglaise");
 
-    await clickExact(page, "Highlights", "ouvrir Highlights EN");
-    await expectText(page, "Highlights", "titre Temps forts anglais");
-
-    await clickExact(page, "Profile", "retour Profile EN");
+    await gotoApp(page, "/settings");
+    await expectText(page, "Profile", "retour Profile EN");
     const languageChecks = [
       ["Español", "Idioma", "Apariencia"],
       ["Deutsch", "Sprache", "Darstellung"],
@@ -139,7 +155,7 @@ async function run() {
     failures.forEach((failure) => console.error(`- ${failure}`));
     process.exit(1);
   }
-  console.log("Audit i18n multi-écrans validé : FR, EN, ES, DE, IT et PT.");
+  console.log("Audit i18n + contenu validé : UI FR/EN/ES/DE/IT/PT, messages, sondages, Temps forts et commentaires.");
 }
 
 run().catch((error) => { console.error(error); process.exitCode = 1; });
