@@ -3,10 +3,10 @@ const path = require("node:path");
 const ts = require("typescript");
 
 const ROOT = process.cwd();
-const CATALOG_PATHS = [
-  path.join(ROOT, "src/i18n/uiTranslations.ts"),
-  path.join(ROOT, "src/i18n/uiTranslationsV17.ts")
-];
+const I18N_ROOT = path.join(ROOT, "src/i18n");
+const CATALOG_PATHS = fs.readdirSync(I18N_ROOT)
+  .filter((name) => /^uiTranslations(?:V\d[^/]*)?\.ts$/i.test(name))
+  .map((name) => path.join(I18N_ROOT, name));
 const SOURCE_ROOTS = [path.join(ROOT, "app"), path.join(ROOT, "src")];
 const REQUIRED_LOCALES = ["en", "es", "de", "it", "pt"];
 const UI_PROP_NAMES = new Set([
