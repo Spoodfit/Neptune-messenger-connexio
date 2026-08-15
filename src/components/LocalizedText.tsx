@@ -1,11 +1,11 @@
 import { type ReactNode } from "react";
 import { Text as NativeText, type TextProps } from "react-native";
 
-import { translateUiText } from "../i18n/uiTranslations";
+import { translateConnexioUiText } from "../i18n/uiTranslator";
 import { useAppLanguage } from "../providers/LanguageProvider";
 
 function translateNode(node: ReactNode, language: string): ReactNode {
-  if (typeof node === "string") return translateUiText(node, language);
+  if (typeof node === "string") return translateConnexioUiText(node, language);
   if (Array.isArray(node)) return node.map((item, index) => <FragmentNode key={index} node={item} language={language} />);
   return node;
 }
@@ -14,20 +14,23 @@ function FragmentNode({ node, language }: { node: ReactNode; language: string })
   return <>{translateNode(node, language)}</>;
 }
 
+function localize(value: unknown, language: string) {
+  return typeof value === "string" ? translateConnexioUiText(value, language) : value;
+}
+
 /**
  * Drop-in React Native Text replacement for bundled interface copy.
- *
- * The component listens to uiLanguage (not to the message-translation locale)
- * and keys the native host node by locale. The key deliberately forces React
- * Native to recreate the native text node when the app language changes, which
- * avoids stale host-text rendering on a physical Android/iOS build.
- *
- * Only exact, known UI strings are translated by the bundled catalogue.
+ * All application Text imports are redirected here at build time.
  */
-export function Text({ children, ...props }: TextProps) {
+export function Text({ children, accessibilityLabel, accessibilityHint, ...props }: TextProps) {
   const { uiLanguage } = useAppLanguage();
   return (
-    <NativeText key={`connexio-ui-text:${uiLanguage}`} {...props}>
+    <NativeText
+      key={`connexio-ui-text:${uiLanguage}`}
+      {...props}
+      accessibilityLabel={localize(accessibilityLabel, uiLanguage) as TextProps["accessibilityLabel"]}
+      accessibilityHint={localize(accessibilityHint, uiLanguage) as TextProps["accessibilityHint"]}
+    >
       {translateNode(children, uiLanguage)}
     </NativeText>
   );

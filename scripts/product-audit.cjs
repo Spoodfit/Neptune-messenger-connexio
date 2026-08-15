@@ -267,7 +267,9 @@ async function run() {
         await english.click();
         await expectVisible(page.getByText("Profile", { exact: true }).first(), "navigation traduite en anglais");
         await expectVisible(page.getByText("Appearance", { exact: true }).first(), "profil traduit en anglais");
-        const reopenLanguage = page.getByLabel("Changer la langue de Connexio", { exact: true });
+        // Accessibility copy changes with the selected UI language as well.
+        const reopenLanguage = page.getByLabel("Change Connexio language", { exact: true });
+        await expectVisible(reopenLanguage, "sélecteur de langue traduit en anglais");
         if (await reopenLanguage.isVisible().catch(() => false)) {
           await reopenLanguage.click();
           const french = page.getByRole("radio").filter({ hasText: "Français" }).first();

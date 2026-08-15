@@ -104,5 +104,5 @@ jobs:
             fi
             sleep 1
           done
-          node scripts/visual-audit.cjs
+          node scripts/visual-audit-fr.cjs
           node scripts/interaction-audit.cjs
