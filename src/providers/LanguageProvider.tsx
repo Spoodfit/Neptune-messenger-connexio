@@ -1,6 +1,6 @@
-import Storage from "expo-sqlite/kv-store";
+import NativeStorage from "expo-sqlite/kv-store";
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { detectSystemLanguage, normalizeLanguageCode, type SupportedLanguage } from "../i18n/languages";
 import { setTranslationRequestLanguage } from "../i18n/translationLocale";
@@ -28,6 +28,33 @@ const LanguageContext = createContext<LanguageContextValue | null>(null);
 const UI_LANGUAGE_PREFERENCE_KEY = "connexio.preferences.ui-language.v2";
 const LEGACY_APP_LANGUAGE_KEY = "connexio.standalone.app-language";
 
+type BrowserStorage = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+};
+
+function getBrowserStorage(): BrowserStorage | null {
+  if (Platform.OS !== "web" || typeof globalThis === "undefined") return null;
+  try {
+    return (globalThis as { localStorage?: BrowserStorage }).localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readPreference(key: string): string | null {
+  if (Platform.OS === "web") return getBrowserStorage()?.getItem(key) ?? null;
+  return NativeStorage.getItemSync(key);
+}
+
+function writePreference(key: string, value: string): void {
+  if (Platform.OS === "web") {
+    getBrowserStorage()?.setItem(key, value);
+    return;
+  }
+  NativeStorage.setItemSync(key, value);
+}
+
 function decodeStoredMode(raw: string | null, systemLanguage: SupportedLanguage): ConnexioLanguageMode | null {
   if (!raw) return null;
   let value: unknown = raw;
@@ -44,13 +71,17 @@ function decodeStoredMode(raw: string | null, systemLanguage: SupportedLanguage)
 
 function readInitialMode(systemLanguage: SupportedLanguage): ConnexioLanguageMode {
   try {
-    const current = decodeStoredMode(Storage.getItemSync(UI_LANGUAGE_PREFERENCE_KEY), systemLanguage);
+    const current = decodeStoredMode(readPreference(UI_LANGUAGE_PREFERENCE_KEY), systemLanguage);
     if (current) return current;
 
-    const legacy = decodeStoredMode(Storage.getItemSync(LEGACY_APP_LANGUAGE_KEY), systemLanguage);
-    if (legacy) {
-      Storage.setItemSync(UI_LANGUAGE_PREFERENCE_KEY, legacy);
-      return legacy;
+    // The legacy value exists in the SQLite KV store used by native standalone
+    // builds. On web we do not attempt to instantiate SQLite during static export.
+    if (Platform.OS !== "web") {
+      const legacy = decodeStoredMode(readPreference(LEGACY_APP_LANGUAGE_KEY), systemLanguage);
+      if (legacy) {
+        writePreference(UI_LANGUAGE_PREFERENCE_KEY, legacy);
+        return legacy;
+      }
     }
   } catch {
     // A storage failure must never prevent Connexio from starting.
@@ -60,7 +91,7 @@ function readInitialMode(systemLanguage: SupportedLanguage): ConnexioLanguageMod
 
 function persistMode(mode: ConnexioLanguageMode): void {
   try {
-    Storage.setItemSync(UI_LANGUAGE_PREFERENCE_KEY, mode);
+    writePreference(UI_LANGUAGE_PREFERENCE_KEY, mode);
   } catch {
     // The in-memory change still applies immediately; the next launch falls back
     // to the previous persisted preference instead of breaking the application.
@@ -95,8 +126,8 @@ export function LanguageProvider({ children }: PropsWithChildren) {
           language === "fr" ? "fr" : "en"
         );
 
-    // Persist first with the synchronous SQLite KV API. This removes the native
-    // race where a pending async load could overwrite a language just selected.
+    // Native builds persist synchronously with SQLite before publishing the
+    // React state change. This removes the startup race seen on the APK.
     persistMode(normalized);
     setMode(normalized);
 
