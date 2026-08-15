@@ -13,7 +13,12 @@ import { Animated,
   View
 } from "react-native";
 
-import { translatedContentField } from "../i18n/contentTranslation";
+import { env } from "../config/env";
+import {
+  contentTranslationTargetsViewer,
+  translatedContentField
+} from "../i18n/contentTranslation";
+import { mockContentTranslation } from "../i18n/mockContentLookup";
 import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { colors, gradients, radii, spacing, typography } from "../theme";
@@ -36,9 +41,14 @@ export function ConversationRow({ conversation, members = [], mentioned = false,
   const theme = useAppTheme();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const pulse = useRef(new Animated.Value(0)).current;
+  const previewTranslation = contentTranslationTargetsViewer(conversation.translation)
+    ? conversation.translation
+    : env.mockMode
+      ? mockContentTranslation(conversation.lastMessage, "lastMessage", conversation.sourceLanguage ?? "fr")
+      : conversation.translation;
   const translatedLastMessage = translatedContentField(
     conversation.lastMessage,
-    conversation.translation,
+    previewTranslation,
     "lastMessage"
   ) ?? conversation.lastMessage;
   const unreadLabel = conversation.unreadCount ? `${conversation.unreadCount} message${conversation.unreadCount > 1 ? "s" : ""} non lu${conversation.unreadCount > 1 ? "s" : ""}` : "Aucun message non lu";
