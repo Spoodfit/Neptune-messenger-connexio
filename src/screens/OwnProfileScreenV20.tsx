@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import { BrandHeader } from "../components/BrandHeader";
 import { LanguagePickerModal } from "../components/LanguagePickerModal";
@@ -29,6 +29,8 @@ const SETTINGS = [
 
 export default function OwnProfileScreenV20() {
   const theme = useAppTheme();
+  const { width } = useWindowDimensions();
+  const compactIdentity = width < 360;
   const { localeTag } = useAppLanguage();
   const { currentUser, signOut } = useSession();
   const { posts } = useExperience();
@@ -58,13 +60,13 @@ export default function OwnProfileScreenV20() {
     <BrandHeader title="Profil" subtitle="Votre univers professionnel et vos réglages Connexio." />
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <LinearGradient colors={theme.isLight ? [theme.surface, theme.accentSoft] : gradients.glass} style={[styles.hero, { borderColor: theme.borderSoft }]}>
-        <View style={styles.identityRow}>
-          <StatusAvatar user={currentUser} size={92} />
-          <View style={styles.identityCopy}>
-            <View style={styles.availabilityRow}><View style={[styles.availabilityDot, { backgroundColor: currentUser.online ? theme.success : theme.pageTextMuted }]} /><Text style={[styles.availabilityText, { color: currentUser.online ? theme.success : theme.pageTextMuted }]}>{currentUser.online ? "Disponible" : "Hors ligne"}</Text></View>
-            <Text style={[styles.name, { color: theme.pageText }]}>{currentUser.name}</Text>
-            <Text style={[styles.headline, { color: theme.pageTextSecondary }]}>{headline}</Text>
-            <View style={styles.metaRow}><MemberStatusBadge role={currentUser.role} compact />{currentUser.city ? <View style={[styles.metaPill, { backgroundColor: theme.surfaceStrong }]}><Ionicons name="location-outline" size={14} color={theme.pageTextMuted} /><Text style={[styles.metaText, { color: theme.pageTextMuted }]}>{currentUser.city}</Text></View> : null}</View>
+        <View style={[styles.identityRow, compactIdentity && styles.identityRowCompact]}>
+          <StatusAvatar user={currentUser} size={compactIdentity ? 84 : 92} />
+          <View style={[styles.identityCopy, compactIdentity && styles.identityCopyCompact]}>
+            <View style={[styles.availabilityRow, compactIdentity && styles.centeredRow]}><View style={[styles.availabilityDot, { backgroundColor: currentUser.online ? theme.success : theme.pageTextMuted }]} /><Text style={[styles.availabilityText, { color: currentUser.online ? theme.success : theme.pageTextMuted }]}>{currentUser.online ? "Disponible" : "Hors ligne"}</Text></View>
+            <Text style={[styles.name, { color: theme.pageText }, compactIdentity && styles.centeredText]}>{currentUser.name}</Text>
+            <Text style={[styles.headline, { color: theme.pageTextSecondary }, compactIdentity && styles.centeredText]}>{headline}</Text>
+            <View style={[styles.metaRow, compactIdentity && styles.metaRowCompact]}><MemberStatusBadge role={currentUser.role} compact />{currentUser.city ? <View style={[styles.metaPill, { backgroundColor: theme.surfaceStrong }]}><Ionicons name="location-outline" size={14} color={theme.pageTextMuted} /><Text numberOfLines={1} style={[styles.metaText, { color: theme.pageTextMuted }]}>{currentUser.city}</Text></View> : null}</View>
           </View>
         </View>
         {universe.bio?.trim() ? <Text style={[styles.bio, { color: theme.pageTextSecondary }]}>{universe.bio.trim()}</Text> : null}
@@ -106,7 +108,60 @@ function Intent({ title, icon, items, color, background }: { title: string; icon
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 }, content: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: spacing.md, paddingBottom: 34 }, hero: { marginTop: 8, borderRadius: 28, borderWidth: 1, padding: 16 }, identityRow: { flexDirection: "row", alignItems: "center", gap: 14 }, identityCopy: { flex: 1, minWidth: 0 }, availabilityRow: { flexDirection: "row", alignItems: "center", gap: 6 }, availabilityDot: { width: 7, height: 7, borderRadius: 4 }, availabilityText: { fontSize: 11, fontWeight: "900" }, name: { fontSize: 25, lineHeight: 30, fontWeight: "900", marginTop: 4 }, headline: { fontSize: 14, lineHeight: 19, fontWeight: "700", marginTop: 3 }, metaRow: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 }, metaPill: { minHeight: 32, paddingHorizontal: 9, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 5 }, metaText: { fontSize: 11, fontWeight: "800" }, bio: { fontSize: 14, lineHeight: 20, marginTop: 13 }, heroActions: { marginTop: 15, flexDirection: "row", gap: 8, flexWrap: "wrap" }, editButton: { flexGrow: 1, minWidth: 170, minHeight: 50, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }, previewButton: { minWidth: 124, minHeight: 50, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }, whiteText: { color: "#fff", fontSize: 13, fontWeight: "900" }, previewText: { fontSize: 12, fontWeight: "900" },
-  sectionHeading: { marginTop: 22, marginBottom: 10 }, sectionTitle: { ...typography.heading3 }, sectionSubtitle: { fontSize: 13, lineHeight: 18, marginTop: 3 }, intentGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, intentCard: { flexGrow: 1, flexBasis: 190, borderRadius: 20, borderWidth: 1, padding: 12 }, intentTitle: { flexDirection: "row", alignItems: "center", gap: 7 }, intentTitleText: { fontSize: 12, fontWeight: "900" }, tags: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 9 }, tag: { minHeight: 32, borderRadius: 999, paddingHorizontal: 9, alignItems: "center", justifyContent: "center" }, tagText: { fontSize: 11, fontWeight: "800" },
-  businessGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 }, businessCard: { flexGrow: 1, flexBasis: 210, minHeight: 174, borderRadius: 22, borderWidth: 1, padding: 13 }, businessIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" }, businessTitle: { fontSize: 14, lineHeight: 19, fontWeight: "900", marginTop: 11 }, businessDescription: { fontSize: 12, lineHeight: 17, marginTop: 6 }, businessFooter: { marginTop: "auto", minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, businessCta: { fontSize: 11, fontWeight: "900" }, posts: { gap: 8 }, postCard: { borderRadius: 20, borderWidth: 1, padding: 12 }, postTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, postKind: { fontSize: 10, fontWeight: "900" }, postDate: { fontSize: 11, fontWeight: "700" }, postBody: { fontSize: 13, lineHeight: 19, marginTop: 8 }, empty: { minHeight: 90, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" }, emptyText: { fontSize: 12, fontWeight: "700" }, settingsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, settingCard: { flexGrow: 1, flexBasis: 145, minHeight: 76, borderRadius: 20, borderWidth: 1, padding: 12, justifyContent: "space-between" }, settingText: { fontSize: 12, fontWeight: "900" }, signOut: { minHeight: 52, marginTop: 22, borderRadius: 17, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 }, signOutText: { fontSize: 13, fontWeight: "900" }, version: { fontSize: 10, textAlign: "center", marginTop: 12 }, pressed: { opacity: 0.82, transform: [{ scale: 0.99 }] }
+  screen: { flex: 1 },
+  content: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: spacing.md, paddingBottom: 34 },
+  hero: { marginTop: 8, borderRadius: 28, borderWidth: 1, padding: 16 },
+  identityRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  identityRowCompact: { flexDirection: "column", alignItems: "center", gap: 10 },
+  identityCopy: { flex: 1, minWidth: 0 },
+  identityCopyCompact: { width: "100%", flex: 0, alignItems: "center" },
+  centeredRow: { justifyContent: "center" },
+  centeredText: { textAlign: "center" },
+  availabilityRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  availabilityDot: { width: 7, height: 7, borderRadius: 4 },
+  availabilityText: { fontSize: 11, fontWeight: "900" },
+  name: { fontSize: 25, lineHeight: 30, fontWeight: "900", marginTop: 4 },
+  headline: { fontSize: 14, lineHeight: 19, fontWeight: "700", marginTop: 3 },
+  metaRow: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, maxWidth: "100%" },
+  metaRowCompact: { justifyContent: "center" },
+  metaPill: { minHeight: 36, maxWidth: "100%", flexShrink: 1, paddingHorizontal: 9, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 5 },
+  metaText: { flexShrink: 1, fontSize: 12, fontWeight: "800" },
+  bio: { fontSize: 14, lineHeight: 20, marginTop: 13 },
+  heroActions: { marginTop: 15, flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  editButton: { flexGrow: 1, flexShrink: 1, minWidth: 150, minHeight: 50, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  previewButton: { flexGrow: 1, flexShrink: 1, minWidth: 118, minHeight: 50, borderRadius: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  whiteText: { color: "#fff", fontSize: 13, fontWeight: "900" },
+  previewText: { fontSize: 12, fontWeight: "900" },
+  sectionHeading: { marginTop: 22, marginBottom: 10 },
+  sectionTitle: { ...typography.heading3 },
+  sectionSubtitle: { fontSize: 14, lineHeight: 19, marginTop: 3 },
+  intentGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  intentCard: { flexGrow: 1, flexBasis: 190, borderRadius: 20, borderWidth: 1, padding: 12 },
+  intentTitle: { flexDirection: "row", alignItems: "center", gap: 7 },
+  intentTitleText: { fontSize: 12, fontWeight: "900" },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 9 },
+  tag: { minHeight: 32, borderRadius: 999, paddingHorizontal: 9, alignItems: "center", justifyContent: "center" },
+  tagText: { fontSize: 11, fontWeight: "800" },
+  businessGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  businessCard: { flexGrow: 1, flexBasis: 210, minHeight: 174, borderRadius: 22, borderWidth: 1, padding: 13 },
+  businessIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  businessTitle: { fontSize: 14, lineHeight: 19, fontWeight: "900", marginTop: 11 },
+  businessDescription: { fontSize: 12, lineHeight: 17, marginTop: 6 },
+  businessFooter: { marginTop: "auto", minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  businessCta: { fontSize: 11, fontWeight: "900" },
+  posts: { gap: 8 },
+  postCard: { borderRadius: 20, borderWidth: 1, padding: 12 },
+  postTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  postKind: { fontSize: 10, fontWeight: "900" },
+  postDate: { fontSize: 11, fontWeight: "700" },
+  postBody: { fontSize: 13, lineHeight: 19, marginTop: 8 },
+  empty: { minHeight: 90, borderRadius: 20, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  emptyText: { fontSize: 12, fontWeight: "700" },
+  settingsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  settingCard: { flexGrow: 1, flexBasis: 145, minHeight: 76, borderRadius: 20, borderWidth: 1, padding: 12, justifyContent: "space-between" },
+  settingText: { fontSize: 12, fontWeight: "900" },
+  signOut: { minHeight: 52, marginTop: 22, borderRadius: 17, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  signOutText: { fontSize: 13, fontWeight: "900" },
+  version: { fontSize: 10, textAlign: "center", marginTop: 12 },
+  pressed: { opacity: 0.82, transform: [{ scale: 0.99 }] }
 });
