@@ -16,7 +16,9 @@ const UI_PROP_NAMES = new Set([
 ]);
 const NON_TRANSLATABLE = new Set([
   "Connexio", "Neptune", "Neptune Business", "Visionnaire", "Amiral", "Capitaine", "Moussaillon", "Triton",
-  "iOS", "Android", "YouTube", "WhatsApp", "EAS", "Expo", "OK"
+  "iOS", "Android", "YouTube", "WhatsApp", "EAS", "Expo", "OK",
+  // Proper place names are data, not interface copy. These demo labels must remain unchanged in every locale.
+  "Carcassonne", "Toulouse", "Montpellier"
 ]);
 const IGNORED_PATH_PREFIXES = [
   "src/i18n/",
