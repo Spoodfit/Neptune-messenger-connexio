@@ -154,6 +154,7 @@ export default function HighlightsScreenV20() {
     if (experienceApi) { const conversation = await experienceApi.createPrivateConversation([selectedMoment.member.id]); await refreshConversations(); return conversation; }
     return createPrivateConversation({ memberIds: [selectedMoment.member.id] });
   };
+
   const openPersonAction = async (action: "message" | "audio" | "video") => {
     if (openingAction) return;
     setOpeningAction(true);
@@ -188,8 +189,46 @@ export default function HighlightsScreenV20() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 }, modeWrap: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingTop: 8, paddingBottom: 7 }, modeBar: { height: 54, padding: 3, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" }, modeButton: { flex: 1, height: 46, borderRadius: 12, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }, modeLabel: { fontSize: 11, fontWeight: "900" },
-  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24 }, quickComposer: { minHeight: 66, borderRadius: 22, borderWidth: 1, padding: 10, flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 9 }, composerBody: { flex: 1, minWidth: 0 }, composerPromptWrap: { minHeight: 44, justifyContent: "center" }, composerPrompt: { fontSize: 14, fontWeight: "700" }, composerInput: { minHeight: 74, maxHeight: 150, paddingVertical: 8, fontSize: 15, lineHeight: 21, textAlignVertical: "top" }, composerTools: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" }, toolButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14 }, locationState: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 4, flexGrow: 1 }, locationText: { fontSize: 10, fontWeight: "700" }, publishButton: { minWidth: 76, minHeight: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 }, publishText: { color: "#fff", fontSize: 12, fontWeight: "900" }, disabled: { opacity: 0.4 }, mediaChip: { minHeight: 36, borderRadius: 12, paddingLeft: 9, marginBottom: 3, flexDirection: "row", alignItems: "center", gap: 6 }, mediaText: { flex: 1, fontSize: 11, fontWeight: "700" }, removeMedia: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  rows: { gap: 9 }, wideRow: { width: "100%" }, pairRow: { width: "100%", flexDirection: "row", alignItems: "stretch", gap: 9 }, halfColumn: { flex: 1, minWidth: 0 }, postPressable: { borderRadius: 22 }, pressed: { opacity: 0.95, transform: [{ scale: 0.996 }] }, empty: { minHeight: 180, alignItems: "center", justifyContent: "center", gap: 8 }, emptyText: { ...typography.bodySmall },
-  mapPage: { flex: 1, width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 6, paddingBottom: 6, position: "relative" }, mapSheet: { position: "absolute", left: 12, right: 12, bottom: 12, borderRadius: 24, borderWidth: 1, padding: 11, shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 }, sheetTop: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 9 }, personIdentity: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 9 }, sheetCopy: { flex: 1, minWidth: 0 }, sheetTitle: { fontSize: 14, lineHeight: 19, fontWeight: "900" }, sheetMeta: { fontSize: 11, lineHeight: 16, marginTop: 2 }, closeButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 14 }, sheetActions: { marginTop: 8, flexDirection: "row", gap: 7 }, sheetAction: { flex: 1, minHeight: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 }, sheetActionText: { fontSize: 11, fontWeight: "900" }, eventIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" }, eventCta: { minHeight: 48, marginTop: 8, borderRadius: 15, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7 }
+  screen: { flex: 1 },
+  modeWrap: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingTop: 8, paddingBottom: 7 },
+  modeBar: { height: 58, padding: 3, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" },
+  modeButton: { flex: 1, minHeight: 50, borderRadius: 12, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  modeLabel: { fontSize: 11, fontWeight: "900" },
+  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingBottom: 24 },
+  quickComposer: { minHeight: 70, borderRadius: 22, borderWidth: 1, padding: 10, flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 9 },
+  composerBody: { flex: 1, minWidth: 0 },
+  composerPromptWrap: { minHeight: 48, justifyContent: "center" },
+  composerPrompt: { fontSize: 14, fontWeight: "700" },
+  composerInput: { minHeight: 74, maxHeight: 150, paddingVertical: 8, fontSize: 15, lineHeight: 21, textAlignVertical: "top" },
+  composerTools: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
+  toolButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center", borderRadius: 14 },
+  locationState: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 4, flexGrow: 1 },
+  locationText: { fontSize: 10, fontWeight: "700" },
+  publishButton: { minWidth: 78, minHeight: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  publishText: { color: "#fff", fontSize: 12, fontWeight: "900" },
+  disabled: { opacity: 0.4 },
+  mediaChip: { minHeight: 40, borderRadius: 12, paddingLeft: 9, marginBottom: 3, flexDirection: "row", alignItems: "center", gap: 6 },
+  mediaText: { flex: 1, fontSize: 11, fontWeight: "700" },
+  removeMedia: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  rows: { gap: 9 },
+  wideRow: { width: "100%" },
+  pairRow: { width: "100%", flexDirection: "row", alignItems: "stretch", gap: 9 },
+  halfColumn: { flex: 1, minWidth: 0 },
+  postPressable: { borderRadius: 22 },
+  pressed: { opacity: 0.95, transform: [{ scale: 0.996 }] },
+  empty: { minHeight: 180, alignItems: "center", justifyContent: "center", gap: 8 },
+  emptyText: { ...typography.bodySmall },
+  mapPage: { flex: 1, width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 6, paddingBottom: 6, position: "relative" },
+  mapSheet: { position: "absolute", left: 12, right: 12, bottom: 12, borderRadius: 24, borderWidth: 1, padding: 11, shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 10 },
+  sheetTop: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 9 },
+  personIdentity: { flex: 1, minWidth: 0, minHeight: 48, flexDirection: "row", alignItems: "center", gap: 9 },
+  sheetCopy: { flex: 1, minWidth: 0 },
+  sheetTitle: { fontSize: 14, lineHeight: 19, fontWeight: "900" },
+  sheetMeta: { fontSize: 11, lineHeight: 16, marginTop: 2 },
+  closeButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center", borderRadius: 14 },
+  sheetActions: { marginTop: 8, flexDirection: "row", gap: 7 },
+  sheetAction: { flex: 1, minHeight: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
+  sheetActionText: { fontSize: 11, fontWeight: "900" },
+  eventIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  eventCta: { minHeight: 48, marginTop: 8, borderRadius: 15, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7 }
 });
