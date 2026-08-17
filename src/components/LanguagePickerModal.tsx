@@ -1,15 +1,8 @@
 import { Text } from "@/components/LocalizedText";
 import { TextInput } from "@/components/LocalizedTextInput";
-import {
-  Ionicons } from "@expo/vector-icons";
-import { useMemo,
-  useState } from "react";
-import { Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View
-} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useMemo, useState } from "react";
+import { InteractionManager, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import { SUPPORTED_UI_LANGUAGES } from "../i18n/uiTranslations";
 import { useAppLanguage } from "../providers/LanguageProvider";
@@ -29,8 +22,17 @@ export function LanguagePickerModal({ visible, onClose }: LanguagePickerModalPro
   }, [query]);
 
   const select = (next: "system" | (typeof SUPPORTED_UI_LANGUAGES)[number]["code"]) => {
-    setLanguageMode(next);
+    if (next === mode) {
+      onClose();
+      return;
+    }
+    // Android peut fermer brutalement l'activité si toute l'arborescence localisée
+    // est remontée pendant l'animation native de fermeture du Modal. On ferme
+    // d'abord le portail natif, puis on applique la nouvelle locale une fois les
+    // interactions terminées.
     onClose();
+    setQuery("");
+    InteractionManager.runAfterInteractions(() => setLanguageMode(next));
   };
 
   return (
