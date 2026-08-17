@@ -4,9 +4,22 @@ import { Text as NativeText, type TextProps } from "react-native";
 import { translateConnexioUiText } from "../i18n/uiTranslator";
 import { useAppLanguage } from "../providers/LanguageProvider";
 
+function isPrimitiveTextNode(node: ReactNode): boolean {
+  return typeof node === "string" || typeof node === "number";
+}
+
 function translateNode(node: ReactNode, language: string): ReactNode {
   if (typeof node === "string") return translateConnexioUiText(node, language);
-  if (Array.isArray(node)) return node.map((item, index) => <FragmentNode key={index} node={item} language={language} />);
+  if (Array.isArray(node)) {
+    // React splits dynamic labels such as "3 publications" into several children.
+    // Recompose primitive-only sequences before translation so pluralisation works
+    // as a complete phrase instead of translating isolated French fragments.
+    if (node.every(isPrimitiveTextNode)) {
+      const combined = node.map((item) => String(item ?? "")).join("");
+      return translateConnexioUiText(combined, language);
+    }
+    return node.map((item, index) => <FragmentNode key={index} node={item} language={language} />);
+  }
   return node;
 }
 

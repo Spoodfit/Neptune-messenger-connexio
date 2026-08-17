@@ -17,6 +17,22 @@ function words(locale: SupportedUiLanguage) {
   return WORDS[(locale === "fr" ? "en" : locale) as DynamicLocale];
 }
 
+function publicationCount(count: number, locale: SupportedUiLanguage): string {
+  if (locale === "es") return `${count} ${count === 1 ? "publicación" : "publicaciones"}`;
+  if (locale === "de") return `${count} ${count === 1 ? "Beitrag" : "Beiträge"}`;
+  if (locale === "it") return `${count} ${count === 1 ? "pubblicazione" : "pubblicazioni"}`;
+  if (locale === "pt") return `${count} ${count === 1 ? "publicação" : "publicações"}`;
+  return `${count} ${count === 1 ? "post" : "posts"}`;
+}
+
+function engagementCount(reactions: number, comments: number, locale: SupportedUiLanguage): string {
+  if (locale === "es") return `${reactions} ${reactions === 1 ? "reacción" : "reacciones"} · ${comments} ${comments === 1 ? "comentario" : "comentarios"}`;
+  if (locale === "de") return `${reactions} ${reactions === 1 ? "Reaktion" : "Reaktionen"} · ${comments} ${comments === 1 ? "Kommentar" : "Kommentare"}`;
+  if (locale === "it") return `${reactions} ${reactions === 1 ? "reazione" : "reazioni"} · ${comments} ${comments === 1 ? "commento" : "commenti"}`;
+  if (locale === "pt") return `${reactions} ${reactions === 1 ? "reação" : "reações"} · ${comments} ${comments === 1 ? "comentário" : "comentários"}`;
+  return `${reactions} ${reactions === 1 ? "reaction" : "reactions"} · ${comments} ${comments === 1 ? "comment" : "comments"}`;
+}
+
 const patterns: Array<[RegExp, DynamicTranslator]> = [
   [/^Profil de (.+)$/u, (m, l) => `${words(l).profileOf} ${m[1]}`],
   [/^Appeler (.+)$/u, (m, l) => `${words(l).call} ${m[1]}`],
@@ -29,6 +45,8 @@ const patterns: Array<[RegExp, DynamicTranslator]> = [
   [/^(\d+) membres ·$/u, (m, l) => `${m[1]} ${words(l).members} ·`],
   [/^(\d+) participants$/u, (m, l) => `${m[1]} ${words(l).participants}`],
   [/^ · (\d+) min$/u, (m, l) => ` · ${m[1]} ${words(l).min}`],
+  [/^(\d+) publications?$/u, (m, l) => publicationCount(Number(m[1]), l)],
+  [/^(\d+) réactions? · (\d+) commentaires?$/u, (m, l) => engagementCount(Number(m[1]), Number(m[2]), l)],
   [/^Visio · Appel manqué$/u, (_m, l) => `${words(l).video} · ${l === "es" ? "Llamada perdida" : l === "de" ? "Verpasster Anruf" : l === "it" ? "Chiamata persa" : l === "pt" ? "Chamada perdida" : "Missed call"}`],
   [/^Visio · Appel entrant$/u, (_m, l) => `${words(l).video} · ${l === "es" ? "Llamada entrante" : l === "de" ? "Eingehender Anruf" : l === "it" ? "Chiamata in arrivo" : l === "pt" ? "Chamada recebida" : "Incoming call"}`],
   [/^Visio · Appel sortant$/u, (_m, l) => `${words(l).video} · ${l === "es" ? "Llamada saliente" : l === "de" ? "Ausgehender Anruf" : l === "it" ? "Chiamata in uscita" : l === "pt" ? "Chamada efetuada" : "Outgoing call"}`],

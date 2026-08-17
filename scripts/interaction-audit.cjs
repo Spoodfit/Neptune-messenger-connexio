@@ -31,7 +31,6 @@ async function run() {
     const pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(String(error)));
 
-    // Bottom navigation must respond to every tab without a global gesture layer stealing taps.
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     await page.getByRole("tab", { name: /Temps forts/ }).click();
     await waitRoute(page, "/highlights", "Navigation Temps forts");
@@ -42,21 +41,18 @@ async function run() {
     await page.getByRole("tab", { name: /Messages/ }).click();
     await waitRoute(page, "/messages", "Navigation Messages");
 
-    // The central plus must open its own quick-action layer and both destinations must be clickable.
     await page.getByLabel("Créer").click();
-    check(await page.getByLabel("Nouvelle conversation").isVisible(), "Bouton + : action Conversation visible");
-    check(await page.getByLabel("Publier un Temps fort").isVisible(), "Bouton + : action Temps fort visible");
-    await page.getByLabel("Nouvelle conversation").click();
+    check(await page.getByLabel("Nouvelle conversation").last().isVisible(), "Bouton + : action Conversation visible");
+    check(await page.getByLabel("Publier un Temps fort").last().isVisible(), "Bouton + : action Temps fort visible");
+    await page.getByLabel("Nouvelle conversation").last().click();
     await waitRoute(page, "/new-conversation", "Bouton + : nouvelle conversation");
     check((await page.getByLabel("Retour à l’écran précédent").count()) === 0, "Aucun bouton Retour secondaire en bas");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     await page.getByLabel("Créer").click();
-    await page.getByLabel("Publier un Temps fort").click();
+    await page.getByLabel("Publier un Temps fort").last().click();
     await waitRoute(page, "/new-highlight", "Bouton + : nouveau Temps fort");
 
-    // Segmented controls must change rendered content. React Native Web does not
-    // consistently expose aria-selected for accessibilityState across versions.
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     const privateTab = page.getByRole("tab", { name: "Privées" });
     await privateTab.click();
@@ -68,27 +64,23 @@ async function run() {
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
     await mapTab.click();
-    check(await page.locator("iframe[title='Carte Neptune']").isVisible(), "Onglet Map actif");
+    check(await page.locator("iframe[title='Carte de découverte Neptune']").isVisible(), "Onglet Map actif");
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
     await feedTab.click();
     check(await page.getByLabel("Options de la publication").first().isVisible(), "Onglet Feed actif");
 
-    // Publication ellipsis must open the Connexio action sheet.
     const postOptions = page.getByLabel("Options de la publication").first();
     check(await postOptions.isVisible(), "Bouton trois points de publication visible");
     await postOptions.click();
-    check(await page.getByRole("menu", { name: "Options du Temps fort" }).isVisible(), "Menu trois points de publication fonctionnel");
+    check(await page.getByRole("menu", { name: "Options du Temps fort" }).isVisible(), "Trois points publication fonctionnels");
     await page.getByLabel("Fermer").last().click();
 
-    // Open a real mock member profile from the feed, then exercise all top-bar actions.
     const profileButton = page.locator('[aria-label^="Ouvrir le profil de "]').first();
     check(await profileButton.isVisible(), "Accès profil depuis un Temps fort visible");
     await profileButton.click();
     check(pathOf(page).includes("/profile/"), "Ouverture du profil membre", `route obtenue: ${pathOf(page)}`);
     check((await page.getByLabel("Retour à l’écran précédent").count()) === 0, "Aucun bouton Retour secondaire sur le profil membre");
 
-    // Expo Router can keep the previous route mounted on web; use the visible/topmost
-    // theme control from the current profile rather than a strict global locator.
     const lightToggle = page.getByLabel("Passer en mode clair").last();
     check(await lightToggle.isVisible(), "Bouton Light/Dark du profil visible");
     await lightToggle.click();
@@ -105,7 +97,6 @@ async function run() {
     await topBack.click();
     await waitRoute(page, "/highlights", "Retour haut gauche du profil fonctionnel");
 
-    // App language selector must be discoverable and use Connexio UI rather than an OS dialog.
     await page.goto(`${BASE_URL}/settings`, { waitUntil: "networkidle" });
     const languageButton = page.getByLabel("Changer la langue de Connexio").last();
     check(await languageButton.isVisible(), "Réglage langue visible");
