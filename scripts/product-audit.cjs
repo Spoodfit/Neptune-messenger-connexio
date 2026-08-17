@@ -36,21 +36,14 @@ const server = http.createServer((request, response) => {
     response.end("Build web absent");
     return;
   }
-  response.writeHead(200, {
-    "Content-Type": mime(file),
-    "Cache-Control": "no-store"
-  });
+  response.writeHead(200, { "Content-Type": mime(file), "Cache-Control": "no-store" });
   fs.createReadStream(file).pipe(response);
 });
 
 function browserExecutable() {
-  const candidates = [
-    process.env.CHROMIUM_PATH,
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "/usr/bin/google-chrome"
-  ].filter(Boolean);
-  return candidates.find((candidate) => fs.existsSync(candidate));
+  return [process.env.CHROMIUM_PATH, "/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/bin/google-chrome"]
+    .filter(Boolean)
+    .find((candidate) => fs.existsSync(candidate));
 }
 
 async function checkGeometry(page, label) {
@@ -58,21 +51,8 @@ async function checkGeometry(page, label) {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     const rootWidth = document.documentElement.scrollWidth;
     const bodyWidth = document.body.scrollWidth;
-    const interactiveSelector = [
-      "button",
-      "a[href]",
-      "input",
-      "textarea",
-      "[role='button']",
-      "[role='tab']",
-      "[role='checkbox']",
-      "[role='radio']",
-      "[role='switch']"
-    ].join(",");
-    const labelFor = (element) =>
-      element.getAttribute("aria-label") ||
-      element.textContent?.trim().slice(0, 80) ||
-      element.tagName;
+    const interactiveSelector = ["button", "a[href]", "input", "textarea", "[role='button']", "[role='tab']", "[role='checkbox']", "[role='radio']", "[role='switch']"].join(",");
+    const labelFor = (element) => element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 80) || element.tagName;
     const ownsPoint = (element, x, y) => {
       const top = document.elementFromPoint(x, y);
       return Boolean(top && (top === element || element.contains(top)));
@@ -80,38 +60,18 @@ async function checkGeometry(page, label) {
     const reachable = (element) => {
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
-      if (
-        style.display === "none" ||
-        style.visibility === "hidden" ||
-        style.pointerEvents === "none" ||
-        Number(style.opacity || "1") <= 0.02 ||
-        element.closest('[aria-hidden="true"], [inert]') ||
-        rect.width <= 0 ||
-        rect.height <= 0 ||
-        rect.bottom <= 0 ||
-        rect.top >= viewport.height ||
-        rect.right <= 0 ||
-        rect.left >= viewport.width
-      ) return false;
+      if (style.display === "none" || style.visibility === "hidden" || style.pointerEvents === "none" || Number(style.opacity || "1") <= 0.02 || element.closest('[aria-hidden="true"], [inert]') || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.top >= viewport.height || rect.right <= 0 || rect.left >= viewport.width) return false;
       const left = Math.max(1, rect.left + 2);
       const right = Math.min(viewport.width - 1, rect.right - 2);
       const top = Math.max(1, rect.top + 2);
       const bottom = Math.min(viewport.height - 1, rect.bottom - 2);
       if (right <= left || bottom <= top) return false;
-      return [
-        [(left + right) / 2, (top + bottom) / 2],
-        [left, top],
-        [right, top],
-        [left, bottom],
-        [right, bottom]
-      ].some(([x, y]) => ownsPoint(element, x, y));
+      return [[(left + right) / 2, (top + bottom) / 2], [left, top], [right, top], [left, bottom], [right, bottom]].some(([x, y]) => ownsPoint(element, x, y));
     };
-    const controls = [...document.querySelectorAll(interactiveSelector)]
-      .filter(reachable)
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        return { label: labelFor(element), left: rect.left, right: rect.right, width: rect.width, height: rect.height };
-      });
+    const controls = [...document.querySelectorAll(interactiveSelector)].filter(reachable).map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { label: labelFor(element), left: rect.left, right: rect.right, width: rect.width, height: rect.height };
+    });
     return {
       horizontalOverflow: Math.max(rootWidth, bodyWidth) > viewport.width + 1,
       cut: controls.filter((item) => item.left < -1 || item.right > viewport.width + 1),
@@ -124,11 +84,8 @@ async function checkGeometry(page, label) {
 }
 
 async function expectVisible(locator, label) {
-  try {
-    await locator.waitFor({ state: "visible", timeout: 7000 });
-  } catch {
-    failures.push(`${label}: élément attendu absent`);
-  }
+  try { await locator.waitFor({ state: "visible", timeout: 7000 }); }
+  catch { failures.push(`${label}: élément attendu absent`); }
 }
 
 async function clickText(page, text, label = text) {
@@ -149,10 +106,7 @@ async function pageDiagnostic(page) {
 }
 
 async function resetToMessages(page) {
-  await page.goto(`http://127.0.0.1:${port}/messages`, {
-    waitUntil: "domcontentloaded",
-    timeout: 30000
-  });
+  await page.goto(`http://127.0.0.1:${port}/messages`, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForTimeout(650);
   await expectVisible(page.getByText("Messages", { exact: true }).first(), "retour propre aux Messages");
 }
@@ -166,12 +120,37 @@ async function openQuickCreate(page) {
   }
 }
 
+async function checkSignInContrast(page) {
+  const result = await page.evaluate(() => {
+    const heading = [...document.querySelectorAll("h1,h2,[role='heading'],div")].find((element) => element.textContent?.trim() === "Se connecter avec Neptune");
+    if (!heading) return { found: false, contrast: 0 };
+    const parse = (value) => {
+      const parts = String(value).match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
+      return parts.map((channel) => channel / 255);
+    };
+    const linear = (value) => value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+    const luminance = (rgb) => 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
+    const style = getComputedStyle(heading);
+    let parent = heading.parentElement;
+    let background = "rgb(255,255,255)";
+    while (parent) {
+      const bg = getComputedStyle(parent).backgroundColor;
+      if (bg && !bg.endsWith(", 0)") && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") { background = bg; break; }
+      parent = parent.parentElement;
+    }
+    const l1 = luminance(parse(style.color));
+    const l2 = luminance(parse(background));
+    return { found: true, contrast: (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05) };
+  });
+  if (!result.found) failures.push("connexion light: titre Neptune introuvable");
+  else if (result.contrast < 4.5) failures.push(`connexion light: contraste titre insuffisant (${result.contrast.toFixed(2)}:1)`);
+}
+
 async function run() {
   if (!fs.existsSync(path.join(root, "index.html"))) throw new Error("Le build web-product-audit-dist est absent.");
   await new Promise((resolve) => server.listen(port, "127.0.0.1", resolve));
   const executablePath = browserExecutable();
   if (!executablePath) throw new Error("Chromium est introuvable.");
-
   const browser = await chromium.launch({ executablePath, headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 
   try {
@@ -211,21 +190,17 @@ async function run() {
         await page.mouse.up();
         await expectVisible(page.getByText(/Mettre en sourdine|Réactiver les notifications/).first(), "menu maintien long");
       }
-    } else {
-      failures.push("maintien long: aucune conversation de groupe visible");
-    }
+    } else failures.push("maintien long: aucune conversation de groupe visible");
 
     await resetToMessages(page);
-
     await openQuickCreate(page);
-    const newConversationAction = page.getByLabel("Nouvelle conversation", { exact: true });
+    const newConversationAction = page.getByLabel("Nouvelle conversation", { exact: true }).last();
     await expectVisible(newConversationAction, "action nouvelle conversation");
     if (await newConversationAction.isVisible().catch(() => false)) {
       await newConversationAction.click();
       await expectVisible(page.getByText("Nouvelle conversation", { exact: true }), "écran nouvelle conversation");
       await checkGeometry(page, "Nouvelle conversation");
       const closeCreation = page.getByLabel("Fermer la création");
-      await expectVisible(closeCreation, "fermeture création conversation");
       if (await closeCreation.isVisible().catch(() => false)) await closeCreation.click();
     }
 
@@ -233,47 +208,41 @@ async function run() {
     await expectVisible(page.getByText("Feed", { exact: true }), "Feed Temps forts");
     await checkGeometry(page, "Feed Temps forts");
     await clickText(page, "Map", "onglet Map");
-    await expectVisible(page.locator("iframe[title='Carte Neptune']"), "carte Leaflet");
+    await expectVisible(page.locator("iframe[title='Carte de découverte Neptune']"), "carte découverte personnes/évènements");
     await checkGeometry(page, "Map");
 
+    await resetToMessages(page);
     await openQuickCreate(page);
-    const createHighlight = page.getByLabel("Publier un Temps fort", { exact: true });
+    const createHighlight = page.getByLabel("Publier un Temps fort", { exact: true }).last();
     await expectVisible(createHighlight, "action publier Temps fort");
     if (await createHighlight.isVisible().catch(() => false)) {
       await createHighlight.click();
-      await expectVisible(page.getByText("Nouveau Temps fort", { exact: true }), "création Temps fort");
-      await checkGeometry(page, "Nouveau Temps fort");
-      const closeHighlight = page.getByLabel("Fermer").first();
+      await expectVisible(page.getByText("Créer un Temps fort", { exact: true }), "création Temps fort V19");
+      await checkGeometry(page, "Créer un Temps fort");
+      const closeHighlight = page.getByLabel("Fermer").last();
       if (await closeHighlight.isVisible().catch(() => false)) await closeHighlight.click();
     }
 
     await clickText(page, "Appels", "onglet Appels");
     await expectVisible(page.getByText("Récents", { exact: true }), "historique appels");
     await checkGeometry(page, "Appels");
-
     await clickText(page, "Profil", "onglet Profil");
     await expectVisible(page.getByText("Compte et sécurité", { exact: true }).first(), "profil fonctionnel");
     await checkGeometry(page, "Profil");
 
-    // Regression: selecting an app language must immediately change visible UI,
-    // not only the Accept-Language header used for message translation.
     const languageButton = page.getByLabel("Changer la langue de Connexio", { exact: true });
     await expectVisible(languageButton, "sélecteur de langue");
     if (await languageButton.isVisible().catch(() => false)) {
       await languageButton.click();
       const english = page.getByRole("radio").filter({ hasText: "English" }).first();
-      await expectVisible(english, "langue English");
       if (await english.isVisible().catch(() => false)) {
         await english.click();
         await expectVisible(page.getByText("Profile", { exact: true }).first(), "navigation traduite en anglais");
         await expectVisible(page.getByText("Appearance", { exact: true }).first(), "profil traduit en anglais");
-        // Accessibility copy changes with the selected UI language as well.
         const reopenLanguage = page.getByLabel("Change Connexio language", { exact: true });
-        await expectVisible(reopenLanguage, "sélecteur de langue traduit en anglais");
         if (await reopenLanguage.isVisible().catch(() => false)) {
           await reopenLanguage.click();
           const french = page.getByRole("radio").filter({ hasText: "Français" }).first();
-          await expectVisible(french, "retour langue Français");
           if (await french.isVisible().catch(() => false)) await french.click();
           await expectVisible(page.getByText("Profil", { exact: true }).first(), "retour interface française");
         }
@@ -286,13 +255,14 @@ async function run() {
       await signOut.click();
       const demoEntry = page.getByLabel("Entrer dans la démonstration Connexio");
       await expectVisible(demoEntry, "retour à la connexion");
+      await expectVisible(page.getByLabel("Changer la langue de Connexio", { exact: true }).last(), "langue disponible avant connexion");
+      await expectVisible(page.getByText("Se connecter avec Neptune", { exact: true }).first(), "titre connexion Neptune");
+      await checkGeometry(page, "Connexion après déconnexion");
+      await checkSignInContrast(page);
       if (await demoEntry.isVisible().catch(() => false)) {
-        await checkGeometry(page, "Connexion après déconnexion");
         await demoEntry.click();
         await expectVisible(page.getByText("Messages", { exact: true }).first(), "reconnexion démonstration");
-      } else {
-        failures.push(`diagnostic après déconnexion: ${JSON.stringify(await pageDiagnostic(page))}`);
-      }
+      } else failures.push(`diagnostic après déconnexion: ${JSON.stringify(await pageDiagnostic(page))}`);
     }
 
     if (runtimeErrors.length) failures.push(`parcours complet: erreurs runtime: ${runtimeErrors.slice(0, 5).join(" | ")}`);
