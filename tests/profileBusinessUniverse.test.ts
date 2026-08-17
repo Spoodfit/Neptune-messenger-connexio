@@ -3,6 +3,16 @@ import test from "node:test";
 
 import { normalizeAppUser } from "../src/services/api/wireExtensions";
 
+interface BusinessUniverseProjection {
+  headline?: string;
+  bio?: string;
+  sector?: string;
+  website?: string;
+  canHelpWith?: string[];
+  lookingFor?: string[];
+  businessItems?: Array<{ title?: string; kind?: string }>;
+}
+
 test("préserve les données métier Neptune utiles au profil Connexio", () => {
   const member = normalizeAppUser({
     id: "member-1",
@@ -20,15 +30,7 @@ test("préserve les données métier Neptune utiles au profil Connexio", () => {
       { id: "service-1", name: "Audit de marque", description: "Positionnement et identité." }
     ],
     produits: ["Kit identité visuelle"]
-  }) as typeof member & {
-    headline?: string;
-    bio?: string;
-    sector?: string;
-    website?: string;
-    canHelpWith?: string[];
-    lookingFor?: string[];
-    businessItems?: Array<{ title?: string; kind?: string }>;
-  };
+  }) as ReturnType<typeof normalizeAppUser> & BusinessUniverseProjection;
 
   assert.equal(member.headline, "Direction artistique & stratégie de marque");
   assert.equal(member.bio, "J'aide les entreprises à clarifier leur image.");
