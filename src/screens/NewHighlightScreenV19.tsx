@@ -4,14 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View
-} from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HighlightMediaView } from "../components/HighlightMediaView";
@@ -57,7 +50,7 @@ const DEMO_PLACES: PlaceSuggestion[] = [
   { id: "demo-montpellier", label: "Montpellier", address: "34000 Montpellier", latitude: 43.611, longitude: 3.877 }
 ];
 
-function isHighlightKind(value: string | undefined): value is HighlightKind {
+function isHighlightKind(value?: string): value is HighlightKind {
   return value === "standard" || value === "besoin" || value === "reussite" || value === "offre";
 }
 
@@ -70,46 +63,50 @@ export default function NewHighlightScreenV19() {
   const { members, createPost, refreshExperience } = useExperience();
   const api = useMemo(() => env.mockMode ? null : new NeptuneExperienceApi(accessToken), [accessToken]);
   const requestedKind = Array.isArray(params.kind) ? params.kind[0] : params.kind;
-  const initialKind = isHighlightKind(requestedKind) && AVAILABLE_KINDS.some((item) => item.value === requestedKind)
+  const initialKind: HighlightKind = isHighlightKind(requestedKind) && AVAILABLE_KINDS.some((item) => item.value === requestedKind)
     ? requestedKind
     : BACKEND_CAPABILITIES.highlightsCommunity ? "standard" : "besoin";
 
   const [kind, setKind] = useState<HighlightKind>(initialKind);
   const [body, setBody] = useState("");
-  const [media, setMedia] = useState<HighlightMedia | undefined>();
-  const [voiceRecorderOpen, setVoiceRecorderOpen] = useState(false);
+  const [media, setMedia] = useState<HighlightMedia>();
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [locationQuery, setLocationQuery] = useState("");
-  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<HighlightLocation | null>(null);
+  const [places, setPlaces] = useState<PlaceSuggestion[]>([]);
+  const [location, setLocation] = useState<HighlightLocation | null>(null);
   const [searchingPlace, setSearchingPlace] = useState(false);
   const [locating, setLocating] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   const mentionQuery = useMemo(() => body.match(/(?:^|\s)@([^\s@]*)$/u)?.[1]?.toLocaleLowerCase("fr") ?? null, [body]);
-  const suggestions = useMemo(() => mentionQuery === null ? [] : members.filter((member) => `${member.name} ${member.company}`.toLocaleLowerCase("fr").includes(mentionQuery)).slice(0, 5), [members, mentionQuery]);
+  const mentionSuggestions = useMemo(() => mentionQuery === null ? [] : members
+    .filter((member) => `${member.name} ${member.company}`.toLocaleLowerCase("fr").includes(mentionQuery))
+    .slice(0, 5), [members, mentionQuery]);
   const mentionedUserIds = useMemo(() => members.filter((member) => {
     const text = body.toLocaleLowerCase("fr");
     const firstName = member.name.split(" ")[0]?.toLocaleLowerCase("fr") ?? "";
-    return (firstName && text.includes(`@${firstName}`)) || text.includes(`@${member.name.toLocaleLowerCase("fr")}`) || Boolean(member.company && text.includes(`@${member.company.toLocaleLowerCase("fr")}`));
+    return Boolean(firstName && text.includes(`@${firstName}`)) || text.includes(`@${member.name.toLocaleLowerCase("fr")}`) || Boolean(member.company && text.includes(`@${member.company.toLocaleLowerCase("fr")}`));
   }).map((member) => member.id), [body, members]);
 
   useEffect(() => {
     const query = locationQuery.trim();
-    if (query.length < 3 || selectedLocation?.label === query) {
-      setPlaceSuggestions([]);
+    if (query.length < 3 || location?.label === query) {
+      setPlaces([]);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
       setSearchingPlace(true);
-      const operation = api
+      const request = api
         ? api.searchPlaces(query)
         : Promise.resolve(DEMO_PLACES.filter((place) => `${place.label} ${place.address ?? ""}`.toLocaleLowerCase("fr").includes(query.toLocaleLowerCase("fr"))));
-      void operation.then((items) => { if (!cancelled) setPlaceSuggestions(items.slice(0, 6)); }).catch(() => { if (!cancelled) setPlaceSuggestions([]); }).finally(() => { if (!cancelled) setSearchingPlace(false); });
+      void request.then((items) => { if (!cancelled) setPlaces(items.slice(0, 6)); })
+        .catch(() => { if (!cancelled) setPlaces([]); })
+        .finally(() => { if (!cancelled) setSearchingPlace(false); });
     }, 280);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [api, locationQuery, selectedLocation?.label]);
+  }, [api, location?.label, locationQuery]);
 
   const chooseKind = (next: HighlightKind) => {
     if (!canPublishHighlightKind(currentUser.role, next)) {
@@ -132,36 +129,25 @@ export default function NewHighlightScreenV19() {
   };
 
   const useRecordedVoice = (attachment: MessageAttachment) => {
-    setVoiceRecorderOpen(false);
-    setMedia({
-      id: attachment.id,
-      kind: "audio",
-      uri: attachment.uri,
-      name: attachment.name,
-      mimeType: attachment.mimeType,
-      sizeBytes: attachment.sizeBytes,
-      durationSeconds: attachment.durationSeconds,
-      uploadProgress: attachment.uploadProgress,
-      status: attachment.status,
-      transcript: attachment.transcript,
-      transcriptStatus: attachment.transcriptStatus
-    });
+    setVoiceOpen(false);
+    setMedia({ ...attachment, kind: "audio" });
   };
 
   const choosePlace = (place: PlaceSuggestion) => {
-    setSelectedLocation({ label: place.label, placeId: place.id, address: place.address, latitude: place.latitude, longitude: place.longitude, accuracyRadiusMeters: 100 });
+    const next: HighlightLocation = { label: place.label, placeId: place.id, address: place.address, latitude: place.latitude, longitude: place.longitude, accuracyRadiusMeters: 100 };
+    setLocation(next);
     setLocationQuery(place.label);
-    setPlaceSuggestions([]);
+    setPlaces([]);
   };
 
   const useCurrentLocation = async () => {
     if (locating) return;
     setLocating(true);
     try {
-      const coordinates = await pickApproximateLocation();
-      const location: HighlightLocation = { label: "Ma position approximative", latitude: coordinates.latitude, longitude: coordinates.longitude, accuracyRadiusMeters: coordinates.accuracyRadiusMeters };
-      setSelectedLocation(location);
-      setLocationQuery(location.label);
+      const point = await pickApproximateLocation();
+      const next: HighlightLocation = { label: "Ma position approximative", latitude: point.latitude, longitude: point.longitude, accuracyRadiusMeters: point.accuracyRadiusMeters };
+      setLocation(next);
+      setLocationQuery(next.label);
     } catch (error) {
       AppAlert.alert("Localisation impossible", error instanceof Error ? error.message : "La position n’a pas pu être obtenue.");
     } finally {
@@ -191,9 +177,9 @@ export default function NewHighlightScreenV19() {
         setMedia((current) => current ? { ...current, status: "uploading", uploadProgress: 0 } : current);
         readyMedia = await uploadHighlightMedia(readyMedia, accessToken, (progress) => setMedia((current) => current ? { ...current, status: "uploading", uploadProgress: progress } : current));
       }
-      const coordinates = selectedLocation ? { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude, accuracyRadiusMeters: selectedLocation.accuracyRadiusMeters } : undefined;
+      const coordinates = location ? { latitude: location.latitude, longitude: location.longitude, accuracyRadiusMeters: location.accuracyRadiusMeters } : undefined;
       const post = api
-        ? await api.createHighlight({ kind, body: cleanBody, media: readyMedia, mentionedUserIds, coordinates, location: selectedLocation ?? undefined, author: currentUser })
+        ? await api.createHighlight({ kind, body: cleanBody, media: readyMedia, mentionedUserIds, coordinates, location: location ?? undefined, author: currentUser })
         : createPost({ kind, body: cleanBody, media: readyMedia ? { ...readyMedia, status: "ready", uploadProgress: 1 } : undefined, mentionedUserIds, coordinates });
       if (api) await refreshExperience();
       router.replace({ pathname: "/(tabs)/highlights", params: { published: post.id } });
@@ -209,132 +195,129 @@ export default function NewHighlightScreenV19() {
   const syncLabel = kind === "besoin" ? "Synchronisé avec les Besoins Neptune Business" : kind === "offre" ? "Synchronisé avec le Comité Avantage" : "Visible dans Connexio";
 
   return <LinearGradient colors={theme.pageGradient} style={styles.screen}>
-    <View style={[styles.header, { paddingTop: Math.max(insets.top, 8), paddingLeft: 8 + insets.left, paddingRight: 8 + insets.right, borderBottomColor: theme.borderSoft, backgroundColor: theme.shellBackground }]}>
+    <View style={[styles.header, { paddingTop: Math.max(insets.top, 8), paddingLeft: 8 + insets.left, paddingRight: 8 + insets.right }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={() => router.back()} style={styles.headerButton}><Ionicons name="close" size={25} color={theme.pageText} /></Pressable>
-      <View style={styles.headerCopy}><Text accessibilityRole="header" style={[styles.headerTitle, { color: theme.pageText }]}>Créer un Temps fort</Text><Text style={[styles.headerSubtitle, { color: theme.pageTextMuted }]}>Une idée, un besoin, une opportunité</Text></View>
-      <View style={styles.headerSpacer} />
+      <View style={styles.headerCopy}><Text accessibilityRole="header" style={styles.headerTitle}>Créer un Temps fort</Text><Text style={styles.headerSubtitle}>Une idée, un besoin, une opportunité</Text></View>
+      <View style={styles.headerButton} />
     </View>
 
-    <ScrollView contentContainerStyle={[styles.content, { paddingLeft: spacing.md + insets.left, paddingRight: spacing.md + insets.right, paddingBottom: 118 + insets.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingLeft: spacing.md + insets.left, paddingRight: spacing.md + insets.right, paddingBottom: 120 + insets.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.authorRow}>
         <StatusAvatar user={currentUser} size={48} accessible={false} />
-        <View style={styles.authorCopy}><Text style={[styles.authorName, { color: theme.pageText }]}>{currentUser.name}</Text><View style={styles.visibilityRow}><Ionicons name="people-outline" size={14} color={theme.pageTextMuted} /><Text style={[styles.visibilityText, { color: theme.pageTextMuted }]}>Visible par la communauté Neptune</Text></View></View>
+        <View style={styles.flex}><Text style={styles.authorName}>{currentUser.name}</Text><View style={styles.inline}><Ionicons name="people-outline" size={14} color={theme.pageTextMuted} /><Text style={styles.mutedSmall}>Visible par la communauté Neptune</Text></View></View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.kindRow}>
         {AVAILABLE_KINDS.map((item) => {
           const active = kind === item.value;
-          return <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected: active }} onPress={() => chooseKind(item.value)} style={[styles.kindChip, { backgroundColor: active ? theme.accentSoft : theme.surface, borderColor: active ? theme.accent : theme.borderSoft }]}><Ionicons name={item.icon} size={18} color={active ? theme.accent : theme.pageTextMuted} /><View><Text style={[styles.kindLabel, { color: active ? theme.pageText : theme.pageTextMuted }]}>{item.label}</Text><Text style={[styles.kindHelper, { color: theme.pageTextMuted }]}>{item.helper}</Text></View></Pressable>;
+          return <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected: active }} onPress={() => chooseKind(item.value)} style={[styles.kindChip, { backgroundColor: active ? theme.accentSoft : theme.surface, borderColor: active ? theme.accent : theme.borderSoft }]}>
+            <Ionicons name={item.icon} size={18} color={active ? theme.accent : theme.pageTextMuted} />
+            <View><Text style={[styles.kindLabel, { color: active ? theme.pageText : theme.pageTextMuted }]}>{item.label}</Text><Text style={styles.kindHelper}>{item.helper}</Text></View>
+          </Pressable>;
         })}
       </ScrollView>
 
-      <View style={styles.editorSection}>
-        <Text style={[styles.prompt, { color: theme.pageText }]}>{PROMPTS[kind]}</Text>
-        <TextInput value={body} onChangeText={setBody} placeholder="Écrivez comme vous parleriez à un membre du réseau… Utilisez @ pour mentionner." placeholderTextColor={theme.pageTextMuted} multiline maxLength={2000} style={[styles.editor, { color: theme.pageText }]} textAlignVertical="top" />
-        <View style={styles.editorFooter}><Text style={[styles.counter, { color: theme.pageTextMuted }]}>{body.length}/2 000</Text><View style={[styles.syncPill, { backgroundColor: theme.successSoft }]}><Ionicons name="sync-outline" size={13} color={theme.success} /><Text style={[styles.syncText, { color: theme.success }]}>{syncLabel}</Text></View></View>
-      </View>
+      <Text style={styles.prompt}>{PROMPTS[kind]}</Text>
+      <TextInput value={body} onChangeText={setBody} multiline maxLength={2000} placeholder="Écrivez comme vous parleriez à un membre du réseau… Utilisez @ pour mentionner." placeholderTextColor={theme.pageTextMuted} style={styles.editor} textAlignVertical="top" />
+      <View style={styles.editorFooter}><Text style={styles.counter}>{body.length}/2 000</Text><View style={styles.syncPill}><Ionicons name="sync-outline" size={13} color={theme.success} /><Text style={styles.syncText}>{syncLabel}</Text></View></View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.starters}>
-        {STARTERS[kind].map((starter) => <Pressable key={starter} accessibilityRole="button" accessibilityLabel={`Commencer par ${starter}`} onPress={() => setBody((current) => current.trim() ? current : `${starter} `)} style={[styles.starterChip, { backgroundColor: theme.surfaceStrong }]}><Ionicons name="flash-outline" size={14} color={theme.orange} /><Text style={[styles.starterText, { color: theme.pageTextSecondary }]}>{starter}</Text></Pressable>)}
+        {STARTERS[kind].map((starter) => <Pressable key={starter} onPress={() => setBody((current) => current.trim() ? current : `${starter} `)} style={styles.starterChip}><Ionicons name="flash-outline" size={14} color={theme.orange} /><Text style={styles.starterText}>{starter}</Text></Pressable>)}
       </ScrollView>
 
-      {suggestions.length > 0 ? <View style={[styles.suggestions, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>{suggestions.map((member) => <Pressable key={member.id} onPress={() => setBody((current) => current.replace(/@[^\s@]*$/u, `@${member.name.split(" ")[0]} `))} style={styles.suggestionRow}><StatusAvatar user={member} size={34} accessible={false} /><View style={styles.suggestionCopy}><Text style={[styles.suggestionName, { color: theme.pageText }]}>{member.name}</Text><Text style={[styles.suggestionCompany, { color: theme.pageTextMuted }]}>{member.company}</Text></View></Pressable>)}</View> : null}
+      {mentionSuggestions.length > 0 ? <View style={styles.suggestions}>{mentionSuggestions.map((member) => <Pressable key={member.id} onPress={() => setBody((current) => current.replace(/@[^\s@]*$/u, `@${member.name.split(" ")[0]} `))} style={styles.suggestionRow}><StatusAvatar user={member} size={34} accessible={false} /><View style={styles.flex}><Text style={styles.suggestionName}>{member.name}</Text><Text style={styles.mutedSmall}>{member.company}</Text></View></Pressable>)}</View> : null}
 
       <View style={styles.mediaToolbar}>
-        <MediaButton icon="image-outline" label="Photo" onPress={() => void selectMedia("photo")} />
-        <MediaButton icon="videocam-outline" label="Vidéo" onPress={() => void selectMedia("video")} />
-        <MediaButton icon="mic-outline" label="Vocal" onPress={() => setVoiceRecorderOpen(true)} />
-        <MediaButton icon="location-outline" label="Lieu" active={Boolean(selectedLocation)} onPress={() => setContextOpen(true)} />
+        <MediaButton styles={styles} theme={theme} icon="image-outline" label="Photo" onPress={() => void selectMedia("photo")} />
+        <MediaButton styles={styles} theme={theme} icon="videocam-outline" label="Vidéo" onPress={() => void selectMedia("video")} />
+        <MediaButton styles={styles} theme={theme} icon="mic-outline" label="Vocal" onPress={() => setVoiceOpen(true)} />
+        <MediaButton styles={styles} theme={theme} icon="location-outline" label="Lieu" active={Boolean(location)} onPress={() => setContextOpen(true)} />
       </View>
 
-      {voiceRecorderOpen ? <View style={styles.recorderWrap}><InlineVoiceRecorder onCancel={() => setVoiceRecorderOpen(false)} onRecorded={useRecordedVoice} /></View> : null}
+      {voiceOpen ? <View style={styles.blockTop}><InlineVoiceRecorder onCancel={() => setVoiceOpen(false)} onRecorded={useRecordedVoice} /></View> : null}
 
-      {media ? <View style={[styles.mediaPreview, { borderColor: theme.borderSoft }]}>
-        <HighlightMediaView media={media} />
-        <View style={styles.mediaOverlay}><View style={styles.mediaStatus}><Text style={styles.mediaStatusText}>{media.status === "uploading" ? `Envoi · ${Math.round((media.uploadProgress ?? 0) * 100)} %` : media.kind === "video" ? "Vidéo" : media.kind === "audio" ? "Vocal" : "Photo"}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Retirer le média" onPress={() => setMedia(undefined)} style={styles.removeMedia}><Ionicons name="close" size={20} color={colors.white} /></Pressable></View>
-      </View> : null}
+      {media ? <View style={styles.mediaPreview}><HighlightMediaView media={media} /><View style={styles.mediaOverlay}><View style={styles.mediaStatus}><Text style={styles.mediaStatusText}>{media.status === "uploading" ? `Envoi · ${Math.round((media.uploadProgress ?? 0) * 100)} %` : media.kind === "video" ? "Vidéo" : media.kind === "audio" ? "Vocal" : "Photo"}</Text></View><Pressable accessibilityLabel="Retirer le média" onPress={() => setMedia(undefined)} style={styles.removeMedia}><Ionicons name="close" size={20} color={colors.white} /></Pressable></View></View> : null}
 
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: contextOpen }} onPress={() => setContextOpen((value) => !value)} style={[styles.contextHeader, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>
-        <View style={[styles.contextIcon, { backgroundColor: theme.orangeSoft }]}><Ionicons name="location-outline" size={20} color={theme.orange} /></View>
-        <View style={styles.contextCopy}><Text style={[styles.contextTitle, { color: theme.pageText }]}>Ajouter du contexte</Text><Text style={[styles.contextSubtitle, { color: theme.pageTextMuted }]}>{selectedLocation ? selectedLocation.label : "Lieu approximatif, facultatif"}</Text></View>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: contextOpen }} onPress={() => setContextOpen((value) => !value)} style={styles.contextHeader}>
+        <View style={styles.contextIcon}><Ionicons name="location-outline" size={20} color={theme.orange} /></View>
+        <View style={styles.flex}><Text style={styles.contextTitle}>Ajouter du contexte</Text><Text style={styles.mutedSmall}>{location?.label ?? "Lieu approximatif, facultatif"}</Text></View>
         <Ionicons name={contextOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.pageTextMuted} />
       </Pressable>
 
-      {contextOpen ? <View style={[styles.contextPanel, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>
-        <View style={[styles.locationSearch, { backgroundColor: theme.inputBackground, borderColor: theme.borderSoft }]}><Ionicons name="search-outline" size={19} color={theme.pageTextMuted} /><TextInput value={locationQuery} onChangeText={(value) => { setLocationQuery(value); if (value !== selectedLocation?.label) setSelectedLocation(null); }} placeholder="Rechercher un lieu" placeholderTextColor={theme.pageTextMuted} style={[styles.locationInput, { color: theme.pageText }]} />{searchingPlace ? <ActivityIndicator size="small" color={theme.accent} /> : null}</View>
-        {placeSuggestions.length > 0 ? <View style={styles.placeList}>{placeSuggestions.map((place) => <Pressable key={place.id} onPress={() => choosePlace(place)} style={styles.placeRow}><Ionicons name="location-outline" size={18} color={theme.orange} /><View style={styles.placeCopy}><Text style={[styles.placeTitle, { color: theme.pageText }]}>{place.label}</Text>{place.address ? <Text style={[styles.placeAddress, { color: theme.pageTextMuted }]}>{place.address}</Text> : null}</View></Pressable>)}</View> : null}
-        <Pressable accessibilityRole="button" accessibilityState={{ busy: locating }} disabled={locating} onPress={() => void useCurrentLocation()} style={[styles.currentLocation, { backgroundColor: theme.surfaceStrong }]}>{locating ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="locate-outline" size={19} color={theme.pageText} />}<Text style={[styles.currentLocationText, { color: theme.pageText }]}>{locating ? "Localisation…" : "Utiliser ma position approximative"}</Text></Pressable>
-        {selectedLocation ? <View style={[styles.selectedLocation, { backgroundColor: theme.successSoft }]}><Ionicons name="checkmark-circle" size={20} color={theme.success} /><View style={styles.selectedLocationCopy}><Text style={[styles.selectedLocationTitle, { color: theme.pageText }]}>{selectedLocation.label}</Text>{selectedLocation.address ? <Text style={[styles.selectedLocationAddress, { color: theme.pageTextMuted }]}>{selectedLocation.address}</Text> : null}</View><Pressable accessibilityLabel="Retirer le lieu" onPress={() => { setSelectedLocation(null); setLocationQuery(""); }} style={styles.removeLocation}><Ionicons name="close" size={19} color={theme.pageTextMuted} /></Pressable></View> : null}
+      {contextOpen ? <View style={styles.contextPanel}>
+        <View style={styles.locationSearch}><Ionicons name="search-outline" size={19} color={theme.pageTextMuted} /><TextInput value={locationQuery} onChangeText={(value) => { setLocationQuery(value); if (value !== location?.label) setLocation(null); }} placeholder="Rechercher un lieu" placeholderTextColor={theme.pageTextMuted} style={styles.locationInput} />{searchingPlace ? <ActivityIndicator size="small" color={theme.accent} /> : null}</View>
+        {places.map((place) => <Pressable key={place.id} onPress={() => choosePlace(place)} style={styles.placeRow}><Ionicons name="location-outline" size={18} color={theme.orange} /><View style={styles.flex}><Text style={styles.placeTitle}>{place.label}</Text>{place.address ? <Text style={styles.mutedSmall}>{place.address}</Text> : null}</View></Pressable>)}
+        <Pressable disabled={locating} onPress={() => void useCurrentLocation()} style={styles.currentLocation}>{locating ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="locate-outline" size={19} color={theme.pageText} />}<Text style={styles.currentLocationText}>{locating ? "Localisation…" : "Utiliser ma position approximative"}</Text></Pressable>
+        {location ? <View style={styles.selectedLocation}><Ionicons name="checkmark-circle" size={20} color={theme.success} /><View style={styles.flex}><Text style={styles.placeTitle}>{location.label}</Text>{location.address ? <Text style={styles.mutedSmall}>{location.address}</Text> : null}</View><Pressable accessibilityLabel="Retirer le lieu" onPress={() => { setLocation(null); setLocationQuery(""); }} style={styles.smallIconButton}><Ionicons name="close" size={19} color={theme.pageTextMuted} /></Pressable></View> : null}
       </View> : null}
     </ScrollView>
 
-    <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10), paddingLeft: spacing.md + insets.left, paddingRight: spacing.md + insets.right, backgroundColor: theme.shellBackground, borderTopColor: theme.borderSoft }]}>
-      <View style={styles.bottomCopy}><Text style={[styles.bottomTitle, { color: theme.pageText }]}>{canPublish ? "Prêt à partager" : "Ajoutez un message ou un média"}</Text><Text style={[styles.bottomMeta, { color: theme.pageTextMuted }]}>{kind === "besoin" ? "Le réseau pourra vous répondre directement." : "Votre Temps fort apparaîtra immédiatement dans le feed."}</Text></View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Publier" accessibilityState={{ disabled: !canPublish, busy: publishing }} disabled={!canPublish} onPress={() => void publish()} style={({ pressed }) => [styles.publishButton, { backgroundColor: theme.accent }, pressed && styles.pressed, !canPublish && styles.disabled]}>{publishing ? <ActivityIndicator size="small" color="#fff" /> : <><Text style={styles.publishText}>Publier</Text><Ionicons name="arrow-up" size={18} color="#fff" /></>}</Pressable>
+    <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 10), paddingLeft: spacing.md + insets.left, paddingRight: spacing.md + insets.right }]}>
+      <View style={styles.flex}><Text style={styles.bottomTitle}>{canPublish ? "Prêt à partager" : "Ajoutez un message ou un média"}</Text><Text style={styles.bottomMeta}>{kind === "besoin" ? "Le réseau pourra vous répondre directement." : "Votre Temps fort apparaîtra immédiatement dans le feed."}</Text></View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Publier" disabled={!canPublish} onPress={() => void publish()} style={[styles.publishButton, !canPublish && styles.disabled]}>{publishing ? <ActivityIndicator size="small" color="#fff" /> : <><Text style={styles.publishText}>Publier</Text><Ionicons name="arrow-up" size={18} color="#fff" /></>}</Pressable>
     </View>
   </LinearGradient>;
 }
 
-function MediaButton({ icon, label, active = false, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; active?: boolean; onPress: () => void }) {
-  const theme = useAppTheme();
-  return <Pressable accessibilityRole="button" accessibilityLabel={`Ajouter ${label}`} onPress={onPress} style={[styles.mediaButton, { backgroundColor: active ? theme.accentSoft : theme.surface, borderColor: active ? theme.accent : theme.borderSoft }]}><Ionicons name={icon} size={20} color={active ? theme.accent : theme.pageText} /><Text style={[styles.mediaButtonText, { color: theme.pageText }]}>{label}</Text></Pressable>;
+type ComposerStyles = ReturnType<typeof createStyles>;
+function MediaButton({ styles, theme, icon, label, active = false, onPress }: { styles: ComposerStyles; theme: ConnexioTheme; icon: keyof typeof Ionicons.glyphMap; label: string; active?: boolean; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={`Ajouter ${label}`} onPress={onPress} style={[styles.mediaButton, { backgroundColor: active ? theme.accentSoft : theme.surface, borderColor: active ? theme.accent : theme.borderSoft }]}><Ionicons name={icon} size={20} color={active ? theme.accent : theme.pageText} /><Text style={styles.mediaButtonText}>{label}</Text></Pressable>;
 }
 
 const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
   screen: { flex: 1 },
-  header: { minHeight: 64, paddingBottom: 8, borderBottomWidth: 1, flexDirection: "row", alignItems: "center" },
+  header: { minHeight: 64, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: theme.borderSoft, backgroundColor: theme.shellBackground, flexDirection: "row", alignItems: "center" },
   headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1, alignItems: "center" },
-  headerTitle: { ...typography.heading3 },
-  headerSubtitle: { fontSize: 10, marginTop: 2 },
-  headerSpacer: { width: 48 },
+  headerTitle: { ...typography.heading3, color: theme.pageText },
+  headerSubtitle: { fontSize: 10, color: theme.pageTextMuted, marginTop: 2 },
   content: { width: "100%", maxWidth: 680, alignSelf: "center", paddingTop: 16 },
   authorRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  authorCopy: { flex: 1 },
-  authorName: { fontSize: 14, fontWeight: "900" },
-  visibilityRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  visibilityText: { fontSize: 11, fontWeight: "700" },
+  flex: { flex: 1, minWidth: 0 },
+  inline: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
+  authorName: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  mutedSmall: { color: theme.pageTextMuted, fontSize: 10, lineHeight: 14 },
   kindRow: { gap: 8, paddingVertical: 14 },
   kindChip: { minWidth: 150, minHeight: 58, paddingHorizontal: 11, borderRadius: 18, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 8 },
   kindLabel: { fontSize: 12, fontWeight: "900" },
-  kindHelper: { fontSize: 9, lineHeight: 12, marginTop: 2, maxWidth: 112 },
-  editorSection: { paddingVertical: 6 },
-  prompt: { fontSize: 21, lineHeight: 27, fontWeight: "900", letterSpacing: -0.35 },
-  editor: { minHeight: 148, paddingVertical: 13, fontSize: 17, lineHeight: 25, fontWeight: "500" },
+  kindHelper: { color: theme.pageTextMuted, fontSize: 9, lineHeight: 12, marginTop: 2, maxWidth: 112 },
+  prompt: { color: theme.pageText, fontSize: 21, lineHeight: 27, fontWeight: "900", letterSpacing: -0.35, marginTop: 4 },
+  editor: { minHeight: 148, paddingVertical: 13, color: theme.pageText, fontSize: 17, lineHeight: 25, fontWeight: "500" },
   editorFooter: { minHeight: 36, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  counter: { fontSize: 10, fontWeight: "700" },
-  syncPill: { minHeight: 28, paddingHorizontal: 8, borderRadius: 999, flexDirection: "row", alignItems: "center", gap: 5 },
-  syncText: { fontSize: 9, fontWeight: "850" },
+  counter: { color: theme.pageTextMuted, fontSize: 10, fontWeight: "700" },
+  syncPill: { minHeight: 28, paddingHorizontal: 8, borderRadius: 999, backgroundColor: theme.successSoft, flexDirection: "row", alignItems: "center", gap: 5 },
+  syncText: { color: theme.success, fontSize: 9, fontWeight: "850" },
   starters: { gap: 7, paddingVertical: 8 },
-  starterChip: { minHeight: 42, paddingHorizontal: 11, borderRadius: 14, flexDirection: "row", alignItems: "center", gap: 6 },
-  starterText: { fontSize: 11, fontWeight: "750" },
-  suggestions: { marginTop: 6, borderRadius: 18, borderWidth: 1, overflow: "hidden" },
+  starterChip: { minHeight: 42, paddingHorizontal: 11, borderRadius: 14, backgroundColor: theme.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 6 },
+  starterText: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "750" },
+  suggestions: { marginTop: 6, borderRadius: 18, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, overflow: "hidden" },
   suggestionRow: { minHeight: 54, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 9 },
-  suggestionCopy: { flex: 1 }, suggestionName: { fontSize: 12, fontWeight: "900" }, suggestionCompany: { fontSize: 10, marginTop: 2 },
+  suggestionName: { color: theme.pageText, fontSize: 12, fontWeight: "900" },
   mediaToolbar: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 10 },
   mediaButton: { minWidth: 76, minHeight: 48, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  mediaButtonText: { fontSize: 11, fontWeight: "900" },
-  recorderWrap: { marginTop: 10 },
-  mediaPreview: { marginTop: 12, borderRadius: 22, borderWidth: 1, overflow: "hidden", position: "relative" },
+  mediaButtonText: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
+  blockTop: { marginTop: 10 },
+  mediaPreview: { marginTop: 12, borderRadius: 22, borderWidth: 1, borderColor: theme.borderSoft, overflow: "hidden", position: "relative" },
   mediaOverlay: { position: "absolute", left: 8, right: 8, top: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   mediaStatus: { minHeight: 30, paddingHorizontal: 9, borderRadius: 999, backgroundColor: "rgba(2,7,19,.76)", justifyContent: "center" },
   mediaStatusText: { color: colors.white, fontSize: 10, fontWeight: "900" },
   removeMedia: { width: 44, height: 44, borderRadius: 15, backgroundColor: "rgba(2,7,19,.78)", alignItems: "center", justifyContent: "center" },
-  contextHeader: { minHeight: 70, marginTop: 16, paddingHorizontal: 11, borderRadius: 20, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10 },
-  contextIcon: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  contextCopy: { flex: 1 }, contextTitle: { fontSize: 13, fontWeight: "900" }, contextSubtitle: { fontSize: 10, marginTop: 3 },
-  contextPanel: { marginTop: 7, padding: 10, borderRadius: 20, borderWidth: 1 },
-  locationSearch: { minHeight: 52, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 7 },
-  locationInput: { flex: 1, minHeight: 50, fontSize: 13 },
-  placeList: { marginTop: 6 }, placeRow: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 6 }, placeCopy: { flex: 1 }, placeTitle: { fontSize: 12, fontWeight: "900" }, placeAddress: { fontSize: 10, marginTop: 2 },
-  currentLocation: { minHeight: 48, marginTop: 7, paddingHorizontal: 10, borderRadius: 15, flexDirection: "row", alignItems: "center", gap: 8 },
-  currentLocationText: { fontSize: 12, fontWeight: "850" },
-  selectedLocation: { minHeight: 58, marginTop: 7, paddingHorizontal: 9, borderRadius: 16, flexDirection: "row", alignItems: "center", gap: 8 },
-  selectedLocationCopy: { flex: 1 }, selectedLocationTitle: { fontSize: 12, fontWeight: "900" }, selectedLocationAddress: { fontSize: 10, marginTop: 2 }, removeLocation: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  bottomBar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 90, paddingTop: 10, borderTopWidth: 1, flexDirection: "row", alignItems: "center", gap: 10 },
-  bottomCopy: { flex: 1, minWidth: 0 }, bottomTitle: { fontSize: 12, fontWeight: "900" }, bottomMeta: { fontSize: 9, lineHeight: 13, marginTop: 2 },
-  publishButton: { minWidth: 108, minHeight: 52, paddingHorizontal: 14, borderRadius: 17, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  contextHeader: { minHeight: 70, marginTop: 16, paddingHorizontal: 11, borderRadius: 20, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, flexDirection: "row", alignItems: "center", gap: 10 },
+  contextIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: theme.orangeSoft, alignItems: "center", justifyContent: "center" },
+  contextTitle: { color: theme.pageText, fontSize: 13, fontWeight: "900" },
+  contextPanel: { marginTop: 7, padding: 10, borderRadius: 20, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface },
+  locationSearch: { minHeight: 52, paddingHorizontal: 10, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.inputBackground, flexDirection: "row", alignItems: "center", gap: 7 },
+  locationInput: { flex: 1, minHeight: 50, color: theme.pageText, fontSize: 13 },
+  placeRow: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 6 },
+  placeTitle: { color: theme.pageText, fontSize: 12, fontWeight: "900" },
+  currentLocation: { minHeight: 48, marginTop: 7, paddingHorizontal: 10, borderRadius: 15, backgroundColor: theme.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 8 },
+  currentLocationText: { color: theme.pageText, fontSize: 12, fontWeight: "850" },
+  selectedLocation: { minHeight: 58, marginTop: 7, paddingHorizontal: 9, borderRadius: 16, backgroundColor: theme.successSoft, flexDirection: "row", alignItems: "center", gap: 8 },
+  smallIconButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  bottomBar: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 90, paddingTop: 10, borderTopWidth: 1, borderTopColor: theme.borderSoft, backgroundColor: theme.shellBackground, flexDirection: "row", alignItems: "center", gap: 10 },
+  bottomTitle: { color: theme.pageText, fontSize: 12, fontWeight: "900" },
+  bottomMeta: { color: theme.pageTextMuted, fontSize: 9, lineHeight: 13, marginTop: 2 },
+  publishButton: { minWidth: 108, minHeight: 52, paddingHorizontal: 14, borderRadius: 17, backgroundColor: theme.accent, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   publishText: { color: "#fff", fontSize: 14, fontWeight: "900" },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
   disabled: { opacity: 0.42 }
 });
