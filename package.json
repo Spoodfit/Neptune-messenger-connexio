@@ -3,6 +3,19 @@
   "version": "1.0.0-rc.1",
   "private": true,
   "main": "expo-router/entry",
+  "expo": {
+    "install": {
+      "exclude": [
+        "expo",
+        "expo-constants",
+        "expo-image-picker",
+        "expo-location",
+        "expo-notifications",
+        "expo-router",
+        "expo-splash-screen"
+      ]
+    }
+  },
   "scripts": {
     "start": "expo start",
     "start:tunnel": "expo start --tunnel",
