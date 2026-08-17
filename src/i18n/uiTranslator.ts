@@ -6,11 +6,14 @@ import { translateUiTextV17B } from "./uiTranslationsV17b";
 import { translateUiTextV17C } from "./uiTranslationsV17c";
 import { translateUiTextV17D } from "./uiTranslationsV17d";
 import { translateUiTextV18 } from "./uiTranslationsV18";
+import { translateUiTextV19 } from "./uiTranslationsV19";
 
 export function translateConnexioUiText(value: string, language: SupportedLanguage | string): string {
   if (!value || language === "fr") return value;
   const dynamic = translateConnexioUiPattern(value, language);
   if (dynamic !== value) return dynamic;
+  const v19 = translateUiTextV19(value, language);
+  if (v19 !== value) return v19;
   const v18 = translateUiTextV18(value, language);
   if (v18 !== value) return v18;
   const fourthBatch = translateUiTextV17D(value, language);
