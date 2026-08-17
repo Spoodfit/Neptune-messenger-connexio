@@ -1,5 +1,6 @@
 export type DiscoveryEventState = "past24h" | "live" | "upcoming" | "expired";
 export type DiscoveryEventWindow = "all" | Exclude<DiscoveryEventState, "expired">;
+export type DiscoveryEventProximity = "past24h" | "live" | "within48h" | "within7d" | "later" | "expired";
 
 export interface DiscoveryEvent {
   id: string;
@@ -42,6 +43,22 @@ export function getDiscoveryEventState(
   if (current <= end) return "live";
   if (current - end <= DAY_MS) return "past24h";
   return "expired";
+}
+
+export function getDiscoveryEventProximity(
+  event: DiscoveryEvent,
+  now: number | Date = Date.now()
+): DiscoveryEventProximity {
+  const current = typeof now === "number" ? now : now.getTime();
+  const start = timestamp(event.startsAt);
+  if (start === null) return "expired";
+  const end = timestamp(event.endsAt) ?? start + DEFAULT_DURATION_MS;
+  if (current >= start && current <= end) return "live";
+  if (current > end) return current - end <= DAY_MS ? "past24h" : "expired";
+  const untilStart = start - current;
+  if (untilStart <= 48 * HOUR_MS) return "within48h";
+  if (untilStart <= 7 * DAY_MS) return "within7d";
+  return "later";
 }
 
 export function visibleDiscoveryEvents(
