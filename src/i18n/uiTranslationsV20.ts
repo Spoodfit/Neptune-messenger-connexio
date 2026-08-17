@@ -14,6 +14,7 @@ export const UI_TRANSLATIONS_V20: Record<string, TranslationSet> = {
   "Localisation auto": { en: "Auto location", es: "Ubicación automática", de: "Automatischer Standort", it: "Posizione automatica", pt: "Localização automática" },
   "Retirer le média": { en: "Remove media", es: "Quitar contenido", de: "Medium entfernen", it: "Rimuovi contenuto", pt: "Remover conteúdo" },
   "Publication détectée automatiquement": { en: "Post detected automatically", es: "Publicación detectada automáticamente", de: "Beitrag automatisch erkannt", it: "Post rilevato automaticamente", pt: "Publicação detetada automaticamente" },
+  "Voir l’évènement": { en: "View event", es: "Ver evento", de: "Event ansehen", it: "Vedi evento", pt: "Ver evento" },
   "Mon univers professionnel": { en: "My professional universe", es: "Mi universo profesional", de: "Meine berufliche Welt", it: "Il mio universo professionale", pt: "O meu universo profissional" },
   "Votre univers professionnel et vos réglages Connexio.": { en: "Your professional universe and Connexio settings.", es: "Tu universo profesional y los ajustes de Connexio.", de: "Deine berufliche Welt und Connexio-Einstellungen.", it: "Il tuo universo professionale e le impostazioni Connexio.", pt: "O seu universo profissional e as definições do Connexio." },
   "Modifier mon profil": { en: "Edit my profile", es: "Editar mi perfil", de: "Mein Profil bearbeiten", it: "Modifica il mio profilo", pt: "Editar o meu perfil" },
