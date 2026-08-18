@@ -89,9 +89,16 @@ async function expectVisible(locator, label) {
 }
 
 async function clickText(page, text, label = text) {
-  const locator = page.getByText(text, { exact: true }).first();
-  await expectVisible(locator, label);
-  if (await locator.isVisible().catch(() => false)) await locator.click();
+  const candidates = page.getByText(text, { exact: true });
+  const count = await candidates.count();
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const candidate = candidates.nth(index);
+    if (await candidate.isVisible().catch(() => false)) {
+      await candidate.click();
+      return;
+    }
+  }
+  failures.push(`${label}: élément attendu absent`);
 }
 
 async function pageDiagnostic(page) {
