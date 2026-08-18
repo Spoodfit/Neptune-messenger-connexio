@@ -217,10 +217,9 @@ async function run() {
     await expectVisible(createHighlight, "action publier Temps fort");
     if (await createHighlight.isVisible().catch(() => false)) {
       await createHighlight.click();
-      await expectVisible(page.getByText("Créer un Temps fort", { exact: true }), "création Temps fort V19");
-      await checkGeometry(page, "Créer un Temps fort");
-      const closeHighlight = page.getByLabel("Fermer").last();
-      if (await closeHighlight.isVisible().catch(() => false)) await closeHighlight.click();
+      await expectVisible(page.getByText("Feed", { exact: true }).first(), "retour direct au Feed Temps forts");
+      await expectVisible(page.getByLabel("Publier maintenant", { exact: true }), "composer rapide Temps fort ouvert");
+      await checkGeometry(page, "Composer rapide Temps fort");
     }
 
     await clickText(page, "Appels", "onglet Appels");
