@@ -51,8 +51,10 @@ async function run() {
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     await page.getByLabel("Créer").click();
     await page.getByLabel("Publier un Temps fort").last().click();
+    const quickComposerFromMessages = page.getByLabel("Publier maintenant", { exact: true });
+    await quickComposerFromMessages.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
     await waitRoute(page, "/highlights", "Bouton + : retour au Feed Temps forts");
-    check(await page.getByLabel("Publier maintenant", { exact: true }).isVisible(), "Bouton + : composer rapide ouvert");
+    check(await quickComposerFromMessages.isVisible(), "Bouton + : composer rapide ouvert");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     const privateTab = page.getByRole("tab", { name: "Privées" });
@@ -69,9 +71,11 @@ async function run() {
 
     await page.getByLabel("Créer").click();
     await page.getByLabel("Publier un Temps fort").last().click();
+    const quickComposerFromMap = page.getByLabel("Publier maintenant", { exact: true });
+    await quickComposerFromMap.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
     await waitRoute(page, "/highlights", "Map + Temps fort : reste dans Temps forts");
+    check(await quickComposerFromMap.isVisible(), "Map + Temps fort : même composer rapide ouvert");
     check(await page.getByRole("tab", { name: "Afficher le Feed", selected: true }).last().isVisible(), "Map + Temps fort : retour automatique au Feed");
-    check(await page.getByLabel("Publier maintenant", { exact: true }).isVisible(), "Map + Temps fort : même composer rapide ouvert");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
