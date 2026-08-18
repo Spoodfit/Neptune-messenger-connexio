@@ -51,7 +51,8 @@ async function run() {
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     await page.getByLabel("Créer").click();
     await page.getByLabel("Publier un Temps fort").last().click();
-    await waitRoute(page, "/new-highlight", "Bouton + : nouveau Temps fort");
+    await waitRoute(page, "/highlights", "Bouton + : retour au Feed Temps forts");
+    check(await page.getByLabel("Publier maintenant", { exact: true }).isVisible(), "Bouton + : composer rapide ouvert");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     const privateTab = page.getByRole("tab", { name: "Privées" });
@@ -115,7 +116,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: navigation, +, segmented controls, menus, theme, single top back control and language picker.");
+  console.log("Interaction audit passed: navigation, +, composer rapide, segmented controls, menus, theme, single top back control and language picker.");
 }
 
 run().catch((error) => {
