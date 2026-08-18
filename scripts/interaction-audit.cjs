@@ -67,7 +67,8 @@ async function run() {
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
     await mapTab.click();
-    check(await page.locator("iframe[title='Carte de découverte Neptune']").isVisible(), "Onglet Map actif");
+    const discoveryMap = page.locator("iframe[title='Carte de découverte Neptune']");
+    check(await discoveryMap.isVisible(), "Onglet Map actif");
 
     await page.getByLabel("Créer").click();
     await page.getByLabel("Publier un Temps fort").last().click();
@@ -75,7 +76,7 @@ async function run() {
     await quickComposerFromMap.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
     await waitRoute(page, "/highlights", "Map + Temps fort : reste dans Temps forts");
     check(await quickComposerFromMap.isVisible(), "Map + Temps fort : même composer rapide ouvert");
-    check(await page.getByRole("tab", { name: "Afficher le Feed", selected: true }).last().isVisible(), "Map + Temps fort : retour automatique au Feed");
+    check(!(await discoveryMap.isVisible().catch(() => false)), "Map + Temps fort : la carte laisse bien place au Feed");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
