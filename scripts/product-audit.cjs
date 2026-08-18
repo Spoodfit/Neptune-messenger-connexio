@@ -89,9 +89,16 @@ async function expectVisible(locator, label) {
 }
 
 async function clickText(page, text, label = text) {
-  const locator = page.getByText(text, { exact: true }).first();
-  await expectVisible(locator, label);
-  if (await locator.isVisible().catch(() => false)) await locator.click();
+  const candidates = page.getByText(text, { exact: true });
+  const count = await candidates.count();
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const candidate = candidates.nth(index);
+    if (await candidate.isVisible().catch(() => false)) {
+      await candidate.click();
+      return;
+    }
+  }
+  failures.push(`${label}: élément attendu absent`);
 }
 
 async function pageDiagnostic(page) {
@@ -217,10 +224,9 @@ async function run() {
     await expectVisible(createHighlight, "action publier Temps fort");
     if (await createHighlight.isVisible().catch(() => false)) {
       await createHighlight.click();
-      await expectVisible(page.getByText("Créer un Temps fort", { exact: true }), "création Temps fort V19");
-      await checkGeometry(page, "Créer un Temps fort");
-      const closeHighlight = page.getByLabel("Fermer").last();
-      if (await closeHighlight.isVisible().catch(() => false)) await closeHighlight.click();
+      await expectVisible(page.getByText("Feed", { exact: true }).first(), "retour direct au Feed Temps forts");
+      await expectVisible(page.getByLabel("Publier maintenant", { exact: true }), "composer rapide Temps fort ouvert");
+      await checkGeometry(page, "Composer rapide Temps fort");
     }
 
     await clickText(page, "Appels", "onglet Appels");
@@ -237,14 +243,14 @@ async function run() {
       const english = page.getByRole("radio").filter({ hasText: "English" }).first();
       if (await english.isVisible().catch(() => false)) {
         await english.click();
-        await expectVisible(page.getByText("Profile", { exact: true }).first(), "navigation traduite en anglais");
-        await expectVisible(page.getByText("Appearance", { exact: true }).first(), "profil traduit en anglais");
+        await expectVisible(page.getByText("Profile", { exact: true }).last(), "navigation traduite en anglais");
+        await expectVisible(page.getByText("Appearance", { exact: true }).last(), "profil traduit en anglais");
         const reopenLanguage = page.getByLabel("Change Connexio language", { exact: true });
         if (await reopenLanguage.isVisible().catch(() => false)) {
           await reopenLanguage.click();
           const french = page.getByRole("radio").filter({ hasText: "Français" }).first();
           if (await french.isVisible().catch(() => false)) await french.click();
-          await expectVisible(page.getByText("Profil", { exact: true }).first(), "retour interface française");
+          await expectVisible(page.getByText("Profil", { exact: true }).last(), "retour interface française");
         }
       }
     }

@@ -2,7 +2,7 @@ import { Text } from "@/components/LocalizedText";
 import { TextInput } from "@/components/LocalizedTextInput";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
@@ -62,6 +62,9 @@ function buildFeedRows(posts: HighlightPost[]): FeedRow[] {
 
 export default function HighlightsScreenV20() {
   const theme = useAppTheme();
+  const params = useLocalSearchParams<{ compose?: string; composeNonce?: string }>();
+  const compose = Array.isArray(params.compose) ? params.compose[0] : params.compose;
+  const composeNonce = Array.isArray(params.composeNonce) ? params.composeNonce[0] : params.composeNonce;
   const { localeTag } = useAppLanguage();
   const { currentUser, accessToken } = useSession();
   const { posts, mapMoments, members, localConversations, createPost, refreshExperience, togglePostReaction, createPrivateConversation } = useExperience();
@@ -102,6 +105,13 @@ export default function HighlightsScreenV20() {
     void startAutomaticLocation();
   };
 
+  useEffect(() => {
+    if (compose !== "1") return;
+    setMode("feed");
+    setSelectedEntity(null);
+    openComposer();
+  }, [compose, composeNonce]);
+
   const selectMedia = async (kind: "photo" | "video") => {
     try {
       const selected = await pickHighlightMedia(kind);
@@ -141,7 +151,7 @@ export default function HighlightsScreenV20() {
         : createPost({ kind, body: cleanBody, media: readyMedia ? { ...readyMedia, status: "ready", uploadProgress: 1 } : undefined, mentionedUserIds, coordinates });
       if (experienceApi) await refreshExperience();
       setBody(""); setMedia(undefined); setLocation(null); setComposerOpen(false);
-      router.setParams({ published: post.id });
+      router.setParams({ published: post.id, compose: "0" });
     } catch (error) {
       AppAlert.alert("Publication impossible", error instanceof Error ? error.message : "Réessayez ultérieurement.");
     } finally { setPublishing(false); }
@@ -172,7 +182,7 @@ export default function HighlightsScreenV20() {
     <View style={styles.modeWrap}><View style={[styles.modeBar, { borderColor: theme.borderSoft, backgroundColor: theme.surface }]} accessibilityRole="tablist">{(["feed", "map"] as const).map((item) => { const active = mode === item; return <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: active }} accessibilityLabel={item === "feed" ? "Afficher le Feed" : "Afficher la carte"} onPress={() => setMode(item)} style={styles.modeButton}>{active ? <LinearGradient colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab} style={StyleSheet.absoluteFill} /> : null}<Ionicons name={item === "feed" ? "sparkles" : "map"} size={16} color={active ? theme.pageText : theme.pageTextMuted} /><Text style={[styles.modeLabel, { color: active ? theme.pageText : theme.pageTextMuted }]}>{item === "feed" ? "Feed" : "Map"}</Text></Pressable>; })}</View></View>
 
     {mode === "feed" ? <ScrollView contentContainerStyle={styles.feed} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View style={[styles.quickComposer, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>
+      <View style={[styles.quickComposer, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}> 
         <StatusAvatar user={currentUser} size={42} accessible={false} />
         <View style={styles.composerBody}>
           {!composerOpen ? <Pressable accessibilityRole="button" accessibilityLabel="Écrire une publication rapide" onPress={openComposer} style={styles.composerPromptWrap}><Text style={[styles.composerPrompt, { color: theme.pageTextMuted }]}>Quoi de neuf pour le réseau ?</Text></Pressable> : <TextInput autoFocus multiline value={body} onChangeText={setBody} placeholder="Partagez simplement ce que vous voulez…" placeholderTextColor={theme.pageTextMuted} style={[styles.composerInput, { color: theme.pageText }]} />}
@@ -199,11 +209,11 @@ const styles = StyleSheet.create({
   composerBody: { flex: 1, minWidth: 0 },
   composerPromptWrap: { minHeight: 48, justifyContent: "center" },
   composerPrompt: { fontSize: 14, fontWeight: "700" },
-  composerInput: { minHeight: 74, maxHeight: 150, paddingVertical: 8, fontSize: 15, lineHeight: 21, textAlignVertical: "top" },
+  composerInput: { minHeight: 74, maxHeight: 150, paddingVertical: 8, fontSize: 16, lineHeight: 22, textAlignVertical: "top" },
   composerTools: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 4, flexWrap: "wrap" },
   toolButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center", borderRadius: 14 },
   locationState: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 4, flexGrow: 1 },
-  locationText: { fontSize: 10, fontWeight: "700" },
+  locationText: { fontSize: 12, fontWeight: "700" },
   publishButton: { minWidth: 78, minHeight: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
   publishText: { color: "#fff", fontSize: 12, fontWeight: "900" },
   disabled: { opacity: 0.4 },

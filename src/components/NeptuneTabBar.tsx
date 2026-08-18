@@ -78,7 +78,10 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
   };
 
   const openNewConversation = () => { setMenuOpen(false); requestAnimationFrame(() => router.push("/new-conversation")); };
-  const openNewHighlight = () => { setMenuOpen(false); requestAnimationFrame(() => router.push("/new-highlight")); };
+  const openNewHighlight = () => {
+    setMenuOpen(false);
+    requestAnimationFrame(() => router.push("/new-highlight"));
+  };
   const actionTranslate = menuProgress.interpolate({ inputRange: [0, 1], outputRange: [26, -74] });
   const actionScale = menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
 

@@ -51,7 +51,10 @@ async function run() {
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     await page.getByLabel("Créer").click();
     await page.getByLabel("Publier un Temps fort").last().click();
-    await waitRoute(page, "/new-highlight", "Bouton + : nouveau Temps fort");
+    const quickComposerFromMessages = page.getByLabel("Publier maintenant", { exact: true });
+    await quickComposerFromMessages.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    await waitRoute(page, "/highlights", "Bouton + : retour au Feed Temps forts");
+    check(await quickComposerFromMessages.isVisible(), "Bouton + : composer rapide ouvert");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     const privateTab = page.getByRole("tab", { name: "Privées" });
@@ -64,9 +67,20 @@ async function run() {
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
     await mapTab.click();
-    check(await page.locator("iframe[title='Carte de découverte Neptune']").isVisible(), "Onglet Map actif");
+    const discoveryMap = page.locator("iframe[title='Carte de découverte Neptune']");
+    check(await discoveryMap.isVisible(), "Onglet Map actif");
+
+    await page.getByLabel("Créer").click();
+    await page.getByLabel("Publier un Temps fort").last().click();
+    const quickComposerFromMap = page.getByLabel("Publier maintenant", { exact: true });
+    await quickComposerFromMap.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    await waitRoute(page, "/highlights", "Map + Temps fort : reste dans Temps forts");
+    check(await quickComposerFromMap.isVisible(), "Map + Temps fort : même composer rapide ouvert");
+    check(!(await discoveryMap.isVisible().catch(() => false)), "Map + Temps fort : la carte laisse bien place au Feed");
+
+    await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
-    await feedTab.click();
+    check(await feedTab.isVisible(), "Onglet Feed visible");
     check(await page.getByLabel("Options de la publication").first().isVisible(), "Onglet Feed actif");
 
     const postOptions = page.getByLabel("Options de la publication").first();
@@ -115,7 +129,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: navigation, +, segmented controls, menus, theme, single top back control and language picker.");
+  console.log("Interaction audit passed: navigation, +, composer rapide depuis Feed/Map, segmented controls, menus, theme, single top back control and language picker.");
 }
 
 run().catch((error) => {
