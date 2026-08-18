@@ -70,7 +70,7 @@ async function run() {
     await page.getByLabel("Créer").click();
     await page.getByLabel("Publier un Temps fort").last().click();
     await waitRoute(page, "/highlights", "Map + Temps fort : reste dans Temps forts");
-    check(await page.getByRole("tab", { name: "Afficher le Feed" }).getAttribute("aria-selected") === "true", "Map + Temps fort : retour automatique au Feed");
+    check(await page.getByRole("tab", { name: "Afficher le Feed", selected: true }).last().isVisible(), "Map + Temps fort : retour automatique au Feed");
     check(await page.getByLabel("Publier maintenant", { exact: true }).isVisible(), "Map + Temps fort : même composer rapide ouvert");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
