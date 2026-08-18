@@ -243,14 +243,14 @@ async function run() {
       const english = page.getByRole("radio").filter({ hasText: "English" }).first();
       if (await english.isVisible().catch(() => false)) {
         await english.click();
-        await expectVisible(page.getByText("Profile", { exact: true }).first(), "navigation traduite en anglais");
-        await expectVisible(page.getByText("Appearance", { exact: true }).first(), "profil traduit en anglais");
+        await expectVisible(page.getByText("Profile", { exact: true }).last(), "navigation traduite en anglais");
+        await expectVisible(page.getByText("Appearance", { exact: true }).last(), "profil traduit en anglais");
         const reopenLanguage = page.getByLabel("Change Connexio language", { exact: true });
         if (await reopenLanguage.isVisible().catch(() => false)) {
           await reopenLanguage.click();
           const french = page.getByRole("radio").filter({ hasText: "Français" }).first();
           if (await french.isVisible().catch(() => false)) await french.click();
-          await expectVisible(page.getByText("Profil", { exact: true }).first(), "retour interface française");
+          await expectVisible(page.getByText("Profil", { exact: true }).last(), "retour interface française");
         }
       }
     }
