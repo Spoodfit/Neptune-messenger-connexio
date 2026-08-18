@@ -66,8 +66,16 @@ async function run() {
     const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
     await mapTab.click();
     check(await page.locator("iframe[title='Carte de découverte Neptune']").isVisible(), "Onglet Map actif");
+
+    await page.getByLabel("Créer").click();
+    await page.getByLabel("Publier un Temps fort").last().click();
+    await waitRoute(page, "/highlights", "Map + Temps fort : reste dans Temps forts");
+    check(await page.getByRole("tab", { name: "Afficher le Feed" }).getAttribute("aria-selected") === "true", "Map + Temps fort : retour automatique au Feed");
+    check(await page.getByLabel("Publier maintenant", { exact: true }).isVisible(), "Map + Temps fort : même composer rapide ouvert");
+
+    await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
-    await feedTab.click();
+    check(await feedTab.isVisible(), "Onglet Feed visible");
     check(await page.getByLabel("Options de la publication").first().isVisible(), "Onglet Feed actif");
 
     const postOptions = page.getByLabel("Options de la publication").first();
@@ -116,7 +124,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: navigation, +, composer rapide, segmented controls, menus, theme, single top back control and language picker.");
+  console.log("Interaction audit passed: navigation, +, composer rapide depuis Feed/Map, segmented controls, menus, theme, single top back control and language picker.");
 }
 
 run().catch((error) => {
