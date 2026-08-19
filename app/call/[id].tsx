@@ -1,19 +1,10 @@
 import { Text } from "@/components/LocalizedText";
-import {
-  Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer } from "expo-audio";
 import { LinearGradient } from "expo-linear-gradient";
-import { router,
-  useLocalSearchParams } from "expo-router";
-import { useEffect,
-  useMemo,
-  useState } from "react";
-import { ActivityIndicator,
-  Linking,
-  Pressable,
-  StyleSheet,
-  View
-} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from "react-native";
 import { AppAlert } from "@/services/ui/AppAlert";
 
 import CallSurface from "@/components/CallSurface";
@@ -79,6 +70,7 @@ export default function CallRoomScreen() {
   const [declining, setDeclining] = useState<DeclineResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [unanswered, setUnanswered] = useState<CallUnansweredEvent | null>(null);
+  const closingRef = useRef(false);
   const api = useMemo(() => (env.mockMode ? null : new NeptuneCallApi(accessToken)), [accessToken]);
   const ringtonePlayer = useAudioPlayer(require("../../assets/audio/connexio-ringtone.mp3"));
 
@@ -97,12 +89,35 @@ export default function CallRoomScreen() {
     };
   }, [declining, incoming, preparing, ringtonePlayer, session, unanswered]);
 
+  useEffect(() => {
+    if (session) closingRef.current = false;
+  }, [session]);
+
   const close = async () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     const activeSession = session;
     setSession(null);
-    if (activeSession) playCallEnd();
-    if (api && activeSession && !activeSession.mock) await api.endCall(activeSession.id).catch(() => undefined);
-    router.replace(returnTo as never);
+    try {
+      if (activeSession) playCallEnd();
+      if (api && activeSession && !activeSession.mock) await api.endCall(activeSession.id).catch(() => undefined);
+      if (activeSession) {
+        router.replace({
+          pathname: "/call-feedback",
+          params: {
+            callId: activeSession.id,
+            conversationId,
+            memberId: remoteMember?.id ?? "",
+            memberName: remoteDisplayName,
+            reason: activeSession.reason ?? reason ?? initialReason
+          }
+        });
+        return;
+      }
+      router.replace(returnTo as never);
+    } finally {
+      setTimeout(() => { closingRef.current = false; }, 650);
+    }
   };
 
   const startOutgoingCall = async () => {
