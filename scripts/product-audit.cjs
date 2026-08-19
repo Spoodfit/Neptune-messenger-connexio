@@ -22,7 +22,7 @@ function mime(file) {
     ".html": "text/html; charset=utf-8",
     ".js": "application/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
-    ".json": "application/json; charset=utf-8",
+    ".json": "application/json",
     ".png": "image/png",
     ".svg": "image/svg+xml",
     ".woff2": "font/woff2"
@@ -183,7 +183,7 @@ async function run() {
     await page.waitForTimeout(800);
 
     await clickText(page, "Privées", "onglet Privées");
-    await expectVisible(page.getByText("Discussions privées", { exact: true }), "titre discussions privées");
+    await expectVisible(page.getByPlaceholder("Rechercher une conversation…"), "état discussions privées");
     await checkGeometry(page, "Messages privés");
     await clickText(page, "Groupes", "onglet Groupes");
 
