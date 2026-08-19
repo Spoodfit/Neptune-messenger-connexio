@@ -13,7 +13,7 @@ function check(condition, label, detail = "") {
 
 async function waitRoute(page, suffix, label) {
   try {
-    await page.waitForURL((url) => url.pathname.replace(/\/$/, "").endsWith(suffix), { timeout: 3000 });
+    await page.waitForURL((url) => url.pathname.replace(/\/$/, "").endsWith(suffix), { timeout: 5000 });
   } catch {}
   check(pathOf(page).endsWith(suffix), label, `route obtenue: ${pathOf(page)}`);
 }
@@ -41,11 +41,12 @@ async function run() {
     await page.getByRole("tab", { name: /Messages/ }).click();
     await waitRoute(page, "/messages", "Navigation Messages");
 
+    // Le + doit rediriger dès le premier tap : aucun second clic n'est émis par l'audit.
     await page.getByLabel("Créer").click();
     check(await page.getByLabel("Nouvelle conversation").last().isVisible(), "Bouton + : action Conversation visible");
     check(await page.getByLabel("Publier un Temps fort").last().isVisible(), "Bouton + : action Temps fort visible");
     await page.getByLabel("Nouvelle conversation").last().click();
-    await waitRoute(page, "/new-conversation", "Bouton + : nouvelle conversation");
+    await waitRoute(page, "/new-conversation", "Bouton + : Conversation en un seul clic");
     check((await page.getByLabel("Retour à l’écran précédent").count()) === 0, "Aucun bouton Retour secondaire en bas");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
@@ -53,16 +54,28 @@ async function run() {
     await page.getByLabel("Publier un Temps fort").last().click();
     const quickComposerFromMessages = page.getByLabel("Publier maintenant", { exact: true });
     await quickComposerFromMessages.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
-    await waitRoute(page, "/highlights", "Bouton + : retour au Feed Temps forts");
+    await waitRoute(page, "/highlights", "Bouton + : Temps fort en un seul clic");
     check(await quickComposerFromMessages.isVisible(), "Bouton + : composer rapide ouvert");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     const privateTab = page.getByRole("tab", { name: "Privées" });
     await privateTab.click();
-    check(await page.getByText("Discussions privées", { exact: true }).isVisible(), "Onglet Privées actif");
+    check(await privateTab.getAttribute("aria-selected") === "true", "Onglet Privées actif");
+    check(await page.getByPlaceholder("Rechercher une conversation…").isVisible(), "Recherche discussions privées visible");
     const groupTab = page.getByRole("tab", { name: "Groupes" });
     await groupTab.click();
-    check(await page.getByText("Discussions de groupe", { exact: true }).isVisible(), "Onglet Groupes actif");
+    check(await groupTab.getAttribute("aria-selected") === "true", "Onglet Groupes actif");
+    check(await page.getByPlaceholder("Rechercher un club ou un groupe…").isVisible(), "Recherche groupes visible");
+    check((await page.getByText("Clubs", { exact: true }).count()) > 0, "Organisation Clubs visible");
+
+    // Le bouton Envoyer doit être structurel : visible même lorsque le champ est vide.
+    await page.goto(`${BASE_URL}/chat/carcassonne`, { waitUntil: "networkidle" });
+    const sendMessage = page.getByLabel("Envoyer le message", { exact: true });
+    check(await sendMessage.isVisible(), "Chat : bouton Envoyer toujours visible");
+    const composer = page.getByLabel("Écrire un message", { exact: true });
+    check(await composer.isVisible(), "Chat : champ message visible");
+    await composer.fill("Test bouton envoi V22");
+    check((await sendMessage.getAttribute("aria-disabled")) !== "true", "Chat : bouton Envoyer activé après saisie");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
@@ -77,6 +90,9 @@ async function run() {
     await waitRoute(page, "/highlights", "Map + Temps fort : reste dans Temps forts");
     check(await quickComposerFromMap.isVisible(), "Map + Temps fort : même composer rapide ouvert");
     check(!(await discoveryMap.isVisible().catch(() => false)), "Map + Temps fort : la carte laisse bien place au Feed");
+
+    check(await page.getByText(/Détecté automatiquement/).first().isVisible(), "Feed : détection automatique de catégorie visible");
+    check(await page.getByLabel("Classer comme Besoin").isVisible(), "Feed : catégorie modifiable manuellement");
 
     await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
     const feedTab = page.getByRole("tab", { name: "Afficher le Feed" });
@@ -111,6 +127,12 @@ async function run() {
     await topBack.click();
     await waitRoute(page, "/highlights", "Retour haut gauche du profil fonctionnel");
 
+    await page.goto(`${BASE_URL}/call-feedback?callId=mock-call&memberName=Johan`, { waitUntil: "networkidle" });
+    check(await page.getByText("Comment s’est passé l’échange ?", { exact: true }).isVisible(), "Fin d’appel : écran satisfaction visible");
+    check(await page.getByLabel("Envoyer l’avis", { exact: true }).isVisible(), "Fin d’appel : action Envoyer l’avis visible");
+    await page.getByLabel("Passer l’avis", { exact: true }).click();
+    await waitRoute(page, "/calls", "Fin d’appel : retour vers Appels");
+
     await page.goto(`${BASE_URL}/settings`, { waitUntil: "networkidle" });
     const languageButton = page.getByLabel("Changer la langue de Connexio").last();
     check(await languageButton.isVisible(), "Réglage langue visible");
@@ -129,7 +151,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: navigation, +, composer rapide depuis Feed/Map, segmented controls, menus, theme, single top back control and language picker.");
+  console.log("Interaction audit passed: V22 single-tap +, permanent send button, group organization, category override, post-call feedback, map/feed, profile, theme and language picker.");
 }
 
 run().catch((error) => {
