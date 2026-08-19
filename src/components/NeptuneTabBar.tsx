@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   outer: { paddingHorizontal: 8, paddingTop: 4, position: "relative", zIndex: 1000, elevation: 40 },
   bar: { height: 72, padding: 5, overflow: "hidden", position: "relative", borderRadius: radii.xl, borderWidth: 1, flexDirection: "row", alignItems: "stretch", elevation: 42, zIndex: 1002, shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
   sideGroup: { flex: 1, minWidth: 0, height: "100%", flexDirection: "row", alignItems: "stretch" },
-  centerSlot: { width: 64, flexShrink: 0 },
+  centerSlot: { width: 60, flexShrink: 0 },
   item: { flex: 1, minWidth: 0, height: "100%", borderRadius: 17, alignItems: "center", justifyContent: "center", gap: 5, overflow: "hidden", position: "relative" },
   activePill: { position: "absolute", left: 1, right: 1, top: 1, bottom: 1, borderRadius: 16, borderWidth: 1 },
   pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
