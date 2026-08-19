@@ -6,6 +6,7 @@ const listeners = new Set<() => void>();
 const hiddenAt = new Map<string, number>();
 const removedAt = new Map<string, number>();
 const seenMention = new Map<string, string>();
+const pinnedIds = new Set<string>();
 const notify = () => { revision += 1; listeners.forEach((listener) => listener()); };
 const latestTimestamp = (conversation: Conversation) => Date.parse(conversation.lastMessageAt ?? "") || 0;
 const signature = (conversation: Conversation) => `${conversation.mentionCount ?? 0}:${conversation.lastMessageAt ?? ""}`;
@@ -21,6 +22,7 @@ export function hidePrivateConversation(conversation: Conversation) {
 export function removePrivateConversation(id: string) {
   removedAt.set(id, Date.now());
   hiddenAt.delete(id);
+  pinnedIds.delete(id);
   notify();
 }
 export function restorePrivateConversation(id: string) {
@@ -44,4 +46,15 @@ export function markConversationMentionSeen(conversation: Conversation) {
 }
 export function isConversationMentionSeen(conversation: Conversation) {
   return seenMention.get(conversation.id) === signature(conversation);
+}
+export function toggleConversationPinned(id: string) {
+  if (pinnedIds.has(id)) pinnedIds.delete(id);
+  else pinnedIds.add(id);
+  notify();
+}
+export function isConversationPinned(id: string) {
+  return pinnedIds.has(id);
+}
+export function pinnedConversationIds(): string[] {
+  return [...pinnedIds];
 }
