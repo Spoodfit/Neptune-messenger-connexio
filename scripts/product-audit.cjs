@@ -95,10 +95,38 @@ async function clickText(page, text, label = text) {
     const candidate = candidates.nth(index);
     if (await candidate.isVisible().catch(() => false)) {
       await candidate.click();
-      return;
+      return true;
     }
   }
   failures.push(`${label}: élément attendu absent`);
+  return false;
+}
+
+async function clickVisibleLabel(page, label, auditLabel = label) {
+  const candidates = page.getByLabel(label, { exact: true });
+  const count = await candidates.count();
+  for (let index = count - 1; index >= 0; index -= 1) {
+    const candidate = candidates.nth(index);
+    if (await candidate.isVisible().catch(() => false)) {
+      await candidate.click();
+      return true;
+    }
+  }
+  failures.push(`${auditLabel}: élément attendu absent`);
+  return false;
+}
+
+async function expectAnyVisible(locator, label, timeout = 7000) {
+  const deadline = Date.now() + timeout;
+  do {
+    const count = await locator.count().catch(() => 0);
+    for (let index = count - 1; index >= 0; index -= 1) {
+      if (await locator.nth(index).isVisible().catch(() => false)) return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  failures.push(`${label}: élément attendu absent`);
+  return false;
 }
 
 async function pageDiagnostic(page) {
@@ -179,7 +207,7 @@ async function run() {
     await page.waitForTimeout(800);
 
     await clickText(page, "Privées", "onglet Privées");
-    await expectVisible(page.getByText("Discussions privées", { exact: true }), "titre discussions privées");
+    await expectVisible(page.getByPlaceholder("Rechercher une conversation…"), "état discussions privées");
     await checkGeometry(page, "Messages privés");
     await clickText(page, "Groupes", "onglet Groupes");
 
@@ -218,20 +246,28 @@ async function run() {
     await expectVisible(enterHub, "entrée Hub Neptune");
     if (await enterHub.isVisible().catch(() => false)) {
       await enterHub.click();
-      await expectVisible(page.getByLabel("Activer le micro", { exact: true }), "Hub micro coupé à l’entrée");
-      await expectVisible(page.getByLabel("Couper la caméra", { exact: true }), "Hub contrôle caméra");
+      await expectAnyVisible(page.getByLabel("Activer le micro", { exact: true }), "Hub micro coupé à l’entrée");
+      await expectAnyVisible(page.getByLabel("Couper la caméra", { exact: true }), "Hub contrôle caméra");
       await checkGeometry(page, "Coworking Hub");
-      const backWithoutLeaving = page.getByLabel("Retour au Coworking sans quitter", { exact: true });
-      if (await backWithoutLeaving.isVisible().catch(() => false)) await backWithoutLeaving.click();
-      await expectVisible(page.getByText("Touchez pour revenir", { exact: true }), "présence Coworking conservée dans le lobby");
-      const leaveCoworking = page.getByLabel("Quitter le Coworking", { exact: true }).last();
-      if (await leaveCoworking.isVisible().catch(() => false)) await leaveCoworking.click();
-      await expectVisible(page.getByLabel("Entrer dans le Hub Neptune", { exact: true }), "sortie Coworking explicite");
+      if (await clickVisibleLabel(page, "Retour au Coworking sans quitter", "retour au lobby sans quitter")) {
+        await expectAnyVisible(page.getByText("Touchez pour revenir", { exact: true }), "présence Coworking conservée dans le lobby");
+        if (await clickVisibleLabel(page, "Quitter le Coworking", "sortie Coworking disponible")) {
+          await expectAnyVisible(page.getByLabel("Entrer dans le Hub Neptune", { exact: true }), "sortie Coworking explicite");
+        }
+      }
     }
 
-    await page.goto(`http://127.0.0.1:${port}/highlights`, { waitUntil: "domcontentloaded" });
+    // Repartir d’un état déterministe puis suivre la navigation normale : cela valide aussi que le Coworking n’a pas cassé les autres onglets.
+    await resetToMessages(page);
+    await clickText(page, "Temps forts", "onglet Temps forts");
     await expectVisible(page.getByText("Feed", { exact: true }), "Feed Temps forts");
     await checkGeometry(page, "Feed Temps forts");
+    await clickText(page, "Map", "onglet Map");
+    await expectVisible(page.locator("iframe[title='Carte de découverte Neptune']"), "carte découverte personnes/évènements");
+    await checkGeometry(page, "Map");
+    await clickText(page, "Feed", "retour Feed depuis Map");
+    await expectVisible(page.getByText("Feed", { exact: true }), "Feed restauré depuis Map");
+
     const quickPrompt = page.getByLabel("Écrire une publication rapide", { exact: true });
     await expectVisible(quickPrompt, "création Temps fort dans le Feed");
     if (await quickPrompt.isVisible().catch(() => false)) {
@@ -239,13 +275,6 @@ async function run() {
       await expectVisible(page.getByLabel("Publier maintenant", { exact: true }), "composer rapide Temps fort ouvert");
       await checkGeometry(page, "Composer rapide Temps fort");
     }
-
-    await page.goto(`http://127.0.0.1:${port}/highlights`, { waitUntil: "domcontentloaded" });
-    await clickText(page, "Map", "onglet Map");
-    await expectVisible(page.locator("iframe[title='Carte de découverte Neptune']"), "carte découverte personnes/évènements");
-    await checkGeometry(page, "Map");
-    await clickText(page, "Feed", "retour Feed depuis Map");
-    await expectVisible(page.getByLabel("Écrire une publication rapide", { exact: true }), "création Temps fort après retour Feed");
 
     await clickText(page, "Appels", "onglet Appels");
     await expectVisible(page.getByText("Récents", { exact: true }), "historique appels");
@@ -261,14 +290,16 @@ async function run() {
       const english = page.getByRole("radio").filter({ hasText: "English" }).first();
       if (await english.isVisible().catch(() => false)) {
         await english.click();
-        await expectVisible(page.getByText("Profile", { exact: true }).last(), "navigation traduite en anglais");
-        await expectVisible(page.getByText("Appearance", { exact: true }).last(), "profil traduit en anglais");
+        await page.waitForTimeout(650);
+        await expectAnyVisible(page.getByText("Profile", { exact: true }), "navigation traduite en anglais");
+        await expectAnyVisible(page.getByText("Appearance", { exact: true }), "profil traduit en anglais");
         const reopenLanguage = page.getByLabel("Change Connexio language", { exact: true });
         if (await reopenLanguage.isVisible().catch(() => false)) {
           await reopenLanguage.click();
           const french = page.getByRole("radio").filter({ hasText: "Français" }).first();
           if (await french.isVisible().catch(() => false)) await french.click();
-          await expectVisible(page.getByText("Profil", { exact: true }).last(), "retour interface française");
+          await page.waitForTimeout(450);
+          await expectAnyVisible(page.getByText("Profil", { exact: true }), "retour interface française");
         }
       }
     }
