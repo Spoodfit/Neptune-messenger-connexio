@@ -103,7 +103,7 @@ export function ConversationRow({ conversation, members = [], mentioned = false,
                   memberIds={activeMemberIds}
                   members={members}
                   memberCount={exactMemberCount}
-                  maxVisible={12}
+                  maxVisible={32}
                   size={compact ? 20 : 22}
                   showCount={false}
                   showOverflow={false}
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   time: { ...typography.caption, flexShrink: 0, fontSize: 11 },
   bottomLine: { minWidth: 0, marginTop: 2, flexDirection: "row", alignItems: "center", gap: spacing.sm },
   preview: { ...typography.bodySmall, flex: 1, minWidth: 0, fontSize: 14 },
-  compactPreview: { fontSize: 12, lineHeight: 15 },
+  compactPreview: { fontSize: 14, lineHeight: 18 },
   memberLine: { minHeight: 22, marginTop: 3, flexDirection: "row", alignItems: "center", overflow: "hidden" },
   mentionPill: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   mentionText: { fontSize: 14, fontWeight: "900" },
