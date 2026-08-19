@@ -80,6 +80,8 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
   const openDestinationOnce = (destination: "/new-conversation" | "/new-highlight") => {
     if (navigationLockRef.current) return;
     navigationLockRef.current = true;
+    menuProgress.stopAnimation();
+    menuProgress.setValue(0);
     setMenuOpen(false);
     router.push(destination);
     setTimeout(() => { navigationLockRef.current = false; }, 650);
@@ -98,12 +100,24 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       </View>
 
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickMessage, { opacity: menuProgress, transform: [{ translateY: actionTranslate }, { scale: actionScale }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Nouvelle conversation" onPressIn={() => openDestinationOnce("/new-conversation")} style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Nouvelle conversation"
+          onPressIn={() => openDestinationOnce("/new-conversation")}
+          onPress={() => openDestinationOnce("/new-conversation")}
+          style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}
+        >
           <LinearGradient colors={["#0E5ED7", "#644FEA"]} style={styles.quickGradient}><View style={styles.quickIcon}><Ionicons name="chatbubble-ellipses" size={21} color={colors.white} /></View><Text style={styles.quickLabel}>Conversation</Text></LinearGradient>
         </Pressable>
       </Animated.View>
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickHighlight, { opacity: menuProgress, transform: [{ translateY: actionTranslate }, { scale: actionScale }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Publier un Temps fort" onPressIn={() => openDestinationOnce("/new-highlight")} style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Publier un Temps fort"
+          onPressIn={() => openDestinationOnce("/new-highlight")}
+          onPress={() => openDestinationOnce("/new-highlight")}
+          style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}
+        >
           <LinearGradient colors={["#7B49EA", "#C043C8", "#EA6A8D"]} style={styles.quickGradient}><View style={styles.quickIcon}><Ionicons name="star" size={21} color={colors.white} /></View><Text style={styles.quickLabel}>Temps fort</Text></LinearGradient>
         </Pressable>
       </Animated.View>
