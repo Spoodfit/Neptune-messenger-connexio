@@ -1,6 +1,6 @@
 import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 import type { HighlightKind } from "../types/experience";
@@ -25,13 +25,13 @@ export function HighlightKindSelector({ inferredKind, manualKind, onChange, comp
   return (
     <View style={styles.shell}>
       <View style={styles.detectedLine}>
-        <Ionicons name="sparkles" size={14} color={theme.violet} />
+        <Ionicons name="sparkles" size={15} color={theme.violet} />
         <Text style={[styles.detectedText, { color: theme.pageTextMuted }]}>
           {manualKind ? "Catégorie choisie" : `Détecté automatiquement : ${OPTIONS.find((option) => option.kind === effective)?.label ?? "Temps fort"}`}
         </Text>
         {manualKind ? <Pressable accessibilityRole="button" accessibilityLabel="Revenir à la détection automatique" onPress={() => onChange(null)} style={styles.autoButton}><Text style={[styles.autoText, { color: theme.violet }]}>Auto</Text></Pressable> : null}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.options}>
+      <View style={styles.options}>
         {OPTIONS.map((option) => {
           const active = effective === option.kind;
           return (
@@ -43,24 +43,24 @@ export function HighlightKindSelector({ inferredKind, manualKind, onChange, comp
               onPress={() => onChange(option.kind)}
               style={[styles.option, compact && styles.optionCompact, { borderColor: active ? theme.violet : theme.borderSoft, backgroundColor: active ? theme.violetSoft : theme.surfaceStrong }]}
             >
-              <Ionicons name={option.icon} size={15} color={active ? theme.violet : theme.pageTextMuted} />
-              <Text style={[styles.optionText, { color: active ? theme.pageText : theme.pageTextMuted }]}>{option.label}</Text>
+              <Ionicons name={option.icon} size={16} color={active ? theme.violet : theme.pageTextMuted} />
+              <Text style={[styles.optionText, { color: active ? theme.pageText : theme.pageTextMuted }]} numberOfLines={1}>{option.label}</Text>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: { width: "100%", gap: 5 },
-  detectedLine: { minHeight: 28, flexDirection: "row", alignItems: "center", gap: 6 },
-  detectedText: { flex: 1, fontSize: 12, fontWeight: "700" },
-  autoButton: { minWidth: 48, minHeight: 32, paddingHorizontal: 8, alignItems: "center", justifyContent: "center" },
-  autoText: { fontSize: 12, fontWeight: "900" },
-  options: { gap: 6, paddingRight: 4 },
-  option: { minHeight: 42, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 6 },
-  optionCompact: { minHeight: 38, paddingHorizontal: 9 },
-  optionText: { fontSize: 12, fontWeight: "900" }
+  shell: { width: "100%", gap: 8 },
+  detectedLine: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
+  detectedText: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 19, fontWeight: "700" },
+  autoButton: { minWidth: 48, minHeight: 48, paddingHorizontal: 8, alignItems: "center", justifyContent: "center" },
+  autoText: { fontSize: 14, fontWeight: "900" },
+  options: { width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  option: { flexBasis: "46%", flexGrow: 1, minWidth: 0, minHeight: 48, paddingHorizontal: 11, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  optionCompact: { minHeight: 48, paddingHorizontal: 9 },
+  optionText: { fontSize: 14, fontWeight: "900", flexShrink: 1 }
 });
