@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { readPinnedConversationIds, writePinnedConversationIds } from "./conversationPinPreference";
 import type { Conversation } from "../types/messaging";
 
 let revision = 0;
@@ -6,8 +7,9 @@ const listeners = new Set<() => void>();
 const hiddenAt = new Map<string, number>();
 const removedAt = new Map<string, number>();
 const seenMention = new Map<string, string>();
-const pinnedIds = new Set<string>();
+const pinnedIds = new Set<string>(readPinnedConversationIds());
 const notify = () => { revision += 1; listeners.forEach((listener) => listener()); };
+const persistPins = () => writePinnedConversationIds([...pinnedIds]);
 const latestTimestamp = (conversation: Conversation) => Date.parse(conversation.lastMessageAt ?? "") || 0;
 const signature = (conversation: Conversation) => `${conversation.mentionCount ?? 0}:${conversation.lastMessageAt ?? ""}`;
 
@@ -22,7 +24,8 @@ export function hidePrivateConversation(conversation: Conversation) {
 export function removePrivateConversation(id: string) {
   removedAt.set(id, Date.now());
   hiddenAt.delete(id);
-  pinnedIds.delete(id);
+  const pinRemoved = pinnedIds.delete(id);
+  if (pinRemoved) persistPins();
   notify();
 }
 export function restorePrivateConversation(id: string) {
@@ -50,6 +53,7 @@ export function isConversationMentionSeen(conversation: Conversation) {
 export function toggleConversationPinned(id: string) {
   if (pinnedIds.has(id)) pinnedIds.delete(id);
   else pinnedIds.add(id);
+  persistPins();
   notify();
 }
 export function isConversationPinned(id: string) {
