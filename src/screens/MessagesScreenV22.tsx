@@ -4,15 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  SectionList,
-  StyleSheet,
-  View
-} from "react-native";
+import { ActivityIndicator, FlatList, Modal, Pressable, SectionList, StyleSheet, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
@@ -33,6 +25,7 @@ import { useGroupAdmin } from "@/providers/GroupAdminProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
+import { AppAlert } from "@/services/ui/AppAlert";
 import {
   hidePrivateConversation,
   isConversationMentionSeen,
@@ -44,18 +37,13 @@ import {
   toggleConversationPinned,
   useConversationPresentationRevision
 } from "@/state/conversationPresentation";
-import { AppAlert } from "@/services/ui/AppAlert";
 import { gradients, spacing, typography } from "@/theme";
 import type { ConversationFilter } from "@/types/experience";
 import type { Conversation } from "@/types/messaging";
 
 const MAX_CONTENT_WIDTH = 720;
 
-type GroupSection = {
-  key: ConversationSectionKey;
-  title: string;
-  data: Conversation[];
-};
+type GroupSection = { key: ConversationSectionKey; title: string; data: Conversation[] };
 
 function matchesMention(conversation: Conversation, aliases: string[]): boolean {
   if ((conversation.mentionCount ?? 0) > 0) return true;
@@ -70,6 +58,7 @@ export default function MessagesScreenV22() {
   const { createdGroups, removeCreatedGroup } = useGroupAdmin();
   const { currentUser } = useSession();
   useConversationPresentationRevision();
+
   const [filter, setFilter] = useState<ConversationFilter>("groups");
   const [query, setQuery] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -120,12 +109,13 @@ export default function MessagesScreenV22() {
     const unpinned = groups.filter((conversation) => !isConversationPinned(conversation.id));
     const section = (key: Exclude<ConversationSectionKey, "pinned">): Conversation[] =>
       sortConversationsByPriority(unpinned.filter((conversation) => groupSectionForConversation(conversation) === key), isConversationPinned);
-    return [
+    const sections: GroupSection[] = [
       { key: "pinned", title: GROUP_SECTION_LABELS.pinned, data: pinned },
       { key: "clubs", title: GROUP_SECTION_LABELS.clubs, data: section("clubs") },
       { key: "management", title: GROUP_SECTION_LABELS.management, data: section("management") },
       { key: "general", title: GROUP_SECTION_LABELS.general, data: section("general") }
-    ].filter((item) => item.data.length > 0);
+    ];
+    return sections.filter((item) => item.data.length > 0);
   }, [allConversations, query]);
 
   const visibleGroupCount = useMemo(
@@ -134,6 +124,7 @@ export default function MessagesScreenV22() {
   );
 
   const closeMenu = () => setSelectedConversation(null);
+
   const openConversation = async (conversation: Conversation) => {
     try {
       if (conversation.left) {
@@ -148,6 +139,7 @@ export default function MessagesScreenV22() {
       AppAlert.alert("Impossible de rejoindre le groupe", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     }
   };
+
   const openDetails = () => {
     if (!selectedConversation) return;
     const route = isPrivateConversationKind(selectedConversation)
@@ -156,22 +148,26 @@ export default function MessagesScreenV22() {
     closeMenu();
     router.push(route);
   };
+
   const toggleMute = () => {
     if (!selectedConversation) return;
     toggleConversationMuted(selectedConversation.id);
     setSelectedConversation({ ...selectedConversation, muted: !selectedConversation.muted });
   };
+
   const togglePin = () => {
     if (!selectedConversation || isAnnouncementConversation(selectedConversation)) return;
     toggleConversationPinned(selectedConversation.id);
     closeMenu();
   };
+
   const leaveSelectedGroup = () => {
     if (!selectedConversation) return;
     if (selectedConversation.id.startsWith("local-group-")) removeCreatedGroup(selectedConversation.id);
     else leaveConversation(selectedConversation.id);
     closeMenu();
   };
+
   const joinSelectedGroup = async () => {
     if (!selectedConversation) return;
     const id = selectedConversation.id;
@@ -184,11 +180,13 @@ export default function MessagesScreenV22() {
       AppAlert.alert("Impossible de rejoindre le groupe", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     }
   };
+
   const deletePrivateConversation = () => {
     if (!deleteCandidate) return;
     removePrivateConversation(deleteCandidate.id);
     setDeleteCandidate(null);
   };
+
   const toggleSection = (key: ConversationSectionKey) => {
     setCollapsedSections((previous) => {
       const next = new Set(previous);
@@ -337,36 +335,36 @@ export default function MessagesScreenV22() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  toolbar: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", paddingHorizontal: 10, paddingTop: 8, gap: 7 },
-  segmented: { height: 50, padding: 3, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" },
-  segmentButton: { flex: 1, height: 42, borderRadius: 12, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  toolbar: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", paddingHorizontal: 10, paddingTop: 8, gap: 8 },
+  segmented: { minHeight: 56, padding: 4, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" },
+  segmentButton: { flex: 1, minHeight: 48, borderRadius: 12, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   segmentText: { fontSize: 14, fontWeight: "800" },
-  searchShell: { minHeight: 48, borderRadius: 16, borderWidth: 1, paddingLeft: 13, flexDirection: "row", alignItems: "center", gap: 8 },
-  searchInput: { flex: 1, minWidth: 0, minHeight: 46, fontSize: 16, paddingVertical: 9 },
+  searchShell: { minHeight: 50, borderRadius: 16, borderWidth: 1, paddingLeft: 13, flexDirection: "row", alignItems: "center", gap: 8 },
+  searchInput: { flex: 1, minWidth: 0, minHeight: 48, fontSize: 16, paddingVertical: 9 },
   clearSearch: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   listViewport: { flex: 1, minHeight: 0, width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center" },
   list: { paddingHorizontal: 10, paddingBottom: 18 },
   emptyList: { flexGrow: 1 },
   announcementWrap: { paddingTop: 8, paddingBottom: 3 },
-  announcementCollapsed: { minHeight: 56, borderRadius: 18, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
-  announcementIcon: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  announcementCollapsed: { minHeight: 58, borderRadius: 18, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  announcementIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   announcementCopy: { flex: 1, minWidth: 0 },
   announcementTitle: { fontSize: 14, fontWeight: "900" },
-  announcementPreview: { marginTop: 2, fontSize: 12 },
-  sectionHeader: { minHeight: 42, paddingHorizontal: 4, paddingTop: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  announcementPreview: { marginTop: 2, fontSize: 14, lineHeight: 18 },
+  sectionHeader: { minHeight: 48, paddingHorizontal: 4, paddingVertical: 6, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   sectionIdentity: { flexDirection: "row", alignItems: "center", gap: 8 },
   sectionTitle: { ...typography.heading3, fontSize: 15, fontWeight: "900" },
   sectionCount: { minWidth: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
   sectionCountText: { fontSize: 11, fontWeight: "900" },
-  privateHint: { minHeight: 34, paddingVertical: 8, fontSize: 12, fontWeight: "700" },
-  footerCount: { textAlign: "center", fontSize: 11, paddingVertical: 10 },
+  privateHint: { minHeight: 40, paddingVertical: 9, fontSize: 14, lineHeight: 18, fontWeight: "700" },
+  footerCount: { textAlign: "center", fontSize: 12, paddingVertical: 10 },
   feedbackWrap: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", flex: 1, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center" },
   feedback: { width: "100%", maxWidth: 430, padding: spacing.lg, borderRadius: 24, borderWidth: 1, alignItems: "center", gap: spacing.sm },
   feedbackTitle: { ...typography.heading3, textAlign: "center" },
   feedbackText: { ...typography.body, textAlign: "center" },
   emptyState: { flex: 1, minHeight: 220, alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: spacing.lg },
   emptyHeading: { ...typography.heading3, textAlign: "center" },
-  emptyText: { ...typography.bodySmall, textAlign: "center" },
+  emptyText: { ...typography.bodySmall, fontSize: 14, lineHeight: 19, textAlign: "center" },
   retryButton: { minWidth: 120, minHeight: 48, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#5F52E8" },
   retryText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
   modalBackdrop: { flex: 1, justifyContent: "flex-end", padding: 10 },
@@ -374,7 +372,7 @@ const styles = StyleSheet.create({
   sheetHandle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", opacity: 0.4, marginBottom: 4 },
   closeButton: { position: "absolute", right: 10, top: 10, width: 48, height: 48, borderRadius: 15, alignItems: "center", justifyContent: "center" },
   sheetTitle: { ...typography.heading2, paddingRight: 52, marginTop: 7 },
-  sheetSubtitle: { fontSize: 12, marginBottom: 7 },
+  sheetSubtitle: { fontSize: 14, marginBottom: 7 },
   sheetAction: { minHeight: 52, borderRadius: 15, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 12 },
   sheetActionText: { fontSize: 14, fontWeight: "800", flex: 1 }
 });
