@@ -18,8 +18,8 @@ async function waitRoute(page, suffix, label) {
   check(pathOf(page).endsWith(suffix), label, `route obtenue: ${pathOf(page)}`);
 }
 
-async function selectedTabVisible(page, name) {
-  const tabs = page.getByRole("tab", { name, exact: true });
+async function selectedTabVisible(page, namePattern) {
+  const tabs = page.getByRole("tab", { name: namePattern });
   const count = await tabs.count();
   for (let index = count - 1; index >= 0; index -= 1) {
     const tab = tabs.nth(index);
@@ -70,13 +70,13 @@ async function run() {
     check(await quickComposerFromMessages.isVisible(), "Bouton + : composer rapide ouvert");
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
-    await page.getByRole("tab", { name: "Privées", exact: true }).click();
+    await page.getByRole("tab", { name: /Privées/ }).click();
     await page.getByPlaceholder("Rechercher une conversation…").waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-    check(await selectedTabVisible(page, "Privées"), "Onglet Privées actif");
+    check(await selectedTabVisible(page, /Privées/), "Onglet Privées actif");
     check(await page.getByPlaceholder("Rechercher une conversation…").isVisible(), "Recherche discussions privées visible");
-    await page.getByRole("tab", { name: "Groupes", exact: true }).click();
+    await page.getByRole("tab", { name: /Groupes/ }).click();
     await page.getByPlaceholder("Rechercher un club ou un groupe…").waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-    check(await selectedTabVisible(page, "Groupes"), "Onglet Groupes actif");
+    check(await selectedTabVisible(page, /Groupes/), "Onglet Groupes actif");
     check(await page.getByPlaceholder("Rechercher un club ou un groupe…").isVisible(), "Recherche groupes visible");
     check((await page.getByText("Clubs", { exact: true }).count()) > 0, "Organisation Clubs visible");
 
