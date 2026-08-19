@@ -68,11 +68,11 @@ export interface HighlightComment {
   author: AppUser;
   body: string;
   createdAt: string;
+  updatedAt?: string;
   parentCommentId?: string;
   mentionedUserIds?: string[];
   reactions: HighlightReactionSummary[];
   sourceLanguage?: string;
-  /** Champs traduisibles: body. */
   translation?: ContentTranslation;
 }
 
@@ -91,6 +91,7 @@ export interface HighlightPost {
   kind: HighlightKind;
   body: string;
   createdAt: string;
+  updatedAt?: string;
   media?: HighlightMedia;
   mentionedUserIds?: string[];
   reactions: HighlightReactionSummary[];
@@ -107,7 +108,6 @@ export interface HighlightPost {
   syncedWithAdvantagesCommittee?: boolean;
   syncState?: "local" | "queued" | "synced" | "failed";
   sourceLanguage?: string;
-  /** Champs traduisibles: body. Les noms/lieux restent canoniques. */
   translation?: ContentTranslation;
 }
 
