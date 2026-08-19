@@ -15,7 +15,7 @@ import type { Conversation } from "../src/types/messaging";
 function post(id: string, kind: HighlightPost["kind"], body: string, reactions = 0, comments = 0, shares = 0): HighlightPost {
   return {
     id,
-    author: { id: "me", name: "Test", initials: "T", company: "Neptune", city: "Carcassonne", role: "moussaillon", online: true },
+    author: { id: "me", name: "Test", initials: "T", company: "Neptune", city: "Carcassonne", role: "moussaillon", roleLabel: "Moussaillon", online: true },
     kind,
     body,
     createdAt: `2026-08-19T10:${id.padStart(2, "0")}:00.000Z`,
@@ -23,7 +23,7 @@ function post(id: string, kind: HighlightPost["kind"], body: string, reactions =
     comments: Array.from({ length: comments }, (_, index) => ({
       id: `${id}-c${index}`,
       postId: id,
-      author: { id: `u${index}`, name: `U${index}`, initials: "U", company: "N", city: "C", role: "moussaillon", online: false },
+      author: { id: `u${index}`, name: `U${index}`, initials: "U", company: "N", city: "C", role: "moussaillon", roleLabel: "Moussaillon", online: false },
       body: "Commentaire",
       createdAt: "2026-08-19T10:00:00.000Z",
       reactions: []
