@@ -1,13 +1,13 @@
 import type { Conversation } from "../types/messaging";
 
-export type ConversationSectionKey = "pinned" | "clubs" | "management" | "general";
+export type ConversationSectionKey = string;
 
-export const GROUP_SECTION_LABELS: Record<ConversationSectionKey, string> = {
+export const GROUP_SECTION_LABELS = {
   pinned: "Épinglés",
   clubs: "Clubs",
   management: "Gestion",
   general: "Généraux"
-};
+} as const;
 
 export function isPrivateConversationKind(conversation: Conversation): boolean {
   return conversation.type === "direct" || conversation.type === "small_group";
@@ -18,7 +18,7 @@ export function isAnnouncementConversation(conversation: Conversation): boolean 
   return conversation.type === "announcement" || normalized === "annonce" || normalized === "annonces";
 }
 
-export function groupSectionForConversation(conversation: Conversation): Exclude<ConversationSectionKey, "pinned"> {
+export function groupSectionForConversation(conversation: Conversation): "clubs" | "management" | "general" {
   if (conversation.type === "city") return "clubs";
   if (conversation.type === "role") return "management";
   return "general";
