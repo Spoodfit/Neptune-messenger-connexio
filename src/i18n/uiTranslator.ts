@@ -9,11 +9,14 @@ import { translateUiTextV18 } from "./uiTranslationsV18";
 import { translateUiTextV19 } from "./uiTranslationsV19";
 import { translateUiTextV19B } from "./uiTranslationsV19b";
 import { translateUiTextV20 } from "./uiTranslationsV20";
+import { translateUiTextV22 } from "./uiTranslationsV22";
 
 export function translateConnexioUiText(value: string, language: SupportedLanguage | string): string {
   if (!value || language === "fr") return value;
   const dynamic = translateConnexioUiPattern(value, language);
   if (dynamic !== value) return dynamic;
+  const v22 = translateUiTextV22(value, language);
+  if (v22 !== value) return v22;
   const v20 = translateUiTextV20(value, language);
   if (v20 !== value) return v20;
   const v19b = translateUiTextV19B(value, language);
