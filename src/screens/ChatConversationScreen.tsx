@@ -533,7 +533,7 @@ const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
   pendingAttachments: { gap: 8, paddingTop: 4 },
   pendingChip: { maxWidth: 230, minHeight: 34, paddingHorizontal: 9, borderRadius: 12, backgroundColor: theme.surface, flexDirection: "row", alignItems: "center", gap: 8 },
   pendingText: { color: theme.pageTextSecondary, fontSize: 11, flexShrink: 1 },
-  composer: { flexDirection: "row", alignItems: "flex-end", gap: 6 },
+  composer: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   attachButton: { width: 48, height: 48, borderRadius: 17, backgroundColor: theme.surfaceStrong, borderWidth: 1, borderColor: theme.borderSoft, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   input: { flex: 1, minWidth: 72, minHeight: 48, maxHeight: 122, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 20, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, color: theme.pageText, ...typography.bodySmall, fontSize: 16, lineHeight: 22 },
   sendButton: { width: 48, height: 48, borderRadius: 17, overflow: "hidden", flexShrink: 0 },
