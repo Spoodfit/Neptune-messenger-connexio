@@ -232,7 +232,7 @@ export default function MessagesScreenV22() {
 
   return (
     <LinearGradient colors={theme.pageGradient} style={styles.screen}>
-      <BrandHeader title="Messages" subtitle="Retrouvez rapidement la bonne conversation." />
+      <BrandHeader title="Messages" subtitle={filter === "private" ? "Discussions privées" : "Discussions de groupe"} />
       <View style={styles.toolbar}>
         <View accessibilityRole="tablist" style={[styles.segmented, { borderColor: theme.borderSoft, backgroundColor: theme.surface }]}>
           {(["groups", "private"] as const).map((value) => {
