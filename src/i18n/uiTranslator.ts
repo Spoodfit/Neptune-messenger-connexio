@@ -1,5 +1,6 @@
 import type { SupportedLanguage } from "./languages";
 import { translateConnexioUiPattern } from "./uiPatterns";
+import { translateCoworkingUiPattern } from "./uiPatternsV23";
 import { translateUiText as translateUiTextCore } from "./uiTranslations";
 import { translateUiTextV17 } from "./uiTranslationsV17";
 import { translateUiTextV17B } from "./uiTranslationsV17b";
@@ -10,11 +11,16 @@ import { translateUiTextV19 } from "./uiTranslationsV19";
 import { translateUiTextV19B } from "./uiTranslationsV19b";
 import { translateUiTextV20 } from "./uiTranslationsV20";
 import { translateUiTextV22 } from "./uiTranslationsV22";
+import { translateUiTextV23 } from "./uiTranslationsV23";
 
 export function translateConnexioUiText(value: string, language: SupportedLanguage | string): string {
   if (!value || language === "fr") return value;
   const dynamic = translateConnexioUiPattern(value, language);
   if (dynamic !== value) return dynamic;
+  const coworkingDynamic = translateCoworkingUiPattern(value, language);
+  if (coworkingDynamic !== value) return coworkingDynamic;
+  const v23 = translateUiTextV23(value, language);
+  if (v23 !== value) return v23;
   const v22 = translateUiTextV22(value, language);
   if (v22 !== value) return v22;
   const v20 = translateUiTextV20(value, language);

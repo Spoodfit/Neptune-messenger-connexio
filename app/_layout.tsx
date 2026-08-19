@@ -7,6 +7,7 @@ import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-c
 
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
+import { CoworkingProvider } from "../src/providers/CoworkingProvider";
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
 import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
 import { LanguageProvider, useAppLanguage } from "../src/providers/LanguageProvider";
@@ -155,7 +156,7 @@ function AuthenticatedApp() {
   }
   if (onUnavailableMessagingRoute || onUnavailableCallRoute) return <Redirect href="/(tabs)/highlights" />;
 
-  return <MessagingProvider key={`user:${currentUser.id}`}><GroupAdminProvider><ExperienceProvider><ScheduledCallsProvider>{applicationStack}</ScheduledCallsProvider></ExperienceProvider></GroupAdminProvider></MessagingProvider>;
+  return <MessagingProvider key={`user:${currentUser.id}`}><GroupAdminProvider><ExperienceProvider><ScheduledCallsProvider><CoworkingProvider>{applicationStack}</CoworkingProvider></ScheduledCallsProvider></ExperienceProvider></GroupAdminProvider></MessagingProvider>;
 }
 
 /**

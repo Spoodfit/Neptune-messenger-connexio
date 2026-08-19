@@ -234,17 +234,23 @@ export default function MessagesScreenV22() {
     <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <BrandHeader title="Messages" subtitle={filter === "private" ? "Discussions privées" : "Discussions de groupe"} />
       <View style={styles.toolbar}>
-        <View accessibilityRole="tablist" style={[styles.segmented, { borderColor: theme.borderSoft, backgroundColor: theme.surface }]}>
-          {(["groups", "private"] as const).map((value) => {
-            const active = filter === value;
-            return (
-              <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={() => setFilter(value)} style={styles.segmentButton}>
-                {active ? <LinearGradient colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab} style={StyleSheet.absoluteFill} /> : null}
-                <Ionicons name={value === "groups" ? "people" : "chatbubble-ellipses"} size={17} color={active ? theme.pageText : theme.pageTextMuted} />
-                <Text style={[styles.segmentText, { color: active ? theme.pageText : theme.pageTextMuted }]}>{value === "groups" ? "Groupes" : "Privées"}</Text>
-              </Pressable>
-            );
-          })}
+        <View style={styles.segmentRow}>
+          <View accessibilityRole="tablist" style={[styles.segmented, { borderColor: theme.borderSoft, backgroundColor: theme.surface }]}>
+            {(["groups", "private"] as const).map((value) => {
+              const active = filter === value;
+              return (
+                <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={() => setFilter(value)} style={styles.segmentButton}>
+                  {active ? <LinearGradient colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab} style={StyleSheet.absoluteFill} /> : null}
+                  <Ionicons name={value === "groups" ? "people" : "chatbubble-ellipses"} size={17} color={active ? theme.pageText : theme.pageTextMuted} />
+                  <Text style={[styles.segmentText, { color: active ? theme.pageText : theme.pageTextMuted }]}>{value === "groups" ? "Groupes" : "Privées"}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Nouvelle conversation" onPress={() => router.push("/new-conversation")} style={({ pressed }) => [styles.newConversationButton, { borderColor: theme.borderSoft, backgroundColor: theme.surface }, pressed && styles.newConversationPressed]}>
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color={theme.violet} />
+            <View style={[styles.newConversationBadge, { backgroundColor: theme.violet }]}><Ionicons name="add" size={11} color="#FFFFFF" /></View>
+          </Pressable>
         </View>
         <View style={[styles.searchShell, { borderColor: theme.borderSoft, backgroundColor: theme.surface }]}>
           <Ionicons name="search" size={18} color={theme.pageTextMuted} />
@@ -274,7 +280,7 @@ export default function MessagesScreenV22() {
           onRefresh={() => void refreshConversations()}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={privateConversations.some((item) => isConversationPinned(item.id)) ? <Text style={[styles.privateHint, { color: theme.pageTextMuted }]}>Les conversations épinglées restent en tête.</Text> : null}
-          ListEmptyComponent={<View style={styles.emptyState}><Ionicons name="chatbubbles-outline" size={34} color={theme.pageTextMuted} /><Text style={[styles.emptyHeading, { color: theme.pageText }]}>Aucune discussion privée</Text><Text style={[styles.emptyText, { color: theme.pageTextMuted }]}>Utilisez le bouton + pour démarrer une conversation.</Text></View>}
+          ListEmptyComponent={<View style={styles.emptyState}><Ionicons name="chatbubbles-outline" size={34} color={theme.pageTextMuted} /><Text style={[styles.emptyHeading, { color: theme.pageText }]}>Aucune discussion privée</Text><Text style={[styles.emptyText, { color: theme.pageTextMuted }]}>Créez une nouvelle conversation pour démarrer un échange.</Text></View>}
         />
       ) : (
         <SectionList
@@ -336,9 +342,13 @@ export default function MessagesScreenV22() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   toolbar: { width: "100%", maxWidth: MAX_CONTENT_WIDTH, alignSelf: "center", paddingHorizontal: 10, paddingTop: 8, gap: 8 },
-  segmented: { minHeight: 56, padding: 4, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" },
+  segmentRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
+  segmented: { flex: 1, minHeight: 56, padding: 4, borderRadius: 16, borderWidth: 1, flexDirection: "row", overflow: "hidden" },
   segmentButton: { flex: 1, minHeight: 48, borderRadius: 12, overflow: "hidden", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   segmentText: { fontSize: 14, fontWeight: "800" },
+  newConversationButton: { width: 56, minHeight: 56, borderRadius: 16, borderWidth: 1, alignItems: "center", justifyContent: "center", position: "relative" },
+  newConversationPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
+  newConversationBadge: { position: "absolute", right: 8, top: 8, width: 17, height: 17, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#FFFFFF" },
   searchShell: { minHeight: 50, borderRadius: 16, borderWidth: 1, paddingLeft: 13, flexDirection: "row", alignItems: "center", gap: 8 },
   searchInput: { flex: 1, minWidth: 0, minHeight: 48, fontSize: 16, paddingVertical: 9 },
   clearSearch: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },

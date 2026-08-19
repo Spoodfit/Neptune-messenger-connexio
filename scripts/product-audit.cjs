@@ -22,7 +22,7 @@ function mime(file) {
     ".html": "text/html; charset=utf-8",
     ".js": "application/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
-    ".json": "application/json",
+    ".json": "application/json; charset=utf-8",
     ".png": "image/png",
     ".svg": "image/svg+xml",
     ".woff2": "font/woff2"
@@ -118,15 +118,6 @@ async function resetToMessages(page) {
   await expectVisible(page.getByText("Messages", { exact: true }).first(), "retour propre aux Messages");
 }
 
-async function openQuickCreate(page) {
-  const create = page.getByLabel("Créer", { exact: true });
-  await expectVisible(create, "bouton + central");
-  if (await create.isVisible().catch(() => false)) {
-    await create.click();
-    await page.waitForTimeout(180);
-  }
-}
-
 async function checkSignInContrast(page) {
   const result = await page.evaluate(() => {
     const heading = [...document.querySelectorAll("h1,h2,[role='heading'],div")].find((element) => element.textContent?.trim() === "Se connecter avec Neptune");
@@ -171,6 +162,11 @@ async function run() {
       await page.waitForTimeout(800);
       await expectVisible(page.getByText("Messages", { exact: true }).first(), `${width}x${height} Messages`);
       await checkGeometry(page, `${width}x${height} Messages`);
+
+      await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForTimeout(500);
+      await expectVisible(page.getByText("Hub Neptune", { exact: true }).first(), `${width}x${height} Coworking`);
+      await checkGeometry(page, `${width}x${height} Coworking observer`);
       if (pageErrors.length) failures.push(`${width}x${height}: erreurs runtime: ${pageErrors.slice(0, 3).join(" | ")}`);
       await page.close();
     }
@@ -183,7 +179,7 @@ async function run() {
     await page.waitForTimeout(800);
 
     await clickText(page, "Privées", "onglet Privées");
-    await expectVisible(page.getByPlaceholder("Rechercher une conversation…"), "état discussions privées");
+    await expectVisible(page.getByText("Discussions privées", { exact: true }), "titre discussions privées");
     await checkGeometry(page, "Messages privés");
     await clickText(page, "Groupes", "onglet Groupes");
 
@@ -200,9 +196,8 @@ async function run() {
     } else failures.push("maintien long: aucune conversation de groupe visible");
 
     await resetToMessages(page);
-    await openQuickCreate(page);
-    const newConversationAction = page.getByLabel("Nouvelle conversation", { exact: true }).last();
-    await expectVisible(newConversationAction, "action nouvelle conversation");
+    const newConversationAction = page.getByLabel("Nouvelle conversation", { exact: true }).first();
+    await expectVisible(newConversationAction, "action nouvelle conversation déplacée dans Messages");
     if (await newConversationAction.isVisible().catch(() => false)) {
       await newConversationAction.click();
       await expectVisible(page.getByText("Nouvelle conversation", { exact: true }), "écran nouvelle conversation");
@@ -211,23 +206,46 @@ async function run() {
       if (await closeCreation.isVisible().catch(() => false)) await closeCreation.click();
     }
 
-    await clickText(page, "Temps forts", "onglet Temps forts");
+    // Coworking V23 : observer -> entrer -> revenir sans quitter -> quitter.
+    await resetToMessages(page);
+    const portal = page.getByRole("button", { name: /Coworking/ }).first();
+    await expectVisible(portal, "portail Coworking central");
+    if (await portal.isVisible().catch(() => false)) await portal.click();
+    await expectVisible(page.getByText("Hub Neptune", { exact: true }).first(), "Hub Neptune observer");
+    await expectVisible(page.getByText("Espaces en cours", { exact: true }), "rooms Coworking visibles");
+    await checkGeometry(page, "Coworking observer");
+    const enterHub = page.getByLabel("Entrer dans le Hub Neptune", { exact: true });
+    await expectVisible(enterHub, "entrée Hub Neptune");
+    if (await enterHub.isVisible().catch(() => false)) {
+      await enterHub.click();
+      await expectVisible(page.getByLabel("Activer le micro", { exact: true }), "Hub micro coupé à l’entrée");
+      await expectVisible(page.getByLabel("Couper la caméra", { exact: true }), "Hub contrôle caméra");
+      await checkGeometry(page, "Coworking Hub");
+      const backWithoutLeaving = page.getByLabel("Retour au Coworking sans quitter", { exact: true });
+      if (await backWithoutLeaving.isVisible().catch(() => false)) await backWithoutLeaving.click();
+      await expectVisible(page.getByText("Touchez pour revenir", { exact: true }), "présence Coworking conservée dans le lobby");
+      const leaveCoworking = page.getByLabel("Quitter le Coworking", { exact: true }).last();
+      if (await leaveCoworking.isVisible().catch(() => false)) await leaveCoworking.click();
+      await expectVisible(page.getByLabel("Entrer dans le Hub Neptune", { exact: true }), "sortie Coworking explicite");
+    }
+
+    await page.goto(`http://127.0.0.1:${port}/highlights`, { waitUntil: "domcontentloaded" });
     await expectVisible(page.getByText("Feed", { exact: true }), "Feed Temps forts");
     await checkGeometry(page, "Feed Temps forts");
-    await clickText(page, "Map", "onglet Map");
-    await expectVisible(page.locator("iframe[title='Carte de découverte Neptune']"), "carte découverte personnes/évènements");
-    await checkGeometry(page, "Map");
-
-    await resetToMessages(page);
-    await openQuickCreate(page);
-    const createHighlight = page.getByLabel("Publier un Temps fort", { exact: true }).last();
-    await expectVisible(createHighlight, "action publier Temps fort");
-    if (await createHighlight.isVisible().catch(() => false)) {
-      await createHighlight.click();
-      await expectVisible(page.getByText("Feed", { exact: true }).first(), "retour direct au Feed Temps forts");
+    const quickPrompt = page.getByLabel("Écrire une publication rapide", { exact: true });
+    await expectVisible(quickPrompt, "création Temps fort dans le Feed");
+    if (await quickPrompt.isVisible().catch(() => false)) {
+      await quickPrompt.click();
       await expectVisible(page.getByLabel("Publier maintenant", { exact: true }), "composer rapide Temps fort ouvert");
       await checkGeometry(page, "Composer rapide Temps fort");
     }
+
+    await page.goto(`http://127.0.0.1:${port}/highlights`, { waitUntil: "domcontentloaded" });
+    await clickText(page, "Map", "onglet Map");
+    await expectVisible(page.locator("iframe[title='Carte de découverte Neptune']"), "carte découverte personnes/évènements");
+    await checkGeometry(page, "Map");
+    await clickText(page, "Feed", "retour Feed depuis Map");
+    await expectVisible(page.getByLabel("Écrire une publication rapide", { exact: true }), "création Temps fort après retour Feed");
 
     await clickText(page, "Appels", "onglet Appels");
     await expectVisible(page.getByText("Récents", { exact: true }), "historique appels");
@@ -283,7 +301,7 @@ async function run() {
     failures.forEach((failure) => console.error(`- ${failure}`));
     process.exit(1);
   }
-  console.log("Product audit Connexio validé.");
+  console.log("Product audit Connexio V23 validé : Coworking, Messages, Temps forts, Appels, Profil, langues et géométrie responsive.");
 }
 
 run().catch((error) => {
