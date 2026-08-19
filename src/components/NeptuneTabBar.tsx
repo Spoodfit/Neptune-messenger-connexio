@@ -1,19 +1,9 @@
 import { Text } from "@/components/LocalizedText";
-import {
-  Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router,
-  Tabs } from "expo-router";
-import { useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentProps } from "react";
-import { Animated,
-  Pressable,
-  StyleSheet,
-  View
-} from "react-native";
+import { router, Tabs } from "expo-router";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { capabilitiesForBackendContract } from "@/config/backendCapabilities";
@@ -38,14 +28,24 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
   const reducedMotion = useReducedMotion();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuProgress = useRef(new Animated.Value(0)).current;
+  const navigationLockRef = useRef(false);
   const currentKey = state.routes[state.index]?.key;
   const routesByName = useMemo(() => new Map(state.routes.map((route) => [route.name, route])), [state.routes]);
   const leftRoutes = [routesByName.get("messages"), routesByName.get("highlights")].filter(Boolean) as typeof state.routes;
   const rightRoutes = [CALLS_AVAILABLE ? routesByName.get("calls") : undefined, routesByName.get("settings")].filter(Boolean) as typeof state.routes;
 
   useEffect(() => {
-    if (reducedMotion) { menuProgress.setValue(menuOpen ? 1 : 0); return; }
-    Animated.spring(menuProgress, { toValue: menuOpen ? 1 : 0, useNativeDriver: true, damping: 18, stiffness: 220, mass: 0.72 }).start();
+    if (reducedMotion) {
+      menuProgress.setValue(menuOpen ? 1 : 0);
+      return;
+    }
+    Animated.spring(menuProgress, {
+      toValue: menuOpen ? 1 : 0,
+      useNativeDriver: true,
+      damping: 18,
+      stiffness: 220,
+      mass: 0.72
+    }).start();
   }, [menuOpen, menuProgress, reducedMotion]);
 
   const renderRoute = (route: (typeof state.routes)[number]) => {
@@ -77,11 +77,16 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
     );
   };
 
-  const openNewConversation = () => { setMenuOpen(false); requestAnimationFrame(() => router.push("/new-conversation")); };
-  const openNewHighlight = () => {
+  const openDestinationOnce = (destination: "/new-conversation" | "/new-highlight") => {
+    if (navigationLockRef.current) return;
+    navigationLockRef.current = true;
+    menuProgress.stopAnimation();
+    menuProgress.setValue(0);
     setMenuOpen(false);
-    requestAnimationFrame(() => router.push("/new-highlight"));
+    router.push(destination);
+    setTimeout(() => { navigationLockRef.current = false; }, 650);
   };
+
   const actionTranslate = menuProgress.interpolate({ inputRange: [0, 1], outputRange: [26, -74] });
   const actionScale = menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
 
@@ -95,12 +100,24 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
       </View>
 
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickMessage, { opacity: menuProgress, transform: [{ translateY: actionTranslate }, { scale: actionScale }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Nouvelle conversation" onPress={openNewConversation} style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Nouvelle conversation"
+          onPressIn={() => openDestinationOnce("/new-conversation")}
+          onPress={() => openDestinationOnce("/new-conversation")}
+          style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}
+        >
           <LinearGradient colors={["#0E5ED7", "#644FEA"]} style={styles.quickGradient}><View style={styles.quickIcon}><Ionicons name="chatbubble-ellipses" size={21} color={colors.white} /></View><Text style={styles.quickLabel}>Conversation</Text></LinearGradient>
         </Pressable>
       </Animated.View>
       <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.quickAction, styles.quickHighlight, { opacity: menuProgress, transform: [{ translateY: actionTranslate }, { scale: actionScale }] }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Publier un Temps fort" onPress={openNewHighlight} style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Publier un Temps fort"
+          onPressIn={() => openDestinationOnce("/new-highlight")}
+          onPress={() => openDestinationOnce("/new-highlight")}
+          style={({ pressed }) => [styles.quickPressable, pressed && styles.quickPressed]}
+        >
           <LinearGradient colors={["#7B49EA", "#C043C8", "#EA6A8D"]} style={styles.quickGradient}><View style={styles.quickIcon}><Ionicons name="star" size={21} color={colors.white} /></View><Text style={styles.quickLabel}>Temps fort</Text></LinearGradient>
         </Pressable>
       </Animated.View>
@@ -118,9 +135,25 @@ const styles = StyleSheet.create({
   outer: { paddingHorizontal: 8, paddingTop: 4, position: "relative", zIndex: 1000, elevation: 40 },
   dismissLayer: { position: "absolute", left: -20, right: -20, top: -220, bottom: 82, zIndex: 1000 },
   bar: { height: 72, padding: 5, overflow: "hidden", position: "relative", borderRadius: radii.xl, borderWidth: 1, flexDirection: "row", alignItems: "stretch", elevation: 42, zIndex: 1002, shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
-  sideGroup: { flex: 1, minWidth: 0, height: "100%", flexDirection: "row", alignItems: "stretch" }, centerSlot: { width: 52, flexShrink: 0 },
-  item: { flex: 1, minWidth: 0, height: "100%", borderRadius: 17, alignItems: "center", justifyContent: "center", gap: 5, overflow: "hidden", position: "relative" }, activePill: { position: "absolute", left: 1, right: 1, top: 1, bottom: 1, borderRadius: 16, borderWidth: 1 }, pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] }, iconWrap: { position: "relative", width: 28, alignItems: "center" }, label: { maxWidth: "100%", fontSize: 11, lineHeight: 13, fontWeight: "800" },
-  badge: { position: "absolute", right: -13, top: -8, minWidth: 21, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.magenta, borderWidth: 2 }, badgeText: { color: colors.white, fontSize: 11, fontWeight: "900" },
-  createShell: { position: "absolute", left: "50%", marginLeft: -29, top: -11, width: 58, height: 58, borderRadius: 29, padding: 4, zIndex: 1020, elevation: 50 }, createPressable: { flex: 1, borderRadius: 25 }, createPressed: { opacity: 0.86 }, createGradient: { flex: 1, borderRadius: 25, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
-  quickAction: { position: "absolute", top: 0, zIndex: 1010, width: 124, height: 56, borderRadius: 20, elevation: 48, shadowColor: "#000", shadowOpacity: 0.32, shadowRadius: 20, shadowOffset: { width: 0, height: 10 } }, quickMessage: { left: "50%", marginLeft: -128 }, quickHighlight: { left: "50%", marginLeft: 4 }, quickPressable: { flex: 1, borderRadius: 20, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.32)" }, quickPressed: { opacity: 0.86, transform: [{ scale: 0.97 }] }, quickGradient: { flex: 1, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }, quickIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(2,7,19,0.26)", alignItems: "center", justifyContent: "center" }, quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900", textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 4 }
+  sideGroup: { flex: 1, minWidth: 0, height: "100%", flexDirection: "row", alignItems: "stretch" },
+  centerSlot: { width: 60, flexShrink: 0 },
+  item: { flex: 1, minWidth: 0, height: "100%", borderRadius: 17, alignItems: "center", justifyContent: "center", gap: 5, overflow: "hidden", position: "relative" },
+  activePill: { position: "absolute", left: 1, right: 1, top: 1, bottom: 1, borderRadius: 16, borderWidth: 1 },
+  pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
+  iconWrap: { position: "relative", width: 28, alignItems: "center" },
+  label: { maxWidth: "100%", fontSize: 11, lineHeight: 13, fontWeight: "800" },
+  badge: { position: "absolute", right: -13, top: -8, minWidth: 21, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.magenta, borderWidth: 2 },
+  badgeText: { color: colors.white, fontSize: 11, fontWeight: "900" },
+  createShell: { position: "absolute", left: "50%", marginLeft: -27, top: -11, width: 58, height: 58, borderRadius: 29, padding: 4, zIndex: 1020, elevation: 50 },
+  createPressable: { flex: 1, borderRadius: 25 },
+  createPressed: { opacity: 0.86 },
+  createGradient: { flex: 1, borderRadius: 25, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.28)" },
+  quickAction: { position: "absolute", top: 0, zIndex: 1010, width: 124, height: 56, borderRadius: 20, elevation: 48, shadowColor: "#000", shadowOpacity: 0.32, shadowRadius: 20, shadowOffset: { width: 0, height: 10 } },
+  quickMessage: { left: "50%", marginLeft: -128 },
+  quickHighlight: { left: "50%", marginLeft: 7 },
+  quickPressable: { flex: 1, borderRadius: 20, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.32)" },
+  quickPressed: { opacity: 0.86, transform: [{ scale: 0.97 }] },
+  quickGradient: { flex: 1, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  quickIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(2,7,19,0.26)", alignItems: "center", justifyContent: "center" },
+  quickLabel: { color: colors.white, fontSize: 11, fontWeight: "900", textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 4 }
 });
