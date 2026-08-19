@@ -9,6 +9,7 @@ interface AppExtra {
   accountDeletionUrl?: string;
   supportUrl?: string;
   mockMode?: boolean;
+  coworkingEnabled?: boolean;
   standaloneMode?: boolean;
   buildProfile?: string;
   backendContract?: "neptune-web-v1" | "connexio-v1";
@@ -38,6 +39,9 @@ export const env = {
   supportUrl: extra.supportUrl ?? "mailto:contact@neptunebusiness.com",
   standaloneMode,
   mockMode: extra.mockMode === true || standaloneMode,
+  coworkingEnabled:
+    extra.coworkingEnabled === true ||
+    process.env.EXPO_PUBLIC_COWORKING_ENABLED === "true",
   buildProfile: extra.buildProfile ?? "development",
   backendContract: extra.backendContract ?? "neptune-web-v1",
   releaseStage: extra.releaseStage ?? "development",
