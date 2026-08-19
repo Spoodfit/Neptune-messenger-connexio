@@ -47,7 +47,7 @@ export default function HighlightsScreenV22() {
   const { currentUser, accessToken } = useSession();
   const { posts, mapMoments, members, localConversations, createPost, refreshExperience, togglePostReaction, createPrivateConversation } = useExperience();
   const { visibleConversations, refreshConversations } = useMessaging();
-  useContentEditRevision();
+  const contentEditRevision = useContentEditRevision();
   const [mode, setMode] = useState<"feed" | "map">("feed");
   const [composerOpen, setComposerOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -65,7 +65,7 @@ export default function HighlightsScreenV22() {
   const experienceApi = useMemo(() => env.mockMode ? null : new NeptuneExperienceApi(accessToken), [accessToken]);
   const eventsApi = useMemo(() => env.mockMode ? null : new NeptuneEventsApi(accessToken), [accessToken]);
   const contentEditApi = useMemo(() => new ContentEditApi(accessToken), [accessToken]);
-  const effectivePosts = useMemo(() => posts.map(applyHighlightEdit), [posts]);
+  const effectivePosts = useMemo(() => posts.map(applyHighlightEdit), [posts, contentEditRevision]);
   const feedBlocks = useMemo(() => buildHighlightFeedBlocks(effectivePosts), [effectivePosts]);
   const inference = useMemo(() => inferHighlight(body), [body]);
   const effectiveKind = manualKind ?? inference.kind;
