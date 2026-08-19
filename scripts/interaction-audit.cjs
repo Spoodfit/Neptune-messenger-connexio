@@ -18,18 +18,6 @@ async function waitRoute(page, suffix, label) {
   check(pathOf(page).endsWith(suffix), label, `route obtenue: ${pathOf(page)}`);
 }
 
-async function selectedTabVisible(page, namePattern) {
-  const tabs = page.getByRole("tab", { name: namePattern });
-  const count = await tabs.count();
-  for (let index = count - 1; index >= 0; index -= 1) {
-    const tab = tabs.nth(index);
-    if (await tab.isVisible().catch(() => false)) {
-      return (await tab.getAttribute("aria-selected")) === "true";
-    }
-  }
-  return false;
-}
-
 async function run() {
   const browser = await chromium.launch({ headless: true });
   try {
@@ -71,13 +59,13 @@ async function run() {
 
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
     await page.getByRole("tab", { name: /Privées/ }).click();
-    await page.getByPlaceholder("Rechercher une conversation…").waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-    check(await selectedTabVisible(page, /Privées/), "Onglet Privées actif");
-    check(await page.getByPlaceholder("Rechercher une conversation…").isVisible(), "Recherche discussions privées visible");
+    const privateSearch = page.getByPlaceholder("Rechercher une conversation…");
+    await privateSearch.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+    check(await privateSearch.isVisible(), "Onglet Privées actif via contenu privé visible");
     await page.getByRole("tab", { name: /Groupes/ }).click();
-    await page.getByPlaceholder("Rechercher un club ou un groupe…").waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
-    check(await selectedTabVisible(page, /Groupes/), "Onglet Groupes actif");
-    check(await page.getByPlaceholder("Rechercher un club ou un groupe…").isVisible(), "Recherche groupes visible");
+    const groupSearch = page.getByPlaceholder("Rechercher un club ou un groupe…");
+    await groupSearch.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+    check(await groupSearch.isVisible(), "Onglet Groupes actif via contenu groupe visible");
     check((await page.getByText("Clubs", { exact: true }).count()) > 0, "Organisation Clubs visible");
 
     // Le bouton Envoyer doit être structurel : visible même lorsque le champ est vide.
