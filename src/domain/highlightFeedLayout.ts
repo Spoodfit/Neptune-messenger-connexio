@@ -3,7 +3,7 @@ import type { HighlightPost } from "../types/experience";
 
 export type HighlightFeedBlock =
   | { id: string; kind: "wide"; post: HighlightPost }
-  | { id: string; kind: "masonry"; left: HighlightPost[]; right: HighlightPost[]; showAdvantage: boolean };
+  | { id: string; kind: "masonry"; left: HighlightPost[]; right: HighlightPost[]; showAdvantage: boolean; advantageColumn: "left" | "right" };
 
 function estimatedCompactHeight(post: HighlightPost): number {
   const bodyLines = Math.min(5, Math.max(1, Math.ceil(post.body.length / 34)));
@@ -46,7 +46,8 @@ export function buildHighlightFeedBlocks(posts: readonly HighlightPost[]): Highl
       kind: "masonry",
       left,
       right,
-      showAdvantage: compactRun.length % 4 !== 0 || Math.abs(leftHeight - rightHeight) > 150
+      showAdvantage: compactRun.length % 4 !== 0 || Math.abs(leftHeight - rightHeight) > 150,
+      advantageColumn: leftHeight <= rightHeight ? "left" : "right"
     });
     compactRun = [];
   };
