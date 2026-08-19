@@ -44,11 +44,10 @@ export function CoworkingPortalButton() {
     return () => loop.stop();
   }, [activeCount, pulse, reducedMotion]);
 
-  const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.045] });
   const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.48] });
 
   return (
-    <Animated.View style={[styles.shell, { backgroundColor: theme.pageBackground, transform: [{ scale }] }]}>
+    <View style={[styles.shell, { backgroundColor: theme.pageBackground }]}>
       {activeCount > 0 ? (
         <Animated.View pointerEvents="none" style={[styles.halo, { opacity: haloOpacity, borderColor: theme.violet }]} />
       ) : null}
@@ -81,7 +80,7 @@ export function CoworkingPortalButton() {
           ) : null}
         </LinearGradient>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
 
