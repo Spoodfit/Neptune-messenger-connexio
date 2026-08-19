@@ -36,8 +36,8 @@ export function CoworkingPortalButton() {
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1300, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1300, useNativeDriver: true })
+        Animated.timing(pulse, { toValue: 1, duration: 1300, useNativeDriver: true, isInteraction: false }),
+        Animated.timing(pulse, { toValue: 0, duration: 1300, useNativeDriver: true, isInteraction: false })
       ])
     );
     loop.start();
