@@ -1,0 +1,75 @@
+
+===== eas-version =====
+npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
+npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated glob@6.0.4: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+eas-cli/21.7.1 linux-x64 node-v22.23.2
+
+[exit=0]
+
+===== eas-whoami =====
+★ eas-cli@22.2.0 is now available.
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+neptunebusiness (authenticated using EXPO_TOKEN)
+contact@neptunebusiness.com
+
+Accounts:
+• neptunebusiness (Role: Owner)
+• neptune-business (Role: Owner)
+
+[exit=0]
+
+===== expo-config =====
+npm warn exec The following package was not found and will be installed: expo@57.0.15
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+PluginError: Failed to resolve plugin for module "expo-router" relative to "/home/runner/work/Neptune-messenger-connexio/Neptune-messenger-connexio". Do you have node modules installed?
+PluginError: Failed to resolve plugin for module "expo-router" relative to "/home/runner/work/Neptune-messenger-connexio/Neptune-messenger-connexio". Do you have node modules installed?
+    at resolvePluginForModule (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config-plugins/build/utils/plugin-resolver.js:84:9)
+    at resolveConfigPluginFunctionWithInfo (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config-plugins/build/utils/plugin-resolver.js:133:7)
+    at resolveConfigPluginFunction (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config-plugins/build/utils/plugin-resolver.js:124:7)
+    at withStaticPlugin (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config-plugins/build/plugins/withStaticPlugin.js:83:70)
+    at /home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config-plugins/build/plugins/withPlugins.js:28:84
+    at Array.reduce (<anonymous>)
+    at withPlugins (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config-plugins/build/plugins/withPlugins.js:28:18)
+    at withConfigPlugins (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config/build/plugins/withConfigPlugins.js:33:47)
+    at fillAndReturnConfig (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config/build/Config.js:247:78)
+    at getConfig (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/config/build/Config.js:300:12)
+    at configAsync (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/cli/build/src/config/configAsync.js:155:60)
+    at expoConfig (/home/runner/.npm/_npx/249ca9fcd30c476a/node_modules/@expo/cli/build/src/config/index.js:93:12)
+
+[exit=1]
+
+===== eas-project-info =====
+★ eas-cli@22.2.0 is now available.
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+Failed to resolve plugin for module "expo-router" relative to "/home/runner/work/Neptune-messenger-connexio/Neptune-messenger-connexio". Do you have node modules installed?
+(node:2156) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+    Error: project:info command failed.
+
+[exit=1]
+★ eas-cli@22.2.0 is now available.
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with outdated version.
+
+(node:2183) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+    Error: build:list command failed.
+
+===== eas-build-list =====
+[exit=1]
