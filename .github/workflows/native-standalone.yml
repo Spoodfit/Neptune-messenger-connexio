@@ -39,9 +39,35 @@ env:
   EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
 
 jobs:
+  eas-status:
+    name: eas-status
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[status-only]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier les accès EAS
+        run: test -n "$EXPO_TOKEN"
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+      - name: Lire les builds Android EAS
+        run: |
+          mkdir -p builds
+          npx --yes eas-cli@21.7.1 build:list --platform android --limit 10 --json --non-interactive > builds/eas-android-status.json
+          cat builds/eas-android-status.json
+      - name: Publier le statut EAS
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds/eas-android-status.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore(build): record EAS Android status [skip ci]"
+          git push origin HEAD:release/connexio-rc1
+
   standalone-android:
     name: standalone-android
-    if: github.event_name == 'push' || inputs.platform == 'android' || inputs.platform == 'all'
+    if: (github.event_name == 'push' && !contains(github.event.head_commit.message, '[status-only]')) || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'android' || inputs.platform == 'all'))
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -91,38 +117,31 @@ jobs:
           splash_path = assets / "splash-icon.png"
           icon_path = assets / "icon.png"
           adaptive_path = assets / "adaptive-icon.png"
-
           source = Image.open(splash_path)
           source.load()
           source = source.convert("RGBA")
           if source.size != (1024, 1024):
               source = source.resize((1024, 1024), Image.Resampling.LANCZOS)
-
           alpha_bbox = source.getchannel("A").getbbox()
           if not alpha_bbox:
               raise SystemExit("Le logo Connexio transparent est vide.")
           logo = source.crop(alpha_bbox)
-
           def fit_logo(max_side: int) -> Image.Image:
               width, height = logo.size
               scale = min(max_side / width, max_side / height)
               size = (max(1, round(width * scale)), max(1, round(height * scale)))
               return logo.resize(size, Image.Resampling.LANCZOS)
-
           source.save(splash_path, format="PNG", optimize=False, compress_level=6)
-
           adaptive_logo = fit_logo(460)
           adaptive = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
           adaptive_pos = ((1024 - adaptive_logo.width) // 2, (1024 - adaptive_logo.height) // 2)
           adaptive.alpha_composite(adaptive_logo, adaptive_pos)
           adaptive.save(adaptive_path, format="PNG", optimize=False, compress_level=6)
-
           icon_logo = fit_logo(660)
           icon = Image.new("RGBA", (1024, 1024), (255, 255, 255, 255))
           icon_pos = ((1024 - icon_logo.width) // 2, (1024 - icon_logo.height) // 2)
           icon.alpha_composite(icon_logo, icon_pos)
           icon.convert("RGB").save(icon_path, format="PNG", optimize=False, compress_level=6)
-
           check_adaptive = Image.open(adaptive_path).convert("RGBA")
           bbox = check_adaptive.getchannel("A").getbbox()
           if not bbox:
@@ -136,7 +155,6 @@ jobs:
               raise SystemExit(f"Foreground Android mal centré: centre=({center_x},{center_y}).")
           if icon_path.read_bytes() == adaptive_path.read_bytes():
               raise SystemExit("icon.png et adaptive-icon.png ne doivent jamais être identiques.")
-
           for path in (icon_path, adaptive_path, splash_path):
               check = Image.open(path)
               check.load()
@@ -162,23 +180,11 @@ jobs:
           EXPO_CONFIG_PLUGIN_VERBOSE_ERRORS: "1"
         run: |
           rm -rf .eas-prebuild
-          npx eas-cli@21.7.1 build:inspect \
-            --profile standalone \
-            --platform android \
-            --stage pre-build \
-            --output .eas-prebuild \
-            --force \
-            --verbose
+          npx eas-cli@21.7.1 build:inspect --profile standalone --platform android --stage pre-build --output .eas-prebuild --force --verbose
           rm -rf .eas-prebuild
       - name: Construire standalone Android avec EAS
         run: |
-          npx eas-cli@21.7.1 build \
-            --profile standalone \
-            --platform android \
-            --non-interactive \
-            --wait \
-            --clear-cache \
-            --json > eas-build-android.json
+          npx eas-cli@21.7.1 build --profile standalone --platform android --non-interactive --wait --clear-cache --json > eas-build-android.json
           cat eas-build-android.json
       - name: Publier les métadonnées du nouvel APK
         run: |
@@ -203,7 +209,6 @@ jobs:
             artifactUrl
           };
           fs.writeFileSync('builds/latest-android-standalone.json', JSON.stringify(metadata, null, 2) + '\n');
-          fs.appendFileSync(process.env.GITHUB_OUTPUT ?? '/dev/null', `artifact_url=${artifactUrl}\n`);
           console.log(JSON.stringify(metadata, null, 2));
           NODE
       - name: Enregistrer la référence du nouvel APK
@@ -212,10 +217,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add builds/latest-android-standalone.json
-          if git diff --cached --quiet; then
-            echo "Métadonnées APK inchangées."
-            exit 0
-          fi
+          if git diff --cached --quiet; then exit 0; fi
           git commit -m "build(android): record latest standalone APK [skip ci]"
           git push origin HEAD:release/connexio-rc1
 
@@ -245,12 +247,4 @@ jobs:
       - name: Vérifier la configuration standalone
         run: npx expo config --type public >/dev/null
       - name: Construire standalone iOS avec EAS
-        run: |
-          npx eas-cli@21.7.1 build \
-            --profile standalone \
-            --platform ios \
-            --non-interactive \
-            --wait \
-            --clear-cache \
-            --verbose-logs \
-            --build-logger-level debug
+        run: npx eas-cli@21.7.1 build --profile standalone --platform ios --non-interactive --wait --clear-cache --verbose-logs --build-logger-level debug
