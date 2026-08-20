@@ -1,0 +1,40 @@
+name: Inspect EAS Android status
+
+on:
+  push:
+    branches:
+      - release/connexio-rc1
+    paths:
+      - .github/workflows/eas-build-status.yml
+
+permissions:
+  contents: write
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  EXPO_PUBLIC_EAS_PROJECT_ID: d2288b09-8249-4879-810f-7cb0072baeeb
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+      - name: Vérifier le token Expo
+        run: test -n "$EXPO_TOKEN"
+      - name: Lire les builds Android EAS
+        run: |
+          mkdir -p builds
+          npx --yes eas-cli@21.7.1 build:list --platform android --limit 10 --json --non-interactive > builds/eas-android-status.json
+          cat builds/eas-android-status.json
+      - name: Publier le statut EAS
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds/eas-android-status.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore(build): record EAS Android status [skip ci]"
+          git push origin HEAD:release/connexio-rc1
