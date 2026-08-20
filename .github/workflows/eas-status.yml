@@ -23,6 +23,13 @@ jobs:
         with:
           ref: release/connexio-rc1
           fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Installer les dépendances verrouillées
+        run: npm ci --no-audit --no-fund
       - name: Inspecter authentification, projet et builds EAS
         shell: bash
         run: |
