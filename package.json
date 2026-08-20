@@ -7,7 +7,6 @@
     "install": {
       "exclude": [
         "expo",
-        "expo-constants",
         "expo-image-picker",
         "expo-location",
         "expo-notifications",
