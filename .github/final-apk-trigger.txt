@@ -1,1 +1,1 @@
-Connexio V23 final APK build trigger
+Connexio V23 final APK local EAS build trigger
