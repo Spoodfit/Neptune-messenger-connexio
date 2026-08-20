@@ -40,42 +40,48 @@ jobs:
           java-version: "17"
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Align native Expo peer dependencies
+      - name: Verify Expo dependency alignment
         run: |
-          npx expo install expo-font expo-asset expo-constants --npm
           npx expo install --check
           npx --yes expo-doctor@latest
-      - name: Persist SDK 57 dependency alignment
-        run: |
-          if git diff --quiet -- package.json package-lock.json; then
-            echo "Expo dependencies already aligned."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "fix(expo): install required SDK 57 native peers [skip ci]"
-          git push origin HEAD:release/connexio-rc1
-      - name: Normalize PNG assets for Expo prebuild
+      - name: Regenerate invalid app icons from canonical splash
         run: |
           python -m pip install --disable-pip-version-check --quiet pillow
           python - <<'PY'
           from pathlib import Path
           from PIL import Image
 
-          for name in ('icon.png', 'adaptive-icon.png', 'splash-icon.png', 'notification-icon.png', 'favicon.png'):
-              path = Path('assets') / name
-              if not path.exists():
-                  continue
+          assets = Path('assets')
+          source_path = assets / 'splash-icon.png'
+          source = Image.open(source_path)
+          source.load()
+          source = source.convert('RGBA')
+          if source.size != (1024, 1024):
+              raise SystemExit(f'Canonical splash must be 1024x1024, got {source.size}.')
+
+          for name in ('icon.png', 'adaptive-icon.png'):
+              target = assets / name
+              source.save(target, format='PNG', optimize=False, compress_level=6)
+
+          for name in ('icon.png', 'adaptive-icon.png', 'splash-icon.png', 'notification-icon.png'):
+              path = assets / name
               image = Image.open(path)
               image.load()
-              if image.mode not in ('RGB', 'RGBA'):
-                  image = image.convert('RGBA')
-              image.save(path, format='PNG', optimize=False, compress_level=6)
-              check = Image.open(path)
-              check.load()
-              print(f'{path}: {check.mode} {check.size} {path.stat().st_size} bytes')
+              if image.format != 'PNG':
+                  raise SystemExit(f'{path} is not PNG.')
+              print(f'{path}: {image.mode} {image.size} {path.stat().st_size} bytes')
           PY
+      - name: Persist repaired native assets
+        run: |
+          if git diff --quiet -- assets/icon.png assets/adaptive-icon.png; then
+            echo "Native icons already healthy."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/icon.png assets/adaptive-icon.png
+          git commit -m "fix(assets): replace invalid PNG app icons [skip ci]"
+          git push origin HEAD:release/connexio-rc1
       - name: Verify Expo access and Android toolchain
         run: |
           test -n "$EXPO_TOKEN"
@@ -103,7 +109,7 @@ jobs:
           test -s Connexio-V23.apk
           file Connexio-V23.apk
           sha256sum Connexio-V23.apk | tee Connexio-V23.apk.sha256
-      - name: Validate APK archive
+      - name: Validate APK archive and signature
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -117,8 +123,11 @@ jobs:
                   raise SystemExit('AndroidManifest.xml absent de l APK.')
               if not any(name.startswith('classes') and name.endswith('.dex') for name in names):
                   raise SystemExit('Aucun classes*.dex dans l APK.')
-          print(f'APK valide: {apk.stat().st_size} bytes')
+          print(f'APK archive valide: {apk.stat().st_size} bytes')
           PY
+          APKSIGNER="$(find "$ANDROID_SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs Connexio-V23.apk
       - name: Upload final APK
         uses: actions/upload-artifact@v4
         with:
