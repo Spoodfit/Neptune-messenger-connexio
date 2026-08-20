@@ -8,7 +8,7 @@ on:
       - .github/final-apk-trigger.txt
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -27,18 +27,55 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: release/connexio-rc1
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
           cache: npm
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
+      - name: Align native Expo peer dependencies
+        run: |
+          npx expo install expo-font expo-asset expo-constants --npm
+          npx expo install --check
+          npx --yes expo-doctor@latest
+      - name: Persist SDK 57 dependency alignment
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "Expo dependencies already aligned."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "fix(expo): install required SDK 57 native peers [skip ci]"
+          git push origin HEAD:release/connexio-rc1
+      - name: Normalize PNG assets for Expo prebuild
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          for name in ('icon.png', 'adaptive-icon.png', 'splash-icon.png', 'notification-icon.png', 'favicon.png'):
+              path = Path('assets') / name
+              if not path.exists():
+                  continue
+              image = Image.open(path)
+              image.load()
+              if image.mode not in ('RGB', 'RGBA'):
+                  image = image.convert('RGBA')
+              image.save(path, format='PNG', optimize=False, compress_level=6)
+              check = Image.open(path)
+              check.load()
+              print(f'{path}: {check.mode} {check.size} {path.stat().st_size} bytes')
+          PY
       - name: Verify Expo access and Android toolchain
         run: |
           test -n "$EXPO_TOKEN"
@@ -49,12 +86,13 @@ jobs:
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
           ls -1 "$ANDROID_SDK_ROOT/ndk" | tail -n 5 || true
       - name: Validate release
-        run: npm run verify && npm run audit:rc && npx expo install --check && npx expo config --type public >/dev/null
+        run: npm run verify && npm run audit:rc && npx expo install --check && npx --yes expo-doctor@latest && npx expo config --type public >/dev/null
       - name: Build final standalone APK locally with EAS
         env:
+          NODE_ENV: production
           EAS_LOCAL_BUILD_ARTIFACTS_DIR: ${{ github.workspace }}/local-eas-artifacts
         run: |
-          rm -rf local-eas-artifacts Connexio-V23.apk
+          rm -rf local-eas-artifacts Connexio-V23.apk Connexio-V23.apk.sha256
           mkdir -p local-eas-artifacts
           npx --yes eas-cli@22.2.0 build \
             --profile standalone \
