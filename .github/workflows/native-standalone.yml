@@ -29,7 +29,7 @@ on:
       - tsconfig.json
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -49,6 +49,8 @@ jobs:
         run: test -n "$EXPO_TOKEN"
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -60,6 +62,22 @@ jobs:
           python-version: "3.12"
       - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
+      - name: Aligner les dépendances Expo SDK 57
+        run: |
+          npx expo install expo-audio expo-linking --npm
+          npx expo install --check
+      - name: Enregistrer le lockfile Expo corrigé
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "Lockfile Expo déjà aligné."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "fix(expo): align SDK 57 dependencies [skip ci]"
+          git push origin HEAD:release/connexio-rc1
       - name: Vérifier Connexio avant build
         run: npm run verify && npm run audit:rc && npx expo install --check
       - name: Normaliser les assets PNG Connexio
@@ -91,27 +109,20 @@ jobs:
               size = (max(1, round(width * scale)), max(1, round(height * scale)))
               return logo.resize(size, Image.Resampling.LANCZOS)
 
-          # Splash : pixels source inchangés, PNG RGBA standard compatible Expo/Jimp.
           source.save(splash_path, format="PNG", optimize=False, compress_level=6)
 
-          # Adaptive icon Android : foreground volontairement très conservateur.
-          # Android applique ensuite différents masques (rond, squircle, etc.) : le logo
-          # doit rester intégralement dans la zone centrale, même sur les launchers agressifs.
           adaptive_logo = fit_logo(460)
           adaptive = Image.new("RGBA", (1024, 1024), (0, 0, 0, 0))
           adaptive_pos = ((1024 - adaptive_logo.width) // 2, (1024 - adaptive_logo.height) // 2)
           adaptive.alpha_composite(adaptive_logo, adaptive_pos)
           adaptive.save(adaptive_path, format="PNG", optimize=False, compress_level=6)
 
-          # Icône générale/iOS : même logo, plus présent, sur le fond blanc demandé.
           icon_logo = fit_logo(660)
           icon = Image.new("RGBA", (1024, 1024), (255, 255, 255, 255))
           icon_pos = ((1024 - icon_logo.width) // 2, (1024 - icon_logo.height) // 2)
           icon.alpha_composite(icon_logo, icon_pos)
           icon.convert("RGB").save(icon_path, format="PNG", optimize=False, compress_level=6)
 
-          # Régression guard : le foreground Android doit être centré et ne jamais
-          # dépasser 46 % du canvas sur son plus grand axe.
           check_adaptive = Image.open(adaptive_path).convert("RGBA")
           bbox = check_adaptive.getchannel("A").getbbox()
           if not bbox:
@@ -167,8 +178,46 @@ jobs:
             --non-interactive \
             --wait \
             --clear-cache \
-            --verbose-logs \
-            --build-logger-level debug
+            --json > eas-build-android.json
+          cat eas-build-android.json
+      - name: Publier les métadonnées du nouvel APK
+        run: |
+          mkdir -p builds
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = JSON.parse(fs.readFileSync('eas-build-android.json', 'utf8'));
+          const build = Array.isArray(raw) ? raw[0] : raw;
+          if (!build || !build.id) throw new Error('Réponse EAS invalide: build introuvable.');
+          const artifactUrl = build.artifacts?.buildUrl || build.artifacts?.applicationArchiveUrl || null;
+          if (!artifactUrl) throw new Error('Build EAS terminé sans URL APK.');
+          const metadata = {
+            id: build.id,
+            status: build.status,
+            platform: build.platform,
+            profile: 'standalone',
+            gitCommit: process.env.GITHUB_SHA,
+            appVersion: build.appVersion ?? null,
+            appBuildVersion: build.appBuildVersion ?? null,
+            createdAt: build.createdAt ?? null,
+            completedAt: build.completedAt ?? null,
+            artifactUrl
+          };
+          fs.writeFileSync('builds/latest-android-standalone.json', JSON.stringify(metadata, null, 2) + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT ?? '/dev/null', `artifact_url=${artifactUrl}\n`);
+          console.log(JSON.stringify(metadata, null, 2));
+          NODE
+      - name: Enregistrer la référence du nouvel APK
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds/latest-android-standalone.json
+          if git diff --cached --quiet; then
+            echo "Métadonnées APK inchangées."
+            exit 0
+          fi
+          git commit -m "build(android): record latest standalone APK [skip ci]"
+          git push origin HEAD:release/connexio-rc1
 
   standalone-ios:
     name: standalone-ios
@@ -187,6 +236,10 @@ jobs:
           cache: npm
       - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
+      - name: Aligner les dépendances Expo SDK 57
+        run: |
+          npx expo install expo-audio expo-linking --npm
+          npx expo install --check
       - name: Vérifier Connexio avant build
         run: npm run verify && npm run audit:rc && npx expo install --check
       - name: Vérifier la configuration standalone
