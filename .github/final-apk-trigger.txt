@@ -1,1 +1,1 @@
-Connexio V23 hardened local EAS APK build trigger
+Connexio V23 explicit Expo native plugins APK build trigger
