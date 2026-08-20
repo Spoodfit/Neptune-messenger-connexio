@@ -32,53 +32,61 @@ jobs:
         with:
           node-version: "22.13"
           cache: npm
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Verify Expo access
+      - name: Verify Expo access and Android toolchain
         run: |
           test -n "$EXPO_TOKEN"
-          npx --yes eas-cli@21.7.1 whoami
-          npx --yes eas-cli@21.7.1 project:info --json
+          npx --yes eas-cli@22.2.0 whoami
+          npx --yes eas-cli@22.2.0 project:info --json
+          test -n "$ANDROID_SDK_ROOT"
+          java -version
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -1 "$ANDROID_SDK_ROOT/ndk" | tail -n 5 || true
       - name: Validate release
         run: npm run verify && npm run audit:rc && npx expo install --check && npx expo config --type public >/dev/null
-      - name: Build final standalone APK
+      - name: Build final standalone APK locally with EAS
+        env:
+          EAS_LOCAL_BUILD_ARTIFACTS_DIR: ${{ github.workspace }}/local-eas-artifacts
         run: |
-          npx --yes eas-cli@21.7.1 build \
+          rm -rf local-eas-artifacts Connexio-V23.apk
+          mkdir -p local-eas-artifacts
+          npx --yes eas-cli@22.2.0 build \
             --profile standalone \
             --platform android \
+            --local \
             --non-interactive \
-            --wait \
-            --clear-cache \
-            --json > eas-build-android.json
-          cat eas-build-android.json
-      - name: Validate APK response
+            --output "$GITHUB_WORKSPACE/Connexio-V23.apk"
+          test -s Connexio-V23.apk
+          file Connexio-V23.apk
+          sha256sum Connexio-V23.apk | tee Connexio-V23.apk.sha256
+      - name: Validate APK archive
         run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const raw = JSON.parse(fs.readFileSync('eas-build-android.json', 'utf8'));
-          const build = Array.isArray(raw) ? raw[0] : raw;
-          const url = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl;
-          if (!build?.id || build.status !== 'FINISHED' || !url?.endsWith('.apk')) throw new Error('EAS did not return a finished APK.');
-          const out = {
-            id: build.id,
-            status: build.status,
-            platform: build.platform,
-            buildProfile: build.buildProfile || 'standalone',
-            sdkVersion: build.sdkVersion || null,
-            appVersion: build.appVersion || null,
-            appBuildVersion: build.appBuildVersion || null,
-            gitCommitHash: build.gitCommitHash || null,
-            createdAt: build.createdAt || null,
-            completedAt: build.completedAt || null,
-            artifactUrl: url
-          };
-          fs.writeFileSync('final-apk.json', JSON.stringify(out, null, 2) + '\n');
-          console.log('FINAL_APK=' + url);
-          console.log(JSON.stringify(out, null, 2));
-          NODE
-      - name: Upload build metadata
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          apk = Path('Connexio-V23.apk')
+          if not apk.exists() or apk.stat().st_size < 1_000_000:
+              raise SystemExit('APK absent ou anormalement petit.')
+          with zipfile.ZipFile(apk) as z:
+              names = set(z.namelist())
+              if 'AndroidManifest.xml' not in names:
+                  raise SystemExit('AndroidManifest.xml absent de l APK.')
+              if not any(name.startswith('classes') and name.endswith('.dex') for name in names):
+                  raise SystemExit('Aucun classes*.dex dans l APK.')
+          print(f'APK valide: {apk.stat().st_size} bytes')
+          PY
+      - name: Upload final APK
         uses: actions/upload-artifact@v4
         with:
           name: connexio-v23-final-apk
-          path: final-apk.json
+          path: |
+            Connexio-V23.apk
+            Connexio-V23.apk.sha256
+          if-no-files-found: error
           retention-days: 14
