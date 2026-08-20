@@ -2,9 +2,9 @@
 ===== eas-version =====
 npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
 npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
-npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
-npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
 npm warn deprecated glob@6.0.4: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+npm warn deprecated rimraf@2.4.5: Rimraf versions prior to v4 are no longer supported
+npm warn deprecated uuid@7.0.3: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
 npm warn deprecated uuid@8.3.2: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
@@ -21,7 +21,7 @@ To upgrade, run:
 npm install -g eas-cli
 Proceeding with outdated version.
 
-(node:2340) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:2457) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 neptunebusiness (authenticated using EXPO_TOKEN)
 contact@neptunebusiness.com
@@ -199,7 +199,7 @@ Accounts:
     backendContract: [32m'neptune-web-v1'[39m,
     mockMode: [33mfalse[39m,
     buildProfile: [32m'development'[39m,
-    buildRef: [32m'2da913fbb41ab84f672020f1fab1d1f362fac21f'[39m,
+    buildRef: [32m'f4af6c3db6f7c14cdbb52b7fb4c83f5bf70d4184'[39m,
     eas: {
       projectId: [32m'd2288b09-8249-4879-810f-7cb0072baeeb'[39m
     },
@@ -216,7 +216,7 @@ To upgrade, run:
 npm install -g eas-cli
 Proceeding with outdated version.
 
-(node:2398) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:2514) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 
 fullName  @neptune-business/neptune
@@ -228,7 +228,7 @@ To upgrade, run:
 npm install -g eas-cli
 Proceeding with outdated version.
 
-(node:2444) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(node:2561) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
 
 ===== eas-build-list =====
