@@ -21,6 +21,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: connexio-v23-standalone-android
+  cancel-in-progress: true
+
 jobs:
   standalone-android:
     if: github.event_name == 'push'
@@ -45,55 +49,109 @@ jobs:
           cache: npm
       - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
-      - name: Vérifier token et projet EAS
+      - name: Préflight V23
+        id: preflight
+        shell: bash
         run: |
-          test -n "$EXPO_TOKEN"
-          npx --yes eas-cli@21.7.1 whoami
-          npx --yes eas-cli@21.7.1 project:info --json >/dev/null
-      - name: Vérifier Connexio avant APK
-        run: npm run verify && npm run audit:rc && npx expo install --check && npx expo config --type public >/dev/null
-      - name: Construire le nouvel APK standalone avec EAS
+          mkdir -p builds
+          : > builds/latest-android-attempt.log
+          set +e
+          {
+            echo '===== whoami ====='
+            test -n "$EXPO_TOKEN" && npx --yes eas-cli@21.7.1 whoami
+            echo '===== project ====='
+            npx --yes eas-cli@21.7.1 project:info --json
+            echo '===== verify ====='
+            npm run verify
+            echo '===== rc-audit ====='
+            npm run audit:rc
+            echo '===== expo-check ====='
+            npx expo install --check
+            echo '===== expo-config ====='
+            npx expo config --type public
+          } > builds/latest-android-attempt.log 2>&1
+          code=$?
+          set -e
+          echo "preflight_code=$code" >> "$GITHUB_OUTPUT"
+          cat builds/latest-android-attempt.log
+      - name: Soumettre et attendre le nouvel APK EAS
+        id: eas
+        if: steps.preflight.outputs.preflight_code == '0'
+        shell: bash
         run: |
+          set +e
           npx --yes eas-cli@21.7.1 build \
             --profile standalone \
             --platform android \
             --non-interactive \
             --wait \
             --clear-cache \
-            --json > eas-build-android.json
-          cat eas-build-android.json
-      - name: Enregistrer l'APK V23 dans la release
+            --json > eas-build-android.json 2> eas-build-android.stderr
+          code=$?
+          set -e
+          echo "eas_code=$code" >> "$GITHUB_OUTPUT"
+          cat eas-build-android.stderr || true
+          cat eas-build-android.json || true
+      - name: Publier le résultat de tentative dans la release
+        if: always()
+        shell: bash
+        env:
+          PREFLIGHT_CODE: ${{ steps.preflight.outputs.preflight_code }}
+          EAS_CODE: ${{ steps.eas.outputs.eas_code }}
         run: |
           mkdir -p builds
           node - <<'NODE'
           const fs = require('fs');
-          const raw = JSON.parse(fs.readFileSync('eas-build-android.json', 'utf8'));
-          const build = Array.isArray(raw) ? raw[0] : raw;
-          if (!build?.id) throw new Error('Réponse EAS sans build id.');
-          if (build.status !== 'FINISHED') throw new Error(`Build EAS non terminé: ${build.status}`);
-          const artifactUrl = build.artifacts?.buildUrl || build.artifacts?.applicationArchiveUrl;
-          if (!artifactUrl || !artifactUrl.endsWith('.apk')) throw new Error('APK EAS introuvable dans la réponse finale.');
-          const out = {
-            id: build.id,
-            status: build.status,
-            platform: build.platform,
-            buildProfile: build.buildProfile || 'standalone',
-            sdkVersion: build.sdkVersion || null,
-            appVersion: build.appVersion || null,
-            appBuildVersion: build.appBuildVersion || null,
-            gitCommitHash: build.gitCommitHash || null,
-            createdAt: build.createdAt || null,
-            completedAt: build.completedAt || null,
-            artifactUrl
+          const preflightCode = Number(process.env.PREFLIGHT_CODE || '1');
+          const easCode = process.env.EAS_CODE === '' || process.env.EAS_CODE == null ? null : Number(process.env.EAS_CODE);
+          const raw = fs.existsSync('eas-build-android.json') ? fs.readFileSync('eas-build-android.json','utf8') : '';
+          const stderr = fs.existsSync('eas-build-android.stderr') ? fs.readFileSync('eas-build-android.stderr','utf8') : '';
+          const preflight = fs.existsSync('builds/latest-android-attempt.log') ? fs.readFileSync('builds/latest-android-attempt.log','utf8') : '';
+          let parsed = null;
+          let parseError = null;
+          try { parsed = raw.trim() ? JSON.parse(raw) : null; } catch (error) { parseError = String(error); }
+          const build = Array.isArray(parsed) ? parsed[0] : parsed;
+          const artifactUrl = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl || null;
+          const attempt = {
+            preflightCode,
+            easCode,
+            buildId: build?.id || null,
+            status: build?.status || null,
+            gitCommitHash: build?.gitCommitHash || null,
+            appVersion: build?.appVersion || null,
+            appBuildVersion: build?.appBuildVersion || null,
+            artifactUrl,
+            parseError,
+            stderr: stderr.slice(-8000),
+            preflightTail: preflight.slice(-8000)
           };
-          fs.writeFileSync('builds/latest-android-standalone.json', JSON.stringify(out, null, 2) + '\n');
-          console.log(JSON.stringify(out, null, 2));
+          fs.writeFileSync('builds/latest-android-attempt.json', JSON.stringify(attempt, null, 2) + '\n');
+          if (preflightCode === 0 && easCode === 0 && build?.status === 'FINISHED' && artifactUrl?.endsWith('.apk')) {
+            fs.writeFileSync('builds/latest-android-standalone.json', JSON.stringify({
+              id: build.id,
+              status: build.status,
+              platform: build.platform,
+              buildProfile: build.buildProfile || 'standalone',
+              sdkVersion: build.sdkVersion || null,
+              appVersion: build.appVersion || null,
+              appBuildVersion: build.appBuildVersion || null,
+              gitCommitHash: build.gitCommitHash || null,
+              createdAt: build.createdAt || null,
+              completedAt: build.completedAt || null,
+              artifactUrl
+            }, null, 2) + '\n');
+          }
+          console.log(JSON.stringify(attempt, null, 2));
           NODE
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f builds/latest-android-standalone.json
-          git commit -m "build(android): record V23 standalone APK [skip ci]"
+          git add -f builds/latest-android-attempt.json
+          if [ -f builds/latest-android-standalone.json ]; then git add -f builds/latest-android-standalone.json; fi
+          git commit -m "build(android): record V23 EAS attempt [skip ci]" || true
           git push origin HEAD:release/connexio-rc1
+          preflight_code="${PREFLIGHT_CODE:-1}"
+          eas_code="${EAS_CODE:-1}"
+          if [ "$preflight_code" != "0" ] || [ "$eas_code" != "0" ]; then exit 1; fi
 
   eas-build:
     if: github.event_name == 'workflow_dispatch'
