@@ -1,4 +1,4 @@
-name: Probe Connexio Expo build
+name: Monitor Connexio Expo build
 
 on:
   workflow_dispatch:
@@ -17,10 +17,12 @@ env:
   EXPO_PUBLIC_MOCK_MODE: "true"
   EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
   EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+  CONNEXIO_BUILD_ID: eec2fc81-a9d3-4094-8165-df9a05c8bf64
 
 jobs:
-  probe:
+  monitor:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout release
         uses: actions/checkout@v4
@@ -34,24 +36,59 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
-      - name: Read EAS project and Android builds
+      - name: Monitor exact EAS build
         shell: bash
         run: |
           mkdir -p builds
-          npx --yes eas-cli@21.7.1 whoami > builds/new-expo-probe.log 2>&1 || true
-          npx --yes eas-cli@21.7.1 project:info --json >> builds/new-expo-probe.log 2>&1 || true
-          set +e
-          npx --yes eas-cli@21.7.1 build:list --platform android --limit 10 --json > builds/new-expo-build-list.json 2>> builds/new-expo-probe.log
-          code=$?
-          set -e
-          echo "build_list_exit=$code" >> builds/new-expo-probe.log
-          cat builds/new-expo-probe.log
-          cat builds/new-expo-build-list.json || true
-      - name: Publish probe
+          : > builds/new-expo-monitor.log
+          final_status=""
+          for i in $(seq 1 90); do
+            echo "===== poll $i $(date -u +%FT%TZ) =====" | tee -a builds/new-expo-monitor.log
+            set +e
+            npx --yes eas-cli@21.7.1 build:view "$CONNEXIO_BUILD_ID" --json > builds/new-expo-build-final.json 2>> builds/new-expo-monitor.log
+            code=$?
+            set -e
+            if [ "$code" != "0" ]; then
+              echo "build:view exit=$code" | tee -a builds/new-expo-monitor.log
+              sleep 30
+              continue
+            fi
+            final_status="$(node -e "const x=require('./builds/new-expo-build-final.json'); console.log(x.status || '')")"
+            echo "status=$final_status" | tee -a builds/new-expo-monitor.log
+            case "$final_status" in
+              FINISHED|ERRORED|CANCELED) break ;;
+            esac
+            sleep 30
+          done
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'builds/new-expo-build-final.json';
+          if (!fs.existsSync(path)) throw new Error('Aucun résultat EAS récupéré.');
+          const build = JSON.parse(fs.readFileSync(path,'utf8'));
+          const artifactUrl = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl || null;
+          fs.writeFileSync('builds/latest-android-standalone.json', JSON.stringify({
+            id: build.id || null,
+            status: build.status || null,
+            platform: build.platform || null,
+            projectId: build.project?.id || process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+            project: build.project?.fullName || '@johanzambellis-team/connexio',
+            buildProfile: build.buildProfile || 'standalone',
+            sdkVersion: build.sdkVersion || null,
+            appVersion: build.appVersion || null,
+            appBuildVersion: build.appBuildVersion || null,
+            gitCommitHash: build.gitCommitHash || null,
+            createdAt: build.createdAt || null,
+            completedAt: build.completedAt || null,
+            artifactUrl,
+            error: build.error || null
+          }, null, 2) + '\n');
+          console.log(fs.readFileSync('builds/latest-android-standalone.json','utf8'));
+          NODE
+      - name: Publish final build state
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f builds/new-expo-probe.log builds/new-expo-build-list.json
-          git commit -m "chore(expo): record new project build status [skip ci]" || true
+          git add -f builds/new-expo-build-final.json builds/new-expo-monitor.log builds/latest-android-standalone.json
+          git commit -m "build(android): record final Expo build state [skip ci]" || true
           git push origin HEAD:release/connexio-rc1
