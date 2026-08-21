@@ -1,0 +1,45 @@
+name: One-shot Connexio EAS status
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/eas-status-v23.yml
+
+permissions:
+  contents: write
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
+  EXPO_PUBLIC_MOCK_MODE: "true"
+  EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+  EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+  CONNEXIO_BUILD_ID: eec2fc81-a9d3-4094-8165-df9a05c8bf64
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Read build status
+        run: |
+          mkdir -p builds
+          npx --yes eas-cli@21.7.1 build:view "$CONNEXIO_BUILD_ID" --json > builds/eas-status-live.json
+          cat builds/eas-status-live.json
+      - name: Publish status
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f builds/eas-status-live.json
+          git commit -m "chore(expo): record live V23 build status [skip ci]" || true
+          git push origin HEAD:release/connexio-rc1
