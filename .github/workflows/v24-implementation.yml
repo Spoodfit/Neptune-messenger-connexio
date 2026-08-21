@@ -1,0 +1,964 @@
+name: Apply Connexio V24 messaging and coworking map
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/v24-implementation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-v24:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout V24 branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/v24-messaging-coworking-map
+          fetch-depth: 0
+
+      - name: Apply V24 implementation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str, count: int = 1):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Marker not found in {path}: {old[:120]!r}")
+              text = text.replace(old, new, count)
+              p.write_text(text)
+
+          # 1) Conversation auto-follow after an outgoing message.
+          replace(
+              'src/screens/ChatConversationScreen.tsx',
+              '  const messageListRef = useRef<FlatList<ChatMessage>>(null);\n',
+              '  const messageListRef = useRef<FlatList<ChatMessage>>(null);\n  const lastAutoFollowMessageIdRef = useRef<string | null>(null);\n'
+          )
+          replace(
+              'src/screens/ChatConversationScreen.tsx',
+              '  useEffect(() => {\n    if (!focusMention && !requestedFocusMessageId) return;\n',
+              '''  useEffect(() => {
+    const latest = messages[0];
+    if (!latest?.isMine || lastAutoFollowMessageIdRef.current === latest.id) return;
+    lastAutoFollowMessageIdRef.current = latest.id;
+    requestAnimationFrame(() => {
+      messageListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+  }, [messages]);
+
+  useEffect(() => {
+    if (!focusMention && !requestedFocusMessageId) return;
+'''
+          )
+
+          # 2) Group section badges = unread messages, never visible group count.
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              'import { useMemo, useState } from "react";\nimport { ActivityIndicator, FlatList, Modal, Pressable, SectionList, StyleSheet, View } from "react-native";\n',
+              'import { useEffect, useMemo, useRef, useState } from "react";\nimport { ActivityIndicator, Animated, FlatList, Modal, Pressable, SectionList, StyleSheet, View } from "react-native";\n'
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              'type GroupSection = { key: ConversationSectionKey; title: string; data: Conversation[] };\n',
+              'type GroupSection = { key: ConversationSectionKey; title: string; data: Conversation[]; unreadCount: number };\n'
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '  const { serviceAvailable, visibleConversations, getMessages, refreshConversations, loadingConversations, lastError } = useMessaging();\n',
+              '  const { serviceAvailable, visibleConversations, getMessages, refreshConversations, markConversationRead, loadingConversations, lastError } = useMessaging();\n'
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '  const [collapsedSections, setCollapsedSections] = useState<Set<ConversationSectionKey>>(new Set());\n',
+              '  const [collapsedSections, setCollapsedSections] = useState<Set<ConversationSectionKey>>(new Set());\n  const [acknowledgedAnnouncementVersion, setAcknowledgedAnnouncementVersion] = useState<string | null>(null);\n  const announcementPulse = useRef(new Animated.Value(0)).current;\n'
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '''    const sections: GroupSection[] = [
+      { key: "pinned", title: GROUP_SECTION_LABELS.pinned, data: pinned },
+      { key: "clubs", title: GROUP_SECTION_LABELS.clubs, data: section("clubs") },
+      { key: "management", title: GROUP_SECTION_LABELS.management, data: section("management") },
+      { key: "general", title: GROUP_SECTION_LABELS.general, data: section("general") }
+    ];
+''',
+              '''    const makeSection = (key: ConversationSectionKey, title: string, data: Conversation[]): GroupSection => ({
+      key,
+      title,
+      data,
+      unreadCount: data.reduce((total, conversation) => total + Math.max(0, conversation.unreadCount ?? 0), 0)
+    });
+    const sections: GroupSection[] = [
+      makeSection("pinned", GROUP_SECTION_LABELS.pinned, pinned),
+      makeSection("clubs", GROUP_SECTION_LABELS.clubs, section("clubs")),
+      makeSection("management", GROUP_SECTION_LABELS.management, section("management")),
+      makeSection("general", GROUP_SECTION_LABELS.general, section("general"))
+    ];
+'''
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '''  const visibleGroupCount = useMemo(
+    () => allConversations.filter((conversation) => !isPrivateConversationKind(conversation)).length,
+    [allConversations]
+  );
+
+''',
+              ''
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '''  const closeMenu = () => setSelectedConversation(null);
+''',
+              '''  const announcementVersion = announcement
+    ? `${announcement.id}:${announcement.lastMessageAt ?? announcement.lastMessage ?? "empty"}`
+    : null;
+  const announcementUnread = Boolean(
+    announcement &&
+      ((announcement.unreadCount ?? 0) > 0 || (announcement.mentionCount ?? 0) > 0) &&
+      acknowledgedAnnouncementVersion !== announcementVersion
+  );
+
+  useEffect(() => {
+    if (!announcementUnread) {
+      announcementPulse.stopAnimation();
+      announcementPulse.setValue(0);
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(announcementPulse, { toValue: 1, duration: 1050, useNativeDriver: true, isInteraction: false }),
+        Animated.timing(announcementPulse, { toValue: 0, duration: 1050, useNativeDriver: true, isInteraction: false })
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [announcementPulse, announcementUnread]);
+
+  const acknowledgeAnnouncement = async () => {
+    if (!announcement) return;
+    setAcknowledgedAnnouncementVersion(announcementVersion);
+    await markConversationRead(announcement.id);
+  };
+
+  const openAnnouncement = async () => {
+    if (!announcement) return;
+    await acknowledgeAnnouncement();
+    await openConversation(announcement);
+  };
+
+  const closeMenu = () => setSelectedConversation(null);
+'''
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '<View style={[styles.sectionCount, { backgroundColor: theme.surfaceStrong }]}><Text style={[styles.sectionCountText, { color: theme.pageTextMuted }]}>{section.data.length}</Text></View>',
+              '{section.unreadCount > 0 ? <View style={[styles.sectionCount, { backgroundColor: theme.violet }]}><Text style={[styles.sectionCountText, { color: "#FFFFFF" }]}>{section.unreadCount > 99 ? "99+" : section.unreadCount}</Text></View> : null}'
+          )
+          old_announcement = '''          ListHeaderComponent={announcement && conversationMatchesQuery(announcement, query) ? (
+            <View style={styles.announcementWrap}>
+              {isAnnouncementCollapsed(announcement) ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir Annonce" onPress={() => void openConversation(announcement)} onLongPress={() => setSelectedConversation(announcement)} style={[styles.announcementCollapsed, { borderColor: theme.borderSoft, backgroundColor: theme.surface }]}>
+                  <View style={[styles.announcementIcon, { backgroundColor: theme.violetSoft }]}><Ionicons name="megaphone" size={19} color={theme.violet} /></View>
+                  <View style={styles.announcementCopy}><Text style={[styles.announcementTitle, { color: theme.pageText }]}>Annonce</Text><Text numberOfLines={1} style={[styles.announcementPreview, { color: theme.pageTextMuted }]}>{announcement.lastMessage ?? "Consulter les annonces Neptune"}</Text></View>
+                  <Ionicons name="chevron-forward" size={18} color={theme.pageTextMuted} />
+                </Pressable>
+              ) : renderConversation(announcement, true)}
+            </View>
+          ) : null}
+'''
+          new_announcement = '''          ListHeaderComponent={announcement && conversationMatchesQuery(announcement, query) ? (
+            <View style={styles.announcementWrap}>
+              <Animated.View style={[styles.announcementGlowShell, announcementUnread && {
+                opacity: announcementPulse.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] })
+              }]}>
+                <LinearGradient
+                  colors={announcementUnread ? [theme.violet, theme.orange, theme.violet] : [theme.borderSoft, theme.borderSoft, theme.borderSoft]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.announcementBorder}
+                >
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={announcementUnread ? "Nouvelle annonce non lue" : "Ouvrir Annonce"}
+                    onPress={() => void openAnnouncement()}
+                    onLongPress={() => setSelectedConversation(announcement)}
+                    style={[styles.announcementCard, { backgroundColor: theme.surface }]}
+                  >
+                    <View style={styles.announcementHeaderLine}>
+                      <View style={[styles.announcementIcon, { backgroundColor: announcementUnread ? theme.violetSoft : theme.surfaceStrong }]}>
+                        <Ionicons name="megaphone" size={18} color={theme.violet} />
+                      </View>
+                      <View style={styles.announcementCopy}>
+                        <View style={styles.announcementTitleLine}>
+                          <Text style={[styles.announcementTitle, { color: theme.pageText }]}>Annonce</Text>
+                          {announcementUnread ? <View style={[styles.announcementUnreadPill, { backgroundColor: theme.violetSoft }]}><Text style={[styles.announcementUnreadText, { color: theme.violet }]}>NOUVEAU</Text></View> : null}
+                        </View>
+                        {!announcementUnread ? <Text numberOfLines={1} style={[styles.announcementPreview, { color: theme.pageTextMuted }]}>{announcement.lastMessage ?? "Consulter les annonces Neptune"}</Text> : null}
+                      </View>
+                      {!announcementUnread ? <Ionicons name="chevron-forward" size={18} color={theme.pageTextMuted} /> : null}
+                    </View>
+                    {announcementUnread ? (
+                      <>
+                        <Text style={[styles.announcementFullText, { color: theme.pageText }]}>{announcement.lastMessage ?? "Nouvelle annonce Neptune"}</Text>
+                        <View style={styles.announcementActions}>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Marquer l'annonce comme lue"
+                            onPress={(event) => { event.stopPropagation(); void acknowledgeAnnouncement(); }}
+                            style={[styles.announcementReadButton, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}
+                          >
+                            <Ionicons name="checkmark-done" size={17} color={theme.violet} />
+                            <Text style={[styles.announcementReadText, { color: theme.pageText }]}>J’ai lu</Text>
+                          </Pressable>
+                          <View style={styles.announcementOpenHint}><Text style={[styles.announcementOpenText, { color: theme.pageTextMuted }]}>Ouvrir le groupe</Text><Ionicons name="arrow-forward" size={15} color={theme.pageTextMuted} /></View>
+                        </View>
+                      </>
+                    ) : null}
+                  </Pressable>
+                </LinearGradient>
+              </Animated.View>
+            </View>
+          ) : null}
+'''
+          replace('src/screens/MessagesScreenV22.tsx', old_announcement, new_announcement)
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '          ListFooterComponent={<Text style={[styles.footerCount, { color: theme.pageTextMuted }]}>{visibleGroupCount} groupe{visibleGroupCount > 1 ? "s" : ""} visible{visibleGroupCount > 1 ? "s" : ""}</Text>}\n',
+              ''
+          )
+          replace(
+              'src/screens/MessagesScreenV22.tsx',
+              '''  announcementWrap: { paddingTop: 8, paddingBottom: 3 },
+  announcementCollapsed: { minHeight: 58, borderRadius: 18, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  announcementIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  announcementCopy: { flex: 1, minWidth: 0 },
+  announcementTitle: { fontSize: 14, fontWeight: "900" },
+  announcementPreview: { marginTop: 2, fontSize: 14, lineHeight: 18 },
+''',
+              '''  announcementWrap: { paddingTop: 8, paddingBottom: 5 },
+  announcementGlowShell: { width: "100%", borderRadius: 20 },
+  announcementBorder: { width: "100%", padding: 1.5, borderRadius: 20 },
+  announcementCard: { minHeight: 58, borderRadius: 18.5, paddingHorizontal: 10, paddingVertical: 9, gap: 9 },
+  announcementHeaderLine: { minHeight: 40, flexDirection: "row", alignItems: "center", gap: 10 },
+  announcementIcon: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  announcementCopy: { flex: 1, minWidth: 0 },
+  announcementTitleLine: { flexDirection: "row", alignItems: "center", gap: 7 },
+  announcementTitle: { fontSize: 14, fontWeight: "900" },
+  announcementUnreadPill: { minHeight: 20, borderRadius: 999, paddingHorizontal: 7, alignItems: "center", justifyContent: "center" },
+  announcementUnreadText: { fontSize: 9, lineHeight: 11, fontWeight: "900", letterSpacing: 0.7 },
+  announcementPreview: { marginTop: 2, fontSize: 14, lineHeight: 18 },
+  announcementFullText: { fontSize: 14, lineHeight: 20, fontWeight: "650", paddingHorizontal: 2 },
+  announcementActions: { minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  announcementReadButton: { minHeight: 44, borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 7 },
+  announcementReadText: { fontSize: 12, fontWeight: "900" },
+  announcementOpenHint: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 4 },
+  announcementOpenText: { fontSize: 11, fontWeight: "800" },
+'''
+          )
+          # Drop no-longer-used helper import and footer style.
+          replace('src/screens/MessagesScreenV22.tsx', '  isAnnouncementCollapsed,\n', '')
+          replace('src/screens/MessagesScreenV22.tsx', '  footerCount: { textAlign: "center", fontSize: 12, paddingVertical: 10 },\n', '')
+
+          # 3) Inline WhatsApp-like voice message player.
+          Path('src/components/VoiceMessagePlayer.tsx').write_text(r'''import { Text } from "@/components/LocalizedText";
+import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import { useMemo, useState } from "react";
+import { Pressable, StyleSheet, View, type GestureResponderEvent } from "react-native";
+
+import { useAppTheme } from "../providers/ThemeProvider";
+import { colors } from "../theme";
+import type { MessageAttachment } from "../types/messaging";
+
+interface VoiceMessagePlayerProps {
+  attachment: MessageAttachment;
+  isMine: boolean;
+}
+
+const BAR_HEIGHTS = [12, 21, 15, 28, 18, 32, 23, 14, 27, 19, 34, 25, 16, 29, 20, 31, 17, 24, 14, 27, 19, 32, 22, 16, 28, 20, 25, 14];
+
+function formatSeconds(value: number): string {
+  const safe = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+  const minutes = Math.floor(safe / 60);
+  const seconds = safe % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+export function VoiceMessagePlayer({ attachment, isMine }: VoiceMessagePlayerProps) {
+  const theme = useAppTheme();
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const source = attachment.downloadUrl ?? attachment.uri ?? null;
+  const player = useAudioPlayer(source, { updateInterval: 120, downloadFirst: false });
+  const status = useAudioPlayerStatus(player);
+  const duration = status.duration > 0 ? status.duration : Math.max(0, attachment.durationSeconds ?? 0);
+  const progress = duration > 0 ? Math.min(1, Math.max(0, status.currentTime / duration)) : 0;
+  const transcript = attachment.transcript?.trim();
+  const transcriptPending = attachment.transcriptStatus === "pending" && !transcript;
+  const transcriptFailed = attachment.transcriptStatus === "failed" && !transcript;
+  const foreground = isMine ? colors.white : theme.pageText;
+  const muted = isMine ? "rgba(255,255,255,0.72)" : theme.pageTextMuted;
+  const track = isMine ? "rgba(255,255,255,0.23)" : theme.surfaceMuted;
+  const active = isMine ? colors.white : theme.violet;
+  const wave = useMemo(() => BAR_HEIGHTS, []);
+
+  const togglePlayback = () => {
+    if (!source) return;
+    if (status.playing) {
+      player.pause();
+      return;
+    }
+    if (duration > 0 && status.currentTime >= duration - 0.15) player.seekTo(0);
+    player.play();
+  };
+
+  const seek = (event: GestureResponderEvent) => {
+    if (!source || duration <= 0) return;
+    const width = event.currentTarget?.measure ? undefined : undefined;
+    void width;
+  };
+
+  return (
+    <View style={[styles.shell, { backgroundColor: isMine ? "rgba(255,255,255,0.10)" : theme.surfaceStrong, borderColor: isMine ? "rgba(255,255,255,0.17)" : theme.borderSoft }]}>
+      <View style={styles.playerRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={status.playing ? "Mettre le vocal en pause" : "Lire le message vocal"}
+          onPress={togglePlayback}
+          disabled={!source}
+          style={[styles.playButton, { backgroundColor: isMine ? "rgba(255,255,255,0.18)" : theme.violetSoft }, !source && styles.disabled]}
+        >
+          <Ionicons name={status.playing ? "pause" : "play"} size={20} color={isMine ? colors.white : theme.violet} />
+        </Pressable>
+        <View style={styles.waveColumn}>
+          <Pressable accessibilityRole="adjustable" accessibilityLabel="Progression du message vocal" onPress={seek} style={styles.waveform}>
+            {wave.map((height, index) => {
+              const barProgress = (index + 1) / wave.length;
+              return <View key={`${attachment.id}-wave-${index}`} style={[styles.waveBar, { height, backgroundColor: barProgress <= progress ? active : track }]} />;
+            })}
+          </Pressable>
+          <View style={styles.timeRow}>
+            <Text style={[styles.time, { color: muted }]}>{formatSeconds(status.currentTime)}</Text>
+            <View style={styles.voiceMeta}><Ionicons name="mic-outline" size={12} color={muted} /><Text style={[styles.time, { color: muted }]}>{formatSeconds(duration)}</Text></View>
+          </View>
+        </View>
+      </View>
+
+      {transcript ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={transcriptExpanded ? "Réduire la transcription" : "Lire toute la transcription"}
+          onPress={() => setTranscriptExpanded((current) => !current)}
+          style={[styles.transcript, { borderTopColor: isMine ? "rgba(255,255,255,0.14)" : theme.borderSoft }]}
+        >
+          <View style={styles.transcriptHeading}><Ionicons name="text-outline" size={14} color={muted} /><Text style={[styles.transcriptLabel, { color: muted }]}>Transcription</Text></View>
+          <Text numberOfLines={transcriptExpanded ? undefined : 3} style={[styles.transcriptText, { color: foreground }]}>{transcript}</Text>
+          {transcript.length > 130 ? <Text style={[styles.expandText, { color: isMine ? colors.white : theme.violet }]}>{transcriptExpanded ? "Réduire" : "Voir tout"}</Text> : null}
+        </Pressable>
+      ) : transcriptPending ? (
+        <View style={[styles.transcriptState, { borderTopColor: isMine ? "rgba(255,255,255,0.14)" : theme.borderSoft }]}><Ionicons name="sparkles-outline" size={14} color={muted} /><Text style={[styles.transcriptStateText, { color: muted }]}>Transcription en cours…</Text></View>
+      ) : transcriptFailed ? (
+        <View style={[styles.transcriptState, { borderTopColor: isMine ? "rgba(255,255,255,0.14)" : theme.borderSoft }]}><Ionicons name="text-outline" size={14} color={muted} /><Text style={[styles.transcriptStateText, { color: muted }]}>Transcription indisponible</Text></View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  shell: { width: 286, maxWidth: "100%", minHeight: 74, borderRadius: 18, borderWidth: 1, padding: 9, gap: 6 },
+  playerRow: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 9 },
+  playButton: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  disabled: { opacity: 0.42 },
+  waveColumn: { flex: 1, minWidth: 0 },
+  waveform: { height: 36, flexDirection: "row", alignItems: "center", gap: 2 },
+  waveBar: { flex: 1, minWidth: 2, maxWidth: 4, borderRadius: 3 },
+  timeRow: { marginTop: 2, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  voiceMeta: { flexDirection: "row", alignItems: "center", gap: 3 },
+  time: { fontSize: 10, lineHeight: 13, fontWeight: "800" },
+  transcript: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 4 },
+  transcriptHeading: { flexDirection: "row", alignItems: "center", gap: 5 },
+  transcriptLabel: { fontSize: 10, lineHeight: 13, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.45 },
+  transcriptText: { fontSize: 12, lineHeight: 17, fontWeight: "650" },
+  expandText: { fontSize: 11, lineHeight: 14, fontWeight: "900", marginTop: 2 },
+  transcriptState: { minHeight: 34, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 7, flexDirection: "row", alignItems: "center", gap: 6 },
+  transcriptStateText: { fontSize: 11, fontWeight: "750" }
+});
+''')
+
+          replace(
+              'src/components/MessageAttachmentsGrid.tsx',
+              'import { HighlightMediaView } from "./HighlightMediaView";\n',
+              'import { HighlightMediaView } from "./HighlightMediaView";\nimport { VoiceMessagePlayer } from "./VoiceMessagePlayer";\n'
+          )
+          replace(
+              'src/components/MessageAttachmentsGrid.tsx',
+              '  const media = attachments.filter((attachment) => attachment.kind === "photo" || attachment.kind === "video");\n  const files = attachments.filter((attachment) => attachment.kind !== "photo" && attachment.kind !== "video");\n',
+              '  const media = attachments.filter((attachment) => attachment.kind === "photo" || attachment.kind === "video");\n  const audio = attachments.filter((attachment) => attachment.kind === "audio");\n  const files = attachments.filter((attachment) => attachment.kind !== "photo" && attachment.kind !== "video" && attachment.kind !== "audio");\n'
+          )
+          replace(
+              'src/components/MessageAttachmentsGrid.tsx',
+              '      {files.length > 0 ? (\n',
+              '      {audio.map((attachment) => <VoiceMessagePlayer key={attachment.id} attachment={attachment} isMine={isMine} />)}\n\n      {files.length > 0 ? (\n'
+          )
+          replace(
+              'src/components/MessageAttachmentsGrid.tsx',
+              '                  <Ionicons name={location ? "location-outline" : attachment.kind === "audio" ? "mic-outline" : contact ? "person-outline" : "document-attach-outline"} size={20} color={isMine ? colors.white : contact ? theme.accent : theme.orange} />\n',
+              '                  <Ionicons name={location ? "location-outline" : contact ? "person-outline" : "document-attach-outline"} size={20} color={isMine ? colors.white : contact ? theme.accent : theme.orange} />\n'
+          )
+
+          # Wire transcript fields returned by upload/message APIs.
+          replace(
+              'src/services/api/uploadApi.ts',
+              '  duration_seconds?: number;\n}\n',
+              '  duration_seconds?: number;\n  transcript?: string;\n  transcript_status?: "pending" | "ready" | "failed";\n}\n'
+          )
+          replace(
+              'src/services/api/uploadApi.ts',
+              '    durationSeconds: completed.duration_seconds ?? attachment.durationSeconds,\n    status: "ready",\n',
+              '    durationSeconds: completed.duration_seconds ?? attachment.durationSeconds,\n    transcript: completed.transcript ?? attachment.transcript,\n    transcriptStatus: completed.transcript_status ?? attachment.transcriptStatus,\n    status: "ready",\n'
+          )
+          replace(
+              'src/services/api/BaseWireExtensions.ts',
+              '''  return {
+    ...attachment,
+    uri: attachment.uri ?? safeHttpsUrl(first(raw, "uri", "url", "download_url", "downloadUrl")),
+    downloadUrl: safeHttpsUrl(first(raw, "downloadUrl", "download_url")),
+    thumbnailUrl: safeHttpsUrl(first(raw, "thumbnailUrl", "thumbnail_url"))
+  };
+''',
+              '''  const transcriptStatusRaw = first(raw, "transcriptStatus", "transcript_status");
+  const transcriptStatus = transcriptStatusRaw === "pending" || transcriptStatusRaw === "ready" || transcriptStatusRaw === "failed"
+    ? transcriptStatusRaw
+    : attachment.transcriptStatus;
+  return {
+    ...attachment,
+    uri: attachment.uri ?? safeHttpsUrl(first(raw, "uri", "url", "download_url", "downloadUrl")),
+    downloadUrl: safeHttpsUrl(first(raw, "downloadUrl", "download_url")),
+    thumbnailUrl: safeHttpsUrl(first(raw, "thumbnailUrl", "thumbnail_url")),
+    transcript: optionalString(first(raw, "transcript", "transcription")) ?? attachment.transcript,
+    transcriptStatus
+  };
+'''
+          )
+
+          # 4) Coworking map media contract: coordinates + optional observer media session.
+          replace(
+              'src/types/coworking.ts',
+              '  joinedAt: string;\n}\n',
+              '  joinedAt: string;\n  mapX?: number;\n  mapY?: number;\n}\n'
+          )
+          replace(
+              'src/types/coworking.ts',
+              '  mock?: boolean;\n}\n',
+              '  mock?: boolean;\n  observer?: boolean;\n}\n'
+          )
+          replace(
+              'src/types/coworking.ts',
+              '  currentUserSpaceId?: string;\n  updatedAt: string;\n}\n',
+              '  currentUserSpaceId?: string;\n  observerMedia?: CoworkingMediaSession;\n  updatedAt: string;\n}\n'
+          )
+          replace(
+              'src/services/api/coworkingApi.ts',
+              '''    speaking: item.speaking === true,
+    joinedAt: stringValue(item.joined_at ?? item.joinedAt, new Date().toISOString())
+''',
+              '''    speaking: item.speaking === true,
+    joinedAt: stringValue(item.joined_at ?? item.joinedAt, new Date().toISOString()),
+    mapX: typeof (item.map_x ?? item.mapX) === "number" ? Math.max(5, Math.min(95, Number(item.map_x ?? item.mapX))) : undefined,
+    mapY: typeof (item.map_y ?? item.mapY) === "number" ? Math.max(8, Math.min(92, Number(item.map_y ?? item.mapY))) : undefined
+'''
+          )
+          replace(
+              'src/services/api/coworkingApi.ts',
+              '''    currentUserSpaceId: stringValue(root.current_user_space_id ?? root.currentUserSpaceId) || undefined,
+    updatedAt: stringValue(root.updated_at ?? root.updatedAt, new Date().toISOString())
+''',
+              '''    currentUserSpaceId: stringValue(root.current_user_space_id ?? root.currentUserSpaceId) || undefined,
+    observerMedia: normalizeMedia(root.observer_media ?? root.observerMedia, "coworking-map"),
+    updatedAt: stringValue(root.updated_at ?? root.updatedAt, new Date().toISOString())
+'''
+          )
+          replace(
+              'src/services/api/coworkingApi.ts',
+              '''    expiresAt: stringValue(item.expires_at) || undefined,
+    mock: false
+''',
+              '''    expiresAt: stringValue(item.expires_at) || undefined,
+    mock: false,
+    observer: item.observer === true || item.listen_only === true || item.listenOnly === true
+'''
+          )
+          # Deterministic mock office positions.
+          replace(
+              'src/providers/CoworkingProvider.tsx',
+              '''    speaking: index === 3,
+    joinedAt: joinedAt(8 + index * 7)
+''',
+              '''    speaking: index === 3,
+    joinedAt: joinedAt(8 + index * 7),
+    mapX: [18, 42, 70, 83, 27, 58, 77, 36, 62][index] ?? 50,
+    mapY: [22, 18, 25, 48, 54, 60, 76, 82, 40][index] ?? 50
+'''
+          )
+
+          # Map-mode media surface: one observer SFU surface spatially places actual remote video streams.
+          Path('src/components/CoworkingMediaSurface.types.ts').write_text(r'''import type { CoworkingMediaSession } from "../types/coworking";
+
+export interface CoworkingMediaLayoutItem {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface CoworkingMediaSurfaceProps {
+  session: CoworkingMediaSession;
+  displayName: string;
+  cameraOn: boolean;
+  microphoneOn: boolean;
+  mapMode?: boolean;
+  participantLayout?: Record<string, CoworkingMediaLayoutItem>;
+  onConnected?: () => void;
+  onError?: (message: string) => void;
+}
+''')
+          replace(
+              'src/components/CoworkingMediaSurface.native.tsx',
+              '''  microphoneOn,
+  onConnected,
+''',
+              '''  microphoneOn,
+  mapMode = false,
+  participantLayout,
+  onConnected,
+'''
+          )
+          replace(
+              'src/components/CoworkingMediaSurface.native.tsx',
+              '    () => buildCoworkingMediaHtml(session, displayName, { cameraOn, microphoneOn }),\n    [displayName, session]\n',
+              '    () => buildCoworkingMediaHtml(session, displayName, { cameraOn, microphoneOn, mapMode, participantLayout }),\n    [cameraOn, displayName, mapMode, microphoneOn, participantLayout, session]\n'
+          )
+          replace(
+              'src/services/coworking/coworkingMedia.ts',
+              '''export interface CoworkingMediaBridgeConfig {
+  cameraOn: boolean;
+  microphoneOn: boolean;
+}
+''',
+              '''export interface CoworkingMediaBridgeConfig {
+  cameraOn: boolean;
+  microphoneOn: boolean;
+  mapMode?: boolean;
+  participantLayout?: Record<string, { x: number; y: number; width: number; height: number }>;
+}
+'''
+          )
+          replace(
+              'src/services/coworking/coworkingMedia.ts',
+              '''    cameraOn: initial.cameraOn,
+    microphoneOn: initial.microphoneOn
+''',
+              '''    cameraOn: initial.cameraOn,
+    microphoneOn: initial.microphoneOn,
+    mapMode: initial.mapMode === true,
+    participantLayout: initial.participantLayout ?? {},
+    observer: session.observer === true
+'''
+          )
+          replace(
+              'src/services/coworking/coworkingMedia.ts',
+              '''    const addRemote=(participant)=>{
+      if(!participant||!participant.id||!participant.stream)return;
+      let node=remoteNodes.get(participant.id);
+      if(!node){
+        node=document.createElement('div');node.className='remote';
+        const video=document.createElement('video');video.autoplay=true;video.playsInline=true;
+        const name=document.createElement('div');name.className='name';
+        node.append(video,name);grid.appendChild(node);remoteNodes.set(participant.id,node);
+      }
+      node.querySelector('video').srcObject=participant.stream;
+      node.querySelector('.name').textContent=participant.displayName||'Membre Neptune';
+      updateEmpty();
+    };
+''',
+              '''    if(cfg.mapMode){grid.style.display='block';grid.style.padding='0';grid.style.pointerEvents='none';empty.style.display='none';local.style.display='none'}
+    const addRemote=(participant)=>{
+      if(!participant||!participant.id||!participant.stream)return;
+      let node=remoteNodes.get(participant.id);
+      if(!node){
+        node=document.createElement('div');node.className='remote';
+        const video=document.createElement('video');video.autoplay=true;video.playsInline=true;
+        const name=document.createElement('div');name.className='name';
+        node.append(video,name);grid.appendChild(node);remoteNodes.set(participant.id,node);
+      }
+      if(cfg.mapMode){
+        const pos=cfg.participantLayout?.[participant.id];
+        if(pos){node.style.position='absolute';node.style.left=pos.x+'%';node.style.top=pos.y+'%';node.style.width=pos.width+'px';node.style.height=pos.height+'px';node.style.transform='translate(-50%,-50%)';node.style.borderRadius='22px'}
+        node.querySelector('.name').style.display='none';
+      }
+      node.querySelector('video').srcObject=participant.stream;
+      node.querySelector('.name').textContent=participant.displayName||'Membre Neptune';
+      updateEmpty();
+    };
+'''
+          )
+          replace(
+              'src/services/coworking/coworkingMedia.ts',
+              '''    async function start(){
+      try{
+        localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+        local.srcObject=localStream;
+        setTracks(cfg.cameraOn,cfg.microphoneOn);
+        const adapter=window.ConnexioCoworkingClient;
+''',
+              '''    async function start(){
+      try{
+        if(!cfg.observer){
+          localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+          local.srcObject=localStream;
+          setTracks(cfg.cameraOn,cfg.microphoneOn);
+        }else{
+          local.style.display='none';
+        }
+        const adapter=window.ConnexioCoworkingClient;
+'''
+          )
+          replace(
+              'src/services/coworking/coworkingMedia.ts',
+              '''          localStream,
+          onParticipantStream:addRemote,
+''',
+              '''          localStream,
+          observer:Boolean(cfg.observer),
+          mapMode:Boolean(cfg.mapMode),
+          onParticipantStream:addRemote,
+'''
+          )
+
+          # 5) Full-screen Coworking Map.
+          Path('src/screens/CoworkingMapScreen.tsx').write_text(r'''import { Text } from "@/components/LocalizedText";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import CoworkingMediaSurface from "../components/CoworkingMediaSurface";
+import { StatusAvatar } from "../components/StatusAvatar";
+import { useCoworking } from "../providers/CoworkingProvider";
+import { useExperience } from "../providers/ExperienceProvider";
+import { useMessaging } from "../providers/MessagingProvider";
+import { useSession } from "../providers/SessionProvider";
+import { useAppTheme } from "../providers/ThemeProvider";
+import { colors, gradients, spacing } from "../theme";
+import type { CoworkingParticipantPresence, CoworkingPresenceMode, CoworkingSpace } from "../types/coworking";
+
+const FALLBACK_POSITIONS = [
+  [18, 22], [42, 18], [70, 25], [83, 48], [27, 54], [58, 60], [77, 76], [36, 82], [62, 40], [15, 72], [88, 20]
+] as const;
+
+const PRESENCE_META: Record<CoworkingPresenceMode, { label: string; icon: keyof typeof Ionicons.glyphMap; tone: string }> = {
+  available: { label: "Disponible", icon: "chatbubble-ellipses-outline", tone: "#36D48A" },
+  focus: { label: "Focus", icon: "headset-outline", tone: "#8D7BFF" },
+  break: { label: "En pause", icon: "cafe-outline", tone: "#F2A64B" },
+  talk: { label: "En échange", icon: "people-outline", tone: "#50B5FF" }
+};
+
+function spaceForParticipant(userId: string, hub: CoworkingSpace, spaces: CoworkingSpace[]): CoworkingSpace | undefined {
+  if (hub.participantIds.includes(userId)) return hub;
+  return spaces.find((space) => space.participantIds.includes(userId));
+}
+
+export default function CoworkingMapScreen() {
+  const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const { currentUser } = useSession();
+  const { members, localConversations } = useExperience();
+  const { visibleConversations } = useMessaging();
+  const { serviceAvailable, snapshot, activeCount, currentSpace, loading, error, joinSpace, leaveCurrentSpace, updatePresence, mediaForSpace } = useCoworking();
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+
+  const participants = useMemo(() => snapshot.participants.filter((participant) => participant.userId !== currentUser.id), [currentUser.id, snapshot.participants]);
+  const currentPresence = snapshot.participants.find((participant) => participant.userId === currentUser.id);
+  const mediaSession = snapshot.observerMedia ?? (currentSpace ? mediaForSpace(currentSpace.id) : undefined);
+  const selectedPresence = participants.find((participant) => participant.userId === selectedUserId);
+  const selectedMember = members.find((member) => member.id === selectedUserId);
+  const selectedSpace = selectedUserId ? spaceForParticipant(selectedUserId, snapshot.hub, snapshot.spaces) : undefined;
+
+  const layout = useMemo(() => Object.fromEntries(participants.map((participant, index) => {
+    const fallback = FALLBACK_POSITIONS[index % FALLBACK_POSITIONS.length] ?? [50, 50];
+    const x = participant.mapX ?? fallback[0];
+    const y = participant.mapY ?? fallback[1];
+    const camera = participant.cameraOn;
+    return [participant.userId, { x, y, width: camera ? 112 : 76, height: camera ? 122 : 76 }];
+  })), [participants]);
+
+  const findDirectConversation = (userId: string) => [...visibleConversations, ...localConversations].find((conversation) => {
+    if (conversation.type !== "direct") return false;
+    const ids = conversation.memberIds ?? [];
+    return ids.includes(currentUser.id) && ids.includes(userId);
+  });
+
+  const sayHello = () => {
+    if (!selectedMember) return;
+    const conversation = findDirectConversation(selectedMember.id);
+    if (conversation) {
+      router.push({ pathname: "/chat/[id]", params: { id: conversation.id, draft: "Bonjour 👋" } });
+    } else {
+      router.push({ pathname: "/new-conversation", params: { memberId: selectedMember.id, prefill: "Bonjour 👋" } });
+    }
+    setSelectedUserId(null);
+  };
+
+  const joinSelected = async () => {
+    if (!selectedSpace || joining) return;
+    setJoining(true);
+    try {
+      if (currentSpace?.id !== selectedSpace.id) await joinSpace(selectedSpace.id);
+      setSelectedUserId(null);
+      router.push(`/coworking/${encodeURIComponent(selectedSpace.id)}`);
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const joinHub = async () => {
+    if (joining) return;
+    setJoining(true);
+    try {
+      await joinSpace(snapshot.hub.id);
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  if (!serviceAvailable) {
+    return <View style={[styles.unavailable, { backgroundColor: theme.pageBackground }]}><Ionicons name="people-circle-outline" size={42} color={theme.violet} /><Text style={[styles.unavailableTitle, { color: theme.pageText }]}>Coworking indisponible</Text><Text style={[styles.unavailableText, { color: theme.pageTextMuted }]}>L’espace réapparaîtra dès que le service temps réel sera activé.</Text><Pressable onPress={() => router.back()} style={[styles.backAction, { backgroundColor: theme.surfaceStrong }]}><Text style={{ color: theme.pageText, fontWeight: "900" }}>Retour</Text></Pressable></View>;
+  }
+
+  return (
+    <View style={[styles.screen, { backgroundColor: theme.pageBackground }]}>
+      <LinearGradient colors={theme.pageGradient} style={StyleSheet.absoluteFill} />
+      <View pointerEvents="none" style={styles.officeBackdrop}>
+        <View style={[styles.zone, styles.zoneQuiet, { borderColor: theme.borderSoft }]}><Text style={[styles.zoneLabel, { color: theme.pageTextMuted }]}>FOCUS</Text></View>
+        <View style={[styles.zone, styles.zoneOpen, { borderColor: theme.borderSoft }]}><Text style={[styles.zoneLabel, { color: theme.pageTextMuted }]}>ESPACE OUVERT</Text></View>
+        <View style={[styles.zone, styles.zoneBreak, { borderColor: theme.borderSoft }]}><Text style={[styles.zoneLabel, { color: theme.pageTextMuted }]}>PAUSE</Text></View>
+        {Array.from({ length: 7 }).map((_, index) => <View key={`v-${index}`} style={[styles.gridLineVertical, { left: `${12 + index * 13}%`, backgroundColor: theme.borderSoft }]} />)}
+        {Array.from({ length: 6 }).map((_, index) => <View key={`h-${index}`} style={[styles.gridLineHorizontal, { top: `${14 + index * 15}%`, backgroundColor: theme.borderSoft }]} />)}
+      </View>
+
+      <View style={styles.avatarLayer} pointerEvents="none">
+        {participants.map((participant, index) => {
+          const member = members.find((item) => item.id === participant.userId);
+          if (!member) return null;
+          const pos = layout[participant.userId];
+          if (!pos) return null;
+          return <View key={`fallback-${participant.userId}`} style={[styles.fallbackNode, { left: `${pos.x}%`, top: `${pos.y}%`, width: pos.width, height: pos.height, marginLeft: -pos.width / 2, marginTop: -pos.height / 2, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong }]}>{participant.cameraOn && member.avatarUrl ? <Image source={{ uri: member.avatarUrl }} style={styles.fallbackImage} resizeMode="cover" /> : <StatusAvatar user={member} size={participant.cameraOn ? 62 : 52} accessible={false} />}</View>;
+        })}
+      </View>
+
+      {mediaSession ? <View pointerEvents="none" style={styles.mediaLayer}><CoworkingMediaSurface session={mediaSession} displayName={currentUser.name} cameraOn={currentPresence?.cameraOn ?? false} microphoneOn={currentPresence?.microphoneOn ?? false} mapMode participantLayout={layout} onError={setMediaError} /></View> : null}
+
+      <View style={styles.interactionLayer} pointerEvents="box-none">
+        {participants.map((participant) => {
+          const member = members.find((item) => item.id === participant.userId);
+          const pos = layout[participant.userId];
+          if (!member || !pos) return null;
+          const meta = PRESENCE_META[participant.mode];
+          return (
+            <Pressable
+              key={participant.userId}
+              accessibilityRole="button"
+              accessibilityLabel={`${member.name}, ${meta.label}${participant.cameraOn ? ", caméra active" : ""}`}
+              onPress={() => setSelectedUserId(participant.userId)}
+              style={({ pressed }) => [styles.personHit, { left: `${pos.x}%`, top: `${pos.y}%`, width: pos.width + 16, height: pos.height + 32, marginLeft: -(pos.width + 16) / 2, marginTop: -(pos.height + 32) / 2 }, pressed && styles.personPressed]}
+            >
+              <View style={[styles.personFrame, { width: pos.width, height: pos.height, borderColor: participant.speaking ? meta.tone : participant.cameraOn ? theme.violet : theme.borderSoft }]} />
+              <View style={[styles.personStatus, { backgroundColor: theme.surface, borderColor: meta.tone }]}><View style={[styles.statusDot, { backgroundColor: meta.tone }]} /><Text style={[styles.statusText, { color: theme.pageText }]}>{meta.label}</Text>{participant.cameraOn ? <Ionicons name="videocam" size={11} color={theme.violet} /> : null}</View>
+              <Text numberOfLines={1} style={[styles.personName, { color: theme.pageText }]}>{member.name.split(" ")[0]}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10), paddingLeft: Math.max(insets.left, 10), paddingRight: Math.max(insets.right, 10) }]}>
+        <Pressable accessibilityLabel="Fermer le coworking" onPress={() => router.back()} style={[styles.circleButton, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}><Ionicons name="close" size={22} color={theme.pageText} /></Pressable>
+        <View style={[styles.liveTitle, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}><View style={styles.liveDot} /><View><Text style={[styles.title, { color: theme.pageText }]}>Coworking</Text><Text style={[styles.subtitle, { color: theme.pageTextMuted }]}>{loading ? "Connexion…" : `${activeCount} présent${activeCount > 1 ? "s" : ""}`}</Text></View></View>
+        <Pressable accessibilityLabel="Actualiser la map" onPress={() => undefined} style={[styles.circleButton, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}><Ionicons name="locate-outline" size={20} color={theme.pageText} /></Pressable>
+      </View>
+
+      {currentSpace ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.presenceRail, { top: Math.max(insets.top, 10) + 62 }]} contentContainerStyle={styles.presenceRailContent}>{(["available", "focus", "break", "talk"] as CoworkingPresenceMode[]).map((mode) => { const meta = PRESENCE_META[mode]; const active = currentPresence?.mode === mode; return <Pressable key={mode} onPress={() => void updatePresence(mode)} style={[styles.presenceChip, { backgroundColor: active ? meta.tone : theme.surface, borderColor: active ? meta.tone : theme.borderSoft }]}><Ionicons name={meta.icon} size={14} color={active ? "#FFFFFF" : meta.tone} /><Text style={[styles.presenceChipText, { color: active ? "#FFFFFF" : theme.pageText }]}>{meta.label}</Text></Pressable>; })}</ScrollView> : null}
+
+      {!currentSpace ? <View style={[styles.joinDock, { bottom: Math.max(insets.bottom, 12), backgroundColor: theme.surface, borderColor: theme.borderSoft }]}><View style={styles.joinCopy}><Text style={[styles.joinTitle, { color: theme.pageText }]}>Le bureau est ouvert</Text><Text style={[styles.joinText, { color: theme.pageTextMuted }]}>Entre sans rendez-vous. Micro coupé par défaut.</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Rejoindre le coworking" onPress={() => void joinHub()} disabled={joining} style={styles.joinButton}><LinearGradient colors={gradients.primary} style={styles.joinGradient}><Ionicons name="enter-outline" size={19} color="#FFFFFF" /><Text style={styles.joinButtonText}>{joining ? "Connexion…" : "J’entre"}</Text></LinearGradient></Pressable></View> : <Pressable accessibilityRole="button" accessibilityLabel="Quitter le coworking" onPress={() => void leaveCurrentSpace()} style={[styles.leaveButton, { bottom: Math.max(insets.bottom, 14), backgroundColor: theme.surface, borderColor: theme.danger }]}><Ionicons name="exit-outline" size={18} color={theme.danger} /></Pressable>}
+
+      {(error || mediaError) ? <View style={[styles.errorPill, { top: Math.max(insets.top, 10) + (currentSpace ? 112 : 64), backgroundColor: theme.dangerSoft }]}><Text style={[styles.errorText, { color: theme.danger }]}>{mediaError ?? error}</Text></View> : null}
+
+      {selectedMember && selectedPresence ? <Pressable style={styles.sheetBackdrop} onPress={() => setSelectedUserId(null)}><Pressable onPress={() => undefined} style={[styles.personSheet, { paddingBottom: Math.max(insets.bottom, 14), backgroundColor: theme.surface, borderColor: theme.borderSoft }]}><View style={styles.sheetHandle} /><View style={styles.sheetMember}><StatusAvatar user={selectedMember} size={52} accessible={false} /><View style={styles.sheetCopy}><Text style={[styles.sheetName, { color: theme.pageText }]}>{selectedMember.name}</Text><Text style={[styles.sheetCompany, { color: theme.pageTextMuted }]} numberOfLines={1}>{selectedMember.company}</Text><View style={styles.sheetPresence}><View style={[styles.statusDot, { backgroundColor: PRESENCE_META[selectedPresence.mode].tone }]} /><Text style={[styles.sheetPresenceText, { color: theme.pageTextSecondary }]}>{selectedPresence.statusText || PRESENCE_META[selectedPresence.mode].label}{selectedPresence.cameraOn ? " · en visio" : ""}</Text></View></View></View><View style={styles.sheetActions}><Pressable onPress={sayHello} style={[styles.sheetAction, { backgroundColor: theme.violetSoft }]}><Ionicons name="hand-left-outline" size={20} color={theme.violet} /><Text style={[styles.sheetActionText, { color: theme.pageText }]}>Dire bonjour</Text></Pressable>{selectedSpace ? <Pressable onPress={() => void joinSelected()} disabled={joining} style={[styles.sheetAction, { backgroundColor: theme.accentSoft }]}><Ionicons name="people-outline" size={20} color={theme.accent} /><Text style={[styles.sheetActionText, { color: theme.pageText }]}>{currentSpace?.id === selectedSpace.id ? "Ouvrir l’espace" : "Les rejoindre"}</Text></Pressable> : null}<Pressable onPress={() => { const id = selectedMember.id; setSelectedUserId(null); router.push(`/profile/${encodeURIComponent(id)}`); }} style={[styles.sheetAction, { backgroundColor: theme.surfaceStrong }]}><Ionicons name="person-outline" size={20} color={theme.pageTextMuted} /><Text style={[styles.sheetActionText, { color: theme.pageText }]}>Profil</Text></Pressable></View></Pressable></Pressable> : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, overflow: "hidden" },
+  unavailable: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, gap: 10 },
+  unavailableTitle: { fontSize: 20, fontWeight: "900" }, unavailableText: { maxWidth: 360, textAlign: "center", fontSize: 13, lineHeight: 18 }, backAction: { minHeight: 48, paddingHorizontal: 18, borderRadius: 16, alignItems: "center", justifyContent: "center", marginTop: 8 },
+  officeBackdrop: { ...StyleSheet.absoluteFillObject },
+  zone: { position: "absolute", borderWidth: 1, borderStyle: "dashed", borderRadius: 28, opacity: 0.72 }, zoneQuiet: { left: "5%", top: "12%", width: "43%", height: "38%" }, zoneOpen: { right: "4%", top: "13%", width: "43%", height: "56%" }, zoneBreak: { left: "8%", bottom: "7%", width: "42%", height: "34%" }, zoneLabel: { position: "absolute", top: 10, left: 12, fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
+  gridLineVertical: { position: "absolute", top: 0, bottom: 0, width: StyleSheet.hairlineWidth, opacity: 0.16 }, gridLineHorizontal: { position: "absolute", left: 0, right: 0, height: StyleSheet.hairlineWidth, opacity: 0.16 },
+  avatarLayer: { ...StyleSheet.absoluteFillObject }, mediaLayer: { ...StyleSheet.absoluteFillObject, backgroundColor: "transparent" }, interactionLayer: { ...StyleSheet.absoluteFillObject },
+  fallbackNode: { position: "absolute", borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center", overflow: "hidden" }, fallbackImage: { width: "100%", height: "100%", opacity: 0.9 },
+  personHit: { position: "absolute", alignItems: "center", justifyContent: "center" }, personPressed: { opacity: 0.76 }, personFrame: { borderRadius: 22, borderWidth: 2, backgroundColor: "transparent" }, personStatus: { position: "absolute", bottom: 9, minHeight: 24, borderRadius: 999, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", gap: 4 }, statusDot: { width: 7, height: 7, borderRadius: 4 }, statusText: { fontSize: 9, fontWeight: "900" }, personName: { position: "absolute", bottom: -7, maxWidth: 104, fontSize: 10, fontWeight: "900" },
+  topBar: { position: "absolute", top: 0, left: 0, right: 0, minHeight: 62, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }, circleButton: { width: 48, height: 48, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" }, liveTitle: { minHeight: 48, paddingHorizontal: 13, borderRadius: 17, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 8 }, liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#36D48A" }, title: { fontSize: 14, fontWeight: "900" }, subtitle: { fontSize: 10, fontWeight: "750", marginTop: 1 },
+  presenceRail: { position: "absolute", left: 0, right: 0, maxHeight: 46 }, presenceRailContent: { paddingHorizontal: 10, gap: 7 }, presenceChip: { minHeight: 40, paddingHorizontal: 11, borderRadius: 15, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 6 }, presenceChipText: { fontSize: 10, fontWeight: "900" },
+  joinDock: { position: "absolute", left: 10, right: 10, minHeight: 72, borderRadius: 22, borderWidth: 1, padding: 10, flexDirection: "row", alignItems: "center", gap: 10 }, joinCopy: { flex: 1, minWidth: 0 }, joinTitle: { fontSize: 13, fontWeight: "900" }, joinText: { fontSize: 10, lineHeight: 14, marginTop: 2 }, joinButton: { minWidth: 104, height: 48, borderRadius: 16, overflow: "hidden" }, joinGradient: { flex: 1, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 }, joinButtonText: { color: "#FFFFFF", fontSize: 11, fontWeight: "900" }, leaveButton: { position: "absolute", right: 14, width: 48, height: 48, borderRadius: 17, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  errorPill: { position: "absolute", alignSelf: "center", maxWidth: "88%", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 }, errorText: { fontSize: 10, lineHeight: 14, fontWeight: "800", textAlign: "center" },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.42)", justifyContent: "flex-end" }, personSheet: { width: "100%", borderTopLeftRadius: 28, borderTopRightRadius: 28, borderWidth: 1, padding: 14, gap: 13 }, sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: "rgba(150,160,180,0.48)", alignSelf: "center" }, sheetMember: { minHeight: 60, flexDirection: "row", alignItems: "center", gap: 11 }, sheetCopy: { flex: 1, minWidth: 0 }, sheetName: { fontSize: 16, fontWeight: "900" }, sheetCompany: { fontSize: 11, marginTop: 2 }, sheetPresence: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 5 }, sheetPresenceText: { fontSize: 11, fontWeight: "750" }, sheetActions: { flexDirection: "row", gap: 8 }, sheetAction: { flex: 1, minHeight: 56, borderRadius: 17, alignItems: "center", justifyContent: "center", gap: 5 }, sheetActionText: { fontSize: 10, fontWeight: "900", textAlign: "center" }
+});
+''')
+          replace('app/coworking.tsx', 'export { default } from "@/screens/CoworkingScreen";\n', 'export { default } from "@/screens/CoworkingMapScreen";\n')
+
+          # Support a map action that preselects a member and pre-fills a greeting.
+          replace('src/screens/NewConversationScreen.tsx', 'import { router } from "expo-router";\n', 'import { router, useLocalSearchParams } from "expo-router";\n')
+          replace(
+              'src/screens/NewConversationScreen.tsx',
+              'export default function NewConversationScreen() {\n  const insets = useSafeAreaInsets();\n',
+              '''export default function NewConversationScreen() {
+  const params = useLocalSearchParams<{ memberId?: string; prefill?: string }>();
+  const preselectedMemberId = Array.isArray(params.memberId) ? params.memberId[0] : params.memberId;
+  const prefill = Array.isArray(params.prefill) ? params.prefill[0] : params.prefill;
+  const insets = useSafeAreaInsets();
+'''
+          )
+          replace('src/screens/NewConversationScreen.tsx', '  const [selectedIds, setSelectedIds] = useState<string[]>([]);\n', '  const [selectedIds, setSelectedIds] = useState<string[]>(() => preselectedMemberId ? [preselectedMemberId] : []);\n')
+          replace(
+              'src/screens/NewConversationScreen.tsx',
+              '  const openExistingConversation = (conversation: Conversation) => {\n    router.replace(`/chat/${encodeURIComponent(conversation.id)}`);\n  };\n',
+              '  const openExistingConversation = (conversation: Conversation) => {\n    router.replace({ pathname: "/chat/[id]", params: { id: conversation.id, ...(prefill ? { draft: prefill } : {}) } });\n  };\n'
+          )
+          replace(
+              'src/screens/NewConversationScreen.tsx',
+              '        router.replace(`/chat/${encodeURIComponent(conversation.id)}`);\n        return;\n',
+              '        router.replace({ pathname: "/chat/[id]", params: { id: conversation.id, ...(prefill ? { draft: prefill } : {}) } });\n        return;\n'
+          )
+          replace(
+              'src/screens/ChatConversationScreen.tsx',
+              '  const params = useLocalSearchParams<{ id: string; focusMention?: string; focusMessageId?: string }>();\n',
+              '  const params = useLocalSearchParams<{ id: string; focusMention?: string; focusMessageId?: string; draft?: string }>();\n'
+          )
+          replace(
+              'src/screens/ChatConversationScreen.tsx',
+              '  const [draft, setDraft] = useState("");\n',
+              '  const initialDraft = Array.isArray(params.draft) ? (params.draft[0] ?? "") : (params.draft ?? "");\n  const [draft, setDraft] = useState(initialDraft);\n'
+          )
+
+          # Announcement semantics: compact iff latest announcement has been read.
+          replace(
+              'src/domain/conversationOrganization.ts',
+              '''export function isAnnouncementCollapsed(conversation: Conversation, now = Date.now()): boolean {
+  if (!isAnnouncementConversation(conversation)) return false;
+  if (conversation.unreadCount > 0 || (conversation.mentionCount ?? 0) > 0) return false;
+  const timestamp = conversationRecency(conversation);
+  if (!timestamp) return true;
+  return now - timestamp > 7 * 24 * 60 * 60 * 1000;
+}
+''',
+              '''export function isAnnouncementCollapsed(conversation: Conversation): boolean {
+  if (!isAnnouncementConversation(conversation)) return false;
+  return conversation.unreadCount <= 0 && (conversation.mentionCount ?? 0) <= 0;
+}
+'''
+          )
+
+          # Backend implementation notes for asynchronous transcription + map observer media.
+          Path('docs/V24_MESSAGING_COWORKING_BACKEND.md').write_text(r'''# Connexio V24 — contrat backend complémentaire
+
+## Messages vocaux
+
+Le client envoie un attachment `kind: audio` avec `duration_seconds` et `transcript_status: pending`.
+Le backend doit déclencher une transcription asynchrone après `/v1/uploads/:id/complete` ou après création du message.
+
+Le message retourné et les évènements temps réel doivent exposer :
+
+```json
+{
+  "kind": "audio",
+  "download_url": "https://…",
+  "duration_seconds": 18.4,
+  "transcript": "Texte transcrit…",
+  "transcript_status": "ready"
+}
+```
+
+Valeurs de `transcript_status`: `pending`, `ready`, `failed`.
+La transcription ne remplace jamais l'audio original. Elle est traduisible via `transcript_translation` comme le reste du contenu Connexio.
+
+## Coworking Map
+
+`GET /v1/coworking` peut fournir pour chaque présence `map_x` et `map_y` (pourcentages 0–100 du plan numérique). Sans coordonnées, le client applique un placement déterministe.
+
+Pour afficher les caméras directement dans la map sans faire entrer automatiquement l'utilisateur dans une salle, le snapshot peut fournir un token SFU **observer/listen-only** :
+
+```json
+{
+  "observer_media": {
+    "space_id": "coworking-map",
+    "socket_url": "https://…",
+    "socket_path": "/socket.io",
+    "client_script_url": "https://…/coworking-client.js",
+    "token": "short-lived-token",
+    "participant_id": "viewer-user-id",
+    "ice_servers": [],
+    "observer": true,
+    "expires_at": "…"
+  }
+}
+```
+
+Le client observer ne demande ni caméra ni microphone. Il reçoit uniquement les flux vidéo autorisés des membres dont `camera_on = true`. Le SDK SFU doit accepter `observer: true` et `localStream: null`.
+
+La map reste utilisable sans `observer_media`: présence, avatar, disponibilité et espaces fonctionnent; seule la miniature vidéo live retombe sur l'avatar.
+''')
+
+          # Basic static assertions.
+          checks = {
+              'src/screens/ChatConversationScreen.tsx': ['scrollToOffset({ offset: 0', 'lastAutoFollowMessageIdRef'],
+              'src/screens/MessagesScreenV22.tsx': ['section.unreadCount', 'announcementFullText', 'isInteraction: false'],
+              'src/components/MessageAttachmentsGrid.tsx': ['VoiceMessagePlayer', 'const audio ='],
+              'src/screens/CoworkingMapScreen.tsx': ['observerMedia', 'Dire bonjour', 'participantLayout'],
+              'app/coworking.tsx': ['CoworkingMapScreen']
+          }
+          for path, needles in checks.items():
+              text = Path(path).read_text()
+              for needle in needles:
+                  if needle not in text:
+                      raise SystemExit(f"V24 assertion failed: {needle} missing from {path}")
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate V24
+        run: npm run verify && npm run audit:rc && npx expo install --check
+
+      - name: Commit V24
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app src docs
+          git commit -m "feat(v24): refine messaging and move coworking into live map"
+          git push origin HEAD:fix/v24-messaging-coworking-map
