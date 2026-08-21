@@ -83,3 +83,5 @@ jobs:
           git add -f builds/new-expo-project.json
           git commit -m "chore(expo): record accessible EAS projects [skip ci]" || true
           git push origin HEAD:release/connexio-rc1
+
+# refreshed after EXPO_TOKEN rotation on 2026-08-21
