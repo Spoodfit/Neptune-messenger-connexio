@@ -138,4 +138,4 @@ jobs:
           git push origin HEAD:release/connexio-rc1
           test "${EAS_CODE:-1}" = "0"
 
-# build trigger 2026-08-21T16:55+02:00
+# retry trigger after release relink — 2026-08-21T16:56+02:00
