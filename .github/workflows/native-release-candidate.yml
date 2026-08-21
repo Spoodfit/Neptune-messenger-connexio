@@ -33,11 +33,17 @@ jobs:
           const https = require('https');
           const token = process.env.EXPO_TOKEN;
           const query = `query CurrentActorProjects {
-            meUserActor {
+            meActor {
               __typename
-              username
               accounts { id name }
-              apps(includeUnpublished: true, limit: 100, offset: 0) { id fullName }
+              ... on User {
+                username
+                apps(includeUnpublished: true, limit: 100, offset: 0) { id fullName }
+              }
+              ... on SSOUser {
+                username
+                apps(includeUnpublished: true, limit: 100, offset: 0) { id fullName }
+              }
             }
           }`;
           const body = JSON.stringify({ query, variables: {} });
@@ -59,7 +65,7 @@ jobs:
               const output = { statusCode: res.statusCode, response: json };
               fs.writeFileSync('builds/new-expo-project.json', JSON.stringify(output, null, 2) + '\n');
               console.log(JSON.stringify(output, null, 2));
-              if (!json?.data?.meUserActor) process.exitCode = 2;
+              if (!json?.data?.meActor) process.exitCode = 2;
             });
           });
           req.on('error', (error) => {
