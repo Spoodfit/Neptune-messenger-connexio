@@ -1,0 +1,38 @@
+[
+  {
+    "id": "eec2fc81-a9d3-4094-8165-df9a05c8bf64",
+    "status": "IN_QUEUE",
+    "platform": "ANDROID",
+    "artifacts": {},
+    "fingerprint": {
+      "id": "01a024db-b748-753c-92a1-7e3c3b19939b",
+      "hash": "e51407fe76a0ec1f760b9052090b70e4d1d22134"
+    },
+    "initiatingActor": {
+      "id": "b2faa799-6ba1-461b-9dcf-93f032fa1db5",
+      "displayName": "johanzambelli"
+    },
+    "logFiles": [],
+    "project": {
+      "id": "1e85dc3a-4114-4387-8e15-2463a82e68fd",
+      "name": "Connexio",
+      "slug": "connexio",
+      "ownerAccount": {
+        "id": "eb02f4cb-affa-4075-a3e9-e9abe7112389",
+        "name": "johanzambellis-team"
+      }
+    },
+    "distribution": "INTERNAL",
+    "buildProfile": "standalone",
+    "sdkVersion": "57.0.0",
+    "appVersion": "1.0.1",
+    "appBuildVersion": "2",
+    "gitCommitHash": "adee1b444332139e2728bcf4cf8aecaecaaa63d0",
+    "gitCommitMessage": "build(expo): target new Connexio EAS project",
+    "priority": "NORMAL",
+    "createdAt": "2026-08-21T15:06:14.173Z",
+    "updatedAt": "2026-08-21T15:06:17.376Z",
+    "expirationDate": "2026-09-04T15:06:14.206Z",
+    "isForIosSimulator": false
+  }
+]
