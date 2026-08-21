@@ -32,6 +32,40 @@ jobs:
         with:
           ref: release/connexio-rc1
           fetch-depth: 0
+      - name: Relink release to new Expo project
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('fs');
+          const newId = '1e85dc3a-4114-4387-8e15-2463a82e68fd';
+          const oldId = 'd2288b09-8249-4879-810f-7cb0072baeeb';
+
+          let appConfig = fs.readFileSync('app.config.ts', 'utf8');
+          appConfig = appConfig.replace(`const EAS_PROJECT_ID = "${oldId}";`, `const EAS_PROJECT_ID = "${newId}";`);
+          appConfig = appConfig.replace('    slug: "neptune",', '    owner: "johanzambellis-team",\n    slug: "connexio",');
+          fs.writeFileSync('app.config.ts', appConfig);
+
+          let envExample = fs.readFileSync('.env.example', 'utf8');
+          envExample = envExample.replace(oldId, newId);
+          fs.writeFileSync('.env.example', envExample);
+
+          const workflow = '.github/workflows/native-standalone.yml';
+          let standalone = fs.readFileSync(workflow, 'utf8');
+          standalone = standalone.replaceAll(oldId, newId);
+          fs.writeFileSync(workflow, standalone);
+
+          if (!fs.readFileSync('app.config.ts','utf8').includes(`const EAS_PROJECT_ID = "${newId}";`)) throw new Error('projectId Expo non remplacé');
+          if (!fs.readFileSync('app.config.ts','utf8').includes('owner: "johanzambellis-team"')) throw new Error('owner Expo non configuré');
+          if (!fs.readFileSync('app.config.ts','utf8').includes('slug: "connexio"')) throw new Error('slug Expo non configuré');
+          NODE
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.config.ts .env.example .github/workflows/native-standalone.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(expo): link Connexio to johanzambellis team"
+            git push origin HEAD:release/connexio-rc1
+          fi
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
