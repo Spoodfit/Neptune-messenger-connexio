@@ -7,7 +7,9 @@ import {
   StyleSheet,
   View,
   type GestureResponderEvent,
-  type LayoutChangeEvent
+  type LayoutChangeEvent,
+  type TextStyle,
+  type ViewStyle
 } from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
@@ -198,8 +200,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 9,
     gap: 6
-  },
-  playerRow: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 9 },
+  } satisfies ViewStyle,
+  playerRow: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: 9 } satisfies ViewStyle,
   playButton: {
     width: 48,
     height: 48,
@@ -207,30 +209,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0
-  },
-  disabled: { opacity: 0.42 },
-  waveColumn: { flex: 1, minWidth: 0 },
-  waveform: { height: 36, flexDirection: "row", alignItems: "center", gap: 2 },
-  waveBar: { flex: 1, minWidth: 2, maxWidth: 4, borderRadius: 3 },
+  } satisfies ViewStyle,
+  disabled: { opacity: 0.42 } satisfies ViewStyle,
+  waveColumn: { flex: 1, minWidth: 0 } satisfies ViewStyle,
+  waveform: { height: 36, flexDirection: "row", alignItems: "center", gap: 2 } satisfies ViewStyle,
+  waveBar: { flex: 1, minWidth: 2, maxWidth: 4, borderRadius: 3 } satisfies ViewStyle,
   timeRow: {
     marginTop: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between"
-  },
-  voiceMeta: { flexDirection: "row", alignItems: "center", gap: 3 },
-  time: { fontSize: 10, lineHeight: 13, fontWeight: "800" },
-  transcript: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 4 },
-  transcriptHeading: { flexDirection: "row", alignItems: "center", gap: 5 },
+  } satisfies ViewStyle,
+  voiceMeta: { flexDirection: "row", alignItems: "center", gap: 3 } satisfies ViewStyle,
+  time: { fontSize: 10, lineHeight: 13, fontWeight: "800" } satisfies TextStyle,
+  transcript: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 4 } satisfies ViewStyle,
+  transcriptHeading: { flexDirection: "row", alignItems: "center", gap: 5 } satisfies ViewStyle,
   transcriptLabel: {
     fontSize: 10,
     lineHeight: 13,
     fontWeight: "900",
     textTransform: "uppercase",
     letterSpacing: 0.45
-  },
-  transcriptText: { fontSize: 12, lineHeight: 17, fontWeight: "650" },
-  expandText: { fontSize: 11, lineHeight: 14, fontWeight: "900", marginTop: 2 },
+  } satisfies TextStyle,
+  transcriptText: { fontSize: 12, lineHeight: 17, fontWeight: "600" } satisfies TextStyle,
+  expandText: { fontSize: 11, lineHeight: 14, fontWeight: "900", marginTop: 2 } satisfies TextStyle,
   transcriptState: {
     minHeight: 34,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -238,6 +240,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6
-  },
-  transcriptStateText: { fontSize: 11, fontWeight: "750" }
+  } satisfies ViewStyle,
+  transcriptStateText: { fontSize: 11, fontWeight: "700" } satisfies TextStyle
 });
