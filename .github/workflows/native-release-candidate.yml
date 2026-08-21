@@ -38,7 +38,7 @@ jobs:
               accounts {
                 id
                 name
-                apps(includeUnpublished: true, limit: 100, offset: 0) {
+                apps(includeUnpublished: true, limit: 50, offset: 0) {
                   id
                   fullName
                 }
