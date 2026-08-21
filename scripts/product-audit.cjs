@@ -258,7 +258,7 @@ async function run() {
     if (await clickVisibleLabel(page, "Rejoindre le coworking", "entrée Coworking")) {
       await expectVisible(page.getByLabel("Quitter le coworking", { exact: true }), "présence Coworking active");
       for (const mode of ["Disponible", "Focus", "En pause", "En échange"]) {
-        await expectVisible(page.getByRole("button").filter({ hasText: mode }), `mode ${mode} visible`);
+        await expectVisible(page.getByRole("button", { name: mode, exact: true }), `mode ${mode} visible`);
       }
       await checkGeometry(page, "Coworking présent");
       if (await clickVisibleLabel(page, "Quitter le coworking", "sortie Coworking disponible")) {
