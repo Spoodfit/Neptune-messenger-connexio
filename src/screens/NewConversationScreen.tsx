@@ -4,9 +4,8 @@ import {
   Ionicons } from "@expo/vector-icons";
 import { ThemeModeButton } from "../components/ThemeModeButton";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useMemo,
-  useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -81,6 +80,7 @@ function sameParticipants(
 }
 
 export default function NewConversationScreen() {
+  const params = useLocalSearchParams<{ memberId?: string; prefill?: string }>();
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const styles = createStyles(theme);
@@ -98,6 +98,8 @@ export default function NewConversationScreen() {
   );
   const canCreateOfficialGroup = isVisionnaireRole(currentUser.role);
   const canInitiatePrivate = canInitiatePrivateInteraction(currentUser.role);
+  const requestedMemberId = Array.isArray(params.memberId) ? params.memberId[0] : params.memberId;
+  const requestedPrefill = Array.isArray(params.prefill) ? params.prefill[0] : params.prefill;
 
   const [mode, setMode] = useState<"private" | "group">("private");
   const [query, setQuery] = useState("");
@@ -114,6 +116,12 @@ export default function NewConversationScreen() {
     "people"
   );
   const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (!requestedMemberId || requestedMemberId === currentUser.id) return;
+    if (!members.some((member) => member.id === requestedMemberId)) return;
+    setSelectedIds((previous) => previous.length > 0 ? previous : [requestedMemberId]);
+  }, [currentUser.id, members, requestedMemberId]);
 
   const filteredMembers = useMemo(() => {
     const cleanQuery = query.trim().toLocaleLowerCase("fr");
@@ -185,7 +193,13 @@ export default function NewConversationScreen() {
   };
 
   const openExistingConversation = (conversation: Conversation) => {
-    router.replace(`/chat/${encodeURIComponent(conversation.id)}`);
+    router.replace({
+      pathname: "/chat/[id]",
+      params: {
+        id: conversation.id,
+        ...(requestedPrefill ? { draft: requestedPrefill } : {})
+      }
+    });
   };
 
   const submit = async () => {
@@ -256,7 +270,13 @@ export default function NewConversationScreen() {
               name: privateName.trim() || undefined
             });
         if (api) await refreshConversations();
-        router.replace(`/chat/${encodeURIComponent(conversation.id)}`);
+        router.replace({
+          pathname: "/chat/[id]",
+          params: {
+            id: conversation.id,
+            ...(requestedPrefill ? { draft: requestedPrefill } : {})
+          }
+        });
         return;
       }
 

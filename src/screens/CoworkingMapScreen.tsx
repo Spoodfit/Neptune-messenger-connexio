@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CoworkingMediaSurface from "../components/CoworkingMediaSurface";
@@ -59,6 +59,7 @@ function spaceForParticipant(
 
 export default function CoworkingMapScreen() {
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth } = useWindowDimensions();
   const theme = useAppTheme();
   const { currentUser } = useSession();
   const { members, localConversations } = useExperience();
@@ -102,20 +103,19 @@ export default function CoworkingMapScreen() {
       Object.fromEntries(
         participants.map((participant, index) => {
           const fallback = FALLBACK_POSITIONS[index % FALLBACK_POSITIONS.length] ?? [50, 50];
-          const x = participant.mapX ?? fallback[0];
+          const width = participant.cameraOn ? 112 : 76;
+          const height = participant.cameraOn ? 122 : 76;
+          const hitWidth = width + 20;
+          const horizontalInset = hitWidth / 2 + 4;
+          const minimumX = Math.min(50, (horizontalInset / Math.max(viewportWidth, 1)) * 100);
+          const maximumX = 100 - minimumX;
+          const rawX = participant.mapX ?? fallback[0];
+          const x = Math.max(minimumX, Math.min(maximumX, rawX));
           const y = participant.mapY ?? fallback[1];
-          return [
-            participant.userId,
-            {
-              x,
-              y,
-              width: participant.cameraOn ? 112 : 76,
-              height: participant.cameraOn ? 122 : 76
-            }
-          ];
+          return [participant.userId, { x, y, width, height }];
         })
       ),
-    [participants]
+    [participants, viewportWidth]
   );
 
   const directConversationFor = (userId: string) =>
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
     gap: 4
   },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontSize: 9, fontWeight: "900" },
+  statusText: { fontSize: 10, fontWeight: "900" },
   personName: {
     position: "absolute",
     bottom: -7,
@@ -677,10 +677,10 @@ const styles = StyleSheet.create({
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#36D48A" },
   title: { fontSize: 14, fontWeight: "900" },
   subtitle: { fontSize: 10, fontWeight: "700", marginTop: 1 },
-  presenceRail: { position: "absolute", left: 0, right: 0, maxHeight: 46 },
+  presenceRail: { position: "absolute", left: 0, right: 0, maxHeight: 54 },
   presenceRailContent: { paddingHorizontal: 10, gap: 7 },
   presenceChip: {
-    minHeight: 40,
+    minHeight: 48,
     paddingHorizontal: 11,
     borderRadius: 15,
     borderWidth: 1,
