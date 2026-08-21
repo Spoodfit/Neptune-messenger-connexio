@@ -1,7 +1,7 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
 const APP_VERSION = "1.0.1";
-const EAS_PROJECT_ID = "d2288b09-8249-4879-810f-7cb0072baeeb";
+const EAS_PROJECT_ID = "1e85dc3a-4114-4387-8e15-2463a82e68fd";
 const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
 const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
 const PUBLIC_POLICY_BASE_URL = "https://spoodfit.github.io/Neptune-messenger-connexio";
@@ -68,7 +68,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: "Connexio by Neptune",
-    slug: "neptune",
+    owner: "johanzambellis-team",
+    slug: "connexio",
     version: APP_VERSION,
     orientation: "default",
     scheme: "neptuneconnexio",
