@@ -123,7 +123,7 @@ export default function ChatScreen() {
   const canInitiateCalls = canInitiatePrivateInteraction(currentUser.role);
   const announcement = conversation?.type === "announcement";
 
-  const [draft, setDraft] = useState(requestedDraft ?? "");
+  const [draft, setDraft] = useState<string>(requestedDraft ?? "");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
