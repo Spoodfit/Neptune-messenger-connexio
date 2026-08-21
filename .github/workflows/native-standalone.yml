@@ -73,10 +73,26 @@ jobs:
     steps:
       - name: Vérifier les accès EAS
         run: test -n "$EXPO_TOKEN"
-      - name: Checkout
+      - name: Checkout release exacte
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'push' && github.sha || 'release/connexio-rc1' }}
           fetch-depth: 0
+      - name: Verrouiller la source Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          echo "Source Android Connexio: $SOURCE_SHA"
+          echo "CONNEXIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$SOURCE_SHA" != "$GITHUB_SHA" ]; then
+            echo "Le checkout ne correspond pas au commit du push: $SOURCE_SHA != $GITHUB_SHA" >&2
+            exit 1
+          fi
+          grep -Fq 'MessagesScreenV22' 'app/(tabs)/messages.tsx'
+          grep -Fq 'HighlightsScreenV22' 'app/(tabs)/highlights.tsx'
+          grep -Fq 'accessibilityLabel="Envoyer le message"' src/screens/ChatConversationScreen.tsx
+          grep -Fq 'call-feedback' app/call/'[id].tsx'
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -88,22 +104,8 @@ jobs:
           python-version: "3.12"
       - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
-      - name: Aligner les dépendances Expo SDK 57
-        run: |
-          npx expo install expo-audio expo-linking --npm
-          npx expo install --check
-      - name: Enregistrer le lockfile Expo corrigé
-        if: github.event_name == 'push'
-        run: |
-          if git diff --quiet -- package.json package-lock.json; then
-            echo "Lockfile Expo déjà aligné."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "fix(expo): align SDK 57 dependencies [skip ci]"
-          git push origin HEAD:release/connexio-rc1
+      - name: Vérifier les dépendances Expo SDK 57 sans mutation
+        run: npx expo install --check
       - name: Vérifier Connexio avant build
         run: npm run verify && npm run audit:rc && npx expo install --check
       - name: Normaliser les assets PNG Connexio
@@ -196,12 +198,17 @@ jobs:
           if (!build || !build.id) throw new Error('Réponse EAS invalide: build introuvable.');
           const artifactUrl = build.artifacts?.buildUrl || build.artifacts?.applicationArchiveUrl || null;
           if (!artifactUrl) throw new Error('Build EAS terminé sans URL APK.');
+          const sourceCommit = process.env.CONNEXIO_SOURCE_SHA || null;
+          if (build.gitCommitHash && sourceCommit && build.gitCommitHash !== sourceCommit) {
+            throw new Error(`EAS a construit ${build.gitCommitHash} au lieu de ${sourceCommit}.`);
+          }
           const metadata = {
             id: build.id,
             status: build.status,
             platform: build.platform,
             profile: 'standalone',
-            gitCommit: process.env.GITHUB_SHA,
+            sourceCommit,
+            easGitCommitHash: build.gitCommitHash ?? null,
             appVersion: build.appVersion ?? null,
             appBuildVersion: build.appBuildVersion ?? null,
             createdAt: build.createdAt ?? null,
@@ -216,7 +223,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add builds/latest-android-standalone.json
+          git add -f builds/latest-android-standalone.json
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "build(android): record latest standalone APK [skip ci]"
           git push origin HEAD:release/connexio-rc1
@@ -229,8 +236,11 @@ jobs:
     steps:
       - name: Vérifier les accès EAS
         run: test -n "$EXPO_TOKEN"
-      - name: Checkout
+      - name: Checkout release exacte
         uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -238,10 +248,8 @@ jobs:
           cache: npm
       - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
-      - name: Aligner les dépendances Expo SDK 57
-        run: |
-          npx expo install expo-audio expo-linking --npm
-          npx expo install --check
+      - name: Vérifier les dépendances Expo SDK 57 sans mutation
+        run: npx expo install --check
       - name: Vérifier Connexio avant build
         run: npm run verify && npm run audit:rc && npx expo install --check
       - name: Vérifier la configuration standalone
