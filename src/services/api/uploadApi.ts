@@ -18,6 +18,8 @@ interface CompleteUploadResponse {
   width?: number;
   height?: number;
   duration_seconds?: number;
+  transcript?: string;
+  transcript_status?: "pending" | "ready" | "failed";
 }
 
 interface UploadableAsset {
@@ -114,6 +116,8 @@ export async function uploadMessageAttachment(
     width: completed.width ?? attachment.width,
     height: completed.height ?? attachment.height,
     durationSeconds: completed.duration_seconds ?? attachment.durationSeconds,
+    transcript: completed.transcript ?? attachment.transcript,
+    transcriptStatus: completed.transcript_status ?? attachment.transcriptStatus,
     status: "ready",
     uploadProgress: 1
   };
