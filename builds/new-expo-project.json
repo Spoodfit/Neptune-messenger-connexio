@@ -1,32 +1,27 @@
 {
   "statusCode": 200,
   "response": {
-    "errors": [
-      {
-        "extensions": {
-          "requestId": "d1ba0c51-6d24-488d-9b4f-0998cb2f14a2",
-          "code": "INTERNAL_SERVER_ERROR",
-          "errorCode": "VALIDATION_ERROR",
-          "errorType": "USER",
-          "isTransient": false
-        },
-        "message": "Limit must be less than or equal to 50",
-        "locations": [
+    "data": {
+      "meActor": {
+        "__typename": "User",
+        "accounts": [
           {
-            "line": 7,
-            "column": 7
+            "id": "acf5c29a-ef48-475e-82f4-e0a2502866cc",
+            "name": "neptunebusiness",
+            "apps": []
+          },
+          {
+            "id": "c172ea1d-c198-43ae-8607-3e275fa8b437",
+            "name": "neptune-business",
+            "apps": [
+              {
+                "id": "d2288b09-8249-4879-810f-7cb0072baeeb",
+                "fullName": "@neptune-business/neptune"
+              }
+            ]
           }
-        ],
-        "path": [
-          "meActor",
-          "accounts",
-          0,
-          "apps"
         ]
       }
-    ],
-    "data": {
-      "meActor": null
     }
   }
 }
