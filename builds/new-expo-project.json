@@ -6,17 +6,17 @@
         "__typename": "User",
         "accounts": [
           {
-            "id": "acf5c29a-ef48-475e-82f4-e0a2502866cc",
-            "name": "neptunebusiness",
+            "id": "a1964ef6-875f-4a94-8a46-51aca0e37861",
+            "name": "johanzambelli",
             "apps": []
           },
           {
-            "id": "c172ea1d-c198-43ae-8607-3e275fa8b437",
-            "name": "neptune-business",
+            "id": "eb02f4cb-affa-4075-a3e9-e9abe7112389",
+            "name": "johanzambellis-team",
             "apps": [
               {
-                "id": "d2288b09-8249-4879-810f-7cb0072baeeb",
-                "fullName": "@neptune-business/neptune"
+                "id": "1e85dc3a-4114-4387-8e15-2463a82e68fd",
+                "fullName": "@johanzambellis-team/connexio"
               }
             ]
           }
