@@ -771,13 +771,13 @@ const styles = StyleSheet.create({
   announcementTitleLine: { flexDirection: "row", alignItems: "center", gap: 7 },
   announcementTitle: { fontSize: 14, fontWeight: "900" },
   announcementUnreadPill: {
-    minHeight: 20,
+    minHeight: 22,
     borderRadius: 999,
     paddingHorizontal: 7,
     alignItems: "center",
     justifyContent: "center"
   },
-  announcementUnreadText: { fontSize: 9, lineHeight: 11, fontWeight: "900", letterSpacing: 0.7 },
+  announcementUnreadText: { fontSize: 11, lineHeight: 13, fontWeight: "900", letterSpacing: 0.5 },
   announcementPreview: { marginTop: 2, fontSize: 14, lineHeight: 18 },
   announcementFullText: { fontSize: 14, lineHeight: 20, fontWeight: "700", paddingHorizontal: 2 },
   announcementActions: {
@@ -788,7 +788,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   announcementReadButton: {
-    minHeight: 44,
+    minHeight: 48,
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
