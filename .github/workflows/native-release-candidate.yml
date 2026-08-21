@@ -1,4 +1,4 @@
-name: Discover Connexio Expo project
+name: Build Connexio V23 on Expo
 
 on:
   workflow_dispatch:
@@ -11,77 +11,95 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: connexio-v23-new-eas-project
+  cancel-in-progress: true
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
+  EXPO_PUBLIC_MOCK_MODE: "true"
+  EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+  EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+
 jobs:
-  discover:
+  android:
     runs-on: ubuntu-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    timeout-minutes: 90
     steps:
-      - name: Checkout release
+      - name: Checkout latest V23 release
         uses: actions/checkout@v4
         with:
           ref: release/connexio-rc1
           fetch-depth: 0
-      - name: Verify Expo token
-        run: test -n "$EXPO_TOKEN"
-      - name: Enumerate Expo projects from accessible accounts
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify Expo account and project
         shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@21.7.1 whoami
+          npx --yes eas-cli@21.7.1 project:info --json | tee eas-project-info.json
+      - name: Verify V23 release
+        run: npm run verify && npm run audit:rc && npx expo install --check
+      - name: Build Android standalone APK on EAS Cloud
+        id: eas
+        shell: bash
+        run: |
+          set +e
+          npx --yes eas-cli@21.7.1 build \
+            --profile standalone \
+            --platform android \
+            --non-interactive \
+            --wait \
+            --clear-cache \
+            --json > eas-build-android.json 2> eas-build-android.stderr
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          cat eas-build-android.stderr || true
+          cat eas-build-android.json || true
+      - name: Record build result
+        if: always()
+        shell: bash
+        env:
+          EAS_CODE: ${{ steps.eas.outputs.code }}
         run: |
           mkdir -p builds
           node - <<'NODE'
           const fs = require('fs');
-          const https = require('https');
-          const token = process.env.EXPO_TOKEN;
-          const query = `query CurrentActorProjects {
-            meActor {
-              __typename
-              accounts {
-                id
-                name
-                apps(includeUnpublished: true, limit: 50, offset: 0) {
-                  id
-                  fullName
-                }
-              }
-            }
-          }`;
-          const body = JSON.stringify({ query, variables: {} });
-          const req = https.request('https://api.expo.dev/graphql', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(body)
-            }
-          }, (res) => {
-            let data = '';
-            res.on('data', (chunk) => data += chunk);
-            res.on('end', () => {
-              let json = null;
-              try { json = JSON.parse(data); } catch (error) {
-                json = { parseError: String(error), raw: data.slice(0, 4000) };
-              }
-              const output = { statusCode: res.statusCode, response: json };
-              fs.writeFileSync('builds/new-expo-project.json', JSON.stringify(output, null, 2) + '\n');
-              console.log(JSON.stringify(output, null, 2));
-              if (!json?.data?.meActor) process.exitCode = 2;
-            });
-          });
-          req.on('error', (error) => {
-            fs.writeFileSync('builds/new-expo-project.json', JSON.stringify({ error: String(error) }, null, 2) + '\n');
-            console.error(error);
-            process.exitCode = 2;
-          });
-          req.write(body);
-          req.end();
+          const raw = fs.existsSync('eas-build-android.json') ? fs.readFileSync('eas-build-android.json','utf8') : '';
+          const stderr = fs.existsSync('eas-build-android.stderr') ? fs.readFileSync('eas-build-android.stderr','utf8') : '';
+          const projectInfo = fs.existsSync('eas-project-info.json') ? fs.readFileSync('eas-project-info.json','utf8') : '';
+          let parsed = null;
+          let parseError = null;
+          try { parsed = raw.trim() ? JSON.parse(raw) : null; } catch (error) { parseError = String(error); }
+          const build = Array.isArray(parsed) ? parsed[0] : parsed;
+          const artifactUrl = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl || null;
+          const result = {
+            easCode: process.env.EAS_CODE === '' || process.env.EAS_CODE == null ? null : Number(process.env.EAS_CODE),
+            projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+            projectInfo: projectInfo.slice(-4000),
+            buildId: build?.id || null,
+            status: build?.status || null,
+            gitCommitHash: build?.gitCommitHash || null,
+            appVersion: build?.appVersion || null,
+            appBuildVersion: build?.appBuildVersion || null,
+            artifactUrl,
+            parseError,
+            stderr: stderr.slice(-12000)
+          };
+          fs.writeFileSync('builds/new-expo-build.json', JSON.stringify(result, null, 2) + '\n');
+          console.log(JSON.stringify(result, null, 2));
           NODE
-      - name: Publish discovery result
-        if: always()
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f builds/new-expo-project.json
-          git commit -m "chore(expo): record accessible EAS projects [skip ci]" || true
+          git add -f builds/new-expo-build.json
+          git commit -m "build(expo): record new Connexio EAS build [skip ci]" || true
           git push origin HEAD:release/connexio-rc1
-
-# refreshed after EXPO_TOKEN rotation on 2026-08-21
+          test "${EAS_CODE:-1}" = "0"
