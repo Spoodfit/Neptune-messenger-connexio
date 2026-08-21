@@ -1,1 +1,1 @@
-export { default } from "@/screens/CoworkingScreen";
+export { default } from "@/screens/CoworkingMapScreen";

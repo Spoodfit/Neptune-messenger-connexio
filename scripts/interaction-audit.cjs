@@ -83,44 +83,45 @@ async function run() {
     await page.getByRole("tab", { name: /Messages/ }).click();
     await waitRoute(page, "/messages", "Navigation Messages");
 
-    // V23 : le + central devient un portail Coworking vivant.
+    // V24 : le portail central ouvre directement la Map Coworking en observation.
     const coworkingPortal = page.getByRole("button", { name: /Coworking/ }).first();
     await checkTarget(coworkingPortal, "Portail Coworking central");
     await coworkingPortal.click();
-    await waitRoute(page, "/coworking", "Portail Coworking : ouverture en un seul tap");
-    check(await page.getByText("Hub Neptune", { exact: true }).first().isVisible(), "Coworking : Hub Neptune visible");
-    check(await page.getByText("Espaces en cours", { exact: true }).isVisible(), "Coworking : espaces actifs visibles");
-    await checkTarget(page.getByLabel("Créer un espace"), "Coworking : création d’espace tactile");
+    await waitRoute(page, "/coworking", "Portail Coworking : ouverture de la Map en un seul tap");
+    check(await page.getByText("Coworking", { exact: true }).first().isVisible(), "Coworking : titre Map visible");
+    check(await page.getByText("Le bureau est ouvert", { exact: true }).isVisible(), "Coworking : état observer visible");
+    await checkTarget(page.getByLabel("Fermer le coworking", { exact: true }), "Coworking : fermeture tactile");
+    await checkTarget(page.getByLabel("Actualiser la map", { exact: true }), "Coworking : actualisation tactile");
+    await checkTarget(page.getByLabel("Rejoindre le coworking", { exact: true }), "Coworking : entrée tactile");
     const observerMediaRequests = await page.evaluate(() => window.__connexioCoworkingMediaRequests ?? 0);
-    check(observerMediaRequests === 0, "Coworking : aucune caméra/micro en mode observation", `requêtes média: ${observerMediaRequests}`);
+    check(observerMediaRequests === 0, "Coworking : aucune caméra/micro local en mode observation", `requêtes média: ${observerMediaRequests}`);
 
-    const enterHub = page.getByLabel("Entrer dans le Hub Neptune", { exact: true });
-    await checkTarget(enterHub, "Coworking : seuil d’entrée tactile");
-    check(await page.getByText("Micro coupé au départ", { exact: true }).isVisible(), "Coworking : micro coupé annoncé avant entrée");
-    await enterHub.click();
-    await waitRoute(page, "/coworking/hub", "Coworking : entrée dans le Hub");
-    check(await anyVisible(page.getByLabel("Activer le micro", { exact: true })), "Coworking Hub : micro coupé par défaut");
-    check(await anyVisible(page.getByLabel("Couper la caméra", { exact: true })), "Coworking Hub : contrôle caméra visible");
-    await checkTarget(page.getByLabel("Activer le micro", { exact: true }), "Coworking Hub : contrôle micro tactile");
-    await checkTarget(page.getByLabel("Couper la caméra", { exact: true }), "Coworking Hub : contrôle caméra tactile");
-    await checkTarget(page.getByLabel("Mode Focus", { exact: true }), "Coworking Hub : mode Focus tactile");
-    await checkTarget(page.getByLabel("Mode disponible", { exact: true }), "Coworking Hub : mode disponible tactile");
+    const participant = await visibleLocator(page.getByRole("button", { name: /, (Disponible|Focus|En pause|En échange)(, caméra active)?$/ }));
+    if (participant) {
+      await checkTarget(page.getByRole("button", { name: /, (Disponible|Focus|En pause|En échange)(, caméra active)?$/ }), "Coworking : personne tactile");
+      await participant.click();
+      await checkTarget(page.getByRole("button").filter({ hasText: "Dire bonjour" }), "Coworking : Dire bonjour tactile");
+      await checkTarget(page.getByRole("button").filter({ hasText: "Profil" }), "Coworking : profil membre tactile");
+      await page.goto(`${BASE_URL}/coworking`, { waitUntil: "networkidle" });
+    } else failures.push("Coworking : aucune personne interactive visible sur la Map");
 
-    const backWithoutLeaving = await visibleLocator(page.getByLabel("Retour au Coworking sans quitter", { exact: true }));
-    if (backWithoutLeaving) {
-      await checkTarget(page.getByLabel("Retour au Coworking sans quitter", { exact: true }), "Coworking Hub : retour sans quitter tactile");
-      await backWithoutLeaving.click();
-      await waitRoute(page, "/coworking", "Coworking : retour lobby sans quitter");
-      await page.getByText("Touchez pour revenir", { exact: true }).last().waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
-      check(await anyVisible(page.getByText("Touchez pour revenir", { exact: true })), "Coworking : présence conservée après retour au lobby");
-      const leaveCoworking = await visibleLocator(page.getByLabel("Quitter le Coworking", { exact: true }));
-      if (leaveCoworking) {
-        await checkTarget(page.getByLabel("Quitter le Coworking", { exact: true }), "Coworking : sortie explicite tactile");
-        await leaveCoworking.click();
-        await page.getByLabel("Entrer dans le Hub Neptune", { exact: true }).last().waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
-        check(await anyVisible(page.getByLabel("Entrer dans le Hub Neptune", { exact: true })), "Coworking : sortie retire la présence locale");
-      } else failures.push("Coworking : sortie explicite tactile — cible absente");
-    } else failures.push("Coworking Hub : retour sans quitter tactile — cible absente");
+    const joinCoworking = page.getByLabel("Rejoindre le coworking", { exact: true });
+    await joinCoworking.click();
+    await page.getByLabel("Quitter le coworking", { exact: true }).waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    check(pathOf(page).endsWith("/coworking"), "Coworking : l’entrée conserve la Map", `route obtenue: ${pathOf(page)}`);
+    await checkTarget(page.getByLabel("Quitter le coworking", { exact: true }), "Coworking : sortie explicite tactile");
+    for (const mode of ["Disponible", "Focus", "En pause", "En échange"]) {
+      await checkTarget(page.getByRole("button", { name: mode, exact: true }), `Coworking : mode ${mode} tactile`);
+    }
+    const focusMode = await visibleLocator(page.getByRole("button", { name: "Focus", exact: true }));
+    if (focusMode) {
+      await focusMode.click();
+      await page.waitForTimeout(150);
+      check((await focusMode.getAttribute("aria-selected")) === "true", "Coworking : mode Focus sélectionnable");
+    }
+    await page.getByLabel("Quitter le coworking", { exact: true }).click();
+    await page.getByLabel("Rejoindre le coworking", { exact: true }).waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+    check(await anyVisible(page.getByLabel("Rejoindre le coworking", { exact: true })), "Coworking : sortie retire la présence locale");
 
     // La création de conversation n’est pas perdue : elle vit maintenant dans Messages.
     await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
@@ -147,7 +148,7 @@ async function run() {
     check(await sendMessage.isVisible(), "Chat : bouton Envoyer toujours visible");
     const composer = page.getByLabel("Écrire un message", { exact: true });
     check(await composer.isVisible(), "Chat : champ message visible");
-    await composer.fill("Test bouton envoi V23");
+    await composer.fill("Test bouton envoi V24");
     check((await sendMessage.getAttribute("aria-disabled")) !== "true", "Chat : bouton Envoyer activé après saisie");
 
     // La publication rapide reste directement disponible dans Temps forts, sans + global.
@@ -223,7 +224,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: V23 Coworking portal, observer privacy, Hub join/leave, 48px controls, relocated conversation creation, messaging, feed/map, profile, feedback and language picker.");
+  console.log("Interaction audit passed: V24 Coworking Map, observer privacy, spatial members, join/leave, 48px controls, messaging, feed/map, profile, feedback and language picker.");
 }
 
 run().catch((error) => {

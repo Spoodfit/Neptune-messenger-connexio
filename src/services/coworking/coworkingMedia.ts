@@ -3,6 +3,11 @@ import type { CoworkingMediaSession } from "../../types/coworking";
 export interface CoworkingMediaBridgeConfig {
   cameraOn: boolean;
   microphoneOn: boolean;
+  mapMode?: boolean;
+  participantLayout?: Record<
+    string,
+    { x: number; y: number; width: number; height: number }
+  >;
 }
 
 function escapeJson(value: unknown): string {
@@ -12,8 +17,8 @@ function escapeJson(value: unknown): string {
 /**
  * Coworking is intentionally separate from the 1-to-1 call stack. The backend
  * supplies a short-lived room client that connects this surface to the Neptune
- * SFU. Opening the lobby never calls getUserMedia; media starts only here,
- * after an explicit join action.
+ * SFU. Opening the map in observer mode never calls getUserMedia; local media
+ * starts only after an explicit join action.
  */
 export function buildCoworkingMediaHtml(
   session: CoworkingMediaSession,
@@ -29,7 +34,10 @@ export function buildCoworkingMediaHtml(
     displayName,
     iceServers: session.iceServers,
     cameraOn: initial.cameraOn,
-    microphoneOn: initial.microphoneOn
+    microphoneOn: initial.microphoneOn,
+    mapMode: initial.mapMode === true,
+    participantLayout: initial.participantLayout ?? {},
+    observer: session.observer === true
   };
   const clientScript = session.clientScriptUrl
     ? `<script src="${session.clientScriptUrl}"></script>`
@@ -43,8 +51,8 @@ export function buildCoworkingMediaHtml(
   <meta name="color-scheme" content="dark" />
   <style>
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;color:#f4f7ff;font-family:Inter,system-ui,-apple-system,sans-serif}
-    #stage{position:absolute;inset:0;overflow:hidden}
-    #remoteGrid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:8px;padding:8px}
+    #stage{position:absolute;inset:0;overflow:hidden;background:transparent}
+    #remoteGrid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:8px;padding:8px;background:transparent}
     .remote{position:relative;overflow:hidden;border-radius:26px;background:#071127;border:1px solid rgba(255,255,255,.1)}
     .remote video{width:100%;height:100%;object-fit:cover;background:#071127}
     .remote .name{position:absolute;left:10px;bottom:10px;max-width:75%;padding:5px 8px;border-radius:999px;background:rgba(2,7,19,.72);font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -65,13 +73,21 @@ export function buildCoworkingMediaHtml(
     let localStream=null;
     let client=null;
 
+    if(cfg.mapMode){
+      grid.style.display='block';
+      grid.style.padding='0';
+      grid.style.pointerEvents='none';
+      local.style.display='none';
+      empty.style.display='none';
+    }
+
     const post=(type,payload={})=>{try{window.ReactNativeWebView?.postMessage(JSON.stringify({type,...payload}))}catch{}};
-    const updateEmpty=()=>{empty.style.display=remoteNodes.size?'none':'flex'};
+    const updateEmpty=()=>{empty.style.display=cfg.mapMode?'none':remoteNodes.size?'none':'flex'};
     const setTracks=(cameraOn,microphoneOn)=>{
       if(!localStream)return;
       localStream.getVideoTracks().forEach(track=>track.enabled=Boolean(cameraOn));
       localStream.getAudioTracks().forEach(track=>track.enabled=Boolean(microphoneOn));
-      local.style.opacity=cameraOn?'1':'0';
+      if(!cfg.mapMode)local.style.opacity=cameraOn?'1':'0';
       if(client&&typeof client.setMediaState==='function')client.setMediaState({cameraOn:Boolean(cameraOn),microphoneOn:Boolean(microphoneOn)});
     };
     const addRemote=(participant)=>{
@@ -82,6 +98,22 @@ export function buildCoworkingMediaHtml(
         const video=document.createElement('video');video.autoplay=true;video.playsInline=true;
         const name=document.createElement('div');name.className='name';
         node.append(video,name);grid.appendChild(node);remoteNodes.set(participant.id,node);
+      }
+      if(cfg.mapMode){
+        const pos=cfg.participantLayout?.[participant.id];
+        if(pos){
+          node.style.position='absolute';
+          node.style.left=pos.x+'%';
+          node.style.top=pos.y+'%';
+          node.style.width=pos.width+'px';
+          node.style.height=pos.height+'px';
+          node.style.transform='translate(-50%,-50%)';
+          node.style.borderRadius='22px';
+          node.style.border='0';
+        }else{
+          node.style.display='none';
+        }
+        node.querySelector('.name').style.display='none';
       }
       node.querySelector('video').srcObject=participant.stream;
       node.querySelector('.name').textContent=participant.displayName||'Membre Neptune';
@@ -104,9 +136,11 @@ export function buildCoworkingMediaHtml(
 
     async function start(){
       try{
-        localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-        local.srcObject=localStream;
-        setTracks(cfg.cameraOn,cfg.microphoneOn);
+        if(!cfg.observer){
+          localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+          local.srcObject=localStream;
+          setTracks(cfg.cameraOn,cfg.microphoneOn);
+        }
         const adapter=window.ConnexioCoworkingClient;
         if(!adapter||typeof adapter.connect!=='function'){
           throw new Error('Client média Coworking indisponible.');
@@ -114,6 +148,8 @@ export function buildCoworkingMediaHtml(
         client=await adapter.connect({
           ...cfg,
           localStream,
+          observer:Boolean(cfg.observer),
+          mapMode:Boolean(cfg.mapMode),
           onParticipantStream:addRemote,
           onParticipantLeft:removeRemote,
           onConnected:()=>post('connected'),
@@ -122,7 +158,7 @@ export function buildCoworkingMediaHtml(
         post('media-ready');
       }catch(error){
         stop();
-        post('error',{message:error?.message||'Accès caméra ou microphone impossible.'});
+        post('error',{message:error?.message||'Connexion média impossible.'});
       }
     }
     window.addEventListener('beforeunload',stop);

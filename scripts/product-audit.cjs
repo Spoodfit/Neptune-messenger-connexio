@@ -193,7 +193,8 @@ async function run() {
 
       await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded", timeout: 30000 });
       await page.waitForTimeout(500);
-      await expectVisible(page.getByText("Hub Neptune", { exact: true }).first(), `${width}x${height} Coworking`);
+      await expectVisible(page.getByText("Coworking", { exact: true }).first(), `${width}x${height} Coworking`);
+      await expectVisible(page.getByLabel("Rejoindre le coworking", { exact: true }), `${width}x${height} entrée Coworking`);
       await checkGeometry(page, `${width}x${height} Coworking observer`);
       if (pageErrors.length) failures.push(`${width}x${height}: erreurs runtime: ${pageErrors.slice(0, 3).join(" | ")}`);
       await page.close();
@@ -234,26 +235,34 @@ async function run() {
       if (await closeCreation.isVisible().catch(() => false)) await closeCreation.click();
     }
 
-    // Coworking V23 : observer -> entrer -> revenir sans quitter -> quitter.
+    // Coworking V24 : Map observer -> interaction spontanée -> présence -> sortie explicite.
     await resetToMessages(page);
     const portal = page.getByRole("button", { name: /Coworking/ }).first();
     await expectVisible(portal, "portail Coworking central");
     if (await portal.isVisible().catch(() => false)) await portal.click();
-    await expectVisible(page.getByText("Hub Neptune", { exact: true }).first(), "Hub Neptune observer");
-    await expectVisible(page.getByText("Espaces en cours", { exact: true }), "rooms Coworking visibles");
+    await expectVisible(page.getByText("Coworking", { exact: true }).first(), "Map Coworking observer");
+    await expectVisible(page.getByText("Le bureau est ouvert", { exact: true }), "état observer Coworking");
+    await expectVisible(page.getByLabel("Rejoindre le coworking", { exact: true }), "entrée Coworking disponible");
     await checkGeometry(page, "Coworking observer");
-    const enterHub = page.getByLabel("Entrer dans le Hub Neptune", { exact: true });
-    await expectVisible(enterHub, "entrée Hub Neptune");
-    if (await enterHub.isVisible().catch(() => false)) {
-      await enterHub.click();
-      await expectAnyVisible(page.getByLabel("Activer le micro", { exact: true }), "Hub micro coupé à l’entrée");
-      await expectAnyVisible(page.getByLabel("Couper la caméra", { exact: true }), "Hub contrôle caméra");
-      await checkGeometry(page, "Coworking Hub");
-      if (await clickVisibleLabel(page, "Retour au Coworking sans quitter", "retour au lobby sans quitter")) {
-        await expectAnyVisible(page.getByText("Touchez pour revenir", { exact: true }), "présence Coworking conservée dans le lobby");
-        if (await clickVisibleLabel(page, "Quitter le Coworking", "sortie Coworking disponible")) {
-          await expectAnyVisible(page.getByLabel("Entrer dans le Hub Neptune", { exact: true }), "sortie Coworking explicite");
-        }
+
+    const participant = page.getByRole("button", { name: /, (Disponible|Focus|En pause|En échange)(, caméra active)?$/ }).first();
+    if (await participant.isVisible().catch(() => false)) {
+      await participant.click();
+      await expectVisible(page.getByText("Dire bonjour", { exact: true }), "action Dire bonjour depuis la Map");
+      await expectVisible(page.getByText("Profil", { exact: true }).last(), "profil depuis la Map");
+      await checkGeometry(page, "Fiche personne Coworking");
+      await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded" });
+      await page.waitForTimeout(350);
+    } else failures.push("Coworking observer: aucune personne interactive visible");
+
+    if (await clickVisibleLabel(page, "Rejoindre le coworking", "entrée Coworking")) {
+      await expectVisible(page.getByLabel("Quitter le coworking", { exact: true }), "présence Coworking active");
+      for (const mode of ["Disponible", "Focus", "En pause", "En échange"]) {
+        await expectVisible(page.getByRole("button", { name: mode, exact: true }), `mode ${mode} visible`);
+      }
+      await checkGeometry(page, "Coworking présent");
+      if (await clickVisibleLabel(page, "Quitter le coworking", "sortie Coworking disponible")) {
+        await expectVisible(page.getByLabel("Rejoindre le coworking", { exact: true }), "sortie Coworking explicite");
       }
     }
 
@@ -332,7 +341,7 @@ async function run() {
     failures.forEach((failure) => console.error(`- ${failure}`));
     process.exit(1);
   }
-  console.log("Product audit Connexio V23 validé : Coworking, Messages, Temps forts, Appels, Profil, langues et géométrie responsive.");
+  console.log("Product audit Connexio V24 validé : Coworking Map, Messages, Temps forts, Appels, Profil, langues et géométrie responsive.");
 }
 
 run().catch((error) => {

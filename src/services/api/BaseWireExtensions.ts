@@ -33,7 +33,9 @@ function optionalNumber(value: unknown): number | undefined {
 }
 function optionalStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  const values = value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim());
+  const values = value
+    .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    .map((item) => item.trim());
   return values.length ? [...new Set(values)] : undefined;
 }
 const USER_ROLES = new Set([
@@ -96,8 +98,12 @@ function normalizePollOption(value: unknown, index: number): PollOption {
   return {
     id: optionalString(first(value, "id", "option_id")) ?? `poll-option-${index}`,
     label,
-    voteCount: Math.max(0, Math.trunc(optionalNumber(first(value, "voteCount", "vote_count", "votes")) ?? 0)),
-    votedByCurrentUser: first(value, "votedByCurrentUser", "voted_by_current_user", "selected") === true,
+    voteCount: Math.max(
+      0,
+      Math.trunc(optionalNumber(first(value, "voteCount", "vote_count", "votes")) ?? 0)
+    ),
+    votedByCurrentUser:
+      first(value, "votedByCurrentUser", "voted_by_current_user", "selected") === true,
     voterIds: optionalStringArray(first(value, "voterIds", "voter_ids")),
     voters: Array.isArray(first(value, "voters", "members"))
       ? (first(value, "voters", "members") as unknown[])
@@ -115,49 +121,79 @@ function normalizePoll(value: unknown): MessagePoll | undefined {
   const calculatedVotes = options.reduce((sum, option) => sum + option.voteCount, 0);
   const closesAt = optionalString(first(value, "closesAt", "closes_at"));
   const explicitClosedAt = optionalString(first(value, "closedAt", "closed_at"));
-  const closed = first(value, "closed", "is_closed") === true || Boolean(explicitClosedAt) || Boolean(closesAt && Date.parse(closesAt) <= Date.now());
+  const closed =
+    first(value, "closed", "is_closed") === true ||
+    Boolean(explicitClosedAt) ||
+    Boolean(closesAt && Date.parse(closesAt) <= Date.now());
   return {
     id: optionalString(first(value, "id", "poll_id")) ?? "poll",
     question,
     options,
     allowMultiple: first(value, "allowMultiple", "allow_multiple", "multiple") !== false,
     anonymous: first(value, "anonymous", "is_anonymous") === true,
-    totalVotes: Math.max(0, Math.trunc(optionalNumber(first(value, "totalVotes", "total_votes")) ?? calculatedVotes)),
+    totalVotes: Math.max(
+      0,
+      Math.trunc(optionalNumber(first(value, "totalVotes", "total_votes")) ?? calculatedVotes)
+    ),
     closesAt,
     closedAt: closed ? explicitClosedAt ?? closesAt : undefined,
-    eventVoteId: optionalString(first(value, "eventVoteId", "event_vote_id", "synced_event_id", "event_id")),
+    eventVoteId: optionalString(
+      first(value, "eventVoteId", "event_vote_id", "synced_event_id", "event_id")
+    ),
     eventVoteUrl: safeHttpsUrl(first(value, "eventVoteUrl", "event_vote_url", "vote_url"))
   };
 }
 function normalizeEventVoteAlert(value: unknown): EventVoteAlert | undefined {
   if (!isRecord(value)) return undefined;
   const title = optionalString(first(value, "title", "label"));
-  const webUrl = safeHttpsUrl(first(value, "webUrl", "web_url", "businessUrl", "business_url", "url"));
+  const webUrl = safeHttpsUrl(
+    first(value, "webUrl", "web_url", "businessUrl", "business_url", "url")
+  );
   if (!title || !webUrl) return undefined;
   const city = optionalString(first(value, "city", "ville"));
   return {
     id: optionalString(first(value, "id", "alert_id")) ?? title,
     title,
-    clubName: optionalString(first(value, "clubName", "club_name", "club")) ?? (city ? `Club ${city}` : "Club Neptune"),
+    clubName:
+      optionalString(first(value, "clubName", "club_name", "club")) ??
+      (city ? `Club ${city}` : "Club Neptune"),
     city,
-    pendingCount: Math.max(0, Math.trunc(optionalNumber(first(value, "pendingCount", "pending_count")) ?? 0)),
+    pendingCount: Math.max(
+      0,
+      Math.trunc(optionalNumber(first(value, "pendingCount", "pending_count")) ?? 0)
+    ),
     webUrl,
     closesAt: optionalString(first(value, "closesAt", "closes_at"))
   };
 }
 function augmentAttachment(attachment: MessageAttachment, raw: unknown): MessageAttachment {
   if (!isRecord(raw)) return attachment;
+  const rawTranscriptStatus = first(raw, "transcriptStatus", "transcript_status");
+  const transcriptStatus =
+    rawTranscriptStatus === "pending" ||
+    rawTranscriptStatus === "ready" ||
+    rawTranscriptStatus === "failed"
+      ? rawTranscriptStatus
+      : attachment.transcriptStatus;
   return {
     ...attachment,
-    uri: attachment.uri ?? safeHttpsUrl(first(raw, "uri", "url", "download_url", "downloadUrl")),
+    uri:
+      attachment.uri ??
+      safeHttpsUrl(first(raw, "uri", "url", "download_url", "downloadUrl")),
     downloadUrl: safeHttpsUrl(first(raw, "downloadUrl", "download_url")),
-    thumbnailUrl: safeHttpsUrl(first(raw, "thumbnailUrl", "thumbnail_url"))
+    thumbnailUrl: safeHttpsUrl(first(raw, "thumbnailUrl", "thumbnail_url")),
+    transcript:
+      optionalString(first(raw, "transcript", "transcription")) ?? attachment.transcript,
+    transcriptStatus
   };
 }
 export function normalizeAppUser(value: unknown): AppUser {
   const user = normalizeBaseUser(value);
   if (!isRecord(value)) return user;
-  return { ...user, webProfileUrl: safeHttpsUrl(first(value, "webProfileUrl", "web_profile_url", "profile_url")) };
+  return {
+    ...user,
+    webProfileUrl: safeHttpsUrl(first(value, "webProfileUrl", "web_profile_url", "profile_url"))
+  };
 }
 export function normalizeSessionPayload(value: unknown): SessionPayload {
   const session = normalizeBaseSession(value);
@@ -167,17 +203,27 @@ export function normalizeSessionPayload(value: unknown): SessionPayload {
 export function normalizeConversation(value: unknown): Conversation {
   const conversation = normalizeBaseConversation(value);
   if (!isRecord(value)) return conversation;
-  const memberIds = optionalStringArray(first(value, "memberIds", "member_ids", "participant_ids")) ?? conversation.memberIds;
+  const memberIds =
+    optionalStringArray(first(value, "memberIds", "member_ids", "participant_ids")) ??
+    conversation.memberIds;
   return {
     ...conversation,
     memberIds,
     memberCount: memberIds?.length ?? conversation.memberCount,
-    activeMemberIds: optionalStringArray(first(value, "activeMemberIds", "active_member_ids", "most_active_member_ids")),
-    eventVoteAlert: normalizeEventVoteAlert(first(value, "eventVoteAlert", "event_vote_alert", "pending_event_vote"))
+    activeMemberIds: optionalStringArray(
+      first(value, "activeMemberIds", "active_member_ids", "most_active_member_ids")
+    ),
+    eventVoteAlert: normalizeEventVoteAlert(
+      first(value, "eventVoteAlert", "event_vote_alert", "pending_event_vote")
+    )
   };
 }
 export function normalizeConversationList(value: unknown): Conversation[] {
-  const items = Array.isArray(value) ? value : isRecord(value) && Array.isArray(first(value, "items", "threads")) ? (first(value, "items", "threads") as unknown[]) : null;
+  const items = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(first(value, "items", "threads"))
+      ? (first(value, "items", "threads") as unknown[])
+      : null;
   if (!items) throw new WireValidationError("Liste des conversations invalide.");
   return items.map(normalizeConversation);
 }
@@ -194,7 +240,12 @@ export function normalizeChatMessage(value: unknown): ChatMessage {
       ? optionalUserRole(first(rawSender, "role", "status", "membership_role"))
       : undefined);
   const rawAttachments = first(value, "attachments");
-  const attachments = message.attachments && Array.isArray(rawAttachments) ? message.attachments.map((attachment, index) => augmentAttachment(attachment, rawAttachments[index])) : message.attachments;
+  const attachments =
+    message.attachments && Array.isArray(rawAttachments)
+      ? message.attachments.map((attachment, index) =>
+          augmentAttachment(attachment, rawAttachments[index])
+        )
+      : message.attachments;
   return {
     ...message,
     senderRole,
@@ -208,5 +259,8 @@ export function normalizeMessagePage(value: unknown): CursorPage<ChatMessage> {
   const items = first(value, "items", "messages");
   if (!Array.isArray(items)) throw new WireValidationError("Liste de messages invalide.");
   const cursor = first(value, "nextCursor", "next_cursor");
-  return { items: items.map(normalizeChatMessage), nextCursor: typeof cursor === "string" && cursor.trim() ? cursor.trim() : null };
+  return {
+    items: items.map(normalizeChatMessage),
+    nextCursor: typeof cursor === "string" && cursor.trim() ? cursor.trim() : null
+  };
 }
