@@ -1,59 +1,42 @@
-name: Apply Connexio V24
+name: Build native release candidate
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/native-release-candidate.yml
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Plateforme à construire
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - android
+          - ios
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
+  eas-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: d2288b09-8249-4879-810f-7cb0072baeeb
     steps:
-      - name: Checkout V24
+      - name: Vérifier les accès EAS
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "Secret EXPO_TOKEN manquant"; exit 1; }
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: fix/v24-messaging-coworking-map
-          fetch-depth: 0
-
-      - name: Apply V24 patch source
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin e3da09e4eeb4c9c7b7c53ac40438a14b562580a0
-          python - <<'PY'
-          import subprocess, textwrap
-          source = subprocess.check_output([
-            "git", "show", "e3da09e4eeb4c9c7b7c53ac40438a14b562580a0:.github/workflows/v24-implementation.yml"
-          ], text=True)
-          start_marker = "          python - <<'PY'\n"
-          end_marker = "\n          PY\n\n      - name: Setup Node"
-          start = source.index(start_marker) + len(start_marker)
-          end = source.index(end_marker, start)
-          exec(compile(textwrap.dedent(source[start:end]), "v24_patch.py", "exec"), {"__name__": "__main__"})
-          PY
-
-      - name: Commit implementation
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app src docs
-          git commit -m "feat(v24): refine messaging and move coworking into live map"
-          git push origin HEAD:fix/v24-messaging-coworking-map
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
           cache: npm
-
-      - name: Install dependencies
+      - name: Installer les dépendances verrouillées
         run: npm ci --no-audit --no-fund
-
-      - name: Validate V24
+      - name: Vérifier la release candidate
         run: npm run verify && npm run audit:rc && npx expo install --check
+      - name: Construire avec EAS
+        run: npx eas-cli@21.7.1 build --profile release-candidate --platform "${{ inputs.platform }}" --non-interactive --wait
