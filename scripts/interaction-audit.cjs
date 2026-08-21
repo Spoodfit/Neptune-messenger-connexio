@@ -100,10 +100,9 @@ async function run() {
     if (participant) {
       await checkTarget(page.getByRole("button", { name: /, (Disponible|Focus|En pause|En échange)(, caméra active)?$/ }), "Coworking : personne tactile");
       await participant.click();
-      await checkTarget(page.getByText("Dire bonjour", { exact: true }), "Coworking : Dire bonjour tactile");
-      await checkTarget(page.getByText("Profil", { exact: true }).last(), "Coworking : profil membre tactile");
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(150);
+      await checkTarget(page.getByRole("button").filter({ hasText: "Dire bonjour" }), "Coworking : Dire bonjour tactile");
+      await checkTarget(page.getByRole("button").filter({ hasText: "Profil" }), "Coworking : profil membre tactile");
+      await page.goto(`${BASE_URL}/coworking`, { waitUntil: "networkidle" });
     } else failures.push("Coworking : aucune personne interactive visible sur la Map");
 
     const joinCoworking = page.getByLabel("Rejoindre le coworking", { exact: true });
