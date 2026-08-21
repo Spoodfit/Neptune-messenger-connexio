@@ -1,0 +1,69 @@
+{
+  "selected": null,
+  "attempts": [
+    {
+      "fullName": "@johanzambelli/connexio",
+      "statusCode": 200,
+      "json": {
+        "errors": [
+          {
+            "extensions": {
+              "requestId": "ecc7302d-56d3-4c07-916a-5fd7832b4832",
+              "code": "INTERNAL_SERVER_ERROR",
+              "errorCode": "EXPERIENCE_NOT_FOUND",
+              "errorType": "USER",
+              "metadata": {
+                "fullName": "@johanzambelli/connexio"
+              },
+              "isTransient": false
+            },
+            "message": "Experience with name '@johanzambelli/connexio' does not exist.",
+            "locations": [
+              {
+                "line": 1,
+                "column": 49
+              }
+            ],
+            "path": [
+              "app",
+              "byFullName"
+            ]
+          }
+        ],
+        "data": null
+      }
+    },
+    {
+      "fullName": "@johanzambelli/neptune",
+      "statusCode": 200,
+      "json": {
+        "errors": [
+          {
+            "extensions": {
+              "requestId": "5a886a3c-60d4-4b11-935d-bd6fd7f8ae21",
+              "code": "INTERNAL_SERVER_ERROR",
+              "errorCode": "EXPERIENCE_NOT_FOUND",
+              "errorType": "USER",
+              "metadata": {
+                "fullName": "@johanzambelli/neptune"
+              },
+              "isTransient": false
+            },
+            "message": "Experience with name '@johanzambelli/neptune' does not exist.",
+            "locations": [
+              {
+                "line": 1,
+                "column": 49
+              }
+            ],
+            "path": [
+              "app",
+              "byFullName"
+            ]
+          }
+        ],
+        "data": null
+      }
+    }
+  ]
+}
