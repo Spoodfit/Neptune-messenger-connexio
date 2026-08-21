@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
       - name: Verify Expo token
         run: test -n "$EXPO_TOKEN"
-      - name: Enumerate Expo projects visible to the token
+      - name: Enumerate Expo projects from accessible accounts
         shell: bash
         run: |
           mkdir -p builds
@@ -35,14 +35,13 @@ jobs:
           const query = `query CurrentActorProjects {
             meActor {
               __typename
-              accounts { id name }
-              ... on User {
-                username
-                apps(includeUnpublished: true, limit: 100, offset: 0) { id fullName }
-              }
-              ... on SSOUser {
-                username
-                apps(includeUnpublished: true, limit: 100, offset: 0) { id fullName }
+              accounts {
+                id
+                name
+                apps(includeUnpublished: true, limit: 100, offset: 0) {
+                  id
+                  fullName
+                }
               }
             }
           }`;
