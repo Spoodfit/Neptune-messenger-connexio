@@ -8,8 +8,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CoworkingMediaSurface from "../components/CoworkingMediaSurface";
 import { StatusAvatar } from "../components/StatusAvatar";
+import { translateConnexioUiText } from "../i18n/uiTranslator";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
+import { useAppLanguage } from "../providers/LanguageProvider";
 import { useMessaging } from "../providers/MessagingProvider";
 import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
@@ -61,6 +63,7 @@ export default function CoworkingMapScreen() {
   const insets = useSafeAreaInsets();
   const { width: viewportWidth } = useWindowDimensions();
   const theme = useAppTheme();
+  const { uiLanguage } = useAppLanguage();
   const { currentUser } = useSession();
   const { members, localConversations } = useExperience();
   const { visibleConversations } = useMessaging();
@@ -387,6 +390,7 @@ export default function CoworkingMapScreen() {
                 <Pressable
                   key={mode}
                   accessibilityRole="button"
+                  accessibilityLabel={translateConnexioUiText(meta.label, uiLanguage)}
                   accessibilityState={{ selected: active }}
                   onPress={() => void updatePresence(mode)}
                   style={[
