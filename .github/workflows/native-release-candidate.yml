@@ -137,3 +137,5 @@ jobs:
           git commit -m "build(expo): record new Connexio EAS build [skip ci]" || true
           git push origin HEAD:release/connexio-rc1
           test "${EAS_CODE:-1}" = "0"
+
+# build trigger 2026-08-21T16:55+02:00
