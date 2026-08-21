@@ -70,13 +70,14 @@ function updateLocalPoll(poll: MessagePoll, optionId: string): MessagePoll {
 }
 
 export default function ChatScreen() {
-  const params = useLocalSearchParams<{ id: string; focusMention?: string; focusMessageId?: string }>();
+  const params = useLocalSearchParams<{ id: string; focusMention?: string; focusMessageId?: string; draft?: string }>();
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const conversationId = Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "");
   const focusMention = (Array.isArray(params.focusMention) ? params.focusMention[0] : params.focusMention) === "1";
   const requestedFocusMessageId = Array.isArray(params.focusMessageId) ? params.focusMessageId[0] : params.focusMessageId;
+  const requestedDraft = Array.isArray(params.draft) ? params.draft[0] : params.draft;
   const { currentUser, accessToken } = useSession();
   const {
     getConversation: getServerConversation,
@@ -122,7 +123,7 @@ export default function ChatScreen() {
   const canInitiateCalls = canInitiatePrivateInteraction(currentUser.role);
   const announcement = conversation?.type === "announcement";
 
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(requestedDraft ?? "");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [pollComposerOpen, setPollComposerOpen] = useState(false);
@@ -137,6 +138,7 @@ export default function ChatScreen() {
   const submitUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkedReadMessageId = useRef<string | null>(null);
   const messageListRef = useRef<FlatList<ChatMessage>>(null);
+  const lastLatestMessageIdRef = useRef<string | null>(null);
   const spotlightProgress = useRef(new Animated.Value(0)).current;
   const [spotlightMessageId, setSpotlightMessageId] = useState<string | null>(null);
 
@@ -190,6 +192,12 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
+    if (!requestedDraft) return;
+    setDraft((current) => current || requestedDraft);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  }, [requestedDraft]);
+
+  useEffect(() => {
     if (!conversationId || localOnly) return;
     lastMarkedReadMessageId.current = null;
     void loadMessages(conversationId);
@@ -201,6 +209,16 @@ export default function ChatScreen() {
     lastMarkedReadMessageId.current = latestMessageId;
     void markConversationRead(conversationId);
   }, [conversationId, latestMessageId, localOnly, markConversationRead]);
+
+  useEffect(() => {
+    const latest = messages[0];
+    const previousLatestId = lastLatestMessageIdRef.current;
+    lastLatestMessageIdRef.current = latest?.id ?? null;
+    if (!latest?.isMine || previousLatestId === null || previousLatestId === latest.id) return;
+    requestAnimationFrame(() => {
+      messageListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+  }, [messages]);
 
   useEffect(() => {
     if (!focusMention && !requestedFocusMessageId) return;
@@ -445,7 +463,7 @@ export default function ChatScreen() {
           contentContainerStyle={styles.messages}
           inverted
           keyboardShouldPersistTaps="handled"
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 72 }}
           onEndReachedThreshold={0.25}
           onEndReached={() => { if (hasMore && !loadingMore) void loadMoreMessages(conversationId); }}
           ListFooterComponent={loadingMore ? <View style={styles.historyLoader} accessibilityLabel="Chargement des messages précédents"><ActivityIndicator size="small" color={theme.violet} /></View> : null}
