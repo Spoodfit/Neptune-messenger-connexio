@@ -111,9 +111,9 @@ async function run() {
     check(pathOf(page).endsWith("/coworking"), "Coworking : l’entrée conserve la Map", `route obtenue: ${pathOf(page)}`);
     await checkTarget(page.getByLabel("Quitter le coworking", { exact: true }), "Coworking : sortie explicite tactile");
     for (const mode of ["Disponible", "Focus", "En pause", "En échange"]) {
-      await checkTarget(page.getByRole("button").filter({ hasText: mode }), `Coworking : mode ${mode} tactile`);
+      await checkTarget(page.getByRole("button", { name: mode, exact: true }), `Coworking : mode ${mode} tactile`);
     }
-    const focusMode = await visibleLocator(page.getByRole("button").filter({ hasText: "Focus" }));
+    const focusMode = await visibleLocator(page.getByRole("button", { name: "Focus", exact: true }));
     if (focusMode) {
       await focusMode.click();
       await page.waitForTimeout(150);
