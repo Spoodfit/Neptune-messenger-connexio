@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
       - name: Verify Expo token
         run: test -n "$EXPO_TOKEN"
-      - name: Discover new Expo project id
+      - name: Enumerate Expo projects visible to the token
         shell: bash
         run: |
           mkdir -p builds
@@ -32,51 +32,43 @@ jobs:
           const fs = require('fs');
           const https = require('https');
           const token = process.env.EXPO_TOKEN;
-          const candidates = ['@johanzambelli/connexio', '@johanzambelli/neptune'];
-          const query = `query AppByFullName($fullName: String!) { app { byFullName(fullName: $fullName) { id fullName } } }`;
-
-          function request(fullName) {
-            return new Promise((resolve) => {
-              const body = JSON.stringify({ query, variables: { fullName } });
-              const req = https.request('https://api.expo.dev/graphql', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                  'Content-Length': Buffer.byteLength(body)
-                }
-              }, (res) => {
-                let data = '';
-                res.on('data', (chunk) => data += chunk);
-                res.on('end', () => {
-                  let json = null;
-                  try { json = JSON.parse(data); } catch {}
-                  resolve({ fullName, statusCode: res.statusCode, json });
-                });
-              });
-              req.on('error', (error) => resolve({ fullName, error: String(error) }));
-              req.write(body);
-              req.end();
-            });
-          }
-
-          (async () => {
-            const attempts = [];
-            let selected = null;
-            for (const candidate of candidates) {
-              const result = await request(candidate);
-              attempts.push(result);
-              const app = result?.json?.data?.app?.byFullName;
-              if (app?.id) {
-                selected = { id: app.id, fullName: app.fullName };
-                break;
-              }
+          const query = `query CurrentActorProjects {
+            meUserActor {
+              __typename
+              username
+              accounts { id name }
+              apps(includeUnpublished: true, limit: 100, offset: 0) { id fullName }
             }
-            const output = { selected, attempts };
-            fs.writeFileSync('builds/new-expo-project.json', JSON.stringify(output, null, 2) + '\n');
-            console.log(JSON.stringify(output, null, 2));
-            if (!selected) process.exitCode = 2;
-          })();
+          }`;
+          const body = JSON.stringify({ query, variables: {} });
+          const req = https.request('https://api.expo.dev/graphql', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(body)
+            }
+          }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => data += chunk);
+            res.on('end', () => {
+              let json = null;
+              try { json = JSON.parse(data); } catch (error) {
+                json = { parseError: String(error), raw: data.slice(0, 4000) };
+              }
+              const output = { statusCode: res.statusCode, response: json };
+              fs.writeFileSync('builds/new-expo-project.json', JSON.stringify(output, null, 2) + '\n');
+              console.log(JSON.stringify(output, null, 2));
+              if (!json?.data?.meUserActor) process.exitCode = 2;
+            });
+          });
+          req.on('error', (error) => {
+            fs.writeFileSync('builds/new-expo-project.json', JSON.stringify({ error: String(error) }, null, 2) + '\n');
+            console.error(error);
+            process.exitCode = 2;
+          });
+          req.write(body);
+          req.end();
           NODE
       - name: Publish discovery result
         if: always()
@@ -84,5 +76,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f builds/new-expo-project.json
-          git commit -m "chore(expo): record new Connexio project id [skip ci]" || true
+          git commit -m "chore(expo): record accessible EAS projects [skip ci]" || true
           git push origin HEAD:release/connexio-rc1
