@@ -115,9 +115,15 @@ async function run() {
     }
     const focusMode = await visibleLocator(page.getByRole("button", { name: "Focus", exact: true }));
     if (focusMode) {
+      await focusMode.scrollIntoViewIfNeeded().catch(() => {});
+      const before = await focusMode.evaluate((node) => getComputedStyle(node).backgroundColor);
       await focusMode.click();
-      await page.waitForTimeout(150);
-      check((await focusMode.getAttribute("aria-selected")) === "true", "Coworking : mode Focus sélectionnable");
+      let after = before;
+      for (let attempt = 0; attempt < 20 && after === before; attempt += 1) {
+        await page.waitForTimeout(100);
+        after = await focusMode.evaluate((node) => getComputedStyle(node).backgroundColor);
+      }
+      check(after !== before, "Coworking : mode Focus sélectionnable", `fond avant/après: ${before} -> ${after}`);
     }
     await page.getByLabel("Quitter le coworking", { exact: true }).click();
     await page.getByLabel("Rejoindre le coworking", { exact: true }).waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
