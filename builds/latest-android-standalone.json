@@ -1,0 +1,18 @@
+{
+  "easCode": 0,
+  "projectId": "1e85dc3a-4114-4387-8e15-2463a82e68fd",
+  "projectInfo": "\nfullName  @johanzambellis-team/connexio\nID        1e85dc3a-4114-4387-8e15-2463a82e68fd\n",
+  "sourceCommit": "23fee57fd49742325e9dd7b44505b69626013585",
+  "buildId": "761b6b57-8106-4c38-865b-2b275b99051a",
+  "status": "FINISHED",
+  "platform": "ANDROID",
+  "buildProfile": "standalone",
+  "gitCommitHash": "23fee57fd49742325e9dd7b44505b69626013585",
+  "appVersion": "1.0.1",
+  "appBuildVersion": "4",
+  "createdAt": "2026-08-22T22:29:44.752Z",
+  "completedAt": "2026-08-22T22:43:48.419Z",
+  "artifactUrl": "https://expo.dev/artifacts/eas/pGAYEAPaAeKrcsBbBDogq3TpO9S_8aBixLEcBedtQhg.apk",
+  "parseError": null,
+  "stderr": "★ eas-cli@22.2.0 is now available.\nTo upgrade, run:\nnpm install -g eas-cli\nProceeding with outdated version.\n\n(node:2905) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n(Use `node --trace-deprecation ...` to show where the warning was created)\nResolved \"preview\" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds\nNo environment variables with visibility \"Plain text\" and \"Sensitive\" found for the \"preview\" environment on EAS.\nEnvironment variables loaded from the \"standalone\" build profile \"env\" configuration: EXPO_PUBLIC_MOCK_MODE, EXPO_PUBLIC_BACKEND_CONTRACT, EXPO_PUBLIC_BUSINESS_WEB_BASE_URL.\n\n- Incrementing versionCode from 3 to 4.\n✔ Incremented versionCode from 3 to 4.\n\n\n✔ Using remote Android credentials (Expo server)\n✔ Using Keystore from configuration: Build Credentials tZ4YwPsB5o (default)\n\nCompressing project files and uploading to EAS Build. Learn more: https://expo.fyi/eas-build-archive\n- Uploading to EAS Build (0 / 1.5 MB)\n✔ Uploaded to EAS \n- Computing project fingerprint\n✔ Computed project fingerprint\n\nSee logs: https://expo.dev/accounts/johanzambellis-team/projects/connexio/builds/761b6b57-8106-4c38-865b-2b275b99051a\n\nWaiting for build to complete. You can press Ctrl+C to exit.\n- Waiting for build to complete.\n✔ Build finished\n"
+}
