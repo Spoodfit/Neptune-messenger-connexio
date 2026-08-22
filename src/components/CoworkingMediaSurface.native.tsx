@@ -56,6 +56,11 @@ export default function CoworkingMediaSurface({
     }
   };
 
+  // The standalone/mock profile has presence data but no actual SFU client.
+  // In Map mode, keep the avatar/status layer visible instead of mounting an
+  // empty WebView that would report a fake media error or cover the Map.
+  if (mapMode && session.mock) return null;
+
   return (
     <View style={[styles.screen, { backgroundColor: mapMode ? "transparent" : theme.pageBackground }]}>
       <WebView
