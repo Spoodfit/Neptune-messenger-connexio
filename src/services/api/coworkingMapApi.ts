@@ -25,12 +25,14 @@ function normalizeIceServers(value: unknown): RTCIceServer[] {
   });
 }
 
-function normalizeMedia(value: unknown): CoworkingMediaSession | undefined {
+function normalizeMedia(value: unknown, observerByDefault: boolean): CoworkingMediaSession | undefined {
   const item = asRecord(value);
   const socketUrl = stringValue(item.socket_url ?? item.signaling_url);
   const token = stringValue(item.token ?? item.room_token);
   const participantId = stringValue(item.participant_id ?? item.user_id);
   if (!socketUrl || !token || !participantId) return undefined;
+  const explicitObserver = item.observer === true || item.listen_only === true || item.listenOnly === true;
+  const explicitPublisher = item.observer === false || item.publish === true || item.publisher === true;
   return {
     spaceId: stringValue(item.space_id) || "coworking-map",
     socketUrl,
@@ -40,7 +42,7 @@ function normalizeMedia(value: unknown): CoworkingMediaSession | undefined {
     participantId,
     iceServers: normalizeIceServers(item.ice_servers),
     expiresAt: stringValue(item.expires_at) || undefined,
-    observer: item.observer !== false,
+    observer: explicitPublisher ? false : explicitObserver ? true : observerByDefault,
     mock: false
   };
 }
@@ -62,7 +64,7 @@ export class CoworkingMapApi {
       },
       this.fallbackAccessToken
     );
-    return { media: normalizeMedia(payload.media ?? payload.map_media) };
+    return { media: normalizeMedia(payload.media ?? payload.map_media, false) };
   }
 
   async leaveMap(): Promise<void> {
