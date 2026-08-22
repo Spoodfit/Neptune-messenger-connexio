@@ -13,6 +13,7 @@ export interface CoworkingMediaSurfaceProps {
   cameraOn: boolean;
   microphoneOn: boolean;
   mapMode?: boolean;
+  spatialAudio?: boolean;
   participantLayout?: Record<string, CoworkingMediaLayoutItem>;
   onConnected?: () => void;
   onError?: (message: string) => void;
