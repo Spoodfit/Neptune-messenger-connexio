@@ -5,13 +5,12 @@ import { Text } from "./LocalizedText";
 import { useAppTheme } from "../providers/ThemeProvider";
 import type { CoworkingMediaSurfaceProps } from "./CoworkingMediaSurface.types";
 
-export default function CoworkingMediaSurfaceWeb({ session, mapMode = false }: CoworkingMediaSurfaceProps) {
+export default function CoworkingMediaSurfaceWeb({ session, mapMode = false, spatialAudio = false }: CoworkingMediaSurfaceProps) {
   const theme = useAppTheme();
 
-  // In Map mode, the React Native layer already renders the spatial avatars and
-  // statuses. A mock/web placeholder must never cover them: real SFU streams
-  // are overlaid only by the native media surface when available.
-  if (mapMode || session.mock) return null;
+  // Geographic Map and the General Room render their own spatial participant
+  // layer in the web preview. Never cover it with a technical placeholder.
+  if (mapMode || spatialAudio || session.mock) return null;
 
   return (
     <View style={[styles.stage, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>
