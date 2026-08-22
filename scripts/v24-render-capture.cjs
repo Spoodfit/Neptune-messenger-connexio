@@ -43,8 +43,8 @@ const server = http.createServer((request, response) => {
   fs.createReadStream(file).pipe(response);
 });
 
-async function settle(page) {
-  await page.waitForTimeout(700);
+async function settle(page, delay = 700) {
+  await page.waitForTimeout(delay);
   await page.evaluate(() => document.fonts?.ready).catch(() => {});
   await page.waitForTimeout(180);
 }
@@ -52,6 +52,11 @@ async function settle(page) {
 async function shot(page, name, fullPage = false) {
   await settle(page);
   await page.screenshot({ path: path.join(output, `${name}.png`), fullPage });
+}
+
+async function open(page, route) {
+  await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: "domcontentloaded" });
+  await settle(page, 500);
 }
 
 async function run() {
@@ -62,36 +67,54 @@ async function run() {
   const executablePath = browserExecutable();
   if (!executablePath) throw new Error("Chromium introuvable");
   const browser = await chromium.launch({ executablePath, headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+
   try {
-    for (const viewport of [{ width: 393, height: 852, suffix: "393x852" }, { width: 280, height: 568, suffix: "280x568" }]) {
+    for (const viewport of [
+      { width: 393, height: 852, suffix: "393x852" },
+      { width: 280, height: 568, suffix: "280x568" }
+    ]) {
       const page = await browser.newPage({ viewport, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
-      await page.goto(`http://127.0.0.1:${port}/messages`, { waitUntil: "domcontentloaded" });
+      await open(page, "/messages");
       await shot(page, `messages-groups-${viewport.suffix}`);
+      await open(page, "/coworking");
+      await shot(page, `coworking-map-${viewport.suffix}`);
       await page.close();
     }
 
     const page = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
-    await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded" });
-    await shot(page, "coworking-observer-393x852");
-
-    const participant = page.getByRole("button", { name: /, (Disponible|Focus|En pause|En échange)(, caméra active)?$/ }).first();
-    if (await participant.isVisible().catch(() => false)) {
-      await participant.click();
-      await shot(page, "coworking-person-sheet-393x852");
-      await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded" });
-      await settle(page);
+    await open(page, "/coworking");
+    const mapFrame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
+    const busyMarker = mapFrame.locator(".cw-marker.busy").first();
+    if (await busyMarker.isVisible().catch(() => false)) {
+      await busyMarker.click();
+      await shot(page, "coworking-group-sheet-393x852");
+      await page.getByLabel("Fermer la fiche", { exact: true }).click().catch(() => {});
+    } else {
+      const anyMarker = mapFrame.locator(".cw-marker").first();
+      if (await anyMarker.isVisible().catch(() => false)) {
+        await anyMarker.click();
+        await shot(page, "coworking-person-sheet-393x852");
+        await page.getByLabel("Fermer la fiche", { exact: true }).click().catch(() => {});
+      }
     }
 
-    const join = page.getByLabel("Rejoindre le coworking", { exact: true });
-    if (await join.isVisible().catch(() => false)) {
-      await join.click();
-      await page.getByLabel("Quitter le coworking", { exact: true }).waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
-      await shot(page, "coworking-joined-393x852");
+    const generalRoom = page.getByLabel("Rejoindre la salle générale", { exact: true });
+    if (await generalRoom.isVisible().catch(() => false)) {
+      await generalRoom.click();
+      await page.getByText("Salle générale", { exact: true }).first().waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+      await shot(page, "coworking-general-room-393x852");
+      const roomMember = page.getByRole("button", { name: /caméra active|^[A-ZÀ-ÿ][^,]{2,}$/ }).filter({ hasNotText: "Quitter" }).first();
+      if (await roomMember.isVisible().catch(() => false)) {
+        await roomMember.click();
+        if (await page.getByLabel("Inviter dans un bureau privé", { exact: true }).isVisible().catch(() => false)) {
+          await shot(page, "coworking-general-room-member-393x852");
+        }
+      }
     }
     await page.close();
 
     const chat = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
-    await chat.goto(`http://127.0.0.1:${port}/chat/carcassonne`, { waitUntil: "domcontentloaded" });
+    await open(chat, "/chat/carcassonne");
     await shot(chat, "chat-393x852");
     const voice = chat.getByLabel("Lire le message vocal").first();
     if (await voice.isVisible().catch(() => false)) {
@@ -100,8 +123,36 @@ async function run() {
     }
     await chat.close();
 
-    fs.writeFileSync(path.join(output, "README.txt"), "Captures réelles du build web V24 générées avant toute nouvelle build Expo.\n");
-    console.log(`V24 render review generated in ${output}`);
+    const highlights = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
+    await open(highlights, "/highlights");
+    await shot(highlights, "highlights-feed-393x852");
+    const mapTab = highlights.getByRole("tab", { name: "Afficher la carte" });
+    if (await mapTab.isVisible().catch(() => false)) {
+      await mapTab.click();
+      await shot(highlights, "highlights-map-393x852");
+    }
+    await highlights.close();
+
+    const calls = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
+    await open(calls, "/calls");
+    await shot(calls, "calls-393x852");
+    await calls.close();
+
+    const settings = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
+    await open(settings, "/settings");
+    await shot(settings, "settings-393x852", true);
+    await settings.close();
+
+    const account = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
+    await open(account, "/account");
+    await shot(account, "account-393x852", true);
+    await account.close();
+
+    fs.writeFileSync(
+      path.join(output, "README.txt"),
+      "Captures réelles du build web V24 géographique + parcours principaux, générées avant toute nouvelle build Expo.\n"
+    );
+    console.log(`V24 whole-app render review generated in ${output}`);
   } finally {
     await browser.close();
     await new Promise((resolve) => server.close(resolve));
