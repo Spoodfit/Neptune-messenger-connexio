@@ -1,4 +1,5 @@
-import { ApiError, apiRequest } from "./httpClient";
+import { ApiError } from "./httpClient";
+import { authenticatedRequest } from "./authenticatedRequest";
 import type {
   CursorPage,
   MessagingApi,
@@ -10,10 +11,6 @@ import {
   normalizeConversationList,
   normalizeMessagePage
 } from "./wireExtensions";
-import {
-  refreshSessionAccessToken,
-  resolveSessionAccessToken
-} from "../auth/sessionRuntime";
 import { evaluateModeration } from "../../domain/moderation";
 import type {
   ChatMessage,
@@ -85,23 +82,7 @@ export class NeptuneMessagingApi implements MessagingApi {
     path: string,
     options: AuthenticatedRequestOptions = {}
   ): Promise<T> {
-    const token = await resolveSessionAccessToken(this.fallbackAccessToken);
-    try {
-      return await apiRequest<T>(path, {
-        ...options,
-        token,
-        credentials: "include"
-      });
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.status !== 401) throw error;
-      const refreshedToken = await refreshSessionAccessToken();
-      if (!refreshedToken) throw error;
-      return apiRequest<T>(path, {
-        ...options,
-        token: refreshedToken,
-        credentials: "include"
-      });
-    }
+    return authenticatedRequest<T>(path, options, this.fallbackAccessToken);
   }
 
   private assertLocalModeration(body: string): void {

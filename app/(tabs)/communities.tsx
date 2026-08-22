@@ -1,7 +1,8 @@
+import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { useMessaging } from "@/providers/MessagingProvider";
@@ -9,7 +10,10 @@ import { colors, radii, spacing, typography } from "@/theme";
 
 const MAX_CONTENT_WIDTH = 720;
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function CommunitiesScreen() {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const {
     visibleConversations,
     refreshConversations,
@@ -81,7 +85,7 @@ export default function CommunitiesScreen() {
               accessibilityElementsHidden
               name={item.canPost ? "chevron-forward" : "lock-closed"}
               size={18}
-              color={colors.textMuted}
+              color={theme.pageTextMuted}
               style={styles.trailingIcon}
             />
           </Pressable>
@@ -100,10 +104,10 @@ export default function CommunitiesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background
+    backgroundColor: theme.pageBackground
   },
   listViewport: {
     width: "100%",
@@ -122,18 +126,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: theme.surface,
     borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border
+    borderColor: theme.border
   },
   cardPressed: { opacity: 0.78, transform: [{ scale: 0.992 }] },
   icon: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 23,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: theme.accentSoft,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0
@@ -145,15 +149,15 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.heading3,
-    color: colors.text
+    color: theme.pageText
   },
   meta: {
     ...typography.caption,
-    color: colors.textMuted
+    color: theme.pageTextMuted
   },
   description: {
     ...typography.bodySmall,
-    color: colors.textSecondary
+    color: theme.pageTextSecondary
   },
   trailingIcon: { flexShrink: 0 },
   emptyState: {
@@ -165,12 +169,12 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     ...typography.heading3,
-    color: colors.text,
+    color: theme.pageText,
     textAlign: "center"
   },
   emptyText: {
     ...typography.body,
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     textAlign: "center"
   }
 });

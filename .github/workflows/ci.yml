@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - release/connexio-rc1
 
 permissions:
   contents: read
@@ -30,9 +31,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Production dependency vulnerability audit
-        run: npm audit --omit=dev --audit-level=high
+        run: npm run audit:dependencies --silent
       - name: TypeScript and domain tests
         run: npm run verify --silent
+      - name: Store release policy audit
+        run: npm run audit:rc --silent
       - name: Expo dependency compatibility
         run: npx expo install --check
       - name: Expo public configuration audit
@@ -40,11 +43,31 @@ jobs:
       - name: Production configuration gate
         env:
           EAS_BUILD_PROFILE: production
+          EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
           EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
           EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
           EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://spoodfit.github.io/Neptune-messenger-connexio/privacy-policy.html
+          EXPO_PUBLIC_TERMS_URL: https://spoodfit.github.io/Neptune-messenger-connexio/connexio-terms.html
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://spoodfit.github.io/Neptune-messenger-connexio/account-deletion.html
+          EXPO_PUBLIC_SUPPORT_URL: mailto:contact@neptunebusiness.com
           EXPO_PUBLIC_MOCK_MODE: "false"
         run: npx expo config --type public >/dev/null
+      - name: Current Neptune backend must stay blocked from Store builds
+        env:
+          EAS_BUILD_PROFILE: production
+          EXPO_PUBLIC_BACKEND_CONTRACT: neptune-web-v1
+          EXPO_PUBLIC_API_BASE_URL: https://api.neptunebusiness.com/api
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_MOCK_MODE: "false"
+        run: |
+          if npx expo config --type public >/tmp/connexio-production-gate.log 2>&1; then
+            echo "Le backend Neptune actuel ne doit pas produire une build Store."
+            exit 1
+          fi
+          grep -q "backend ne déclare pas encore le contrat sécurisé connexio-v1" /tmp/connexio-production-gate.log
 
   responsive-audit:
     runs-on: ubuntu-latest
@@ -81,4 +104,5 @@ jobs:
             fi
             sleep 1
           done
-          node scripts/visual-audit.cjs
+          node scripts/visual-audit-fr.cjs
+          node scripts/interaction-audit.cjs

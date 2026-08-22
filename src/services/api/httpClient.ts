@@ -110,7 +110,9 @@ export async function apiRequest<T>(
 
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
-  headers.set("Accept-Language", "fr-FR");
+  if (!headers.has("Accept-Language")) {
+    headers.set("Accept-Language", "fr-FR");
+  }
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }

@@ -1,3 +1,5 @@
+import { getTranslationRequestLanguage } from "../../i18n/translationLocale";
+import { normalizeLanguageCode } from "../../i18n/languages";
 import type { CallMode, IntegratedCallSession } from "../calls/callRoom";
 import { authenticatedRequest } from "./authenticatedRequest";
 
@@ -19,6 +21,13 @@ interface CallSessionWire {
   initiator?: unknown;
   ice_servers?: unknown;
   expires_at?: unknown;
+  captioning_enabled?: unknown;
+  captions_enabled?: unknown;
+  caption_target_language?: unknown;
+  captions_target_language?: unknown;
+  captions_default_on?: unknown;
+  caption_audio_chunk_ms?: unknown;
+  caption_max_audio_base64_length?: unknown;
 }
 
 function requiredString(value: unknown, label: string): string {
@@ -49,6 +58,16 @@ function normalizeIceServers(value: unknown): RTCIceServer[] {
     : [{ urls: "stun:stun.l.google.com:19302" }];
 }
 
+function boundedInteger(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.trunc(value)));
+}
+
 function normalizeSession(
   payload: CallSessionWire,
   fallbackConversationId: string,
@@ -59,6 +78,7 @@ function normalizeSession(
     payload.socket_url ?? payload.signaling_url,
     "socket_url"
   );
+  const requestedLanguage = getTranslationRequestLanguage();
   return {
     id: requiredString(payload.id ?? payload.call_id, "call_id"),
     conversationId:
@@ -87,6 +107,25 @@ function normalizeSession(
     iceServers: normalizeIceServers(payload.ice_servers),
     expiresAt:
       typeof payload.expires_at === "string" ? payload.expires_at : undefined,
+    captioningEnabled:
+      payload.captioning_enabled === true || payload.captions_enabled === true,
+    captionTargetLanguage: normalizeLanguageCode(
+      payload.caption_target_language ?? payload.captions_target_language,
+      requestedLanguage
+    ),
+    captionsDefaultOn: payload.captions_default_on === true,
+    captionAudioChunkMs: boundedInteger(
+      payload.caption_audio_chunk_ms,
+      1_200,
+      800,
+      3_000
+    ),
+    captionMaxAudioBase64Length: boundedInteger(
+      payload.caption_max_audio_base64_length,
+      524_288,
+      64_000,
+      1_000_000
+    ),
     mock: false
   };
 }
@@ -103,6 +142,7 @@ export class NeptuneCallApi {
     if (cleanReason.length < 3) {
       throw new Error("Indiquez brièvement la raison de l’appel.");
     }
+    const captionLanguage = getTranslationRequestLanguage();
     const payload = await authenticatedRequest<CallSessionWire>(
       "/v1/calls",
       {
@@ -112,7 +152,9 @@ export class NeptuneCallApi {
           conversation_id: conversationId,
           type: mode,
           reason: cleanReason,
-          subject: cleanReason
+          subject: cleanReason,
+          captions_requested: mode === "video",
+          caption_target_language: captionLanguage
         })
       },
       this.fallbackAccessToken
@@ -127,7 +169,13 @@ export class NeptuneCallApi {
   ): Promise<IntegratedCallSession> {
     const payload = await authenticatedRequest<CallSessionWire>(
       `/v1/calls/${encodeURIComponent(callId)}/accept`,
-      { method: "POST" },
+      {
+        method: "POST",
+        body: JSON.stringify({
+          captions_requested: mode === "video",
+          caption_target_language: getTranslationRequestLanguage()
+        })
+      },
       this.fallbackAccessToken
     );
     return normalizeSession(payload, conversationId, mode);

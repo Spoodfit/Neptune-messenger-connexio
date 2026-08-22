@@ -5,6 +5,7 @@ export type CanonicalUserRole =
   | "legende"
   | "moussaillon"
   | "triton"
+  | "allie"
   | "free"
   | "admin";
 
@@ -12,7 +13,8 @@ export type LegacyUserRole =
   | "member"
   | "captain"
   | "admiral"
-  | "visionary";
+  | "visionary"
+  | "ally";
 
 export type UserRole = CanonicalUserRole | LegacyUserRole;
 
@@ -32,6 +34,31 @@ export type MessageStatus =
   | "delivered"
   | "read"
   | "failed";
+
+export type MessageTranslationStatus = "pending" | "ready" | "failed";
+
+/**
+ * Traduction dérivée d'un contenu utilisateur. Les valeurs originales restent
+ * toujours dans leurs champs canoniques ; `fields` ne sert qu'à l'affichage.
+ */
+export interface ContentTranslation {
+  targetLanguage: string;
+  sourceLanguage?: string;
+  status: MessageTranslationStatus;
+  generatedAt?: string;
+  fields?: Record<string, string>;
+}
+
+/** Compatibilité avec le contrat historique de traduction des messages. */
+export interface MessageTranslation extends ContentTranslation {
+  body?: string;
+}
+
+export interface PollTranslation extends ContentTranslation {
+  question?: string;
+  /** Traductions indexées par l'identifiant stable de l'option. */
+  options?: Record<string, string>;
+}
 
 export type AttachmentKind =
   | "photo"
@@ -66,6 +93,8 @@ export interface EventVoteAlert {
   pendingCount: number;
   webUrl: string;
   closesAt?: string;
+  sourceLanguage?: string;
+  translation?: ContentTranslation;
 }
 
 export interface Conversation {
@@ -90,11 +119,19 @@ export interface Conversation {
   /** Membres les plus actifs, ordonnés par activité récente côté serveur. */
   activeMemberIds?: string[];
   ownerId?: string;
+  /** Responsables opérationnels du groupe. Visionnaires implicites sur tous les groupes. */
   adminIds?: string[];
+  /** Amiraux ou Capitaines explicitement autorisés à publier dans Annonce. */
+  announcementPublisherIds?: string[];
+  /** Le groupe est visible aux Free, mais l’adhésion exige une montée Triton. */
+  allowFreeDiscovery?: boolean;
   muted?: boolean;
   archived?: boolean;
   left?: boolean;
   eventVoteAlert?: EventVoteAlert;
+  sourceLanguage?: string;
+  /** Champs traduisibles: description, lastMessage, pinnedMessage. */
+  translation?: ContentTranslation;
 }
 
 export interface MessageAttachment {
@@ -116,6 +153,7 @@ export interface MessageAttachment {
   status?: "local" | "uploading" | "ready" | "failed";
   transcript?: string;
   transcriptStatus?: "pending" | "ready" | "failed";
+  transcriptTranslation?: ContentTranslation;
 }
 
 export interface MessageReactionSummary {
@@ -129,6 +167,8 @@ export interface ReplyPreview {
   messageId: string;
   senderName: string;
   body: string;
+  sourceLanguage?: string;
+  translation?: MessageTranslation;
 }
 
 export interface PollVoter {
@@ -136,6 +176,7 @@ export interface PollVoter {
   name: string;
   initials: string;
   avatarUrl?: string;
+  role?: UserRole;
 }
 
 export interface PollOption {
@@ -159,6 +200,8 @@ export interface MessagePoll {
   closedAt?: string;
   eventVoteId?: string;
   eventVoteUrl?: string;
+  sourceLanguage?: string;
+  translation?: PollTranslation;
 }
 
 export interface CreatePollInput {
@@ -186,14 +229,21 @@ export interface ModerationDecision {
   requiresManualReview?: boolean;
 }
 
+export type ScheduleFrequency = "once" | "daily" | "weekly" | "monthly";
+
 export interface ScheduledMessage {
   id: string;
   conversationId: string;
+  name: string;
   body: string;
   attachments?: MessageAttachment[];
   scheduledFor: string;
+  frequency: ScheduleFrequency;
+  enabled: boolean;
   createdByUserId: string;
-  status: "scheduled" | "sending" | "sent" | "cancelled" | "failed";
+  createdByName?: string;
+  updatedByUserId?: string;
+  status: "scheduled" | "paused" | "sending" | "sent" | "cancelled" | "failed";
 }
 
 export interface ChatMessage {
@@ -204,7 +254,14 @@ export interface ChatMessage {
   senderName: string;
   senderInitials: string;
   senderAvatarUrl?: string;
+  /** Statut Neptune de l’auteur, utilisé pour le contour et le badge. */
+  senderRole?: UserRole;
+  /** Texte canonique tel qu’il a été écrit par l’auteur. Ne jamais l’écraser par une traduction. */
   body: string;
+  /** Langue source détectée côté serveur, au format BCP-47/ISO 639 lorsque disponible. */
+  sourceLanguage?: string;
+  /** Traduction dérivée pour la langue du lecteur. Le corps original reste dans `body`. */
+  translation?: MessageTranslation;
   createdAt: string;
   updatedAt?: string;
   status: MessageStatus;

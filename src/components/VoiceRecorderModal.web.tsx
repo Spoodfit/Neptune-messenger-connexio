@@ -1,15 +1,19 @@
+import { Text } from "@/components/LocalizedText";
+import {
+  useMemo } from "react";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect,
+  useRef,
+  useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors, gradients, spacing, typography } from "../theme";
 import type { VoiceRecorderModalProps } from "./VoiceRecorderModal.types";
@@ -35,6 +39,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export default function VoiceRecorderModal({
   visible,
   onClose,
@@ -42,6 +47,8 @@ export default function VoiceRecorderModal({
   maxDurationSeconds = 300,
   maxSizeBytes = 12 * 1024 * 1024
 }: VoiceRecorderModalProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -100,7 +107,7 @@ export default function VoiceRecorderModal({
       });
       onClose();
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Vocal indisponible",
         error instanceof Error ? error.message : "Le vocal n’a pas pu être préparé."
       );
@@ -124,7 +131,7 @@ export default function VoiceRecorderModal({
       !navigator.mediaDevices?.getUserMedia ||
       typeof MediaRecorder === "undefined"
     ) {
-      Alert.alert(
+      AppAlert.alert(
         "Microphone non compatible",
         "Ce navigateur ne prend pas en charge l’enregistrement vocal intégré."
       );
@@ -157,7 +164,7 @@ export default function VoiceRecorderModal({
       };
       recorder.onerror = () => {
         cleanup();
-        Alert.alert(
+        AppAlert.alert(
           "Microphone interrompu",
           "L’enregistrement vocal a été interrompu par le navigateur."
         );
@@ -174,7 +181,7 @@ export default function VoiceRecorderModal({
       }, 250);
     } catch (error) {
       cleanup();
-      Alert.alert(
+      AppAlert.alert(
         "Microphone indisponible",
         error instanceof DOMException && error.name === "NotAllowedError"
           ? "Autorisez le microphone dans le navigateur pour enregistrer un vocal."
@@ -253,7 +260,7 @@ export default function VoiceRecorderModal({
             style={[styles.recordTarget, preparing && styles.disabled]}
           >
             <LinearGradient
-              colors={recording ? [colors.danger, colors.magenta] : gradients.primaryWarm}
+              colors={recording ? [theme.danger, colors.magenta] : gradients.primaryWarm}
               style={styles.recordButton}
             >
               {preparing ? (
@@ -275,7 +282,7 @@ export default function VoiceRecorderModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -291,8 +298,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: colors.border,
-    backgroundColor: colors.surface
+    borderColor: theme.border,
+    backgroundColor: theme.surface
   },
   handle: {
     width: 42,
@@ -300,7 +307,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 14,
-    backgroundColor: colors.textMuted
+    backgroundColor: theme.pageTextMuted
   },
   header: { flexDirection: "row", alignItems: "center", gap: 11 },
   iconShell: {
@@ -312,37 +319,37 @@ const styles = StyleSheet.create({
   },
   icon: { color: colors.white, fontSize: 18 },
   headerText: { flex: 1, minWidth: 0 },
-  title: { ...typography.heading3, color: colors.text },
-  subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3 },
+  title: { ...typography.heading3, color: theme.pageText },
+  subtitle: { ...typography.caption, color: theme.pageTextMuted, marginTop: 3 },
   closeButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceStrong
+    backgroundColor: theme.surfaceStrong
   },
-  closeText: { color: colors.textMuted, fontSize: 28, lineHeight: 30 },
+  closeText: { color: theme.pageTextMuted, fontSize: 28, lineHeight: 30 },
   visual: {
     minHeight: 132,
     marginTop: spacing.lg,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.background,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.pageBackground,
     alignItems: "center",
     justifyContent: "center",
     gap: 12
   },
   visualRecording: { borderColor: "rgba(244,177,131,0.38)" },
-  timer: { color: colors.text, fontSize: 34, lineHeight: 40, fontWeight: "900" },
+  timer: { color: theme.pageText, fontSize: 34, lineHeight: 40, fontWeight: "900" },
   waveform: { height: 30, flexDirection: "row", alignItems: "center", gap: 3 },
   waveBar: {
     width: 3,
     borderRadius: 2,
-    backgroundColor: colors.orange
+    backgroundColor: theme.orange
   },
-  status: { color: colors.textMuted, fontSize: 10.5, fontWeight: "800" },
+  status: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "800" },
   recordTarget: {
     width: 88,
     height: 88,
@@ -373,7 +380,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: theme.pageTextMuted,
     textAlign: "center",
     marginTop: spacing.md
   },

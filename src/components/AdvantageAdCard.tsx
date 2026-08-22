@@ -1,6 +1,7 @@
+import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 
 import { env } from "../config/env";
 import { colors, gradients, typography } from "../theme";
@@ -46,8 +47,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end"
   },
   icon: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 16,
     marginBottom: "auto",
     alignItems: "center",
@@ -56,7 +57,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: colors.whiteMuted,
-    fontSize: 8.5,
+    fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.8
   },
@@ -66,8 +67,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6
+    gap: 8
   },
-  ctaText: { color: colors.white, fontSize: 10.5, fontWeight: "900" },
+  ctaText: { color: colors.white, fontSize: 11, fontWeight: "900" },
   pressed: { opacity: 0.8, transform: [{ scale: 0.987 }] }
 });

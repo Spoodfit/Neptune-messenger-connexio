@@ -1,42 +1,53 @@
-name: Deploy V14 preview to GitHub Pages
+name: Deploy RC1 preview to GitHub Pages
 
 on:
   push:
     branches:
-      - feat/v14-ux-calls-moderation
+      - release/connexio-rc1
+      - store/go-store-hardening
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: connexio-v14-pages-preview
+  group: connexio-rc1-pages-preview
   cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Checkout V14
+      - name: Checkout release source
         uses: actions/checkout@v4
-        with:
-          ref: feat/v14-ux-calls-moderation
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22.13"
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
-      - name: Build web preview
+      - name: Build web preview and public store documents
         env:
           EXPO_PUBLIC_MOCK_MODE: "true"
-          EXPO_PUBLIC_API_BASE_URL: https://api.example.com
-          EXPO_PUBLIC_REALTIME_URL: wss://api.example.com/v1/realtime
+          EXPO_PUBLIC_GITHUB_PAGES: "true"
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://spoodfit.github.io/Neptune-messenger-connexio/privacy-policy.html
+          EXPO_PUBLIC_TERMS_URL: https://spoodfit.github.io/Neptune-messenger-connexio/connexio-terms.html
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://spoodfit.github.io/Neptune-messenger-connexio/account-deletion.html
+          EXPO_PUBLIC_SUPPORT_URL: mailto:contact@neptunebusiness.com
         run: npm run web:build
+
+      - name: Ensure store policy documents are published
+        run: |
+          test -f dist/privacy-policy.html
+          test -f dist/connexio-terms.html
+          test -f dist/account-deletion.html
 
       - name: Adapt build for project Pages URL
         run: |
@@ -73,7 +84,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Deploy Connexio V14 preview ${GITHUB_SHA}"
+          git commit -m "Deploy Connexio preview ${GITHUB_SHA}"
           git branch -M gh-pages
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin gh-pages

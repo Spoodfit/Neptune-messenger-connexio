@@ -22,6 +22,34 @@ test("normalise un message WebSocket minimal conforme au contrat", () => {
   assert.equal(event.payload.senderName, "Membre Neptune");
 });
 
+test("conserve original et traduction dans un message temps réel", () => {
+  const event = normalizeRealtimeEvent({
+    type: "message.created",
+    payload: {
+      id: "message-translated",
+      conversation_id: "carcassonne",
+      sender_id: "user-2",
+      body: "See you tomorrow",
+      source_language: "en",
+      created_at: "2026-08-13T12:00:00.000Z",
+      translation: {
+        source_language: "en",
+        target_language: "fr",
+        body: "À demain",
+        status: "ready"
+      }
+    }
+  });
+
+  if (!event || event.type !== "message.created") {
+    throw new Error("Événement message traduit attendu");
+  }
+  assert.equal(event.payload.body, "See you tomorrow");
+  assert.equal(event.payload.sourceLanguage, "en");
+  assert.equal(event.payload.translation?.targetLanguage, "fr");
+  assert.equal(event.payload.translation?.body, "À demain");
+});
+
 test("accepte les identifiants snake_case des événements de contrôle", () => {
   assert.deepEqual(
     normalizeRealtimeEvent({

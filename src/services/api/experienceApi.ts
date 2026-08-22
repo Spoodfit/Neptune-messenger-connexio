@@ -14,6 +14,14 @@ import type {
   MessageAttachment
 } from "../../types/messaging";
 import { authenticatedRequest } from "./authenticatedRequest";
+import { ApiError } from "./httpClient";
+import { env } from "../../config/env";
+import { normalizeAppUser } from "./wireExtensions";
+import {
+  needPayloadFromHighlight,
+  normalizeNeptuneNeed,
+  normalizeNeptuneWebFeed
+} from "./neptuneWebFeed";
 
 export interface CreateHighlightInput {
   kind: HighlightKind;
@@ -22,19 +30,56 @@ export interface CreateHighlightInput {
   mentionedUserIds?: string[];
   coordinates?: HighlightPost["coordinates"];
   location?: HighlightLocation;
+  author?: AppUser;
+}
+
+function groupPayload(draft: GroupDraft) {
+  return {
+    name: draft.name.trim(),
+    description: draft.description.trim(),
+    avatar_url: draft.avatarUrl ?? null,
+    icon_name: draft.iconName ?? "people",
+    allowed_roles: draft.allowedRoles,
+    members_can_post: draft.canMembersPost,
+    responsible_ids: draft.adminIds ?? [],
+    announcement_publisher_ids: draft.announcementPublisherIds ?? [],
+    allow_free_discovery: draft.allowFreeDiscovery ?? false
+  };
 }
 
 export class NeptuneExperienceApi {
+  private memberCache: AppUser[] | null = null;
   constructor(private readonly fallbackAccessToken?: string | null) {}
 
-  listMembers(query?: string): Promise<AppUser[]> {
+  async listMembers(query?: string): Promise<AppUser[]> {
+    if (env.backendContract === "neptune-web-v1") {
+      const params = new URLSearchParams({ limit: "500", sort: "prenom" });
+      const payload = await authenticatedRequest<unknown>(
+        `/v1/users?${params.toString()}`,
+        {},
+        this.fallbackAccessToken
+      );
+      if (!Array.isArray(payload)) throw new Error("Annuaire Neptune invalide.");
+      const normalized = payload
+        .map((item) => normalizeAppUser(item))
+        .filter((member) => {
+          if (!query?.trim()) return true;
+          return `${member.name} ${member.company} ${member.city}`
+            .toLocaleLowerCase("fr")
+            .includes(query.trim().toLocaleLowerCase("fr"));
+        });
+      this.memberCache = normalized;
+      return normalized;
+    }
     const params = new URLSearchParams({ visible: "true" });
     if (query?.trim()) params.set("query", query.trim());
-    return authenticatedRequest<AppUser[]>(
+    const members = await authenticatedRequest<AppUser[]>(
       `/v1/members?${params.toString()}`,
       {},
       this.fallbackAccessToken
     );
+    this.memberCache = members;
+    return members;
   }
 
   createPrivateConversation(
@@ -60,14 +105,7 @@ export class NeptuneExperienceApi {
       "/v1/groups",
       {
         method: "POST",
-        body: JSON.stringify({
-          name: draft.name.trim(),
-          description: draft.description.trim(),
-          avatar_url: draft.avatarUrl ?? null,
-          icon_name: draft.iconName ?? "people",
-          allowed_roles: draft.allowedRoles,
-          members_can_post: draft.canMembersPost
-        })
+        body: JSON.stringify(groupPayload(draft))
       },
       this.fallbackAccessToken
     );
@@ -78,15 +116,51 @@ export class NeptuneExperienceApi {
       `/v1/groups/${encodeURIComponent(conversationId)}`,
       {
         method: "PATCH",
-        body: JSON.stringify({
-          name: draft.name.trim(),
-          description: draft.description.trim(),
-          avatar_url: draft.avatarUrl ?? null,
-          icon_name: draft.iconName ?? "people",
-          allowed_roles: draft.allowedRoles,
-          members_can_post: draft.canMembersPost
-        })
+        body: JSON.stringify(groupPayload(draft))
       },
+      this.fallbackAccessToken
+    );
+  }
+
+  async joinGroup(conversationId: string): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/join`,
+      { method: "POST" },
+      this.fallbackAccessToken
+    );
+  }
+
+  async setGroupResponsible(
+    conversationId: string,
+    memberId: string,
+    responsible: boolean
+  ): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/responsibles/${encodeURIComponent(memberId)}`,
+      { method: responsible ? "PUT" : "DELETE" },
+      this.fallbackAccessToken
+    );
+  }
+
+  async removeGroupMember(
+    conversationId: string,
+    memberId: string
+  ): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/members/${encodeURIComponent(memberId)}`,
+      { method: "DELETE" },
+      this.fallbackAccessToken
+    );
+  }
+
+  async setAnnouncementPublisher(
+    conversationId: string,
+    memberId: string,
+    allowed: boolean
+  ): Promise<void> {
+    await authenticatedRequest(
+      `/v1/groups/${encodeURIComponent(conversationId)}/announcement-publishers/${encodeURIComponent(memberId)}`,
+      { method: allowed ? "PUT" : "DELETE" },
       this.fallbackAccessToken
     );
   }
@@ -127,9 +201,28 @@ export class NeptuneExperienceApi {
     );
   }
 
-  listHighlights(
+  async listHighlights(
     cursor?: string
   ): Promise<{ items: HighlightPost[]; nextCursor: string | null }> {
+    if (env.backendContract === "neptune-web-v1") {
+      const members = this.memberCache ?? (await this.listMembers());
+      const [needs, benefits] = await Promise.all([
+        authenticatedRequest<unknown>(
+          "/v1/needs?statut=actif&is_sample=false&sort=-created_date&limit=100",
+          {},
+          this.fallbackAccessToken
+        ),
+        authenticatedRequest<unknown>(
+          "/v1/benefits?active=true&is_sample=false&sort=-created_date&limit=100",
+          {},
+          this.fallbackAccessToken
+        )
+      ]);
+      return {
+        items: normalizeNeptuneWebFeed(needs, benefits, members),
+        nextCursor: null
+      };
+    }
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
     return authenticatedRequest(
       `/v1/highlights${query}`,
@@ -138,7 +231,36 @@ export class NeptuneExperienceApi {
     );
   }
 
-  createHighlight(input: CreateHighlightInput): Promise<HighlightPost> {
+  async createHighlight(input: CreateHighlightInput): Promise<HighlightPost> {
+    if (env.backendContract === "neptune-web-v1") {
+      if (input.kind !== "besoin" || !input.author) {
+        throw new ApiError(
+          "Le backend Neptune actuel accepte uniquement la publication mobile des Besoins.",
+          503,
+          { code: "backend_capability_missing" },
+          undefined,
+          "backend_capability_missing"
+        );
+      }
+      const created = await authenticatedRequest<unknown>(
+        "/v1/needs",
+        {
+          method: "POST",
+          body: JSON.stringify(
+            needPayloadFromHighlight(
+              input.body,
+              input.author,
+              input.mentionedUserIds
+            )
+          )
+        },
+        this.fallbackAccessToken
+      );
+      return normalizeNeptuneNeed(
+        created,
+        new Map([[input.author.id, input.author]])
+      );
+    }
     const syncTargets =
       input.kind === "besoin"
         ? ["connexio", "business-needs"]

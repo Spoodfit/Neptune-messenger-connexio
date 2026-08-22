@@ -4,11 +4,19 @@ const BASE_URL = process.env.VISUAL_AUDIT_BASE_URL ?? "http://127.0.0.1:4173";
 const cases = [
   { name: "messages-280x568", width: 280, height: 568, route: "/" },
   { name: "messages-320x568", width: 320, height: 568, route: "/" },
+  { name: "messages-360x800", width: 360, height: 800, route: "/" },
   { name: "messages-390x844", width: 390, height: 844, route: "/" },
+  { name: "messages-393x852", width: 393, height: 852, route: "/" },
   { name: "messages-tablet-768x1024", width: 768, height: 1024, route: "/" },
   { name: "messages-landscape-1024x768", width: 1024, height: 768, route: "/" },
+  { name: "contacts-360x800", width: 360, height: 800, route: "/contacts" },
+  { name: "account-390x844", width: 390, height: 844, route: "/account" },
+  { name: "privacy-393x852", width: 393, height: 852, route: "/privacy" },
+  { name: "notifications-360x800", width: 360, height: 800, route: "/notification-settings" },
+  { name: "blocked-users-390x844", width: 390, height: 844, route: "/blocked-users" },
+  { name: "new-highlight-393x852", width: 393, height: 852, route: "/new-highlight" },
   { name: "highlights-feed-280x568", width: 280, height: 568, route: "/highlights" },
-  { name: "highlights-map-390x844", width: 390, height: 844, route: "/highlights", clickLabel: "Afficher la carte" },
+  { name: "highlights-map-390x844", width: 390, height: 844, route: "/highlights", clickText: "Map" },
   { name: "calls-280x568", width: 280, height: 568, route: "/calls" },
   { name: "settings-280x568", width: 280, height: 568, route: "/settings" },
   { name: "settings-zoom140", width: 320, height: 568, route: "/settings", zoom: 1.4 },
@@ -83,7 +91,7 @@ async function inspectPage(page) {
     const smallTargets = controls
       .filter((element) => {
         const rect = element.getBoundingClientRect();
-        return rect.width < 44 || rect.height < 44;
+        return rect.width < 48 || rect.height < 48;
       })
       .map((element) => {
         const rect = element.getBoundingClientRect();
@@ -183,6 +191,48 @@ async function inspectPage(page) {
         scrollWidth: element.scrollWidth
       }));
 
+    const typographyIssues = allElements
+      .filter((element) => {
+        const tag = element.tagName.toLowerCase();
+        const isInput = ["input", "textarea", "select"].includes(tag);
+        const value = (element.textContent || element.getAttribute("placeholder") || "").trim();
+        if (!isInput && (!value || element.children.length > 0)) return false;
+        const fontSize = Number.parseFloat(getComputedStyle(element).fontSize);
+        if (!Number.isFinite(fontSize)) return false;
+        if (isInput && ["checkbox", "radio"].includes(element.type)) return false;
+        if (isInput) return fontSize < 16;
+        if (fontSize < 11) return true;
+        return value.length > 32 && fontSize < 14;
+      })
+      .slice(0, 40)
+      .map((element) => ({
+        label: label(element),
+        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
+        tag: element.tagName.toLowerCase()
+      }));
+
+    const controlSpacingIssues = [];
+    for (let index = 0; index < controlRects.length; index += 1) {
+      for (let nextIndex = index + 1; nextIndex < controlRects.length; nextIndex += 1) {
+        const first = controlRects[index];
+        const second = controlRects[nextIndex];
+        if (first.element.contains(second.element) || second.element.contains(first.element)) continue;
+        if (first.element.getAttribute("role") === "tab" || second.element.getAttribute("role") === "tab") continue;
+        const a = first.rect;
+        const b = second.rect;
+        if (a.width > 96 || b.width > 96 || a.height > 96 || b.height > 96) continue;
+        const verticalOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        const horizontalOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+        const horizontalGap = Math.max(a.left, b.left) - Math.min(a.right, b.right);
+        const verticalGap = Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom);
+        const tooCloseHorizontally = verticalOverlap > Math.min(a.height, b.height) * 0.45 && horizontalGap >= 0 && horizontalGap < 8;
+        const tooCloseVertically = horizontalOverlap > Math.min(a.width, b.width) * 0.45 && verticalGap >= 0 && verticalGap < 8;
+        if (tooCloseHorizontally || tooCloseVertically) {
+          controlSpacingIssues.push({ first: first.label, second: second.label, gap: Number(Math.max(horizontalGap, verticalGap).toFixed(2)) });
+        }
+      }
+    }
+
     return {
       viewportWidth,
       viewportHeight,
@@ -191,7 +241,9 @@ async function inspectPage(page) {
       horizontalClipping,
       smallTargets,
       controlOverlaps,
-      textOverflow
+      textOverflow,
+      typographyIssues,
+      controlSpacingIssues
     };
   });
 }
@@ -221,6 +273,10 @@ async function run() {
       }
       if (testCase.clickLabel) {
         await page.getByLabel(testCase.clickLabel).click();
+        await page.waitForTimeout(350);
+      }
+      if (testCase.clickText) {
+        await page.getByText(testCase.clickText, { exact: true }).click();
         await page.waitForTimeout(350);
       }
       await page.waitForTimeout(200);
@@ -272,6 +328,8 @@ async function run() {
       finding.metrics.smallTargets.length > 0 ||
       finding.metrics.controlOverlaps.length > 0 ||
       finding.metrics.textOverflow.length > 0 ||
+      finding.metrics.typographyIssues.length > 0 ||
+      finding.metrics.controlSpacingIssues.length > 0 ||
       finding.consoleErrors.length > 0 ||
       finding.pageErrors.length > 0
     );

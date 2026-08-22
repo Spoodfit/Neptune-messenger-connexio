@@ -1,0 +1,43 @@
+import type { SupportedLanguage } from "./languages";
+import { translateConnexioUiPattern } from "./uiPatterns";
+import { translateCoworkingUiPattern } from "./uiPatternsV23";
+import { translateUiText as translateUiTextCore } from "./uiTranslations";
+import { translateUiTextV17 } from "./uiTranslationsV17";
+import { translateUiTextV17B } from "./uiTranslationsV17b";
+import { translateUiTextV17C } from "./uiTranslationsV17c";
+import { translateUiTextV17D } from "./uiTranslationsV17d";
+import { translateUiTextV18 } from "./uiTranslationsV18";
+import { translateUiTextV19 } from "./uiTranslationsV19";
+import { translateUiTextV19B } from "./uiTranslationsV19b";
+import { translateUiTextV20 } from "./uiTranslationsV20";
+import { translateUiTextV22 } from "./uiTranslationsV22";
+import { translateUiTextV23 } from "./uiTranslationsV23";
+
+export function translateConnexioUiText(value: string, language: SupportedLanguage | string): string {
+  if (!value || language === "fr") return value;
+  const dynamic = translateConnexioUiPattern(value, language);
+  if (dynamic !== value) return dynamic;
+  const coworkingDynamic = translateCoworkingUiPattern(value, language);
+  if (coworkingDynamic !== value) return coworkingDynamic;
+  const v23 = translateUiTextV23(value, language);
+  if (v23 !== value) return v23;
+  const v22 = translateUiTextV22(value, language);
+  if (v22 !== value) return v22;
+  const v20 = translateUiTextV20(value, language);
+  if (v20 !== value) return v20;
+  const v19b = translateUiTextV19B(value, language);
+  if (v19b !== value) return v19b;
+  const v19 = translateUiTextV19(value, language);
+  if (v19 !== value) return v19;
+  const v18 = translateUiTextV18(value, language);
+  if (v18 !== value) return v18;
+  const fourthBatch = translateUiTextV17D(value, language);
+  if (fourthBatch !== value) return fourthBatch;
+  const thirdBatch = translateUiTextV17C(value, language);
+  if (thirdBatch !== value) return thirdBatch;
+  const secondBatch = translateUiTextV17B(value, language);
+  if (secondBatch !== value) return secondBatch;
+  const firstBatch = translateUiTextV17(value, language);
+  if (firstBatch !== value) return firstBatch;
+  return translateUiTextCore(value, language);
+}

@@ -10,6 +10,7 @@ test("les anciens rôles sont normalisés vers les six statuts Neptune", () => {
   assert.equal(normalizeUserRole("visionary"), "visionnaire");
   assert.equal(normalizeUserRole("captain"), "capitaine");
   assert.equal(normalizeUserRole("member"), "triton");
+  assert.equal(normalizeUserRole("legende"), "moussaillon");
 });
 
 test("les permissions comparent les rôles normalisés", () => {

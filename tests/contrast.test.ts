@@ -2,12 +2,11 @@ import { ok } from "node:assert";
 import test from "node:test";
 
 import { colors } from "../src/theme";
+import { lightSemanticPalette } from "../src/theme/semanticPalette";
 
 function channel(value: number): number {
   const normalized = value / 255;
-  return normalized <= 0.04045
-    ? normalized / 12.92
-    : ((normalized + 0.055) / 1.055) ** 2.4;
+  return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
 }
 
 function luminance(hex: string): number {
@@ -38,8 +37,20 @@ const normalTextPairs: Array<[string, string, string]> = [
   ["blanc sur magenta du gradient", colors.white, colors.magenta]
 ];
 
+const lightTextPairs: Array<[string, string, string]> = [
+  ["light texte principal sur fond", lightSemanticPalette.text, lightSemanticPalette.background],
+  ["light texte secondaire sur surface", lightSemanticPalette.textSecondary, lightSemanticPalette.surface],
+  ["light texte atténué sur surface", lightSemanticPalette.textMuted, lightSemanticPalette.surface],
+  ["light accent sur surface", lightSemanticPalette.accent, lightSemanticPalette.surface],
+  ["light violet sur surface", lightSemanticPalette.violet, lightSemanticPalette.surface],
+  ["light orange sur surface", lightSemanticPalette.orange, lightSemanticPalette.surface],
+  ["light succès", lightSemanticPalette.success, lightSemanticPalette.successSoft],
+  ["light avertissement", lightSemanticPalette.warning, lightSemanticPalette.warningSoft],
+  ["light erreur", lightSemanticPalette.danger, lightSemanticPalette.dangerSoft]
+];
+
 test("les couleurs de texte principales respectent WCAG AA", () => {
-  for (const [label, foreground, background] of normalTextPairs) {
+  for (const [label, foreground, background] of [...normalTextPairs, ...lightTextPairs]) {
     const ratio = contrast(foreground, background);
     ok(ratio >= 4.5, `${label}: contraste ${ratio.toFixed(2)} inférieur à 4.5`);
   }

@@ -1,0 +1,27 @@
+{
+  "statusCode": 200,
+  "response": {
+    "data": {
+      "meActor": {
+        "__typename": "User",
+        "accounts": [
+          {
+            "id": "a1964ef6-875f-4a94-8a46-51aca0e37861",
+            "name": "johanzambelli",
+            "apps": []
+          },
+          {
+            "id": "eb02f4cb-affa-4075-a3e9-e9abe7112389",
+            "name": "johanzambellis-team",
+            "apps": [
+              {
+                "id": "1e85dc3a-4114-4387-8e15-2463a82e68fd",
+                "fullName": "@johanzambellis-team/connexio"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

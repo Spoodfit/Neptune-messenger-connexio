@@ -1,22 +1,30 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
+import { ThemeModeButton } from "../components/ThemeModeButton";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { env } from "../config/env";
+import {
+  canInitiatePrivateInteraction,
+  TRITON_CHECKOUT_URL
+} from "../domain/accessPolicy";
 import {
   GROUP_VISIBILITY_ROLES,
   isVisionnaireRole,
@@ -30,6 +38,7 @@ import {
 import { useGroupAdmin } from "../providers/GroupAdminProvider";
 import { useMessaging } from "../providers/MessagingProvider";
 import { useSession } from "../providers/SessionProvider";
+import { type ConnexioTheme, useAppTheme } from "../providers/ThemeProvider";
 import { NeptuneExperienceApi } from "../services/api/experienceApi";
 import { uploadGroupAvatar } from "../services/api/uploadApi";
 import { pickGroupAvatar } from "../services/media/mediaPicker";
@@ -38,6 +47,7 @@ import type {
   CanonicalUserRole,
   Conversation
 } from "../types/messaging";
+import { StatusAvatar } from "../components/StatusAvatar";
 
 const GROUP_ICONS: Array<keyof typeof Ionicons.glyphMap> = [
   "people",
@@ -72,6 +82,8 @@ function sameParticipants(
 
 export default function NewConversationScreen() {
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const { currentUser, accessToken } = useSession();
   const {
     members,
@@ -85,6 +97,7 @@ export default function NewConversationScreen() {
     [accessToken]
   );
   const canCreateOfficialGroup = isVisionnaireRole(currentUser.role);
+  const canInitiatePrivate = canInitiatePrivateInteraction(currentUser.role);
 
   const [mode, setMode] = useState<"private" | "group">("private");
   const [query, setQuery] = useState("");
@@ -130,12 +143,16 @@ export default function NewConversationScreen() {
   ]);
 
   const toggleMember = (memberId: string) => {
+    if (!canInitiatePrivate) {
+      void Linking.openURL(TRITON_CHECKOUT_URL);
+      return;
+    }
     setSelectedIds((previous) => {
       if (previous.includes(memberId)) {
         return previous.filter((id) => id !== memberId);
       }
       if (previous.length >= MAX_PRIVATE_CONTACTS) {
-        Alert.alert(
+        AppAlert.alert(
           "Limite atteinte",
           `${MAX_PRIVATE_PARTICIPANTS} participants maximum, vous compris.`
         );
@@ -158,7 +175,7 @@ export default function NewConversationScreen() {
       const selected = await pickGroupAvatar();
       if (selected) setAvatarUri(selected);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Image indisponible",
         error instanceof Error
           ? error.message
@@ -174,12 +191,26 @@ export default function NewConversationScreen() {
   const submit = async () => {
     if (creating) return;
     if (mode === "private") {
+      if (!canInitiatePrivate) {
+        AppAlert.alert(
+          "Passez Triton",
+          "Un compte Free peut recevoir une invitation privée, mais doit passer Triton pour démarrer une conversation.",
+          [
+            { text: "Plus tard", style: "cancel" },
+            {
+              text: "Passer Triton",
+              onPress: () => void Linking.openURL(TRITON_CHECKOUT_URL)
+            }
+          ]
+        );
+        return;
+      }
       if (selectedIds.length === 0) {
-        Alert.alert("Contact requis", "Sélectionnez au moins un membre.");
+        AppAlert.alert("Contact requis", "Sélectionnez au moins un membre.");
         return;
       }
       if (existingPrivateConversation) {
-        Alert.alert(
+        AppAlert.alert(
           "Conversation déjà ouverte",
           "Une conversation existe déjà avec exactement ces participants.",
           [
@@ -196,18 +227,18 @@ export default function NewConversationScreen() {
 
     if (mode === "group") {
       if (!canCreateOfficialGroup) {
-        Alert.alert(
+        AppAlert.alert(
           "Réservé aux Visionnaires",
           "Seuls les Visionnaires peuvent créer ou administrer un groupe officiel."
         );
         return;
       }
       if (!groupName.trim()) {
-        Alert.alert("Nom requis", "Indiquez le nom du groupe.");
+        AppAlert.alert("Nom requis", "Indiquez le nom du groupe.");
         return;
       }
       if (allowedRoles.length === 0) {
-        Alert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
+        AppAlert.alert("Visibilité requise", "Sélectionnez au moins un statut.");
         return;
       }
     }
@@ -245,7 +276,7 @@ export default function NewConversationScreen() {
       if (api) await refreshConversations();
       router.replace(`/group/${encodeURIComponent(group.id)}`);
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Création impossible",
         error instanceof Error ? error.message : "La création a échoué."
       );
@@ -255,7 +286,7 @@ export default function NewConversationScreen() {
   };
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.screen}>
+    <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <View
         style={[
           styles.header,
@@ -272,11 +303,12 @@ export default function NewConversationScreen() {
           onPress={() => router.back()}
           style={styles.headerButton}
         >
-          <Ionicons name="close" size={25} color={colors.text} />
+          <Ionicons name="close" size={25} color={theme.pageText} />
         </Pressable>
         <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>
           Nouvelle conversation
         </Text>
+        <ThemeModeButton />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Créer"
@@ -286,7 +318,7 @@ export default function NewConversationScreen() {
           style={styles.createAction}
         >
           {creating ? (
-            <ActivityIndicator size="small" color={colors.orange} />
+            <ActivityIndicator size="small" color={theme.orange} />
           ) : (
             <Text style={styles.createActionText}>Créer</Text>
           )}
@@ -301,12 +333,12 @@ export default function NewConversationScreen() {
           style={styles.tab}
         >
           {mode === "private" ? (
-            <LinearGradient colors={gradients.activeTab} style={StyleSheet.absoluteFill} />
+            <LinearGradient colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab} style={StyleSheet.absoluteFill} />
           ) : null}
           <Ionicons
             name="chatbubbles"
             size={17}
-            color={mode === "private" ? colors.text : colors.textMuted}
+            color={mode === "private" ? theme.pageText : theme.pageTextMuted}
           />
           <Text style={[styles.tabText, mode === "private" && styles.tabTextActive]}>
             Privée
@@ -320,12 +352,12 @@ export default function NewConversationScreen() {
             style={styles.tab}
           >
             {mode === "group" ? (
-              <LinearGradient colors={gradients.activeTab} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={theme.isLight ? [theme.accentSoft, theme.violetSoft] : gradients.activeTab} style={StyleSheet.absoluteFill} />
             ) : null}
             <Ionicons
               name="people"
               size={17}
-              color={mode === "group" ? colors.text : colors.textMuted}
+              color={mode === "group" ? theme.pageText : theme.pageTextMuted}
             />
             <Text style={[styles.tabText, mode === "group" && styles.tabTextActive]}>
               Groupe officiel
@@ -345,7 +377,7 @@ export default function NewConversationScreen() {
         {mode === "private" ? (
           <>
             <View style={styles.infoCard}>
-              <Ionicons name="shield-checkmark" size={19} color={colors.success} />
+              <Ionicons name="shield-checkmark" size={19} color={theme.success} />
               <Text style={styles.infoText}>
                 Discussion individuelle ou mini-groupe de {MAX_PRIVATE_PARTICIPANTS} participants au total, vous compris.
               </Text>
@@ -356,7 +388,7 @@ export default function NewConversationScreen() {
                 value={privateName}
                 onChangeText={setPrivateName}
                 placeholder="Nom du mini-groupe (facultatif)"
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={theme.pageTextMuted}
                 maxLength={70}
                 style={styles.input}
               />
@@ -366,7 +398,7 @@ export default function NewConversationScreen() {
               value={query}
               onChangeText={setQuery}
               placeholder="Rechercher par nom, entreprise ou ville"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={theme.pageTextMuted}
               style={styles.input}
             />
 
@@ -386,14 +418,14 @@ export default function NewConversationScreen() {
                 onPress={() => openExistingConversation(existingPrivateConversation)}
                 style={styles.existingBanner}
               >
-                <Ionicons name="chatbubble-ellipses" size={20} color={colors.orange} />
+                <Ionicons name="chatbubble-ellipses" size={20} color={theme.orange} />
                 <View style={styles.existingContent}>
                   <Text style={styles.existingTitle}>Conversation déjà ouverte</Text>
                   <Text style={styles.existingText} numberOfLines={1}>
                     {existingPrivateConversation.name}
                   </Text>
                 </View>
-                <Ionicons name="arrow-forward" size={18} color={colors.orange} />
+                <Ionicons name="arrow-forward" size={18} color={theme.orange} />
               </Pressable>
             ) : null}
 
@@ -413,13 +445,7 @@ export default function NewConversationScreen() {
                       pressed && styles.pressed
                     ]}
                   >
-                    <View style={styles.avatar}>
-                      {member.avatarUrl ? (
-                        <Image source={{ uri: member.avatarUrl }} style={styles.avatarImage} />
-                      ) : (
-                        <Text style={styles.initials}>{member.initials}</Text>
-                      )}
-                    </View>
+                    <StatusAvatar user={member} size={44} accessible={false} />
                     <View style={styles.memberContent}>
                       <Text style={styles.memberName}>{member.name}</Text>
                       <Text style={styles.memberMeta} numberOfLines={1}>
@@ -439,7 +465,7 @@ export default function NewConversationScreen() {
         ) : (
           <>
             <View style={[styles.infoCard, styles.visionnaireCard]}>
-              <Ionicons name="diamond" size={19} color={colors.orange} />
+              <Ionicons name="diamond" size={19} color={theme.orange} />
               <Text style={styles.infoText}>
                 Administration officielle réservée aux Visionnaires. Les droits sont également contrôlés par le backend.
               </Text>
@@ -456,7 +482,7 @@ export default function NewConversationScreen() {
                 {avatarUri ? (
                   <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
                 ) : (
-                  <Ionicons name={iconName} size={28} color={colors.text} />
+                  <Ionicons name={iconName} size={28} color={theme.pageText} />
                 )}
                 <View style={styles.cropBadge}>
                   <Ionicons name="crop-outline" size={14} color={colors.white} />
@@ -467,7 +493,7 @@ export default function NewConversationScreen() {
                   value={groupName}
                   onChangeText={setGroupName}
                   placeholder="Nom du groupe"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={theme.pageTextMuted}
                   maxLength={70}
                   style={styles.input}
                 />
@@ -481,7 +507,7 @@ export default function NewConversationScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder="Description du groupe"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={theme.pageTextMuted}
               multiline
               maxLength={240}
               textAlignVertical="top"
@@ -503,7 +529,7 @@ export default function NewConversationScreen() {
                     <Ionicons
                       name={icon}
                       size={22}
-                      color={selected ? colors.orange : colors.textMuted}
+                      color={selected ? theme.orange : theme.pageTextMuted}
                     />
                   </Pressable>
                 );
@@ -542,7 +568,7 @@ export default function NewConversationScreen() {
                 style={styles.switchControl}
                 value={membersCanPost}
                 onValueChange={setMembersCanPost}
-                trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
+                trackColor={{ false: theme.surfaceMuted, true: colors.primary }}
                 thumbColor={colors.white}
               />
             </View>
@@ -553,7 +579,7 @@ export default function NewConversationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
   screen: { flex: 1 },
   header: {
     minHeight: 58,
@@ -570,18 +596,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...typography.heading3,
-    color: colors.text,
+    color: theme.pageText,
     flex: 1,
     minWidth: 0,
     textAlign: "center"
   },
   createAction: {
     minWidth: 62,
-    minHeight: 44,
+    minHeight: 48,
     alignItems: "center",
     justifyContent: "center"
   },
-  createActionText: { color: colors.orange, fontSize: 12, fontWeight: "900" },
+  createActionText: { color: theme.orange, fontSize: 14, fontWeight: "900" },
   tabs: {
     width: "100%",
     maxWidth: 680,
@@ -591,22 +617,22 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row"
   },
   tab: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 48,
     overflow: "hidden",
     borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7
+    gap: 8
   },
-  tabText: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
-  tabTextActive: { color: colors.text },
+  tabText: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "900" },
+  tabTextActive: { color: theme.pageText },
   content: {
     width: "100%",
     maxWidth: 680,
@@ -618,21 +644,21 @@ const styles = StyleSheet.create({
     minHeight: 60,
     padding: 12,
     borderRadius: radii.lg,
-    backgroundColor: colors.successSoft,
+    backgroundColor: theme.successSoft,
     flexDirection: "row",
     alignItems: "center",
     gap: 9
   },
   visionnaireCard: { backgroundColor: "rgba(244,177,131,0.11)" },
-  infoText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
+  infoText: { ...typography.bodySmall, color: theme.pageTextSecondary, flex: 1 },
   input: {
     minHeight: 50,
     paddingHorizontal: 13,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    color: colors.text,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
+    color: theme.pageText,
     ...typography.bodySmall
   },
   multiline: { minHeight: 92, paddingVertical: 12 },
@@ -643,8 +669,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8
   },
-  selectionText: { color: colors.textSecondary, fontSize: 10, fontWeight: "900" },
-  participantText: { color: colors.textMuted, fontSize: 9, fontWeight: "800" },
+  selectionText: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900" },
+  participantText: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "800" },
   existingBanner: {
     minHeight: 58,
     padding: 10,
@@ -657,50 +683,50 @@ const styles = StyleSheet.create({
     gap: 9
   },
   existingContent: { flex: 1, minWidth: 0 },
-  existingTitle: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  existingText: { color: colors.textSecondary, fontSize: 9.5, marginTop: 2 },
-  memberList: { gap: 7 },
+  existingTitle: { color: theme.orange, fontSize: 11, fontWeight: "900" },
+  existingText: { color: theme.pageTextSecondary, fontSize: 11, marginTop: 2 },
+  memberList: { gap: 8 },
   memberRow: {
     minHeight: 65,
     padding: 10,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 10
   },
   memberRowSelected: {
-    borderColor: colors.violet,
+    borderColor: theme.violet,
     backgroundColor: "rgba(107,79,234,0.16)"
   },
   pressed: { opacity: 0.78, transform: [{ scale: 0.993 }] },
   avatar: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: 15,
     overflow: "hidden",
-    backgroundColor: colors.primarySoft,
+    backgroundColor: theme.accentSoft,
     alignItems: "center",
     justifyContent: "center"
   },
   avatarImage: { width: "100%", height: "100%" },
-  initials: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  initials: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
   memberContent: { flex: 1, minWidth: 0 },
-  memberName: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  memberMeta: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
+  memberName: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  memberMeta: { color: theme.pageTextMuted, fontSize: 11, marginTop: 3 },
   check: {
     width: 27,
     height: 27,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.border,
     alignItems: "center",
     justifyContent: "center"
   },
   checkSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  label: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 7 },
+  label: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900", marginTop: 7 },
   identityRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   groupAvatar: {
     width: 84,
@@ -708,9 +734,9 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     overflow: "hidden",
     position: "relative",
-    backgroundColor: colors.primarySoft,
+    backgroundColor: theme.accentSoft,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: theme.border,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -725,47 +751,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  identityFields: { flex: 1, minWidth: 0, gap: 5 },
-  helperText: { color: colors.textMuted, fontSize: 8.5, lineHeight: 12 },
-  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  identityFields: { flex: 1, minWidth: 0, gap: 8 },
+  helperText: { color: theme.pageTextMuted, fontSize: 11, lineHeight: 12 },
+  iconGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   iconChoice: {
     width: 48,
     height: 48,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center"
   },
-  iconChoiceSelected: { borderColor: colors.orange, backgroundColor: "rgba(244,177,131,0.12)" },
-  roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  iconChoiceSelected: { borderColor: theme.orange, backgroundColor: "rgba(244,177,131,0.12)" },
+  roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   roleChip: {
     minHeight: 42,
     paddingHorizontal: 11,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center"
   },
-  roleChipSelected: { borderColor: colors.violet, backgroundColor: "rgba(107,79,234,0.18)" },
-  roleText: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
-  roleTextSelected: { color: colors.text },
+  roleChipSelected: { borderColor: theme.violet, backgroundColor: "rgba(107,79,234,0.18)" },
+  roleText: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "800" },
+  roleTextSelected: { color: theme.pageText },
   switchRow: {
     minHeight: 74,
     padding: 12,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surface,
     flexDirection: "row",
     alignItems: "center",
     gap: 12
   },
   switchContent: { flex: 1, minWidth: 0 },
-  switchTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  switchSubtitle: { color: colors.textMuted, fontSize: 9, lineHeight: 13, marginTop: 3 },
-  switchControl: { width: 48, height: 44 }
+  switchTitle: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  switchSubtitle: { color: theme.pageTextMuted, fontSize: 11, lineHeight: 13, marginTop: 3 },
+  switchControl: { width: 48, height: 48 }
 });

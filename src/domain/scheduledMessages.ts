@@ -1,6 +1,7 @@
 import { normalizeUserRole } from "./roles";
 import type {
   MessageAttachment,
+  ScheduleFrequency,
   ScheduledMessage,
   UserRole
 } from "../types/messaging";
@@ -8,10 +9,14 @@ import type {
 export interface ScheduleMessageInput {
   id: string;
   conversationId: string;
+  name: string;
   body: string;
   attachments?: MessageAttachment[];
   scheduledFor: string;
+  frequency?: ScheduleFrequency;
+  enabled?: boolean;
   createdByUserId: string;
+  createdByName?: string;
   role: UserRole;
   canManageConversation: boolean;
   now?: Date;
@@ -25,9 +30,7 @@ export function canScheduleMessages(
   role: UserRole,
   canManageConversation: boolean
 ): boolean {
-  return (
-    canManageConversation && AUTHORIZED_ROLES.has(normalizeUserRole(role))
-  );
+  return canManageConversation && AUTHORIZED_ROLES.has(normalizeUserRole(role));
 }
 
 export function createScheduledMessage(
@@ -35,13 +38,17 @@ export function createScheduledMessage(
 ): ScheduledMessage {
   if (!canScheduleMessages(input.role, input.canManageConversation)) {
     throw new Error(
-      "Seuls les Capitaines, Amiraux et Visionnaires responsables de ce groupe peuvent programmer un message."
+      "Seuls les Capitaines, Amiraux et Visionnaires responsables de ce groupe peuvent créer une automatisation."
     );
+  }
+  const cleanName = input.name.trim();
+  if (cleanName.length < 3) {
+    throw new Error("Donnez un nom explicite à l’automatisation.");
   }
   const cleanBody = input.body.trim();
   const attachments = input.attachments ?? [];
   if (!cleanBody && attachments.length === 0) {
-    throw new Error("Le message programmé ne peut pas être vide.");
+    throw new Error("Le message automatisé ne peut pas être vide.");
   }
   const now = input.now ?? new Date();
   const scheduledAt = new Date(input.scheduledFor);
@@ -53,16 +60,20 @@ export function createScheduledMessage(
     throw new Error("Programmez l’envoi au moins deux minutes à l’avance.");
   }
   if (delay > MAXIMUM_DELAY_MS) {
-    throw new Error("Un message ne peut pas être programmé plus d’un an à l’avance.");
+    throw new Error("Une automatisation ne peut pas démarrer plus d’un an à l’avance.");
   }
 
   return {
     id: input.id,
     conversationId: input.conversationId,
+    name: cleanName,
     body: cleanBody,
     attachments,
     scheduledFor: scheduledAt.toISOString(),
+    frequency: input.frequency ?? "once",
+    enabled: input.enabled ?? true,
     createdByUserId: input.createdByUserId,
-    status: "scheduled"
+    createdByName: input.createdByName,
+    status: input.enabled === false ? "paused" : "scheduled"
   };
 }

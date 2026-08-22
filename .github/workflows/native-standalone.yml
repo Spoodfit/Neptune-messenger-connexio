@@ -1,0 +1,167 @@
+name: Build standalone native apps
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Plateforme standalone à construire
+        required: true
+        default: android
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+  push:
+    branches:
+      - release/connexio-rc1
+    paths:
+      - .github/workflows/native-standalone.yml
+      - app/**
+      - src/**
+      - assets/**
+      - app.json
+      - app.config.*
+      - eas.json
+      - package.json
+      - package-lock.json
+      - tsconfig.json
+
+permissions:
+  contents: write
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
+  EXPO_PUBLIC_MOCK_MODE: "true"
+  EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+  EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+
+jobs:
+  standalone-android:
+    name: standalone-android
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.platform == 'android' || inputs.platform == 'all'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout release exacte
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.sha || 'release/connexio-rc1' }}
+          fetch-depth: 0
+      - name: Verrouiller la source Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          echo "CONNEXIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "Source Connexio: $SOURCE_SHA"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Installer les dépendances verrouillées
+        run: npm ci --no-audit --no-fund
+      - name: Vérifier le nouveau projet Expo
+        run: |
+          test -n "$EXPO_TOKEN"
+          npx --yes eas-cli@21.7.1 whoami
+          npx --yes eas-cli@21.7.1 project:info --json | tee eas-project-info.json
+      - name: Vérifier Connexio V23
+        run: npm run verify && npm run audit:rc && npx expo install --check
+      - name: Vérifier Expo Prebuild Android
+        env:
+          EXPO_DEBUG: "1"
+          EXPO_CONFIG_PLUGIN_VERBOSE_ERRORS: "1"
+        run: |
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+          test -x android/gradlew
+          test -f android/app/build.gradle
+          rm -rf android
+      - name: Construire le nouvel APK sur EAS Cloud
+        id: eas
+        shell: bash
+        run: |
+          set +e
+          npx --yes eas-cli@21.7.1 build \
+            --profile standalone \
+            --platform android \
+            --non-interactive \
+            --wait \
+            --clear-cache \
+            --json > eas-build-android.json 2> eas-build-android.stderr
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          cat eas-build-android.stderr || true
+          cat eas-build-android.json || true
+      - name: Publier le résultat EAS
+        if: always()
+        shell: bash
+        env:
+          EAS_CODE: ${{ steps.eas.outputs.code }}
+        run: |
+          mkdir -p builds
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = fs.existsSync('eas-build-android.json') ? fs.readFileSync('eas-build-android.json', 'utf8') : '';
+          const stderr = fs.existsSync('eas-build-android.stderr') ? fs.readFileSync('eas-build-android.stderr', 'utf8') : '';
+          const projectInfo = fs.existsSync('eas-project-info.json') ? fs.readFileSync('eas-project-info.json', 'utf8') : '';
+          let parsed = null;
+          let parseError = null;
+          try { parsed = raw.trim() ? JSON.parse(raw) : null; } catch (error) { parseError = String(error); }
+          const build = Array.isArray(parsed) ? parsed[0] : parsed;
+          const artifactUrl = build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl || null;
+          const result = {
+            easCode: process.env.EAS_CODE === '' || process.env.EAS_CODE == null ? null : Number(process.env.EAS_CODE),
+            projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+            projectInfo: projectInfo.slice(-4000),
+            sourceCommit: process.env.CONNEXIO_SOURCE_SHA || null,
+            buildId: build?.id || null,
+            status: build?.status || null,
+            platform: build?.platform || null,
+            buildProfile: build?.buildProfile || 'standalone',
+            gitCommitHash: build?.gitCommitHash || null,
+            appVersion: build?.appVersion || null,
+            appBuildVersion: build?.appBuildVersion || null,
+            createdAt: build?.createdAt || null,
+            completedAt: build?.completedAt || null,
+            artifactUrl,
+            parseError,
+            stderr: stderr.slice(-12000)
+          };
+          fs.writeFileSync('builds/latest-android-standalone.json', JSON.stringify(result, null, 2) + '\n');
+          console.log(JSON.stringify(result, null, 2));
+          NODE
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f builds/latest-android-standalone.json
+          git commit -m "build(android): record latest Expo standalone build [skip ci]" || true
+          git push origin HEAD:release/connexio-rc1 || true
+          test "${EAS_CODE:-1}" = "0"
+
+  standalone-ios:
+    name: standalone-ios
+    if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'ios' || inputs.platform == 'all')
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Installer les dépendances
+        run: npm ci --no-audit --no-fund
+      - name: Vérifier Connexio
+        run: npm run verify && npm run audit:rc && npx expo install --check
+      - name: Construire iOS avec EAS
+        run: npx --yes eas-cli@21.7.1 build --profile standalone --platform ios --non-interactive --wait --clear-cache
+
+# Re-triggered against the migrated johanzambellis-team/connexio EAS project after quota/account migration verification.

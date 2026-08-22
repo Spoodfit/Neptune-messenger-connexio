@@ -6,13 +6,62 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "development"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "channel": "preview"
+    },
+    "standalone": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_MOCK_MODE": "true",
+        "EXPO_PUBLIC_BACKEND_CONTRACT": "connexio-v1",
+        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL": "https://neptunebusiness.com"
+      },
+      "ios": {
+        "image": "sdk-57"
+      },
+      "android": {
+        "image": "sdk-57",
+        "buildType": "apk"
+      }
+    },
+    "release-candidate": {
+      "distribution": "internal",
+      "channel": "release-candidate",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_MOCK_MODE": "false",
+        "EXPO_PUBLIC_BACKEND_CONTRACT": "neptune-web-v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.neptunebusiness.com/api",
+        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL": "https://neptunebusiness.com"
+      },
+      "ios": {
+        "image": "sdk-57"
+      },
+      "android": {
+        "image": "sdk-57"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "channel": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_MOCK_MODE": "false",
+        "EXPO_PUBLIC_BACKEND_CONTRACT": "neptune-web-v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.neptunebusiness.com/api",
+        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL": "https://neptunebusiness.com"
+      },
+      "ios": {
+        "image": "sdk-57"
+      },
+      "android": {
+        "image": "sdk-57"
+      }
     }
   },
   "submit": {

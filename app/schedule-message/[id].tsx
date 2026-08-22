@@ -1,32 +1,43 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
+import {
+  Ionicons } from "@expo/vector-icons";
 import * as Crypto from "expo-crypto";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router,
+  useLocalSearchParams } from "expo-router";
+import { useEffect,
+  useMemo,
+  useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
+  Switch,
   View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppAlert } from "@/services/ui/AppAlert";
 
+import { ThemeModeButton } from "@/components/ThemeModeButton";
 import { env } from "@/config/env";
 import {
-  canScheduleMessages,
-  createScheduledMessage
-} from "@/domain/scheduledMessages";
+  canManageAllGroupAutomations,
+  canScheduleMessages
+} from "@/domain/accessPolicy";
+import { createScheduledMessage } from "@/domain/scheduledMessages";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useGroupAdmin } from "@/providers/GroupAdminProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
+import { type ConnexioTheme, useAppTheme } from "@/providers/ThemeProvider";
 import { NeptuneGovernanceApi } from "@/services/api/governanceApi";
-import { colors, gradients, spacing, typography } from "@/theme";
-import type { ScheduledMessage } from "@/types/messaging";
+import { colors, gradients, radii, spacing, typography } from "@/theme";
+import type {
+  ScheduleFrequency,
+  ScheduledMessage
+} from "@/types/messaging";
 
 interface SchedulePreset {
   id: string;
@@ -71,6 +82,17 @@ const PRESETS: SchedulePreset[] = [
       return next;
     }
   }
+];
+
+const FREQUENCIES: Array<{
+  value: ScheduleFrequency;
+  label: string;
+  description: string;
+}> = [
+  { value: "once", label: "Une fois", description: "Un envoi unique" },
+  { value: "daily", label: "Chaque jour", description: "À la même heure" },
+  { value: "weekly", label: "Chaque semaine", description: "Le même jour" },
+  { value: "monthly", label: "Chaque mois", description: "À la même date" }
 ];
 
 function first(value?: string | string[]): string {
@@ -131,9 +153,15 @@ function formatScheduledDate(value: string): string {
   }).format(date);
 }
 
-export default function ScheduleMessageScreen() {
+function frequencyLabel(frequency: ScheduleFrequency): string {
+  return FREQUENCIES.find((item) => item.value === frequency)?.label ?? "Une fois";
+}
+
+export default function GroupAutomationsScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const theme = useAppTheme();
+  const styles = createStyles(theme);
   const conversationId = first(params.id);
   const { currentUser, accessToken } = useSession();
   const { getConversation: getServerConversation } = useMessaging();
@@ -143,30 +171,36 @@ export default function ScheduleMessageScreen() {
     getServerConversation(conversationId) ??
     getLocalConversation(conversationId) ??
     getCreatedGroup(conversationId);
-  const responsible = Boolean(
-    conversation?.canManage ||
-      conversation?.ownerId === currentUser.id ||
-      conversation?.adminIds?.includes(currentUser.id)
-  );
   const authorized = Boolean(
     conversation &&
       conversation.type !== "direct" &&
-      canScheduleMessages(currentUser.role, responsible)
+      conversation.type !== "small_group" &&
+      canScheduleMessages(currentUser, conversation)
   );
+  const canManageAll = canManageAllGroupAutomations(currentUser.role);
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneGovernanceApi(accessToken)),
     [accessToken]
   );
 
-  const initialDate = useMemo(() => PRESETS.find((preset) => preset.id === "tomorrow-nine")?.resolve(new Date()) ?? new Date(Date.now() + 86_400_000), []);
+  const initialDate = useMemo(
+    () =>
+      PRESETS.find((preset) => preset.id === "tomorrow-nine")?.resolve(new Date()) ??
+      new Date(Date.now() + 86_400_000),
+    []
+  );
+  const [automationName, setAutomationName] = useState("");
   const [body, setBody] = useState("");
   const [dateValue, setDateValue] = useState(formatDateInput(initialDate));
   const [timeValue, setTimeValue] = useState(formatTimeInput(initialDate));
+  const [frequency, setFrequency] = useState<ScheduleFrequency>("once");
   const [selectedPreset, setSelectedPreset] = useState("tomorrow-nine");
-  const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
+  const [enabled, setEnabled] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [automations, setAutomations] = useState<ScheduledMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authorized || !api || !conversationId) return;
@@ -176,19 +210,21 @@ export default function ScheduleMessageScreen() {
       .listScheduledMessages(conversationId)
       .then((items) => {
         if (!cancelled) {
-          setScheduledMessages(
-            items
-              .filter((item) => item.status === "scheduled")
-              .sort(
-                (firstItem, secondItem) =>
-                  Date.parse(firstItem.scheduledFor) -
-                  Date.parse(secondItem.scheduledFor)
-              )
+          setAutomations(
+            [...items].sort(
+              (firstItem, secondItem) =>
+                Date.parse(firstItem.scheduledFor) - Date.parse(secondItem.scheduledFor)
+            )
           );
         }
       })
-      .catch(() => {
-        if (!cancelled) setScheduledMessages([]);
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          AppAlert.alert(
+            "Automatisations indisponibles",
+            error instanceof Error ? error.message : "Réessayez ultérieurement."
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -198,6 +234,18 @@ export default function ScheduleMessageScreen() {
     };
   }, [api, authorized, conversationId]);
 
+  const resetForm = () => {
+    const next = PRESETS.find((preset) => preset.id === "tomorrow-nine")?.resolve(new Date()) ?? new Date(Date.now() + 86_400_000);
+    setAutomationName("");
+    setBody("");
+    setDateValue(formatDateInput(next));
+    setTimeValue(formatTimeInput(next));
+    setFrequency("once");
+    setSelectedPreset("tomorrow-nine");
+    setEnabled(true);
+    setEditingId(null);
+  };
+
   const applyPreset = (preset: SchedulePreset) => {
     const date = preset.resolve(new Date());
     setSelectedPreset(preset.id);
@@ -205,87 +253,152 @@ export default function ScheduleMessageScreen() {
     setTimeValue(formatTimeInput(date));
   };
 
-  const schedule = async () => {
-    if (!authorized || saving) return;
-    const cleanBody = body.trim();
-    if (!cleanBody) {
-      Alert.alert("Message requis", "Écrivez le message à envoyer automatiquement.");
-      return;
-    }
+  const canManageItem = (item: ScheduledMessage): boolean =>
+    canManageAll || item.createdByUserId === currentUser.id;
 
+  const saveAutomation = async () => {
+    if (!authorized || saving) return;
     setSaving(true);
     try {
       const scheduledFor = parseLocalSchedule(dateValue, timeValue).toISOString();
+      const existing = editingId
+        ? automations.find((item) => item.id === editingId)
+        : undefined;
+      if (existing && !canManageItem(existing)) {
+        throw new Error("Seuls les Visionnaires peuvent modifier l’automatisation d’un autre responsable.");
+      }
       const validated = createScheduledMessage({
-        id: `scheduled-${Crypto.randomUUID()}`,
+        id: editingId ?? `scheduled-${Crypto.randomUUID()}`,
         conversationId,
-        body: cleanBody,
+        name: automationName,
+        body,
         scheduledFor,
-        createdByUserId: currentUser.id,
+        frequency,
+        enabled,
+        createdByUserId: existing?.createdByUserId ?? currentUser.id,
+        createdByName: existing?.createdByName ?? currentUser.name,
         role: currentUser.role,
-        canManageConversation: responsible
+        canManageConversation: true
       });
-      const scheduled = api
-        ? await api.scheduleMessage({
-            conversationId,
-            body: cleanBody,
-            scheduledFor
-          })
+      const input = {
+        conversationId,
+        name: validated.name,
+        body: validated.body,
+        scheduledFor: validated.scheduledFor,
+        frequency: validated.frequency,
+        enabled: validated.enabled
+      };
+      const saved = api
+        ? editingId
+          ? await api.updateScheduledMessage(editingId, input)
+          : await api.scheduleMessage(input)
         : validated;
-      setScheduledMessages((previous) =>
-        [...previous, scheduled].sort(
+      setAutomations((previous) =>
+        [saved, ...previous.filter((item) => item.id !== saved.id)].sort(
           (firstItem, secondItem) =>
-            Date.parse(firstItem.scheduledFor) -
-            Date.parse(secondItem.scheduledFor)
+            Date.parse(firstItem.scheduledFor) - Date.parse(secondItem.scheduledFor)
         )
       );
-      setBody("");
-      Alert.alert(
-        "Message programmé",
-        `Il sera envoyé automatiquement ${formatScheduledDate(scheduled.scheduledFor)}.`
+      AppAlert.alert(
+        editingId ? "Automatisation modifiée" : "Automatisation créée",
+        `${saved.name} démarrera ${formatScheduledDate(saved.scheduledFor)}.`
       );
+      resetForm();
     } catch (error) {
-      Alert.alert(
-        "Programmation impossible",
-        error instanceof Error
-          ? error.message
-          : "Le message n’a pas pu être programmé."
+      AppAlert.alert(
+        "Enregistrement impossible",
+        error instanceof Error ? error.message : "L’automatisation n’a pas été enregistrée."
       );
     } finally {
       setSaving(false);
     }
   };
 
-  const cancelScheduled = async (item: ScheduledMessage) => {
-    if (cancellingId) return;
-    setCancellingId(item.id);
+  const editAutomation = (item: ScheduledMessage) => {
+    if (!canManageItem(item)) {
+      AppAlert.alert(
+        "Modification réservée",
+        "Seuls les Visionnaires peuvent modifier une automatisation créée par un autre responsable."
+      );
+      return;
+    }
+    const date = new Date(item.scheduledFor);
+    setEditingId(item.id);
+    setAutomationName(item.name);
+    setBody(item.body);
+    setDateValue(formatDateInput(date));
+    setTimeValue(formatTimeInput(date));
+    setFrequency(item.frequency);
+    setEnabled(item.enabled);
+    setSelectedPreset("");
+  };
+
+  const toggleEnabled = async (item: ScheduledMessage) => {
+    if (!canManageItem(item) || busyId) return;
+    const nextEnabled = !item.enabled;
+    setBusyId(item.id);
+    setAutomations((previous) =>
+      previous.map((candidate) =>
+        candidate.id === item.id
+          ? {
+              ...candidate,
+              enabled: nextEnabled,
+              status: nextEnabled ? "scheduled" : "paused"
+            }
+          : candidate
+      )
+    );
     try {
       if (api) {
-        await api.cancelScheduledMessage(conversationId, item.id);
+        await api.setScheduledMessageEnabled(conversationId, item.id, nextEnabled);
       }
-      setScheduledMessages((previous) =>
-        previous.filter((scheduled) => scheduled.id !== item.id)
-      );
     } catch (error) {
-      Alert.alert(
-        "Annulation impossible",
-        error instanceof Error
-          ? error.message
-          : "Le message programmé n’a pas pu être annulé."
+      setAutomations((previous) =>
+        previous.map((candidate) => (candidate.id === item.id ? item : candidate))
+      );
+      AppAlert.alert(
+        "Modification impossible",
+        error instanceof Error ? error.message : "L’état n’a pas été modifié."
       );
     } finally {
-      setCancellingId(null);
+      setBusyId(null);
     }
+  };
+
+  const deleteAutomation = (item: ScheduledMessage) => {
+    if (!canManageItem(item) || busyId) return;
+    AppAlert.alert(`Supprimer « ${item.name} » ?`, "Cette action est définitive.", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Supprimer",
+        style: "destructive",
+        onPress: () => {
+          setBusyId(item.id);
+          void (async () => {
+            try {
+              if (api) await api.cancelScheduledMessage(conversationId, item.id);
+              setAutomations((previous) => previous.filter((candidate) => candidate.id !== item.id));
+              if (editingId === item.id) resetForm();
+            } catch (error) {
+              AppAlert.alert(
+                "Suppression impossible",
+                error instanceof Error ? error.message : "L’automatisation n’a pas été supprimée."
+              );
+            } finally {
+              setBusyId(null);
+            }
+          })();
+        }
+      }
+    ]);
   };
 
   if (!conversation) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.center}>
-        <Ionicons name="calendar-outline" size={38} color={colors.textMuted} />
+      <LinearGradient colors={theme.pageGradient} style={styles.center}>
+        <Ionicons name="repeat-outline" size={40} color={theme.pageTextMuted} />
         <Text style={styles.title}>Groupe introuvable</Text>
-        <Text style={styles.description}>
-          Ce groupe n’existe plus ou n’est plus accessible avec votre statut.
-        </Text>
+        <Text style={styles.description}>Ce groupe n’existe plus ou n’est plus accessible.</Text>
         <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
           <Text style={styles.secondaryText}>Retour</Text>
         </Pressable>
@@ -295,14 +408,13 @@ export default function ScheduleMessageScreen() {
 
   if (!authorized) {
     return (
-      <LinearGradient colors={gradients.screen} style={styles.center}>
+      <LinearGradient colors={theme.pageGradient} style={styles.center}>
         <View style={styles.lockIcon}>
-          <Ionicons name="lock-closed-outline" size={31} color={colors.orange} />
+          <Ionicons name="lock-closed-outline" size={31} color={theme.orange} />
         </View>
-        <Text style={styles.title}>Programmation non autorisée</Text>
+        <Text style={styles.title}>Automatisations non autorisées</Text>
         <Text style={styles.description}>
-          Seuls les Capitaines, Amiraux et Visionnaires responsables de ce groupe
-          peuvent programmer des messages.
+          Seuls les Visionnaires et les responsables Amiraux ou Capitaines de ce groupe peuvent accéder à cet espace.
         </Text>
         <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
           <Text style={styles.secondaryText}>Retour au groupe</Text>
@@ -312,7 +424,7 @@ export default function ScheduleMessageScreen() {
   }
 
   return (
-    <LinearGradient colors={gradients.screen} style={styles.screen}>
+    <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <View
         style={[
           styles.header,
@@ -323,25 +435,14 @@ export default function ScheduleMessageScreen() {
           }
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Retour"
-          onPress={() => router.back()}
-          style={styles.headerButton}
-        >
-          <Ionicons name="chevron-back" size={25} color={colors.text} />
+        <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={() => router.back()} style={styles.headerButton}>
+          <Ionicons name="chevron-back" size={25} color={theme.pageText} />
         </Pressable>
         <View style={styles.headerText}>
-          <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>
-            Programmer un message
-          </Text>
-          <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {conversation.name}
-          </Text>
+          <Text accessibilityRole="header" style={styles.headerTitle} numberOfLines={1}>Automatisations du groupe</Text>
+          <Text style={styles.headerSubtitle} numberOfLines={1}>{conversation.name}</Text>
         </View>
-        <View style={styles.roleBadge}>
-          <Ionicons name="shield-checkmark-outline" size={15} color={colors.success} />
-        </View>
+        <View style={styles.headerActions}><View style={styles.roleBadge}><Ionicons name="shield-checkmark-outline" size={17} color={theme.success} /></View><ThemeModeButton /></View>
       </View>
 
       <ScrollView
@@ -357,152 +458,121 @@ export default function ScheduleMessageScreen() {
         ]}
       >
         <View style={styles.infoCard}>
-          <Ionicons name="information-circle-outline" size={21} color={colors.orange} />
+          <Ionicons name="people-outline" size={21} color={theme.orange} />
           <Text style={styles.infoText}>
-            Le message sera envoyé par Neptune à l’heure choisie, même si votre
-            téléphone ou votre ordinateur est éteint.
+            Toutes les personnes autorisées voient les mêmes automatisations. Les Visionnaires peuvent gérer celles de tous les responsables.
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Message</Text>
-        <TextInput
-          value={body}
-          onChangeText={setBody}
-          placeholder="Ex. Rappel : notre atelier commence demain à 9 h."
-          placeholderTextColor={colors.textMuted}
-          multiline
-          maxLength={4_000}
-          textAlignVertical="top"
-          style={styles.editor}
-        />
-        <Text style={styles.counter}>{body.length}/4 000</Text>
+        <Text style={styles.sectionTitle}>{editingId ? "Modifier l’automatisation" : "Nouvelle automatisation"}</Text>
+        <View style={styles.formCard}>
+          <Text style={styles.label}>Nom de l’automatisation</Text>
+          <TextInput value={automationName} onChangeText={setAutomationName} placeholder="Ex. Rappel atelier chaque lundi" placeholderTextColor={theme.pageTextMuted} maxLength={80} style={styles.input} />
 
-        <Text style={styles.sectionTitle}>Quand l’envoyer ?</Text>
-        <View style={styles.presetGrid}>
-          {PRESETS.map((preset) => {
-            const active = selectedPreset === preset.id;
-            return (
-              <Pressable
-                key={preset.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                onPress={() => applyPreset(preset)}
-                style={[styles.preset, active && styles.presetActive]}
-              >
-                <Ionicons
-                  name={preset.icon}
-                  size={19}
-                  color={active ? colors.orange : colors.textMuted}
-                />
-                <Text style={[styles.presetText, active && styles.presetTextActive]}>
-                  {preset.label}
-                </Text>
+          <Text style={styles.label}>Message</Text>
+          <TextInput value={body} onChangeText={setBody} placeholder="Écrivez le message qui sera envoyé…" placeholderTextColor={theme.pageTextMuted} multiline maxLength={4000} style={[styles.input, styles.messageInput]} />
+          <Text style={styles.counter}>{body.length}/4000</Text>
+
+          <Text style={styles.label}>Récurrence</Text>
+          <View style={styles.frequencyGrid}>
+            {FREQUENCIES.map((item) => {
+              const selected = frequency === item.value;
+              return (
+                <Pressable key={item.value} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setFrequency(item.value)} style={[styles.frequencyButton, selected && styles.frequencySelected]}>
+                  <Text style={[styles.frequencyLabel, selected && styles.frequencyLabelSelected]}>{item.label}</Text>
+                  <Text style={styles.frequencyDescription}>{item.description}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.label}>Démarrage rapide</Text>
+          <View style={styles.presetGrid}>
+            {PRESETS.map((preset) => {
+              const selected = selectedPreset === preset.id;
+              return (
+                <Pressable key={preset.id} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => applyPreset(preset)} style={[styles.presetButton, selected && styles.presetSelected]}>
+                  <Ionicons name={preset.icon} size={18} color={selected ? theme.orange : theme.pageTextMuted} />
+                  <Text style={[styles.presetText, selected && styles.presetTextSelected]}>{preset.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.dateRow}>
+            <View style={styles.dateField}>
+              <Text style={styles.label}>Date</Text>
+              <TextInput value={dateValue} onChangeText={(value) => { setDateValue(value); setSelectedPreset(""); }} keyboardType="numbers-and-punctuation" placeholder="JJ/MM/AAAA" placeholderTextColor={theme.pageTextMuted} style={styles.input} />
+            </View>
+            <View style={styles.timeField}>
+              <Text style={styles.label}>Heure</Text>
+              <TextInput value={timeValue} onChangeText={(value) => { setTimeValue(value); setSelectedPreset(""); }} keyboardType="numbers-and-punctuation" placeholder="HH:MM" placeholderTextColor={theme.pageTextMuted} style={styles.input} />
+            </View>
+          </View>
+
+          <View style={styles.enabledRow}>
+            <View style={styles.enabledContent}>
+              <Text style={styles.enabledTitle}>Activer dès l’enregistrement</Text>
+              <Text style={styles.enabledSubtitle}>Vous pourrez la mettre en pause à tout moment.</Text>
+            </View>
+            <Switch accessibilityLabel="Activer l’automatisation" value={enabled} onValueChange={setEnabled} trackColor={{ false: theme.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
+          </View>
+
+          <View style={styles.formActions}>
+            {editingId ? (
+              <Pressable accessibilityRole="button" onPress={resetForm} style={styles.cancelButton}>
+                <Text style={styles.cancelText}>Annuler</Text>
               </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.dateRow}>
-          <View style={styles.dateField}>
-            <Text style={styles.fieldLabel}>Date</Text>
-            <TextInput
-              value={dateValue}
-              onChangeText={(value) => {
-                setDateValue(value);
-                setSelectedPreset("");
-              }}
-              placeholder="JJ/MM/AAAA"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numbers-and-punctuation"
-              maxLength={10}
-              style={styles.dateInput}
-            />
-          </View>
-          <View style={styles.timeField}>
-            <Text style={styles.fieldLabel}>Heure</Text>
-            <TextInput
-              value={timeValue}
-              onChangeText={(value) => {
-                setTimeValue(value);
-                setSelectedPreset("");
-              }}
-              placeholder="HH:MM"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="numbers-and-punctuation"
-              maxLength={5}
-              style={styles.dateInput}
-            />
+            ) : null}
+            <Pressable accessibilityRole="button" accessibilityState={{ busy: saving, disabled: saving }} disabled={saving} onPress={() => void saveAutomation()} style={styles.saveAutomationButton}>
+              {saving ? <ActivityIndicator color={colors.white} /> : <><Ionicons name={editingId ? "save-outline" : "add-circle-outline"} size={20} color={colors.white} /><Text style={styles.saveAutomationText}>{editingId ? "Enregistrer" : "Créer"}</Text></>}
+            </Pressable>
           </View>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Programmer l’envoi automatique"
-          accessibilityState={{ busy: saving, disabled: saving }}
-          disabled={saving}
-          onPress={() => void schedule()}
-          style={[styles.primaryButton, saving && styles.disabled]}
-        >
-          {saving ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Ionicons name="calendar" size={20} color={colors.white} />
-          )}
-          <Text style={styles.primaryText}>
-            {saving ? "Programmation…" : "Programmer l’envoi"}
-          </Text>
-        </Pressable>
-
-        <View style={styles.scheduledHeader}>
-          <Text style={styles.sectionTitle}>Envois à venir</Text>
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>{scheduledMessages.length}</Text>
-          </View>
+        <View style={styles.listHeader}>
+          <Text style={styles.sectionTitle}>Automatisations partagées</Text>
+          <View style={styles.countBadge}><Text style={styles.countText}>{automations.length}</Text></View>
         </View>
 
         {loading ? (
-          <View style={styles.loadingList}>
-            <ActivityIndicator color={colors.violet} />
-          </View>
-        ) : scheduledMessages.length === 0 ? (
+          <View style={styles.loading}><ActivityIndicator color={theme.violet} /></View>
+        ) : automations.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Ionicons name="calendar-clear-outline" size={28} color={colors.textMuted} />
-            <Text style={styles.emptyTitle}>Aucun message programmé</Text>
-            <Text style={styles.emptyText}>
-              Les prochains envois automatiques apparaîtront ici.
-            </Text>
+            <Ionicons name="repeat-outline" size={30} color={theme.pageTextMuted} />
+            <Text style={styles.emptyTitle}>Aucune automatisation</Text>
+            <Text style={styles.emptyText}>Créez le premier envoi automatique de ce groupe.</Text>
           </View>
         ) : (
-          <View style={styles.scheduledList}>
-            {scheduledMessages.map((item) => (
-              <View key={item.id} style={styles.scheduledCard}>
-                <View style={styles.scheduledIcon}>
-                  <Ionicons name="time-outline" size={20} color={colors.orange} />
+          <View style={styles.automationList}>
+            {automations.map((item) => {
+              const manageable = canManageItem(item);
+              return (
+                <View key={item.id} style={[styles.automationCard, !item.enabled && styles.pausedCard]}>
+                  <View style={styles.automationTop}>
+                    <View style={styles.automationIcon}><Ionicons name={item.frequency === "once" ? "send-outline" : "repeat"} size={20} color={item.enabled ? theme.orange : theme.pageTextMuted} /></View>
+                    <View style={styles.automationContent}>
+                      <Text style={styles.automationName} numberOfLines={2}>{item.name}</Text>
+                      <Text style={styles.automationMeta}>{frequencyLabel(item.frequency)} · {formatScheduledDate(item.scheduledFor)}</Text>
+                      <Text style={styles.creator} numberOfLines={1}>Créée par {item.createdByName ?? (item.createdByUserId === currentUser.id ? currentUser.name : "un responsable")}</Text>
+                    </View>
+                    <Switch accessibilityLabel={`${item.enabled ? "Mettre en pause" : "Activer"} ${item.name}`} disabled={!manageable || busyId === item.id} value={item.enabled} onValueChange={() => void toggleEnabled(item)} trackColor={{ false: theme.surfaceMuted, true: colors.primary }} thumbColor={colors.white} />
+                  </View>
+                  <Text style={styles.automationBody} numberOfLines={3}>{item.body}</Text>
+                  <View style={styles.cardActions}>
+                    <Pressable accessibilityRole="button" disabled={!manageable} onPress={() => editAutomation(item)} style={[styles.cardAction, !manageable && styles.actionDisabled]}>
+                      <Ionicons name="create-outline" size={18} color={theme.pageTextSecondary} />
+                      <Text style={styles.cardActionText}>Modifier</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" disabled={!manageable || busyId === item.id} onPress={() => deleteAutomation(item)} style={[styles.cardAction, styles.deleteAction, !manageable && styles.actionDisabled]}>
+                      {busyId === item.id ? <ActivityIndicator size="small" color={theme.danger} /> : <Ionicons name="trash-outline" size={18} color={theme.danger} />}
+                      <Text style={styles.deleteText}>Supprimer</Text>
+                    </Pressable>
+                  </View>
+                  {!manageable ? <Text style={styles.readOnlyText}>Lecture seule · gestion réservée au créateur ou aux Visionnaires</Text> : null}
                 </View>
-                <View style={styles.scheduledContent}>
-                  <Text style={styles.scheduledDate}>
-                    {formatScheduledDate(item.scheduledFor)}
-                  </Text>
-                  <Text style={styles.scheduledBody} numberOfLines={3}>
-                    {item.body}
-                  </Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Annuler ce message programmé"
-                  accessibilityState={{ busy: cancellingId === item.id }}
-                  disabled={Boolean(cancellingId)}
-                  onPress={() => void cancelScheduled(item)}
-                  style={styles.cancelButton}
-                >
-                  {cancellingId === item.id ? (
-                    <ActivityIndicator size="small" color={colors.danger} />
-                  ) : (
-                    <Ionicons name="trash-outline" size={19} color={colors.danger} />
-                  )}
-                </Pressable>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -510,194 +580,75 @@ export default function ScheduleMessageScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ConnexioTheme) => StyleSheet.create({
   screen: { flex: 1 },
-  center: {
-    flex: 1,
-    padding: spacing.xl,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.md
-  },
-  lockIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 23,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(244,177,131,0.12)"
-  },
-  title: { ...typography.heading2, color: colors.text, textAlign: "center" },
-  description: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: "center",
-    maxWidth: 480
-  },
-  header: {
-    minHeight: 68,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSoft,
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  headerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  headerText: { flex: 1, minWidth: 0 },
-  headerTitle: { ...typography.heading3, color: colors.text },
-  headerSubtitle: { color: colors.textMuted, fontSize: 9.5, marginTop: 2 },
-  roleBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.successSoft
-  },
-  content: { width: "100%", maxWidth: 680, alignSelf: "center" },
-  infoCard: {
-    marginTop: spacing.md,
-    padding: 12,
-    borderRadius: 17,
-    borderWidth: 1,
-    borderColor: "rgba(244,177,131,0.24)",
-    backgroundColor: "rgba(244,177,131,0.10)",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 9
-  },
-  infoText: { ...typography.bodySmall, color: colors.textSecondary, flex: 1 },
-  sectionTitle: {
-    ...typography.heading3,
-    color: colors.text,
-    marginTop: spacing.lg,
-    marginBottom: 8
-  },
-  editor: {
-    minHeight: 142,
-    padding: spacing.md,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    ...typography.body
-  },
-  counter: { color: colors.textMuted, fontSize: 9, textAlign: "right", marginTop: 4 },
+  header: { minHeight: 64, paddingBottom: spacing.sm, flexDirection: "row", alignItems: "center" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 2 },
+  headerButton: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  headerText: { flex: 1, minWidth: 0, alignItems: "center" },
+  headerTitle: { ...typography.heading3, color: theme.pageText, maxWidth: "100%" },
+  headerSubtitle: { color: theme.pageTextMuted, fontSize: 11, marginTop: 2 },
+  roleBadge: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  content: { width: "100%", maxWidth: 760, alignSelf: "center" },
+  infoCard: { minHeight: 60, padding: 12, borderRadius: 18, backgroundColor: "rgba(244,177,131,0.09)", borderWidth: 1, borderColor: "rgba(244,177,131,0.20)", flexDirection: "row", alignItems: "center", gap: 9 },
+  infoText: { flex: 1, color: theme.pageTextSecondary, fontSize: 11, lineHeight: 14 },
+  sectionTitle: { ...typography.heading3, color: theme.pageText, marginTop: spacing.lg, marginBottom: 9 },
+  formCard: { padding: spacing.md, borderRadius: radii.xl, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface },
+  label: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900", marginBottom: 6, marginTop: 10 },
+  input: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 11, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, color: theme.pageText, fontSize: 14 },
+  messageInput: { minHeight: 110, textAlignVertical: "top" },
+  counter: { color: theme.pageTextMuted, fontSize: 11, textAlign: "right", marginTop: 4 },
+  frequencyGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  frequencyButton: { flexGrow: 1, flexBasis: 135, minHeight: 58, padding: 10, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong },
+  frequencySelected: { borderColor: theme.violet, backgroundColor: "rgba(107,79,234,0.18)" },
+  frequencyLabel: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "900" },
+  frequencyLabelSelected: { color: theme.pageText },
+  frequencyDescription: { color: theme.pageTextMuted, fontSize: 11, marginTop: 3 },
   presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  preset: {
-    minWidth: "47%",
-    flexGrow: 1,
-    minHeight: 48,
-    paddingHorizontal: 11,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7
-  },
-  presetActive: {
-    borderColor: colors.violet,
-    backgroundColor: "rgba(107,79,234,0.22)"
-  },
-  presetText: { color: colors.textMuted, fontSize: 10.5, fontWeight: "800" },
-  presetTextActive: { color: colors.text },
-  dateRow: { marginTop: 10, flexDirection: "row", gap: 9 },
-  dateField: { flex: 1.45, minWidth: 0 },
-  timeField: { flex: 0.8, minWidth: 0 },
-  fieldLabel: { color: colors.textMuted, fontSize: 9, fontWeight: "900", marginBottom: 5 },
-  dateInput: {
-    minHeight: 50,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: "800"
-  },
-  primaryButton: {
-    minHeight: 54,
-    marginTop: spacing.md,
-    borderRadius: 19,
-    backgroundColor: colors.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8
-  },
-  primaryText: { color: colors.white, fontSize: 13, fontWeight: "900" },
-  secondaryButton: {
-    minHeight: 48,
-    minWidth: 140,
-    paddingHorizontal: spacing.md,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  secondaryText: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  scheduledHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  countBadge: {
-    minWidth: 26,
-    height: 26,
-    marginTop: spacing.lg,
-    marginBottom: 8,
-    paddingHorizontal: 7,
-    borderRadius: 13,
-    backgroundColor: "rgba(107,79,234,0.20)",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  countText: { color: colors.text, fontSize: 10, fontWeight: "900" },
-  loadingList: { minHeight: 96, alignItems: "center", justifyContent: "center" },
-  emptyCard: {
-    minHeight: 144,
-    padding: spacing.md,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7
-  },
-  emptyTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  emptyText: { color: colors.textMuted, fontSize: 10, textAlign: "center" },
-  scheduledList: { gap: 8 },
-  scheduledCard: {
-    minHeight: 84,
-    padding: 11,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10
-  },
-  scheduledIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 15,
-    backgroundColor: "rgba(244,177,131,0.12)",
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  scheduledContent: { flex: 1, minWidth: 0 },
-  scheduledDate: { color: colors.orange, fontSize: 9.5, fontWeight: "900" },
-  scheduledBody: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 4 },
-  cancelButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  disabled: { opacity: 0.55 }
+  presetButton: { flexGrow: 1, flexBasis: 130, minHeight: 48, paddingHorizontal: 10, borderRadius: 15, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  presetSelected: { borderColor: theme.orange, backgroundColor: "rgba(244,177,131,0.11)" },
+  presetText: { color: theme.pageTextMuted, fontSize: 11, fontWeight: "800" },
+  presetTextSelected: { color: theme.orange },
+  dateRow: { flexDirection: "row", gap: 8 },
+  dateField: { flex: 1.3, minWidth: 0 },
+  timeField: { flex: 0.7, minWidth: 0 },
+  enabledRow: { minHeight: 68, marginTop: 10, flexDirection: "row", alignItems: "center", gap: 12 },
+  enabledContent: { flex: 1, minWidth: 0 },
+  enabledTitle: { color: theme.pageText, fontSize: 11, fontWeight: "900" },
+  enabledSubtitle: { color: theme.pageTextMuted, fontSize: 11, marginTop: 3 },
+  formActions: { marginTop: spacing.md, flexDirection: "row", gap: 8 },
+  cancelButton: { minHeight: 50, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, alignItems: "center", justifyContent: "center" },
+  cancelText: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900" },
+  saveAutomationButton: { flex: 1, minHeight: 50, paddingHorizontal: 16, borderRadius: 16, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  saveAutomationText: { color: colors.white, fontSize: 11, fontWeight: "900" },
+  listHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  countBadge: { minWidth: 26, height: 26, paddingHorizontal: 7, borderRadius: 13, backgroundColor: theme.surfaceStrong, alignItems: "center", justifyContent: "center", marginTop: spacing.lg, marginBottom: 9 },
+  countText: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900" },
+  loading: { minHeight: 100, alignItems: "center", justifyContent: "center" },
+  emptyCard: { minHeight: 150, padding: spacing.lg, borderRadius: radii.xl, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
+  emptyTitle: { color: theme.pageText, fontSize: 14, fontWeight: "900", marginTop: 9 },
+  emptyText: { color: theme.pageTextMuted, fontSize: 11, marginTop: 4, textAlign: "center" },
+  automationList: { gap: 9 },
+  automationCard: { padding: 13, borderRadius: radii.xl, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface },
+  pausedCard: { opacity: 0.7 },
+  automationTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+  automationIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: theme.surfaceStrong, alignItems: "center", justifyContent: "center" },
+  automationContent: { flex: 1, minWidth: 0 },
+  automationName: { color: theme.pageText, fontSize: 14, lineHeight: 16, fontWeight: "900" },
+  automationMeta: { color: theme.pageTextMuted, fontSize: 11, marginTop: 3 },
+  creator: { color: theme.orange, fontSize: 11, marginTop: 3, fontWeight: "800" },
+  automationBody: { color: theme.pageTextSecondary, fontSize: 11, lineHeight: 15, marginTop: 10 },
+  cardActions: { marginTop: 10, flexDirection: "row", gap: 8 },
+  cardAction: { flex: 1, minHeight: 48, borderRadius: 14, backgroundColor: theme.surfaceStrong, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  deleteAction: { backgroundColor: theme.dangerSoft },
+  cardActionText: { color: theme.pageTextSecondary, fontSize: 11, fontWeight: "900" },
+  deleteText: { color: theme.danger, fontSize: 11, fontWeight: "900" },
+  actionDisabled: { opacity: 0.35 },
+  readOnlyText: { color: theme.pageTextMuted, fontSize: 11, textAlign: "center", marginTop: 7 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl, gap: spacing.md },
+  lockIcon: { width: 72, height: 72, borderRadius: 24, backgroundColor: "rgba(244,177,131,0.12)", alignItems: "center", justifyContent: "center" },
+  title: { ...typography.heading2, color: theme.pageText, textAlign: "center" },
+  description: { ...typography.body, color: theme.pageTextMuted, textAlign: "center", maxWidth: 460 },
+  secondaryButton: { minHeight: 48, paddingHorizontal: spacing.lg, borderRadius: 16, borderWidth: 1, borderColor: theme.borderSoft, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
+  secondaryText: { color: theme.pageTextSecondary, fontWeight: "900" }
 });

@@ -1,13 +1,47 @@
-import { strictEqual, throws } from "node:assert";
+import { deepStrictEqual, strictEqual, throws } from "node:assert";
 import test from "node:test";
 
 import {
+  normalizeAppUser,
   normalizeChatMessage,
   normalizeConversationList,
   normalizeMessagePage,
   normalizeSessionPayload,
   WireValidationError
 } from "../src/services/api/wire";
+
+test("normalise le profil réel Neptune sans créer de second compte", () => {
+  const user = normalizeAppUser({
+    id: "user-neptune-1",
+    prenom: "Léa",
+    nom: "Depoulain",
+    entreprise: "Neptune Business",
+    ville: "Carcassonne",
+    special_role: "Visionnaire",
+    photo_profil: "https://cdn.example.com/lea.jpg",
+    telephone: "0600000000"
+  });
+
+  strictEqual(user.id, "user-neptune-1");
+  strictEqual(user.name, "Léa Depoulain");
+  strictEqual(user.company, "Neptune Business");
+  strictEqual(user.city, "Carcassonne");
+  strictEqual(user.role, "visionnaire");
+  strictEqual(user.roleLabel, "Visionnaire");
+  strictEqual(user.avatarUrl, "https://cdn.example.com/lea.jpg");
+});
+
+test("mappe l’ancien plan Légende vers Moussaillon", () => {
+  const user = normalizeAppUser({
+    id: "legacy-user",
+    prenom: "Ancien",
+    nom: "Compte",
+    plan: "Légende"
+  });
+
+  strictEqual(user.role, "moussaillon");
+  strictEqual(user.roleLabel, "Moussaillon");
+});
 
 test("normalise une session snake_case sans donner de privilèges par défaut", () => {
   const session = normalizeSessionPayload({
@@ -58,6 +92,25 @@ test("normalise conversations et compteurs snake_case en lecture seule par défa
   strictEqual(conversations[0]?.unreadCount, 5);
   strictEqual(conversations[0]?.lastMessage, "Bonjour");
   strictEqual(conversations[0]?.canPost, false);
+});
+
+test("conserve les participants et membres actifs d’une conversation privée", () => {
+  const conversations = normalizeConversationList([
+    {
+      id: "direct-1",
+      name: "Aurore Martin",
+      type: "direct",
+      participants: [
+        { id: "user-current", name: "Johan" },
+        { user_id: "user-aurore", name: "Aurore Martin" }
+      ],
+      active_member_ids: ["user-aurore"],
+      member_count: 2
+    }
+  ]);
+
+  deepStrictEqual(conversations[0]?.memberIds, ["user-current", "user-aurore"]);
+  deepStrictEqual(conversations[0]?.activeMemberIds, ["user-aurore"]);
 });
 
 test("refuse un type de conversation absent ou inconnu", () => {
