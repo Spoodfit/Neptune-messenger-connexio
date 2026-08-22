@@ -12,6 +12,7 @@ export default function CoworkingMediaSurface({
   cameraOn,
   microphoneOn,
   mapMode = false,
+  spatialAudio = false,
   participantLayout,
   onConnected,
   onError
@@ -24,9 +25,10 @@ export default function CoworkingMediaSurface({
         cameraOn,
         microphoneOn,
         mapMode,
+        spatialAudio,
         participantLayout
       }),
-    [cameraOn, displayName, mapMode, microphoneOn, participantLayout, session]
+    [cameraOn, displayName, mapMode, microphoneOn, participantLayout, session, spatialAudio]
   );
 
   useEffect(() => {
@@ -38,6 +40,16 @@ export default function CoworkingMediaSurface({
       })});true;`
     );
   }, [cameraOn, microphoneOn]);
+
+  useEffect(() => {
+    if (!participantLayout) return;
+    webViewRef.current?.injectJavaScript(
+      `window.__connexioCoworkingControl?.(${JSON.stringify({
+        type: "layout",
+        participantLayout
+      })});true;`
+    );
+  }, [participantLayout]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
@@ -56,13 +68,15 @@ export default function CoworkingMediaSurface({
     }
   };
 
-  // The standalone/mock profile has presence data but no actual SFU client.
-  // In Map mode, keep the avatar/status layer visible instead of mounting an
-  // empty WebView that would report a fake media error or cover the Map.
-  if (mapMode && session.mock) return null;
+  if ((mapMode || spatialAudio) && session.mock) return null;
 
   return (
-    <View style={[styles.screen, { backgroundColor: mapMode ? "transparent" : theme.pageBackground }]}>
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: mapMode || spatialAudio ? "transparent" : theme.pageBackground }
+      ]}
+    >
       <WebView
         ref={webViewRef}
         source={{ html, baseUrl: new URL(session.socketUrl).origin }}
@@ -73,7 +87,10 @@ export default function CoworkingMediaSurface({
         allowsInlineMediaPlayback
         originWhitelist={["https://*", "http://localhost*"]}
         onMessage={handleMessage}
-        style={[styles.webView, { backgroundColor: mapMode ? "transparent" : theme.pageBackground }]}
+        style={[
+          styles.webView,
+          { backgroundColor: mapMode || spatialAudio ? "transparent" : theme.pageBackground }
+        ]}
       />
     </View>
   );
