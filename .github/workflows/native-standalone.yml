@@ -163,3 +163,5 @@ jobs:
         run: npm run verify && npm run audit:rc && npx expo install --check
       - name: Construire iOS avec EAS
         run: npx --yes eas-cli@21.7.1 build --profile standalone --platform ios --non-interactive --wait --clear-cache
+
+# Re-triggered against the migrated johanzambellis-team/connexio EAS project after quota/account migration verification.
