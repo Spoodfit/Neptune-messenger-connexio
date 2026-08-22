@@ -10,6 +10,8 @@ export interface CoworkingParticipantPresence {
   microphoneOn: boolean;
   speaking: boolean;
   joinedAt: string;
+  mapX?: number;
+  mapY?: number;
 }
 
 export interface CoworkingSpace {
@@ -26,14 +28,6 @@ export interface CoworkingSpace {
   mediaEnabled: boolean;
 }
 
-export interface CoworkingSnapshot {
-  hub: CoworkingSpace;
-  spaces: CoworkingSpace[];
-  participants: CoworkingParticipantPresence[];
-  currentUserSpaceId?: string;
-  updatedAt: string;
-}
-
 export interface CoworkingMediaSession {
   spaceId: string;
   socketUrl: string;
@@ -44,6 +38,16 @@ export interface CoworkingMediaSession {
   iceServers: RTCIceServer[];
   expiresAt?: string;
   mock?: boolean;
+  observer?: boolean;
+}
+
+export interface CoworkingSnapshot {
+  hub: CoworkingSpace;
+  spaces: CoworkingSpace[];
+  participants: CoworkingParticipantPresence[];
+  currentUserSpaceId?: string;
+  observerMedia?: CoworkingMediaSession;
+  updatedAt: string;
 }
 
 export interface CreateCoworkingSpaceInput {

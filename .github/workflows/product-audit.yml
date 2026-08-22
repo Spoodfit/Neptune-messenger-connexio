@@ -44,11 +44,20 @@ jobs:
         run: node scripts/product-audit.cjs
       - name: Run full multilingual audit
         run: node scripts/i18n-product-audit.cjs
+      - name: Capture V24 render review
+        run: node scripts/v24-render-capture.cjs
+      - name: Upload V24 render review
+        uses: actions/upload-artifact@v4
+        with:
+          name: connexio-v24-render-review
+          path: v24-render-review
+          if-no-files-found: error
+          retention-days: 14
       - name: Package downloadable web preview
         run: |
           cp TESTER_CONNEXIO.bat web-product-audit-dist/TESTER_CONNEXIO.bat
           cat > web-product-audit-dist/README_TEST.txt <<'EOF'
-          CONNEXIO V17 — VERSION WEB DE DEMONSTRATION
+          CONNEXIO V24 — VERSION WEB DE DEMONSTRATION
 
           Cette archive contient le build web validé par Product Audit, y compris le parcours multilingue complet.
           Pour un test immédiat sans backend, utilisez de préférence l'adresse GitHub Pages indiquée dans TESTER_EN_UN_CLIC.md.
@@ -57,7 +66,7 @@ jobs:
       - name: Upload downloadable web preview
         uses: actions/upload-artifact@v4
         with:
-          name: connexio-v17-web-preview
+          name: connexio-v24-web-preview
           path: web-product-audit-dist
           if-no-files-found: error
           retention-days: 14
