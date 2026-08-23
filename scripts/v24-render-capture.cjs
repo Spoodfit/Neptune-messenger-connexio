@@ -154,6 +154,7 @@ async function run() {
     await captureSimpleRoute(browser, "/contacts", "contacts-393x852");
     await captureSimpleRoute(browser, "/profile/user-lea", "member-profile-393x852", true);
     await captureSimpleRoute(browser, "/schedule-call?memberId=user-lea&mode=video", "schedule-call-393x852", true);
+    await captureSimpleRoute(browser, "/call/carcassonne?mode=video&scheduled=1&reason=Valider%20le%20partenariat%20Neptune&returnTo=%2Fcalls", "scheduled-call-join-393x852");
     await captureSimpleRoute(browser, "/contact-actions?intent=recommend&recipientId=user-lea", "recommend-contact-393x852", true);
     await captureSimpleRoute(browser, "/contact-actions?intent=invite", "invite-contact-393x852", true);
     await captureSimpleRoute(browser, "/new-highlight", "new-highlight-393x852");
@@ -168,7 +169,7 @@ async function run() {
       path.join(output, "README.txt"),
       [
         "Captures réelles du build web V24 avant toute nouvelle build Expo.",
-        "Couverture : Messages Groupes/Privées 393 et 280, Map Coworking 393 et 280, fiche disponible, mosaïque occupée, Salle générale avant/après déplacement, chat/vocal/traduction, Temps forts Feed/Map, nouvelle conversation, contacts, profil membre, programmation d’appel, recommandation/invitation de contact, nouveau Temps fort, appels, profil, compte, notifications, confidentialité et utilisateurs bloqués.",
+        "Couverture : Messages Groupes/Privées 393 et 280, Map Coworking 393 et 280, fiche disponible, mosaïque occupée, Salle générale avant/après déplacement, chat/vocal/traduction, Temps forts Feed/Map, nouvelle conversation, contacts, profil membre, programmation d’appel, entrée d’un rendez-vous programmé, recommandation/invitation de contact, nouveau Temps fort, appels, profil, compte, notifications, confidentialité et utilisateurs bloqués.",
         ""
       ].join("\n")
     );
