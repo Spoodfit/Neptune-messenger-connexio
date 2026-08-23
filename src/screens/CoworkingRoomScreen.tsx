@@ -4,7 +4,7 @@ import { StatusAvatar } from "@/components/StatusAvatar";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -56,12 +56,15 @@ export default function CoworkingRoomScreen() {
     snapshot,
     currentSpace,
     mediaForSpace,
+    mediaStateForSpace,
+    updateMediaState,
     leaveCurrentSpace,
     createSpace
   } = useCoworking();
   const mapApi = useMemo(() => (env.mockMode ? null : new CoworkingMapApi(accessToken)), [accessToken]);
-  const [cameraOn, setCameraOn] = useState(true);
-  const [microphoneOn, setMicrophoneOn] = useState(true);
+  const savedMediaState = mediaStateForSpace(spaceId);
+  const [cameraOn, setCameraOn] = useState(savedMediaState?.cameraOn ?? true);
+  const [microphoneOn, setMicrophoneOn] = useState(savedMediaState?.microphoneOn ?? false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [ownPosition, setOwnPosition] = useState({ x: 50, y: 54 });
   const [stageSize, setStageSize] = useState({ width: 1, height: 1 });
@@ -98,10 +101,17 @@ export default function CoworkingRoomScreen() {
     return layout;
   }, [currentUser.id, nodeSize, ownPosition.x, ownPosition.y, participants]);
 
+  useEffect(() => {
+    if (!media) return;
+    updateMediaState(spaceId, { cameraOn, microphoneOn });
+  }, [cameraOn, media, microphoneOn, spaceId, updateMediaState]);
+
   const leave = async () => {
     try {
       await leaveCurrentSpace();
       router.replace("/coworking");
+    } catch (error) {
+      AppAlert.alert("Impossible de quitter la salle", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     }
   };
 
@@ -190,21 +200,22 @@ export default function CoworkingRoomScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        accessibilityRole={isGeneralRoom ? "button" : undefined}
-        accessibilityLabel={isGeneralRoom ? "Espace de déplacement de la Salle générale" : undefined}
-        onPress={moveMe}
-        onLayout={onStageLayout}
-        style={[styles.stage, { borderColor: theme.borderSoft }]}
-      >
+      <View onLayout={onStageLayout} style={[styles.stage, { borderColor: theme.borderSoft }]}>
         {isGeneralRoom ? (
-          <View pointerEvents="none" style={styles.spatialBackdrop}>
-            <View style={[styles.proximityAnchor, { left: `${ownPosition.x}%`, top: `${ownPosition.y}%` }]}>
-              <View style={[styles.proximityCircle, styles.proximityNear, { borderColor: theme.success }]} />
-              <View style={[styles.proximityCircle, styles.proximityFar, { borderColor: theme.borderSoft }]} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Espace de déplacement de la Salle générale"
+            onPress={moveMe}
+            style={StyleSheet.absoluteFill}
+          >
+            <View pointerEvents="none" style={styles.spatialBackdrop}>
+              <View style={[styles.proximityAnchor, { left: `${ownPosition.x}%`, top: `${ownPosition.y}%` }]}>
+                <View style={[styles.proximityCircle, styles.proximityNear, { borderColor: theme.success }]} />
+                <View style={[styles.proximityCircle, styles.proximityFar, { borderColor: theme.borderSoft }]} />
+              </View>
+              <Text style={[styles.moveHint, { color: theme.pageTextMuted }]}>Touchez l’espace pour vous déplacer</Text>
             </View>
-            <Text style={[styles.moveHint, { color: theme.pageTextMuted }]}>Touchez l’espace pour vous déplacer</Text>
-          </View>
+          </Pressable>
         ) : null}
 
         <View pointerEvents="none" style={styles.avatarLayer}>
@@ -247,6 +258,11 @@ export default function CoworkingRoomScreen() {
               spatialAudio={isGeneralRoom}
               participantLayout={isGeneralRoom ? participantLayout : undefined}
               onError={setMediaError}
+              onLocalMediaUnavailable={(message) => {
+                setCameraOn(false);
+                setMicrophoneOn(false);
+                setMediaError(message);
+              }}
             />
           </View>
         ) : null}
@@ -293,7 +309,7 @@ export default function CoworkingRoomScreen() {
             <Text numberOfLines={2} style={[styles.mediaWarningText, { color: theme.pageText }]}>Connexion média réduite. La présence reste disponible.</Text>
           </View>
         ) : null}
-      </Pressable>
+      </View>
 
       {selectedMember ? (
         <View style={[styles.memberSheet, { bottom: Math.max(insets.bottom, 10) + 78, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
