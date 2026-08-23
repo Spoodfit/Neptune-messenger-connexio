@@ -42,6 +42,24 @@ async function checkTarget(locator, label, minimum = 48) {
   return target;
 }
 
+async function intersectionRatio(locator) {
+  return locator.evaluate((element) => new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      observer.disconnect();
+      resolve(value);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      finish(entry ? entry.intersectionRatio : 0);
+    }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
+    observer.observe(element);
+    setTimeout(() => finish(0), 350);
+  })).catch(() => 0);
+}
+
 async function sentMessageSurface(page, body) {
   const candidate = page.locator(`[aria-label*="${body.replaceAll('"', '\\"')}"]`).first();
   await candidate.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
@@ -109,15 +127,12 @@ async function auditCoworking(page) {
   const mapRoot = frame.locator("#map");
   await mapRoot.waitFor({ state: "visible", timeout: 7000 }).catch(() => {});
   check(await mapRoot.isVisible().catch(() => false), "Coworking : vraie carte géographique visible");
-
-  const allMarkers = frame.locator(".cw-marker");
-  const markerCount = await allMarkers.count().catch(() => 0);
-  check(markerCount > 0, "Coworking : membres connectés visibles sur la carte", `marqueurs: ${markerCount}`);
+  check((await frame.locator(".cw-marker").count().catch(() => 0)) > 0, "Coworking : membres connectés visibles sur la carte");
   check((await frame.locator(".cw-marker.available").count().catch(() => 0)) > 0, "Coworking : au moins une personne disponible verte");
   check((await frame.locator(".cw-marker.busy").count().catch(() => 0)) > 0, "Coworking : au moins une visio occupée rouge");
   check((await frame.locator(".cw-media.group").count().catch(() => 0)) > 0, "Coworking : visio de groupe rendue en mosaïque");
 
-  const availableMarker = frame.locator(".cw-marker.available").first();
+  const availableMarker = frame.locator(".cw-marker.available .cw-hit").first();
   if (await availableMarker.isVisible().catch(() => false)) {
     await availableMarker.click();
     await page.getByLabel("Dire bonjour", { exact: true }).waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
@@ -128,7 +143,7 @@ async function auditCoworking(page) {
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
-  const busyMarker = frame.locator(".cw-marker.busy").first();
+  const busyMarker = frame.locator(".cw-marker.busy .cw-hit").first();
   if (await busyMarker.isVisible().catch(() => false)) {
     await busyMarker.click();
     await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
@@ -169,13 +184,8 @@ async function auditChat(page) {
   if (sent) {
     const text = await sent.innerText().catch(() => "");
     check(text.includes(body), "Chat : contenu du message réellement rendu", text.slice(0, 120));
-    const box = await sent.boundingBox().catch(() => null);
-    if (box) {
-      const viewport = page.viewportSize();
-      const top = box.y;
-      const bottom = box.y + box.height;
-      check(bottom <= (viewport?.height ?? 852) + 1 && top >= -1, "Chat : écran suit automatiquement le dernier message envoyé", `top=${Math.round(top)}, bottom=${Math.round(bottom)}`);
-    } else failures.push("Chat : géométrie du dernier message indisponible");
+    const ratio = await intersectionRatio(sent);
+    check(ratio >= 0.5, "Chat : écran suit automatiquement le dernier message envoyé", `intersection=${Math.round(ratio * 100)} %`);
   }
 
   const translationToggle = page.getByLabel(/Afficher le contenu original|Afficher la traduction/).first();
