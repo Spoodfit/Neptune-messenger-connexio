@@ -24,26 +24,36 @@ export type RealtimeEvent =
   | {
       type: "conversation.membership.changed";
       payload: { conversationId: string; active: boolean };
+    }
+  | {
+      type: "coworking.hello";
+      payload: { fromUserId: string };
+    }
+  | {
+      type: "coworking.knock";
+      payload: { requestId: string; fromUserId: string; spaceId: string };
+    }
+  | {
+      type: "coworking.knock.resolved";
+      payload: {
+        requestId: string;
+        status: "accepted" | "declined";
+        spaceId?: string;
+      };
     };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function readUnknown(
-  record: Record<string, unknown>,
-  ...keys: string[]
-): unknown {
+function readUnknown(record: Record<string, unknown>, ...keys: string[]): unknown {
   for (const key of keys) {
     if (key in record) return record[key];
   }
   return undefined;
 }
 
-function requireString(
-  record: Record<string, unknown>,
-  ...keys: string[]
-): string {
+function requireString(record: Record<string, unknown>, ...keys: string[]): string {
   const value = readUnknown(record, ...keys);
   if (typeof value !== "string" || !value.trim()) {
     throw new WireValidationError("Événement temps réel incomplet.");
@@ -51,10 +61,12 @@ function requireString(
   return value.trim();
 }
 
-function requireBoolean(
-  record: Record<string, unknown>,
-  ...keys: string[]
-): boolean {
+function optionalString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
+  const value = readUnknown(record, ...keys);
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function requireBoolean(record: Record<string, unknown>, ...keys: string[]): boolean {
   const value = readUnknown(record, ...keys);
   if (typeof value !== "boolean") {
     throw new WireValidationError("Événement temps réel incomplet.");
@@ -76,11 +88,7 @@ export function normalizeRealtimeEvent(value: unknown): RealtimeEvent | null {
         return {
           type: value.type,
           payload: {
-            conversationId: requireString(
-              payload,
-              "conversationId",
-              "conversation_id"
-            ),
+            conversationId: requireString(payload, "conversationId", "conversation_id"),
             messageId: requireString(payload, "messageId", "message_id")
           }
         };
@@ -88,17 +96,9 @@ export function normalizeRealtimeEvent(value: unknown): RealtimeEvent | null {
         return {
           type: value.type,
           payload: {
-            conversationId: requireString(
-              payload,
-              "conversationId",
-              "conversation_id"
-            ),
+            conversationId: requireString(payload, "conversationId", "conversation_id"),
             userId: requireString(payload, "userId", "user_id"),
-            lastReadMessageId: requireString(
-              payload,
-              "lastReadMessageId",
-              "last_read_message_id"
-            )
+            lastReadMessageId: requireString(payload, "lastReadMessageId", "last_read_message_id")
           }
         };
       case "presence.changed":
@@ -113,14 +113,38 @@ export function normalizeRealtimeEvent(value: unknown): RealtimeEvent | null {
         return {
           type: value.type,
           payload: {
-            conversationId: requireString(
-              payload,
-              "conversationId",
-              "conversation_id"
-            ),
+            conversationId: requireString(payload, "conversationId", "conversation_id"),
             active: requireBoolean(payload, "active")
           }
         };
+      case "coworking.hello":
+        return {
+          type: value.type,
+          payload: {
+            fromUserId: requireString(payload, "fromUserId", "from_user_id", "userId", "user_id")
+          }
+        };
+      case "coworking.knock":
+        return {
+          type: value.type,
+          payload: {
+            requestId: requireString(payload, "requestId", "request_id", "id"),
+            fromUserId: requireString(payload, "fromUserId", "from_user_id", "userId", "user_id"),
+            spaceId: requireString(payload, "spaceId", "space_id")
+          }
+        };
+      case "coworking.knock.resolved": {
+        const status = requireString(payload, "status");
+        if (status !== "accepted" && status !== "declined") return null;
+        return {
+          type: value.type,
+          payload: {
+            requestId: requireString(payload, "requestId", "request_id", "id"),
+            status,
+            spaceId: optionalString(payload, "spaceId", "space_id")
+          }
+        };
+      }
       default:
         return null;
     }
