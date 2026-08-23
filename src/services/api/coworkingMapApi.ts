@@ -50,6 +50,7 @@ function normalizeMedia(value: unknown, observerByDefault: boolean): CoworkingMe
 export interface CoworkingKnockResult {
   requestId?: string;
   status: "sent" | "accepted" | "declined";
+  spaceId?: string;
 }
 
 export interface CoworkingKnockResponse {
@@ -107,7 +108,8 @@ export class CoworkingMapApi {
     const rawStatus = stringValue(payload.status);
     return {
       requestId: stringValue(payload.request_id ?? payload.id) || undefined,
-      status: rawStatus === "accepted" || rawStatus === "declined" ? rawStatus : "sent"
+      status: rawStatus === "accepted" || rawStatus === "declined" ? rawStatus : "sent",
+      spaceId: stringValue(payload.space_id ?? payload.spaceId) || undefined
     };
   }
 
