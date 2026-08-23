@@ -169,8 +169,9 @@ async function auditMap(page, label, interactive = false) {
   }
 
   for (let i = 0; i < 6; i += 1) {
-    const zoomAnchor = frame.locator(".cw-marker.busy:visible").first();
-    if (await zoomAnchor.isVisible().catch(() => false)) await zoomAnchor.hover();
+    const zoomAnchor = frame.locator(".cw-marker.busy:visible .cw-hit").first();
+    const anchorBox = await zoomAnchor.boundingBox().catch(() => null);
+    if (anchorBox) await page.mouse.move(anchorBox.x + anchorBox.width / 2, anchorBox.y + anchorBox.height / 2);
     else await frame.locator("#map").hover();
     await page.mouse.wheel(0, -900);
     await page.waitForTimeout(180);
