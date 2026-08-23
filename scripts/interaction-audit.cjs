@@ -117,21 +117,25 @@ async function auditCoworking(page) {
   check((await frame.locator(".cw-marker.busy").count().catch(() => 0)) > 0, "Coworking : au moins une visio occupée rouge");
   check((await frame.locator(".cw-media.group").count().catch(() => 0)) > 0, "Coworking : visio de groupe rendue en mosaïque");
 
-  const busyMarker = frame.locator(".cw-marker.busy").first();
   const availableMarker = frame.locator(".cw-marker.available").first();
   if (await availableMarker.isVisible().catch(() => false)) {
     await availableMarker.click();
+    await page.getByLabel("Dire bonjour", { exact: true }).waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
     await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Coworking : Bonjour tactile");
     await checkTarget(page.getByLabel("Proposer un rendez-vous", { exact: true }), "Coworking : rendez-vous tactile");
     check((await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).count()) === 0, "Coworking : pas de Toquer sur une personne disponible hors visio");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
+  const busyMarker = frame.locator(".cw-marker.busy").first();
   if (await busyMarker.isVisible().catch(() => false)) {
     await busyMarker.click();
+    await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
     await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Coworking groupe : Bonjour tactile");
     await checkTarget(page.getByLabel("Toquer pour rejoindre la visio", { exact: true }), "Coworking groupe : Toquer tactile");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
   await page.getByLabel("Rejoindre la salle générale", { exact: true }).click();
@@ -168,7 +172,9 @@ async function auditChat(page) {
     const box = await sent.boundingBox().catch(() => null);
     if (box) {
       const viewport = page.viewportSize();
-      check(box.bottom <= (viewport?.height ?? 852) + 1 && box.top >= -1, "Chat : écran suit automatiquement le dernier message envoyé", `top=${Math.round(box.top)}, bottom=${Math.round(box.bottom)}`);
+      const top = box.y;
+      const bottom = box.y + box.height;
+      check(bottom <= (viewport?.height ?? 852) + 1 && top >= -1, "Chat : écran suit automatiquement le dernier message envoyé", `top=${Math.round(top)}, bottom=${Math.round(bottom)}`);
     } else failures.push("Chat : géométrie du dernier message indisponible");
   }
 
