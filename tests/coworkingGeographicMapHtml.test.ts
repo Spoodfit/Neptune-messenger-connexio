@@ -1,4 +1,4 @@
-import { match, ok } from "node:assert";
+import { doesNotThrow, match, ok } from "node:assert";
 import { test } from "node:test";
 
 import { buildCoworkingGeographicMapHtml } from "../src/services/coworking/geographicMapHtml";
@@ -43,12 +43,20 @@ const html = buildCoworkingGeographicMapHtml({
 test("la Map garde les initiales tant que l’avatar distant n’est pas prêt", () => {
   match(html, /const fallback='<span class="cw-fallback">'\+escapeText\(member\.initials\|\|'\?'\)\+'<\/span>';/);
   match(html, /\.cw-face img,[^}]+opacity:0/);
-  match(html, /onload="this\.parentElement\.classList\.add\('avatar-ready'\)"/);
+  match(html, /onload="this\.parentElement\.classList\.add\(&quot;avatar-ready&quot;\)"/);
   match(html, /onerror="this\.remove\(\)"/);
 });
 
 test("une caméra déclarée active ne masque jamais l’avatar sans flux vidéo", () => {
-  match(html, /<video[^>]+onplaying="this\.classList\.add\('video-ready'\)"/);
+  match(html, /<video[^>]+onplaying="this\.classList\.add\(&quot;video-ready&quot;\)"/);
   match(html, /\.cw-face video\.video-ready\{opacity:1/);
   ok(!html.includes(".cw-face video{z-index:2;background:var(--surfaceStrong)}"));
+});
+
+test("chaque script injecté dans l’iframe reste du JavaScript syntaxiquement valide", () => {
+  const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+    .flatMap((matchResult) => typeof matchResult[1] === "string" && matchResult[1].trim().length > 0 ? [matchResult[1]] : []);
+
+  ok(scripts.length > 0);
+  for (const script of scripts) doesNotThrow(() => new Function(script));
 });

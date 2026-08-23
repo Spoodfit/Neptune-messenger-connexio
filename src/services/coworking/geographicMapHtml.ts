@@ -100,8 +100,8 @@ ${clientScript}
   const bounds=[];
   const faceHtml=member=>{
     const fallback='<span class="cw-fallback">'+escapeText(member.initials||'?')+'</span>';
-    const avatar=member.avatarUrl?'<img src="'+escapeText(member.avatarUrl)+'" alt="" onload="this.parentElement.classList.add(\'avatar-ready\')" onerror="this.remove()"/>':'';
-    const video=member.cameraOn?'<video data-user-id="'+escapeText(member.id)+'" autoplay playsinline muted onplaying="this.classList.add(\'video-ready\')" onpause="this.classList.remove(\'video-ready\')" onemptied="this.classList.remove(\'video-ready\')"></video>':'';
+    const avatar=member.avatarUrl?'<img src="'+escapeText(member.avatarUrl)+'" alt="" onload="this.parentElement.classList.add(&quot;avatar-ready&quot;)" onerror="this.remove()"/>':'';
+    const video=member.cameraOn?'<video data-user-id="'+escapeText(member.id)+'" autoplay playsinline muted onplaying="this.classList.add(&quot;video-ready&quot;)" onpause="this.classList.remove(&quot;video-ready&quot;)" onemptied="this.classList.remove(&quot;video-ready&quot;)"></video>':'';
     return '<div class="cw-face" data-member-id="'+escapeText(member.id)+'">'+fallback+avatar+video+'</div>';
   };
   const satelliteAngles=[90,55,125,20,160,-15,195,235,305];
