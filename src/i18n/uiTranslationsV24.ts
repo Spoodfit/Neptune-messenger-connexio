@@ -16,6 +16,8 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Bureau indisponible": { en: "Office unavailable", es: "Oficina no disponible", de: "Büro nicht verfügbar", it: "Ufficio non disponibile", pt: "Escritório indisponível" },
   "Bureau privé": { en: "Private office", es: "Oficina privada", de: "Privates Büro", it: "Ufficio privato", pt: "Escritório privado" },
   "Carte géographique du Coworking Connexio": { en: "Connexio Coworking geographic map", es: "Mapa geográfico del Coworking Connexio", de: "Geografische Connexio-Coworking-Karte", it: "Mappa geografica del Coworking Connexio", pt: "Mapa geográfico do Coworking Connexio" },
+  "Connexion à la salle": { en: "Connecting to room", es: "Conectando con la sala", de: "Verbindung zum Raum", it: "Connessione alla sala", pt: "A ligar à sala" },
+  "Connexion à la salle…": { en: "Connecting to room…", es: "Conectando con la sala…", de: "Verbindung zum Raum…", it: "Connessione alla sala…", pt: "A ligar à sala…" },
   "Connexion média réduite. La présence reste disponible.": { en: "Reduced media connection. Presence remains available.", es: "Conexión multimedia reducida. La presencia sigue disponible.", de: "Eingeschränkte Medienverbindung. Die Präsenz bleibt verfügbar.", it: "Connessione multimediale ridotta. La presenza resta disponibile.", pt: "Ligação multimédia reduzida. A presença continua disponível." },
   "Dire bonjour": { en: "Say hello", es: "Saludar", de: "Hallo sagen", it: "Saluta", pt: "Dizer olá" },
   "En échange": { en: "Talking", es: "En conversación", de: "Im Gespräch", it: "In conversazione", pt: "Em conversa" },
