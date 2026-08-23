@@ -233,6 +233,10 @@ async function auditAppRoutes(page) {
     ["/highlights", "Temps forts"],
     ["/calls", "Appels"],
     ["/settings", "Profil/Paramètres"],
+    ["/profile/user-lea", "Profil membre"],
+    ["/schedule-call?memberId=user-lea&mode=video", "Programmer un appel"],
+    ["/contact-actions?intent=recommend&recipientId=user-lea", "Recommander un contact"],
+    ["/contact-actions?intent=invite", "Inviter un contact"],
     ["/account", "Compte"],
     ["/notification-settings", "Notifications"],
     ["/privacy", "Confidentialité"],
@@ -273,7 +277,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Product Audit passed: six viewport families, clipped geometry, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow and core routes.");
+  console.log("Product Audit passed: six viewport families, clipped geometry, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow, member profile, call scheduling, contact actions and core routes.");
 }
 
 run().catch((error) => {
