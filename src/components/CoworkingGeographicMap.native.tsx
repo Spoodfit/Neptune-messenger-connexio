@@ -26,23 +26,22 @@ export default function CoworkingGeographicMap({
   const eventsKey = JSON.stringify(events);
   const mediaKey = JSON.stringify(mediaSession ?? null);
   const html = useMemo(
-    () =>
-      buildCoworkingGeographicMapHtml({
-        markers,
-        events,
-        mediaSession,
-        bridge: "native",
-        theme: {
-          pageBackground: theme.pageBackground,
-          surface: theme.surface,
-          surfaceStrong: theme.surfaceStrong,
-          pageText: theme.pageText,
-          pageTextMuted: theme.pageTextMuted,
-          border: theme.border,
-          shellBackground: theme.shellBackground,
-          isLight: theme.isLight
-        }
-      }),
+    () => buildCoworkingGeographicMapHtml({
+      markers,
+      events,
+      mediaSession,
+      bridge: "native",
+      theme: {
+        pageBackground: theme.pageBackground,
+        surface: theme.surface,
+        surfaceStrong: theme.surfaceStrong,
+        pageText: theme.pageText,
+        pageTextMuted: theme.pageTextMuted,
+        border: theme.border,
+        shellBackground: theme.shellBackground,
+        isLight: theme.isLight
+      }
+    }),
     [eventsKey, markersKey, mediaKey, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
   );
 
@@ -54,14 +53,12 @@ export default function CoworkingGeographicMap({
     }));
   };
 
-  useEffect(() => {
-    postSelection();
-  }, [selectedEventId, selectedMarkerId]);
+  useEffect(() => { postSelection(); }, [selectedEventId, selectedMarkerId]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
-      const payload = JSON.parse(event.nativeEvent.data) as { type?: string; id?: string; message?: string };
-      if (payload.type === "marker-selected" && payload.id) onSelectMarker(payload.id);
+      const payload = JSON.parse(event.nativeEvent.data) as { type?: string; id?: string; memberId?: string; message?: string };
+      if (payload.type === "marker-selected" && payload.id) onSelectMarker(payload.id, payload.memberId);
       if (payload.type === "event-selected" && payload.id) onSelectEvent?.(payload.id);
       if (payload.type === "media-unavailable") onMediaUnavailable?.(payload.message ?? "La caméra n’a pas pu être activée.");
     } catch {}
@@ -107,11 +104,7 @@ export default function CoworkingGeographicMap({
         accessibilityRole="button"
         accessibilityLabel="Me localiser"
         onPress={() => void locate()}
-        style={({ pressed }) => [
-          styles.locate,
-          { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft },
-          pressed && styles.pressed
-        ]}
+        style={({ pressed }) => [styles.locate, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }, pressed && styles.pressed]}
       >
         {locating ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="locate" size={20} color={theme.pageText} />}
       </Pressable>
