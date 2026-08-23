@@ -1,4 +1,4 @@
-import { Redirect, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
@@ -22,26 +22,28 @@ export default function CoworkingRoomRoute() {
   const [joining, setJoining] = useState(false);
   const [joinFailed, setJoinFailed] = useState(false);
 
-  const generalRoomRemoved = Boolean(spaceId && spaceId === snapshot.hub.id);
-  const space = useMemo(
-    () => snapshot.spaces.find((item) => item.id === spaceId),
-    [snapshot.spaces, spaceId]
-  );
+  const space = useMemo(() => {
+    if (!spaceId) return undefined;
+    if (snapshot.hub.id === spaceId) return snapshot.hub;
+    return snapshot.spaces.find((item) => item.id === spaceId);
+  }, [snapshot.hub, snapshot.spaces, spaceId]);
   const joined = Boolean(
-    space && (currentSpace?.id === space.id || space.participantIds.includes(currentUser.id))
+    space &&
+      (currentSpace?.id === space.id ||
+        space.participantIds.includes(currentUser.id) ||
+        snapshot.currentUserSpaceId === space.id)
   );
 
   useEffect(() => {
-    if (generalRoomRemoved || !space || joined || joining || attemptedRef.current === space.id) return;
+    if (!space || joined || joining || attemptedRef.current === space.id) return;
     attemptedRef.current = space.id;
     setJoining(true);
     setJoinFailed(false);
     void joinSpace(space.id)
       .catch(() => setJoinFailed(true))
       .finally(() => setJoining(false));
-  }, [generalRoomRemoved, joinSpace, joined, joining, space]);
+  }, [joinSpace, joined, joining, space]);
 
-  if (generalRoomRemoved) return <Redirect href="/coworking" />;
   if (!space || joinFailed) return <CoworkingRoomScreen />;
   if (!joined) {
     return (
