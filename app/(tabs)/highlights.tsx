@@ -1,1 +1,1 @@
-export { default } from "@/screens/HighlightsScreenV22";
+export { default } from "@/screens/HighlightsFeedScreenV24";
