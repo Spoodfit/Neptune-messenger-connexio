@@ -1,4 +1,7 @@
-import type { CoworkingMapMarker } from "../../components/CoworkingGeographicMap.types";
+import type {
+  CoworkingMapEventMarker,
+  CoworkingMapMarker
+} from "../../components/CoworkingGeographicMap.types";
 import type { CoworkingMediaSession } from "../../types/coworking";
 
 interface GeographicMapTheme {
@@ -14,6 +17,7 @@ interface GeographicMapTheme {
 
 interface GeographicMapHtmlOptions {
   markers: CoworkingMapMarker[];
+  events?: CoworkingMapEventMarker[];
   mediaSession?: CoworkingMediaSession;
   theme: GeographicMapTheme;
   bridge: "native" | "web";
@@ -25,6 +29,7 @@ function escapeJson(value: unknown): string {
 
 export function buildCoworkingGeographicMapHtml({
   markers,
+  events = [],
   mediaSession,
   theme,
   bridge
@@ -60,8 +65,9 @@ export function buildCoworkingGeographicMapHtml({
 <style>
 :root{--bg:${theme.pageBackground};--surface:${theme.surface};--surfaceStrong:${theme.surfaceStrong};--text:${theme.pageText};--muted:${theme.pageTextMuted};--border:${theme.border};--shell:${theme.shellBackground};--available:#35D58B;--busy:#FF5868}
 *{box-sizing:border-box}html,body,#map{height:100%;width:100%;margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}.leaflet-control-attribution{background:rgba(0,0,0,.12)!important;color:var(--muted)!important;font-size:7px!important}.leaflet-control-attribution a{color:var(--muted)!important}.leaflet-pane.leaflet-marker-pane{z-index:620}.leaflet-tooltip{background:var(--shell)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:11px!important;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.16)!important;padding:6px 9px!important}
-.cw-marker{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;filter:drop-shadow(0 8px 18px rgba(0,0,0,.28));transform-origin:50% 72%;transition:transform .18s ease,filter .18s ease}.cw-marker.selected{transform:scale(1.09);filter:drop-shadow(0 11px 24px rgba(0,0,0,.38))}.cw-media{position:relative;background:var(--surfaceStrong);border:3px solid var(--status);overflow:hidden;display:grid;box-shadow:0 0 0 3px color-mix(in srgb,var(--status) 18%,transparent),0 8px 20px rgba(0,0,0,.28)}.cw-media.single{width:58px;height:58px;border-radius:50%}.cw-media.group{width:82px;height:62px;border-radius:19px;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:1px}.cw-cell{position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--surfaceStrong);display:grid;place-items:center;color:var(--text);font-size:11px;font-weight:900}.cw-cell img,.cw-cell video{width:100%;height:100%;object-fit:cover;display:block}.cw-cell video{position:absolute;inset:0;background:var(--surfaceStrong)}.cw-cell .fallback{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,var(--surfaceStrong),var(--surface));z-index:0}.cw-cell img{position:relative;z-index:1}.cw-cell video{z-index:2}.cw-camera{position:absolute;right:-4px;top:-5px;width:22px;height:22px;border-radius:11px;background:var(--shell);border:2px solid var(--status);display:grid;place-items:center;z-index:8;color:var(--text);font-size:11px}.cw-count{position:absolute;right:-6px;bottom:-5px;min-width:25px;height:25px;padding:0 6px;border-radius:13px;background:var(--shell);border:2px solid var(--status);display:grid;place-items:center;color:var(--text);font-size:10px;font-weight:900;z-index:8}.cw-status{margin-top:5px;height:22px;max-width:94px;padding:0 7px;border-radius:11px;background:var(--shell);border:1px solid color-mix(in srgb,var(--status) 72%,transparent);display:flex;align-items:center;gap:5px;color:var(--text);font-size:9px;font-weight:900;white-space:nowrap}.cw-dot{width:7px;height:7px;border-radius:50%;background:var(--status);box-shadow:0 0 10px color-mix(in srgb,var(--status) 75%,transparent)}.cw-pulse{position:absolute;inset:-7px;border-radius:28px;border:2px solid var(--status);opacity:0;animation:cwPulse 3s ease-out infinite;pointer-events:none}.cw-marker.busy .cw-pulse{animation:none;opacity:.16}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{width:44px;height:44px;border-radius:22px;border:3px solid rgba(255,255,255,.92);background:var(--shell);color:var(--text);display:grid;place-items:center;font-weight:900;box-shadow:0 7px 18px rgba(0,0,0,.25)}@keyframes cwPulse{0%{opacity:.32;transform:scale(.82)}75%,100%{opacity:0;transform:scale(1.2)}}@media(prefers-reduced-motion:reduce){.cw-pulse{animation:none!important;opacity:.16}}
-.cw-cell video{opacity:0;transition:opacity .18s ease}.cw-cell video.ready{opacity:1}
+.cw-marker{--offset-x:0px;--offset-y:0px;--core-size:42px;--sat-size:23px;position:relative;width:100%;height:100%;transform:translate(var(--offset-x),var(--offset-y)) scale(1);transform-origin:center;transition:transform .2s ease,filter .2s ease;filter:drop-shadow(0 7px 15px rgba(0,0,0,.25));cursor:pointer}.cw-marker.selected{transform:translate(var(--offset-x),var(--offset-y)) scale(1.12);filter:drop-shadow(0 10px 21px rgba(0,0,0,.36))}.cw-core,.cw-satellite,.cw-extra{position:absolute;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--surfaceStrong);color:var(--text);font-weight:900;border:3px solid var(--status);box-shadow:0 0 0 2px color-mix(in srgb,var(--status) 14%,transparent),0 6px 15px rgba(0,0,0,.26)}.cw-core{left:50%;top:50%;width:var(--core-size);height:var(--core-size);transform:translate(-50%,-50%);z-index:4;font-size:10px}.cw-group .cw-core{top:38%}.cw-satellite,.cw-extra{width:var(--sat-size);height:var(--sat-size);transform:translate(-50%,-50%);z-index:5;border-width:2px;font-size:7px}.cw-extra{z-index:7;background:var(--shell);font-size:8px}.cw-face{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,var(--surfaceStrong),var(--surface));overflow:hidden}.cw-face img,.cw-face video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}.cw-face img{z-index:1}.cw-face video{z-index:2;background:var(--surfaceStrong);opacity:0;transition:opacity .18s ease}.cw-face video.ready{opacity:1}.cw-marker.available .cw-core{animation:cwPulse 3.4s ease-out infinite}.cw-marker.busy .cw-core{box-shadow:0 0 0 3px color-mix(in srgb,var(--busy) 15%,transparent),0 7px 18px rgba(0,0,0,.28)}
+.event-marker{width:46px;height:50px;position:relative;--event:#3479aa;--wave:5.2s;--pulse:.12;transform-origin:14px 42px;transition:transform .18s ease,filter .18s ease;cursor:pointer}.event-marker.past24h{--event:#6f9dbe;--wave:5.8s;--pulse:.1}.event-marker.later{--event:#3479aa}.event-marker.within7d{--event:#248fc0;--wave:4.2s;--pulse:.2}.event-marker.within48h{--event:#12b9cc;--wave:2.9s;--pulse:.36}.event-marker.live{--event:#19e0c8;--wave:2s;--pulse:.55}.event-marker.selected{transform:translateY(-2px) scale(1.12);filter:drop-shadow(0 7px 12px color-mix(in srgb,var(--event) 45%,transparent))}.event-pole{position:absolute;left:11px;top:7px;width:3px;height:38px;border-radius:3px;background:linear-gradient(180deg,#f8fbff,#8da9bb);box-shadow:0 2px 8px rgba(0,0,0,.24);z-index:2}.event-flag{position:absolute;left:14px;top:7px;width:28px;height:20px;background:linear-gradient(115deg,var(--event),color-mix(in srgb,var(--event) 70%,white));clip-path:polygon(0 0,100% 10%,86% 50%,100% 90%,0 100%);border-radius:2px 6px 6px 2px;transform-origin:0 50%;animation:flagWave var(--wave) ease-in-out infinite;box-shadow:0 4px 11px color-mix(in srgb,var(--event) 40%,transparent);z-index:3}.event-pulse{position:absolute;left:1px;bottom:0;width:28px;height:12px;border-radius:50%;border:2px solid var(--event);opacity:var(--pulse);animation:eventPulse calc(var(--wave) * .92) ease-out infinite}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.9);background:var(--shell);color:var(--text);display:grid;place-items:center;font-size:11px;font-weight:900;box-shadow:0 7px 17px rgba(0,0,0,.25)}
+@keyframes cwPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--available) 30%,transparent),0 6px 15px rgba(0,0,0,.26)}72%,100%{box-shadow:0 0 0 9px transparent,0 6px 15px rgba(0,0,0,.26)}}@keyframes flagWave{0%,100%{transform:perspective(70px) rotateY(0deg) skewY(-1deg)}50%{transform:perspective(70px) rotateY(-18deg) skewY(2deg)}}@keyframes eventPulse{0%{transform:scale(.72);opacity:var(--pulse)}78%,100%{transform:scale(1.7);opacity:0}}@media(prefers-reduced-motion:reduce){.cw-marker.available .cw-core,.event-flag,.event-pulse{animation:none!important}}
 </style>
 </head>
 <body>
@@ -72,21 +78,31 @@ ${clientScript}
 <script>
 (() => {
   const markerData=${escapeJson(markers)};
+  const eventData=${escapeJson(events)};
   const session=${escapeJson(session)};
-  const nodes=new Map();
+  const markerNodes=new Map();
+  const eventNodes=new Map();
   const videoNodes=new Map();
   const participantStreams=new Map();
+  const markerEntries=[];
   const escapeText=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
   const post=payload=>{try{${postExpression}}catch{}};
   const map=L.map('map',{zoomControl:false,minZoom:4,maxZoom:18,zoomSnap:.25,attributionControl:true});
   L.tileLayer('https://{s}.basemaps.cartocdn.com/${tileStyle}/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
-  const cluster=L.markerClusterGroup({maxClusterRadius:60,spiderfyOnMaxZoom:true,showCoverageOnHover:false,iconCreateFunction:c=>L.divIcon({className:'custom-cluster',html:'<div class="cluster-core" role="button" tabindex="0" aria-label="'+c.getChildCount()+' membres dans cette zone">'+c.getChildCount()+'</div>',iconSize:[44,44]})});
+  const cluster=L.markerClusterGroup({
+    maxClusterRadius:zoom=>zoom<7?58:zoom<10?46:32,
+    disableClusteringAtZoom:12,
+    spiderfyOnMaxZoom:false,
+    showCoverageOnHover:false,
+    removeOutsideVisibleBounds:true,
+    iconCreateFunction:c=>L.divIcon({className:'custom-cluster',html:'<div class="cluster-core" role="button" aria-label="'+c.getChildCount()+' membres proches">'+c.getChildCount()+'</div>',iconSize:[40,40]})
+  });
   const bounds=[];
-  const cellHtml=member=>{
-    const fallback='<div class="fallback">'+escapeText(member.initials||'?')+'</div>';
+  const faceHtml=member=>{
+    const fallback='<span>'+escapeText(member.initials||'?')+'</span>';
     const avatar=member.avatarUrl?'<img src="'+escapeText(member.avatarUrl)+'" alt=""/>':'';
     const video=member.cameraOn?'<video data-user-id="'+escapeText(member.id)+'" autoplay playsinline muted></video>':'';
-    return '<div class="cw-cell" data-member-id="'+escapeText(member.id)+'">'+fallback+avatar+video+'</div>';
+    return '<div class="cw-face" data-member-id="'+escapeText(member.id)+'">'+fallback+avatar+video+'</div>';
   };
   const attachVideo=(participantId,video)=>{
     const stream=participantStreams.get(participantId);
@@ -95,32 +111,145 @@ ${clientScript}
     video.play?.().catch(()=>{});
     if(video.readyState>=2)video.classList.add('ready');
   };
-  markerData.forEach(item=>{
+  const satelliteAngles=[90,55,125,20,160,-15,195,235,305];
+  const markerHtml=item=>{
     const group=item.members.length>1;
     const status=item.availability==='busy'?'#FF5868':'#35D58B';
-    const first=item.members[0];
-    const anyCamera=item.members.some(member=>member.cameraOn);
-    const media='<div class="cw-media '+(group?'group':'single')+'" style="--status:'+status+'">'+item.members.slice(0,4).map(cellHtml).join('')+'</div>';
-    const camera=anyCamera?'<div class="cw-camera">●</div>':'';
-    const count=group?'<div class="cw-count">'+item.members.length+'</div>':'';
+    const host=item.members[0];
     const label=item.availability==='busy'?'Occupé':'Disponible';
-    const markerLabel=group?'Visio occupée avec '+item.members.map(member=>member.name).join(', '):(first?.name||'Membre Connexio')+'. '+label;
-    const html='<div class="cw-marker '+(item.availability==='busy'?'busy':'available')+'" role="button" tabindex="0" aria-label="'+escapeText(markerLabel)+'" data-marker-id="'+escapeText(item.id)+'" style="--status:'+status+'"><div class="cw-pulse"></div>'+media+camera+count+'<div class="cw-status"><span class="cw-dot"></span>'+label+'</div></div>';
-    const width=group?96:74;const height=group?102:96;
-    const marker=L.marker([item.latitude,item.longitude],{icon:L.divIcon({className:'',html,iconSize:[width,height],iconAnchor:[width/2,height-19]}),title:group?item.members.map(m=>m.name).join(', '):first?.name||'Membre Connexio'});
+    const markerLabel=group?'Visio occupée avec '+item.members.map(member=>member.name).join(', '):(host?.name||'Membre Connexio')+'. '+label;
+    let satellites='';
+    if(group){
+      const visibleGuests=item.members.slice(1,9);
+      satellites=visibleGuests.map((member,index)=>{
+        const angle=(satelliteAngles[index]??(90+index*47))*Math.PI/180;
+        return '<div class="cw-satellite" data-angle="'+angle+'">'+faceHtml(member)+'</div>';
+      }).join('');
+      if(item.members.length>9) satellites+='<div class="cw-extra" data-extra="1">+'+(item.members.length-9)+'</div>';
+    }
+    return '<div class="cw-marker '+(group?'cw-group ':'cw-single ')+(item.availability==='busy'?'busy':'available')+'" role="button" tabindex="0" aria-label="'+escapeText(markerLabel)+'" data-marker-id="'+escapeText(item.id)+'" style="--status:'+status+'"><div class="cw-core">'+faceHtml(host)+'</div>'+satellites+'</div>';
+  };
+  markerData.forEach(item=>{
+    const group=item.members.length>1;
+    const width=group?116:72;
+    const height=group?108:72;
+    const marker=L.marker([item.latitude,item.longitude],{
+      icon:L.divIcon({className:'',html:markerHtml(item),iconSize:[width,height],iconAnchor:[width/2,height/2]}),
+      title:group?item.members.map(m=>m.name).join(', '):(item.members[0]?.name||'Membre Connexio'),
+      keyboard:true
+    });
     marker.on('add',()=>{
       const root=marker.getElement()?.querySelector('.cw-marker');
-      if(root){nodes.set(item.id,root);root.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();post({type:'marker-selected',id:item.id});}});root.querySelectorAll('video[data-user-id]').forEach(video=>{const participantId=video.dataset.userId;const showVideo=()=>video.classList.add('ready');video.addEventListener('loadeddata',showVideo,{once:true});video.addEventListener('playing',showVideo,{once:true});videoNodes.set(participantId,video);attachVideo(participantId,video);});}
+      if(root){
+        markerNodes.set(item.id,root);
+        root.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();post({type:'marker-selected',id:item.id});}});
+        root.querySelectorAll('video[data-user-id]').forEach(video=>{
+          const participantId=video.dataset.userId;
+          const showVideo=()=>video.classList.add('ready');
+          video.addEventListener('loadeddata',showVideo,{once:true});
+          video.addEventListener('playing',showVideo,{once:true});
+          videoNodes.set(participantId,video);
+          attachVideo(participantId,video);
+        });
+        updateMarkerVisual(root);
+      }
     });
     marker.on('click',()=>post({type:'marker-selected',id:item.id}));
-    marker.bindTooltip(escapeText(group?item.members.map(member=>member.name.split(' ')[0]).join(' · '):(first?.name||'Membre Connexio')),{direction:'bottom',offset:[0,12],opacity:.96});
-    cluster.addLayer(marker);bounds.push([item.latitude,item.longitude]);
+    marker.bindTooltip(escapeText(group?item.members.map(member=>member.name.split(' ')[0]).join(' · '):(item.members[0]?.name||'Membre Connexio')),{direction:'bottom',offset:[0,14],opacity:.96});
+    markerEntries.push({id:item.id,marker});
+    cluster.addLayer(marker);
+    bounds.push([item.latitude,item.longitude]);
   });
   map.addLayer(cluster);
-  if(bounds.length){map.fitBounds(bounds,{padding:[52,52],maxZoom:9})}else{map.setView([46.5,2.2],5.6)}
-  const updateSelection=id=>nodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(id)&&key===id));
-  const handle=raw=>{try{const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.type==='selection')updateSelection(data.id||null);if(data?.type==='locate'&&data.location){const point=[data.location.latitude,data.location.longitude];map.flyTo(point,11,{duration:.65});}}catch{}};
-  window.addEventListener('message',event=>handle(event.data));document.addEventListener('message',event=>handle(event.data));
+
+  const eventLayer=L.layerGroup().addTo(map);
+  eventData.forEach(event=>{
+    const html='<div class="event-marker '+escapeText(event.proximity)+'" role="button" tabindex="0" aria-label="Évènement '+escapeText(event.title)+'" data-event-id="'+escapeText(event.id)+'"><div class="event-pulse"></div><div class="event-pole"></div><div class="event-flag"></div></div>';
+    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:350,keyboard:true});
+    marker.on('add',()=>{
+      const node=marker.getElement()?.querySelector('.event-marker');
+      if(node){eventNodes.set(event.id,node);node.addEventListener('keydown',keyboardEvent=>{if(keyboardEvent.key==='Enter'||keyboardEvent.key===' '){keyboardEvent.preventDefault();post({type:'event-selected',id:event.id});}});}
+    });
+    marker.on('click',()=>post({type:'event-selected',id:event.id}));
+    marker.bindTooltip(escapeText(event.title),{direction:'bottom',offset:[13,8],opacity:.96});
+    marker.addTo(eventLayer);
+    bounds.push([event.latitude,event.longitude]);
+  });
+
+  if(bounds.length){map.fitBounds(bounds,{padding:[48,48],maxZoom:9})}else{map.setView([46.5,2.2],5.6)}
+
+  function visualCoreSize(){
+    const count=markerData.length;
+    const zoom=map.getZoom();
+    let size=count>120?28:count>70?31:count>38?34:count>20?38:42;
+    if(zoom>=13)size+=4;
+    if(zoom>=15)size+=3;
+    if(zoom<=7)size-=3;
+    return Math.max(27,Math.min(49,size));
+  }
+  function updateMarkerVisual(root){
+    const core=visualCoreSize();
+    const satellite=Math.max(19,Math.min(27,Math.round(core*.56)));
+    const radius=Math.max(27,Math.round(core*.76));
+    root.style.setProperty('--core-size',core+'px');
+    root.style.setProperty('--sat-size',satellite+'px');
+    root.querySelectorAll('.cw-satellite[data-angle]').forEach(node=>{
+      const angle=Number(node.dataset.angle||0);
+      node.style.left='calc(50% + '+Math.cos(angle)*radius+'px)';
+      node.style.top='calc(38% + '+Math.sin(angle)*radius+'px)';
+    });
+    const extra=root.querySelector('.cw-extra[data-extra]');
+    if(extra){
+      const angle=270*Math.PI/180;
+      extra.style.left='calc(50% + '+Math.cos(angle)*radius+'px)';
+      extra.style.top='calc(38% + '+Math.sin(angle)*radius+'px)';
+    }
+  }
+  function setOffset(root,x,y){
+    root.style.setProperty('--offset-x',Math.round(x)+'px');
+    root.style.setProperty('--offset-y',Math.round(y)+'px');
+  }
+  function applyCollisionOffsets(){
+    markerNodes.forEach(node=>{setOffset(node,0,0);updateMarkerVisual(node)});
+    if(map.getZoom()<12)return;
+    const visible=markerEntries.map(entry=>({entry,node:entry.marker.getElement()?.querySelector('.cw-marker'),point:map.latLngToLayerPoint(entry.marker.getLatLng())})).filter(item=>item.node);
+    const visited=new Set();
+    for(let i=0;i<visible.length;i+=1){
+      if(visited.has(i))continue;
+      const group=[i];visited.add(i);
+      for(let cursor=0;cursor<group.length;cursor+=1){
+        const source=visible[group[cursor]];
+        for(let j=0;j<visible.length;j+=1){
+          if(visited.has(j))continue;
+          const target=visible[j];
+          const dx=source.point.x-target.point.x,dy=source.point.y-target.point.y;
+          if(Math.hypot(dx,dy)<42){visited.add(j);group.push(j)}
+        }
+      }
+      if(group.length<2)continue;
+      setOffset(visible[group[0]].node,0,0);
+      const around=group.slice(1);
+      around.forEach((index,slot)=>{
+        const ring=Math.floor(slot/7);
+        const position=slot%7;
+        const count=Math.min(7,around.length-ring*7);
+        const radius=31+ring*24;
+        const angle=Math.PI/2+(position/count)*Math.PI*2;
+        const item=visible[index];
+        setOffset(item.node,Math.cos(angle)*radius,Math.sin(angle)*radius);
+      });
+    }
+  }
+  const updateSelection=(markerId,eventId)=>{
+    markerNodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(markerId)&&key===markerId));
+    eventNodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(eventId)&&key===eventId));
+  };
+  const handle=raw=>{try{const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.type==='selection')updateSelection(data.markerId||null,data.eventId||null);if(data?.type==='locate'&&data.location){const point=[data.location.latitude,data.location.longitude];map.flyTo(point,12.5,{duration:.65});}}catch{}};
+  window.addEventListener('message',event=>handle(event.data));
+  document.addEventListener('message',event=>handle(event.data));
+  map.on('zoomend moveend',()=>requestAnimationFrame(applyCollisionOffsets));
+  cluster.on('animationend',()=>requestAnimationFrame(applyCollisionOffsets));
+  setTimeout(applyCollisionOffsets,80);
 
   async function connectMedia(){
     if(!session||session.mock)return;
@@ -134,8 +263,7 @@ ${clientScript}
       if(!session.observer&&navigator.mediaDevices?.getUserMedia){
         localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
         participantStreams.set(session.participantId,localStream);
-        const ownVideo=videoNodes.get(session.participantId);
-        attachVideo(session.participantId,ownVideo);
+        attachVideo(session.participantId,videoNodes.get(session.participantId));
       }
       await adapter.connect({
         ...session,
@@ -149,7 +277,8 @@ ${clientScript}
         },
         onParticipantLeft:participantId=>{
           participantStreams.delete(participantId);
-          const video=videoNodes.get(participantId);if(video){video.srcObject=null;video.classList.remove('ready');}
+          const video=videoNodes.get(participantId);
+          if(video){video.srcObject=null;video.classList.remove('ready');}
         },
         onConnected:()=>post({type:'media-connected'})
       });
