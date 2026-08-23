@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-context";
 
+import { CoworkingInteractionOverlay } from "../src/components/CoworkingInteractionOverlay";
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
 import { CoworkingProvider } from "../src/providers/CoworkingProvider";
@@ -156,7 +157,20 @@ function AuthenticatedApp() {
   }
   if (onUnavailableMessagingRoute || onUnavailableCallRoute) return <Redirect href="/(tabs)/highlights" />;
 
-  return <MessagingProvider key={`user:${currentUser.id}`}><GroupAdminProvider><ExperienceProvider><ScheduledCallsProvider><CoworkingProvider>{applicationStack}</CoworkingProvider></ScheduledCallsProvider></ExperienceProvider></GroupAdminProvider></MessagingProvider>;
+  return (
+    <MessagingProvider key={`user:${currentUser.id}`}>
+      <GroupAdminProvider>
+        <ExperienceProvider>
+          <ScheduledCallsProvider>
+            <CoworkingProvider>
+              {applicationStack}
+              <CoworkingInteractionOverlay />
+            </CoworkingProvider>
+          </ScheduledCallsProvider>
+        </ExperienceProvider>
+      </GroupAdminProvider>
+    </MessagingProvider>
+  );
 }
 
 /**
