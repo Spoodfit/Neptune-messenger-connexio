@@ -1,0 +1,30 @@
+name: Sync V24 with release
+
+on:
+  push:
+    branches:
+      - fix/v24-geographic-coworking
+    paths:
+      - .github/workflows/sync-v24-release.yml
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout V24 branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/v24-geographic-coworking
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge current release without regressing V24 conflict resolutions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin release/connexio-rc1
+          git merge --no-edit -X ours origin/release/connexio-rc1
+          git push origin HEAD:fix/v24-geographic-coworking
