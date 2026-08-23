@@ -46,130 +46,172 @@ function browserExecutable() {
     .find((candidate) => fs.existsSync(candidate));
 }
 
-async function checkGeometry(page, label) {
-  const result = await page.evaluate(() => {
+async function expectVisible(locator, label, timeout = 7000) {
+  try {
+    await locator.waitFor({ state: "visible", timeout });
+    return true;
+  } catch {
+    failures.push(`${label}: élément attendu absent`);
+    return false;
+  }
+}
+
+async function checkGeometry(page, label, minimum = 44) {
+  const result = await page.evaluate(({ minimum }) => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
-    const rootWidth = document.documentElement.scrollWidth;
-    const bodyWidth = document.body.scrollWidth;
-    const interactiveSelector = ["button", "a[href]", "input", "textarea", "[role='button']", "[role='tab']", "[role='checkbox']", "[role='radio']", "[role='switch']"].join(",");
-    const labelFor = (element) => element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 80) || element.tagName;
-    const ownsPoint = (element, x, y) => {
-      const top = document.elementFromPoint(x, y);
-      return Boolean(top && (top === element || element.contains(top)));
-    };
-    const reachable = (element) => {
+    const interactiveSelector = ["button", "a[href]", "input", "textarea", "[role='button']", "[role='tab']", "[role='switch']"].join(",");
+    const labelFor = (element) => (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().replace(/\s+/g, " ").slice(0, 90);
+    const visible = (element) => {
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
-      if (style.display === "none" || style.visibility === "hidden" || style.pointerEvents === "none" || Number(style.opacity || "1") <= 0.02 || element.closest('[aria-hidden="true"], [inert]') || rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.top >= viewport.height || rect.right <= 0 || rect.left >= viewport.width) return false;
-      const left = Math.max(1, rect.left + 2);
-      const right = Math.min(viewport.width - 1, rect.right - 2);
-      const top = Math.max(1, rect.top + 2);
-      const bottom = Math.min(viewport.height - 1, rect.bottom - 2);
-      if (right <= left || bottom <= top) return false;
-      return [[(left + right) / 2, (top + bottom) / 2], [left, top], [right, top], [left, bottom], [right, bottom]].some(([x, y]) => ownsPoint(element, x, y));
+      return style.display !== "none" && style.visibility !== "hidden" && style.pointerEvents !== "none" && Number(style.opacity || "1") > 0.02 && rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < viewport.height && rect.right > 0 && rect.left < viewport.width;
     };
-    const controls = [...document.querySelectorAll(interactiveSelector)].filter(reachable).map((element) => {
+    const controls = [...document.querySelectorAll(interactiveSelector)].filter(visible).map((element) => {
       const rect = element.getBoundingClientRect();
-      return { label: labelFor(element), left: rect.left, right: rect.right, width: rect.width, height: rect.height };
+      return { label: labelFor(element), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
     });
+    const clipped = controls.filter((item) => item.left < -1 || item.right > viewport.width + 1);
+    const undersized = controls.filter((item) => item.width < minimum || item.height < minimum);
+    const overlaps = [];
+    for (let i = 0; i < controls.length; i += 1) {
+      for (let j = i + 1; j < controls.length; j += 1) {
+        const a = controls[i], b = controls[j];
+        const w = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+        const h = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        if (w <= 1 || h <= 1) continue;
+        const ratio = (w * h) / Math.max(1, Math.min(a.width * a.height, b.width * b.height));
+        if (ratio > 0.42) overlaps.push({ a: a.label, b: b.label, ratio });
+      }
+    }
     return {
-      horizontalOverflow: Math.max(rootWidth, bodyWidth) > viewport.width + 1,
-      cut: controls.filter((item) => item.left < -1 || item.right > viewport.width + 1),
-      undersized: controls.filter((item) => item.width < 43 || item.height < 43)
+      viewport,
+      horizontalOverflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > viewport.width + 1,
+      clipped,
+      undersized,
+      overlaps
     };
-  });
-  if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal`);
-  if (result.cut.length) failures.push(`${label}: contrôles coupés horizontalement: ${result.cut.slice(0, 4).map((item) => item.label).join(", ")}`);
-  if (result.undersized.length) failures.push(`${label}: cibles sous 44 px: ${result.undersized.slice(0, 5).map((item) => `${item.label} (${Math.round(item.width)}x${Math.round(item.height)})`).join(", ")}`);
+  }, { minimum });
+
+  if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal global`);
+  if (result.clipped.length) failures.push(`${label}: contrôles coupés: ${result.clipped.slice(0, 5).map((item) => item.label).join(", ")}`);
+  if (result.undersized.length) failures.push(`${label}: cibles < ${minimum}px: ${result.undersized.slice(0, 6).map((item) => `${item.label} ${Math.round(item.width)}x${Math.round(item.height)}`).join(", ")}`);
+  if (result.overlaps.length) failures.push(`${label}: contrôles qui se chevauchent: ${result.overlaps.slice(0, 4).map((item) => `${item.a}/${item.b}`).join(", ")}`);
 }
 
-async function expectVisible(locator, label) {
-  try { await locator.waitFor({ state: "visible", timeout: 7000 }); }
-  catch { failures.push(`${label}: élément attendu absent`); }
+async function runtimeProbe(page, route, label) {
+  const errors = [];
+  const onPageError = (error) => errors.push(String(error));
+  const onConsole = (message) => {
+    if (message.type() === "error" && !/favicon|ERR_BLOCKED_BY_CLIENT/i.test(message.text())) errors.push(message.text());
+  };
+  page.on("pageerror", onPageError);
+  page.on("console", onConsole);
+  await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForTimeout(750);
+  await checkGeometry(page, label);
+  if (errors.length) failures.push(`${label}: erreurs runtime: ${errors.slice(0, 3).join(" | ")}`);
+  page.off("pageerror", onPageError);
+  page.off("console", onConsole);
 }
 
-async function clickText(page, text, label = text) {
-  const candidates = page.getByText(text, { exact: true });
-  const count = await candidates.count();
-  for (let index = count - 1; index >= 0; index -= 1) {
-    const candidate = candidates.nth(index);
-    if (await candidate.isVisible().catch(() => false)) {
-      await candidate.click();
-      return true;
-    }
+async function auditCoworking(page, sizeLabel) {
+  await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForTimeout(900);
+  await expectVisible(page.getByText("Coworking", { exact: true }).first(), `${sizeLabel} Coworking`);
+  await expectVisible(page.getByText("Disponible", { exact: true }).first(), `${sizeLabel} légende disponible`);
+  await expectVisible(page.getByText("Occupé", { exact: true }).first(), `${sizeLabel} légende occupé`);
+  await expectVisible(page.getByLabel("Rejoindre la salle générale", { exact: true }), `${sizeLabel} Salle générale`);
+  if ((await page.getByText("J’entre", { exact: true }).count()) > 0) failures.push(`${sizeLabel} Coworking: ancien bouton J’entre encore présent`);
+  if ((await page.getByText("Focus", { exact: true }).count()) > 0) failures.push(`${sizeLabel} Coworking: ancien statut Focus encore présent`);
+  await checkGeometry(page, `${sizeLabel} Coworking géographique`);
+
+  const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
+  await expectVisible(frame.locator("#map"), `${sizeLabel} carte géographique`);
+  const markerCount = await frame.locator(".cw-marker").count().catch(() => 0);
+  if (markerCount === 0) failures.push(`${sizeLabel} Coworking: aucun membre connecté sur la carte`);
+  const groupCount = await frame.locator(".cw-media.group").count().catch(() => 0);
+  if (groupCount === 0) failures.push(`${sizeLabel} Coworking: aucun groupe visio en mosaïque dans les données de QA`);
+}
+
+async function auditInteractiveCoworking(page) {
+  await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(850);
+  const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
+  const available = frame.locator(".cw-marker.available").first();
+  const busy = frame.locator(".cw-marker.busy").first();
+
+  if (await available.isVisible().catch(() => false)) {
+    await available.click();
+    await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "fiche disponible : bonjour");
+    await expectVisible(page.getByLabel("Proposer un rendez-vous", { exact: true }), "fiche disponible : rendez-vous");
+    if ((await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).count()) > 0) failures.push("fiche disponible : Toquer proposé alors que le membre n’est pas en visio");
+    await checkGeometry(page, "fiche personne disponible");
+    await page.getByLabel("Fermer la fiche", { exact: true }).click();
+  } else failures.push("Coworking : aucune personne disponible verte dans les données de QA");
+
+  if (await busy.isVisible().catch(() => false)) {
+    await busy.click();
+    await expectVisible(page.getByLabel("Toquer pour rejoindre la visio", { exact: true }), "fiche visio : Toquer");
+    await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "fiche visio : Bonjour");
+    await checkGeometry(page, "fiche groupe visio");
+    await page.getByLabel("Fermer la fiche", { exact: true }).click();
+  } else failures.push("Coworking : aucun groupe occupé rouge dans les données de QA");
+
+  await page.getByLabel("Rejoindre la salle générale", { exact: true }).click();
+  await page.waitForURL((url) => url.pathname.endsWith("/coworking/hub"), { timeout: 5000 }).catch(() => {});
+  await expectVisible(page.getByText("Salle générale", { exact: true }).first(), "Salle générale ouverte");
+  await expectVisible(page.getByText("Touchez l’espace pour vous déplacer", { exact: true }), "Salle générale : explication déplacement");
+  await expectVisible(page.getByLabel(/Couper le micro|Activer le micro/), "Salle générale : micro");
+  await expectVisible(page.getByLabel(/Couper la caméra|Activer la caméra/), "Salle générale : caméra");
+  await checkGeometry(page, "Salle générale");
+  if ((await page.getByText("Focus", { exact: true }).count()) > 0 || (await page.getByText("En pause", { exact: true }).count()) > 0) {
+    failures.push("Salle générale : anciens états Focus/Pause encore visibles");
   }
-  failures.push(`${label}: élément attendu absent`);
-  return false;
 }
 
-async function clickVisibleLabel(page, label, auditLabel = label) {
-  const candidates = page.getByLabel(label, { exact: true });
-  const count = await candidates.count();
-  for (let index = count - 1; index >= 0; index -= 1) {
-    const candidate = candidates.nth(index);
-    if (await candidate.isVisible().catch(() => false)) {
-      await candidate.click();
-      return true;
-    }
+async function auditMessaging(page) {
+  await page.goto(`http://127.0.0.1:${port}/messages`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(600);
+  await expectVisible(page.getByLabel("Nouvelle conversation", { exact: true }), "Messages : nouvelle conversation");
+  await checkGeometry(page, "Messages principal");
+
+  const section = page.getByLabel(/^Replier (Clubs|Gestion|Généraux|Épinglés)$/).first();
+  if (await section.isVisible().catch(() => false)) {
+    await section.click();
+    const collapsed = page.getByLabel(/^Déplier (Clubs|Gestion|Généraux|Épinglés)$/).first();
+    const text = await collapsed.innerText().catch(() => "");
+    if (/(^|\s)0($|\s)/.test(text)) failures.push(`Messages : compteur 0 inutile après repli (${text.trim()})`);
   }
-  failures.push(`${auditLabel}: élément attendu absent`);
-  return false;
+
+  await page.goto(`http://127.0.0.1:${port}/chat/carcassonne`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(550);
+  const input = page.getByLabel("Écrire un message", { exact: true });
+  const send = page.getByLabel("Envoyer le message", { exact: true });
+  const body = `QA dernier message ${Date.now()}`;
+  await input.fill(body);
+  await send.click();
+  const sent = page.getByText(body, { exact: true });
+  await expectVisible(sent, "Chat : message envoyé");
+  const box = await sent.boundingBox().catch(() => null);
+  const viewport = page.viewportSize();
+  if (!box || box.top < -1 || box.bottom > (viewport?.height ?? 844) + 1) failures.push("Chat : dernier message envoyé n’est pas suivi automatiquement à l’écran");
+  await checkGeometry(page, "Chat après envoi");
 }
 
-async function expectAnyVisible(locator, label, timeout = 7000) {
-  const deadline = Date.now() + timeout;
-  do {
-    const count = await locator.count().catch(() => 0);
-    for (let index = count - 1; index >= 0; index -= 1) {
-      if (await locator.nth(index).isVisible().catch(() => false)) return true;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  } while (Date.now() < deadline);
-  failures.push(`${label}: élément attendu absent`);
-  return false;
-}
-
-async function pageDiagnostic(page) {
-  return page.evaluate(() => ({
-    url: window.location.href,
-    text: document.body.innerText.replace(/\s+/g, " ").trim().slice(0, 500),
-    controls: [...document.querySelectorAll("button, [role='button'], a, input")]
-      .map((element) => element.getAttribute("aria-label") || element.textContent?.replace(/\s+/g, " ").trim())
-      .filter(Boolean)
-      .slice(0, 30)
-  }));
-}
-
-async function resetToMessages(page) {
-  await page.goto(`http://127.0.0.1:${port}/messages`, { waitUntil: "domcontentloaded", timeout: 30000 });
-  await page.waitForTimeout(650);
-  await expectVisible(page.getByText("Messages", { exact: true }).first(), "retour propre aux Messages");
-}
-
-async function checkSignInContrast(page) {
-  const result = await page.evaluate(() => {
-    const heading = [...document.querySelectorAll("h1,h2,[role='heading'],div")].find((element) => element.textContent?.trim() === "Se connecter avec Neptune");
-    if (!heading) return { found: false, contrast: 0 };
-    const parse = (value) => {
-      const parts = String(value).match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
-      return parts.map((channel) => channel / 255);
-    };
-    const linear = (value) => value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
-    const luminance = (rgb) => 0.2126 * linear(rgb[0]) + 0.7152 * linear(rgb[1]) + 0.0722 * linear(rgb[2]);
-    const style = getComputedStyle(heading);
-    let parent = heading.parentElement;
-    let background = "rgb(255,255,255)";
-    while (parent) {
-      const bg = getComputedStyle(parent).backgroundColor;
-      if (bg && !bg.endsWith(", 0)") && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") { background = bg; break; }
-      parent = parent.parentElement;
-    }
-    const l1 = luminance(parse(style.color));
-    const l2 = luminance(parse(background));
-    return { found: true, contrast: (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05) };
-  });
-  if (!result.found) failures.push("connexion light: titre Neptune introuvable");
-  else if (result.contrast < 4.5) failures.push(`connexion light: contraste titre insuffisant (${result.contrast.toFixed(2)}:1)`);
+async function auditAppRoutes(page) {
+  const routes = [
+    ["/highlights", "Temps forts"],
+    ["/calls", "Appels"],
+    ["/settings", "Profil/Paramètres"],
+    ["/account", "Compte"],
+    ["/notification-settings", "Notifications"],
+    ["/privacy", "Confidentialité"],
+    ["/contacts", "Contacts"],
+    ["/new-highlight", "Nouveau Temps fort"]
+  ];
+  for (const [route, label] of routes) {
+    await runtimeProbe(page, route, label);
+  }
 }
 
 async function run() {
@@ -182,154 +224,16 @@ async function run() {
   try {
     const sizes = [[280, 568], [320, 568], [390, 844], [430, 720], [768, 1024], [1024, 768]];
     for (const [width, height] of sizes) {
-      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: "reduce", locale: "fr-FR" });
-      const pageErrors = [];
-      page.on("pageerror", (error) => pageErrors.push(error.message));
-      page.on("console", (message) => { if (message.type() === "error") pageErrors.push(message.text()); });
-      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(800);
-      await expectVisible(page.getByText("Messages", { exact: true }).first(), `${width}x${height} Messages`);
-      await checkGeometry(page, `${width}x${height} Messages`);
-
-      await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded", timeout: 30000 });
-      await page.waitForTimeout(500);
-      await expectVisible(page.getByText("Coworking", { exact: true }).first(), `${width}x${height} Coworking`);
-      await expectVisible(page.getByLabel("Rejoindre le coworking", { exact: true }), `${width}x${height} entrée Coworking`);
-      await checkGeometry(page, `${width}x${height} Coworking observer`);
-      if (pageErrors.length) failures.push(`${width}x${height}: erreurs runtime: ${pageErrors.slice(0, 3).join(" | ")}`);
+      const page = await browser.newPage({ viewport: { width, height }, reducedMotion: "reduce", locale: "fr-FR", colorScheme: "dark" });
+      await runtimeProbe(page, "/messages", `${width}x${height} Messages`);
+      await auditCoworking(page, `${width}x${height}`);
       await page.close();
     }
 
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, locale: "fr-FR" });
-    const runtimeErrors = [];
-    page.on("pageerror", (error) => runtimeErrors.push(error.message));
-    page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(message.text()); });
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "domcontentloaded" });
-    await page.waitForTimeout(800);
-
-    await clickText(page, "Privées", "onglet Privées");
-    await expectVisible(page.getByPlaceholder("Rechercher une conversation…"), "état discussions privées");
-    await checkGeometry(page, "Messages privés");
-    await clickText(page, "Groupes", "onglet Groupes");
-
-    const conversation = page.getByRole("button").filter({ hasText: /Annonces|Toulouse|Carcassonne/ }).first();
-    if (await conversation.isVisible().catch(() => false)) {
-      const box = await conversation.boundingBox();
-      if (box) {
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        await page.mouse.down();
-        await page.waitForTimeout(650);
-        await page.mouse.up();
-        await expectVisible(page.getByText(/Mettre en sourdine|Réactiver les notifications/).first(), "menu maintien long");
-      }
-    } else failures.push("maintien long: aucune conversation de groupe visible");
-
-    await resetToMessages(page);
-    const newConversationAction = page.getByLabel("Nouvelle conversation", { exact: true }).first();
-    await expectVisible(newConversationAction, "action nouvelle conversation déplacée dans Messages");
-    if (await newConversationAction.isVisible().catch(() => false)) {
-      await newConversationAction.click();
-      await expectVisible(page.getByText("Nouvelle conversation", { exact: true }), "écran nouvelle conversation");
-      await checkGeometry(page, "Nouvelle conversation");
-      const closeCreation = page.getByLabel("Fermer la création");
-      if (await closeCreation.isVisible().catch(() => false)) await closeCreation.click();
-    }
-
-    // Coworking V24 : Map observer -> interaction spontanée -> présence -> sortie explicite.
-    await resetToMessages(page);
-    const portal = page.getByRole("button", { name: /Coworking/ }).first();
-    await expectVisible(portal, "portail Coworking central");
-    if (await portal.isVisible().catch(() => false)) await portal.click();
-    await expectVisible(page.getByText("Coworking", { exact: true }).first(), "Map Coworking observer");
-    await expectVisible(page.getByText("Le bureau est ouvert", { exact: true }), "état observer Coworking");
-    await expectVisible(page.getByLabel("Rejoindre le coworking", { exact: true }), "entrée Coworking disponible");
-    await checkGeometry(page, "Coworking observer");
-
-    const participant = page.getByRole("button", { name: /, (Disponible|Focus|En pause|En échange)(, caméra active)?$/ }).first();
-    if (await participant.isVisible().catch(() => false)) {
-      await participant.click();
-      await expectVisible(page.getByText("Dire bonjour", { exact: true }), "action Dire bonjour depuis la Map");
-      await expectVisible(page.getByText("Profil", { exact: true }).last(), "profil depuis la Map");
-      await checkGeometry(page, "Fiche personne Coworking");
-      await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded" });
-      await page.waitForTimeout(350);
-    } else failures.push("Coworking observer: aucune personne interactive visible");
-
-    if (await clickVisibleLabel(page, "Rejoindre le coworking", "entrée Coworking")) {
-      await expectVisible(page.getByLabel("Quitter le coworking", { exact: true }), "présence Coworking active");
-      for (const mode of ["Disponible", "Focus", "En pause", "En échange"]) {
-        await expectVisible(page.getByRole("button", { name: mode, exact: true }), `mode ${mode} visible`);
-      }
-      await checkGeometry(page, "Coworking présent");
-      if (await clickVisibleLabel(page, "Quitter le coworking", "sortie Coworking disponible")) {
-        await expectVisible(page.getByLabel("Rejoindre le coworking", { exact: true }), "sortie Coworking explicite");
-      }
-    }
-
-    // Repartir d’un état déterministe puis suivre la navigation normale : cela valide aussi que le Coworking n’a pas cassé les autres onglets.
-    await resetToMessages(page);
-    await clickText(page, "Temps forts", "onglet Temps forts");
-    await expectVisible(page.getByText("Feed", { exact: true }), "Feed Temps forts");
-    await checkGeometry(page, "Feed Temps forts");
-    await clickText(page, "Map", "onglet Map");
-    await expectVisible(page.locator("iframe[title='Carte de découverte Neptune']"), "carte découverte personnes/évènements");
-    await checkGeometry(page, "Map");
-    await clickText(page, "Feed", "retour Feed depuis Map");
-    await expectVisible(page.getByText("Feed", { exact: true }), "Feed restauré depuis Map");
-
-    const quickPrompt = page.getByLabel("Écrire une publication rapide", { exact: true });
-    await expectVisible(quickPrompt, "création Temps fort dans le Feed");
-    if (await quickPrompt.isVisible().catch(() => false)) {
-      await quickPrompt.click();
-      await expectVisible(page.getByLabel("Publier maintenant", { exact: true }), "composer rapide Temps fort ouvert");
-      await checkGeometry(page, "Composer rapide Temps fort");
-    }
-
-    await clickText(page, "Appels", "onglet Appels");
-    await expectVisible(page.getByText("Récents", { exact: true }), "historique appels");
-    await checkGeometry(page, "Appels");
-    await clickText(page, "Profil", "onglet Profil");
-    await expectVisible(page.getByText("Compte et sécurité", { exact: true }).first(), "profil fonctionnel");
-    await checkGeometry(page, "Profil");
-
-    const languageButton = page.getByLabel("Changer la langue de Connexio", { exact: true });
-    await expectVisible(languageButton, "sélecteur de langue");
-    if (await languageButton.isVisible().catch(() => false)) {
-      await languageButton.click();
-      const english = page.getByRole("radio").filter({ hasText: "English" }).first();
-      if (await english.isVisible().catch(() => false)) {
-        await english.click();
-        await page.waitForTimeout(650);
-        await expectAnyVisible(page.getByText("Profile", { exact: true }), "navigation traduite en anglais");
-        await expectAnyVisible(page.getByText("Appearance", { exact: true }), "profil traduit en anglais");
-        const reopenLanguage = page.getByLabel("Change Connexio language", { exact: true });
-        if (await reopenLanguage.isVisible().catch(() => false)) {
-          await reopenLanguage.click();
-          const french = page.getByRole("radio").filter({ hasText: "Français" }).first();
-          if (await french.isVisible().catch(() => false)) await french.click();
-          await page.waitForTimeout(450);
-          await expectAnyVisible(page.getByText("Profil", { exact: true }), "retour interface française");
-        }
-      }
-    }
-
-    const signOut = page.getByLabel("Se déconnecter de Connexio");
-    await expectVisible(signOut, "bouton de déconnexion");
-    if (await signOut.isVisible().catch(() => false)) {
-      await signOut.click();
-      const demoEntry = page.getByLabel("Entrer dans la démonstration Connexio");
-      await expectVisible(demoEntry, "retour à la connexion");
-      await expectVisible(page.getByLabel("Changer la langue de Connexio", { exact: true }).last(), "langue disponible avant connexion");
-      await expectVisible(page.getByText("Se connecter avec Neptune", { exact: true }).first(), "titre connexion Neptune");
-      await checkGeometry(page, "Connexion après déconnexion");
-      await checkSignInContrast(page);
-      if (await demoEntry.isVisible().catch(() => false)) {
-        await demoEntry.click();
-        await expectVisible(page.getByText("Messages", { exact: true }).first(), "reconnexion démonstration");
-      } else failures.push(`diagnostic après déconnexion: ${JSON.stringify(await pageDiagnostic(page))}`);
-    }
-
-    if (runtimeErrors.length) failures.push(`parcours complet: erreurs runtime: ${runtimeErrors.slice(0, 5).join(" | ")}`);
+    const page = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
+    await auditMessaging(page);
+    await auditInteractiveCoworking(page);
+    await auditAppRoutes(page);
     await page.close();
   } finally {
     await browser.close();
@@ -337,11 +241,11 @@ async function run() {
   }
 
   if (failures.length) {
-    console.error("Échecs du product audit:");
-    failures.forEach((failure) => console.error(`- ${failure}`));
-    process.exit(1);
+    console.error("Product Audit failed:\n" + failures.map((failure) => `- ${failure}`).join("\n"));
+    process.exitCode = 1;
+    return;
   }
-  console.log("Product audit Connexio V24 validé : Coworking Map, Messages, Temps forts, Appels, Profil, langues et géométrie responsive.");
+  console.log("Product Audit passed: six viewport families, geographic Coworking, green/red availability, video mosaics, General Room proximity UX, messaging follow, core routes, geometry and runtime health.");
 }
 
 run().catch((error) => {
