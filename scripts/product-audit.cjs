@@ -228,6 +228,18 @@ async function auditMessaging(page) {
   await checkGeometry(page, "Chat après envoi");
 }
 
+async function auditScheduledCall(page) {
+  const reason = "Valider le partenariat Neptune";
+  await page.goto(`http://127.0.0.1:${port}/call/carcassonne?mode=video&scheduled=1&reason=${encodeURIComponent(reason)}&returnTo=%2Fcalls`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(650);
+  await expectVisible(page.getByText("Rendez-vous programmé", { exact: true }).first(), "Appel programmé : état dédié");
+  await expectVisible(page.getByText(reason, { exact: true }).first(), "Appel programmé : objet conservé");
+  await expectVisible(page.getByLabel("Rejoindre le rendez-vous", { exact: true }), "Appel programmé : rejoindre directement");
+  if ((await page.getByText("Pourquoi appelez-vous ?", { exact: true }).count()) > 0) failures.push("Appel programmé : redemande encore pourquoi l’utilisateur appelle");
+  if ((await page.getByText("Une phrase suffit. Elle s’affichera avant que le destinataire décroche.", { exact: true }).count()) > 0) failures.push("Appel programmé : ancien prompt d’objet encore visible");
+  await checkGeometry(page, "Rejoindre un appel programmé");
+}
+
 async function auditAppRoutes(page) {
   const routes = [
     ["/highlights", "Temps forts"],
@@ -265,6 +277,7 @@ async function run() {
     const page = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
     await auditMessaging(page);
     await auditInteractiveCoworking(page);
+    await auditScheduledCall(page);
     await auditAppRoutes(page);
     await page.close();
   } finally {
@@ -277,7 +290,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Product Audit passed: six viewport families, clipped geometry, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow, member profile, call scheduling, contact actions and core routes.");
+  console.log("Product Audit passed: six viewport families, clipped geometry, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow, scheduled-call subject reuse, member profile, call scheduling, contact actions and core routes.");
 }
 
 run().catch((error) => {
