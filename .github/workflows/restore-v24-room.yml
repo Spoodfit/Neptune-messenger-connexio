@@ -1,0 +1,31 @@
+name: Restore audited Coworking room
+
+on:
+  push:
+    branches:
+      - fix/v24-geographic-coworking
+    paths:
+      - .github/workflows/restore-v24-room.yml
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout V24
+        uses: actions/checkout@v4
+        with:
+          ref: fix/v24-geographic-coworking
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore audited room from current release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin release/connexio-rc1
+          git checkout origin/release/connexio-rc1 -- src/screens/CoworkingRoomScreen.tsx
+          git add src/screens/CoworkingRoomScreen.tsx
+          git commit -m "fix(coworking): restore audited room media state" || exit 0
+          git push origin HEAD:fix/v24-geographic-coworking
