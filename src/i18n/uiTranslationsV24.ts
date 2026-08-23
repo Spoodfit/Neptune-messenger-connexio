@@ -5,6 +5,8 @@ type TranslationSet = Partial<Record<Exclude<SupportedUiLanguage, "fr">, string>
 
 export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "· en visio": { en: "· on video", es: "· en videollamada", de: "· per Video", it: "· in video", pt: "· em vídeo" },
+  "Accepter": { en: "Accept", es: "Aceptar", de: "Annehmen", it: "Accetta", pt: "Aceitar" },
+  "Accepter le toquement": { en: "Accept knock", es: "Aceptar llamada", de: "Anklopfen annehmen", it: "Accetta la richiesta", pt: "Aceitar pedido" },
   "Activez la localisation pour recentrer la carte autour de vous.": { en: "Enable location to recenter the map around you.", es: "Activa la ubicación para volver a centrar el mapa a tu alrededor.", de: "Aktiviere den Standort, um die Karte auf dich zu zentrieren.", it: "Attiva la posizione per ricentrare la mappa su di te.", pt: "Ative a localização para recentrar o mapa em si." },
   "Actualisation…": { en: "Refreshing…", es: "Actualizando…", de: "Aktualisierung…", it: "Aggiornamento…", pt: "A atualizar…" },
   "Actualiser la map": { en: "Refresh map", es: "Actualizar mapa", de: "Karte aktualisieren", it: "Aggiorna mappa", pt: "Atualizar mapa" },
@@ -39,6 +41,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Ouvrir l’espace": { en: "Open space", es: "Abrir espacio", de: "Bereich öffnen", it: "Apri spazio", pt: "Abrir espaço" },
   "Ouvrir le groupe": { en: "Open group", es: "Abrir grupo", de: "Gruppe öffnen", it: "Apri gruppo", pt: "Abrir grupo" },
   "PAUSE": { en: "BREAK", es: "PAUSA", de: "PAUSE", it: "PAUSA", pt: "PAUSA" },
+  "Pas maintenant": { en: "Not now", es: "Ahora no", de: "Jetzt nicht", it: "Non ora", pt: "Agora não" },
   "Progression du message vocal": { en: "Voice message progress", es: "Progreso del mensaje de voz", de: "Fortschritt der Sprachnachricht", it: "Avanzamento del messaggio vocale", pt: "Progresso da mensagem de voz" },
   "Proposer un rendez-vous": { en: "Suggest a meeting", es: "Proponer una cita", de: "Termin vorschlagen", it: "Proponi un appuntamento", pt: "Propor uma reunião" },
   "Quitter la salle": { en: "Leave room", es: "Salir de la sala", de: "Raum verlassen", it: "Esci dalla sala", pt: "Sair da sala" },
@@ -50,12 +53,16 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Retour à la Map sans quitter": { en: "Back to Map without leaving", es: "Volver al mapa sin salir", de: "Zurück zur Karte, ohne zu verlassen", it: "Torna alla mappa senza uscire", pt: "Voltar ao mapa sem sair" },
   "Salle générale": { en: "General room", es: "Sala general", de: "Allgemeiner Raum", it: "Sala generale", pt: "Sala geral" },
   "Salle indisponible": { en: "Room unavailable", es: "Sala no disponible", de: "Raum nicht verfügbar", it: "Sala non disponibile", pt: "Sala indisponível" },
+  "Souhaite rejoindre votre échange": { en: "Wants to join your conversation", es: "Quiere unirse a vuestra conversación", de: "Möchte eurem Gespräch beitreten", it: "Vuole unirsi alla vostra conversazione", pt: "Quer juntar-se à vossa conversa" },
   "Toquer": { en: "Knock", es: "Llamar", de: "Anklopfen", it: "Bussa", pt: "Bater à porta" },
   "Toquer pour rejoindre la visio": { en: "Knock to join the video call", es: "Llamar para unirse a la videollamada", de: "Anklopfen, um dem Videoanruf beizutreten", it: "Bussa per entrare nella videochiamata", pt: "Bater à porta para entrar na videochamada" },
+  "toque à votre bureau": { en: "is knocking at your office", es: "llama a vuestra oficina", de: "klopft an euer Büro", it: "bussa al vostro ufficio", pt: "está a bater à porta do vosso escritório" },
   "Touchez l’espace pour vous déplacer": { en: "Tap the space to move", es: "Toca el espacio para moverte", de: "Tippe in den Raum, um dich zu bewegen", it: "Tocca lo spazio per spostarti", pt: "Toque no espaço para se mover" },
   "Transcription": { en: "Transcript", es: "Transcripción", de: "Transkript", it: "Trascrizione", pt: "Transcrição" },
   "Transcription indisponible": { en: "Transcript unavailable", es: "Transcripción no disponible", de: "Transkript nicht verfügbar", it: "Trascrizione non disponibile", pt: "Transcrição indisponível" },
-  "Voir tout": { en: "See all", es: "Ver todo", de: "Alles anzeigen", it: "Vedi tutto", pt: "Ver tudo" }
+  "UN SIGNE DU COWORKING": { en: "A COWORKING HELLO", es: "UN SALUDO DEL COWORKING", de: "EIN COWORKING-GRUSS", it: "UN SALUTO DAL COWORKING", pt: "UM OLÁ DO COWORKING" },
+  "Voir tout": { en: "See all", es: "Ver todo", de: "Alles anzeigen", it: "Vedi tutto", pt: "Ver tudo" },
+  "vous dit bonjour 👋": { en: "says hello 👋", es: "te saluda 👋", de: "sagt Hallo 👋", it: "ti saluta 👋", pt: "diz olá 👋" }
 };
 
 export function translateUiTextV24(value: string, language: SupportedLanguage | string): string {
