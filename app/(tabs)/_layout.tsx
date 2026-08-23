@@ -4,12 +4,14 @@ import { NeptuneTabBar } from "@/components/NeptuneTabBar";
 import { SkeletonPulseGroup } from "@/components/SkeletonPulseGroup";
 import { StandalonePersistenceBridge } from "@/components/StandalonePersistenceBridge";
 import { TabsLoadingOverlay } from "@/components/TabsLoadingOverlay";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { useMessaging } from "@/providers/MessagingProvider";
 
 export default function TabsLayout() {
   const { visibleConversations } = useMessaging();
   const theme = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const unreadCount = visibleConversations.reduce(
     (total, conversation) => total + conversation.unreadCount,
     0
@@ -22,7 +24,7 @@ export default function TabsLayout() {
         tabBar={(props) => <NeptuneTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          animation: "fade",
+          animation: reducedMotion ? "none" : "fade",
           sceneStyle: { backgroundColor: theme.pageBackground }
         }}
       >

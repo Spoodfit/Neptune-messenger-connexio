@@ -21,6 +21,7 @@ import {
 } from "@/domain/conversationOrganization";
 import { useExperience } from "@/providers/ExperienceProvider";
 import { useGroupAdmin } from "@/providers/GroupAdminProvider";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import { useMessaging } from "@/providers/MessagingProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
@@ -57,6 +58,7 @@ function matchesMention(conversation: Conversation, aliases: string[]): boolean 
 
 export default function MessagesScreenV22() {
   const theme = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const {
     serviceAvailable,
     visibleConversations,
@@ -170,7 +172,7 @@ export default function MessagesScreenV22() {
   );
 
   useEffect(() => {
-    if (!announcementUnread) {
+    if (!announcementUnread || reducedMotion) {
       announcementPulse.stopAnimation();
       announcementPulse.setValue(0);
       return;
@@ -193,7 +195,7 @@ export default function MessagesScreenV22() {
     );
     animation.start();
     return () => animation.stop();
-  }, [announcementPulse, announcementUnread]);
+  }, [announcementPulse, announcementUnread, reducedMotion]);
 
   const closeMenu = () => setSelectedConversation(null);
 

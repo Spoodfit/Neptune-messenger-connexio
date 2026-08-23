@@ -215,9 +215,9 @@ export function MessageBubble(props: MessageBubbleProps) {
 const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   container: { width: "100%" },
   translationMeta: {
-    minHeight: 32,
+    minHeight: 44,
     marginTop: -spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
@@ -227,6 +227,6 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.creat
   centeredMeta: { justifyContent: "center", marginHorizontal: spacing.md },
   translationLabel: { color: theme.pageTextMuted, fontSize: 11, lineHeight: 15, fontWeight: "700" },
   separator: { color: theme.pageTextMuted, fontSize: 11 },
-  toggleTarget: { minHeight: 32, justifyContent: "center", paddingHorizontal: 4 },
+  toggleTarget: { minHeight: 44, justifyContent: "center", paddingHorizontal: 6, paddingVertical: 6 },
   toggleText: { color: theme.violet, fontSize: 11, lineHeight: 15, fontWeight: "900" }
 });

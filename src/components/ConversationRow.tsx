@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Pressable, StyleSheet, View } from "react-native";
 
 import { env } from "../config/env";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 import { contentTranslationTargetsViewer, translatedContentField } from "../i18n/contentTranslation";
 import { mockContentTranslation } from "../i18n/mockContentLookup";
 import { useSession } from "../providers/SessionProvider";
@@ -30,6 +31,7 @@ interface ConversationRowProps {
 export function ConversationRow({ conversation, members = [], mentioned = false, muted = false, pinned = false, compact = false, onPress, onLongPress }: ConversationRowProps) {
   const { currentUser } = useSession();
   const theme = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const [avatarFailed, setAvatarFailed] = useState(false);
   const pulse = useRef(new Animated.Value(0)).current;
   const previewTranslation = contentTranslationTargetsViewer(conversation.translation)
@@ -46,14 +48,14 @@ export function ConversationRow({ conversation, members = [], mentioned = false,
 
   useEffect(() => setAvatarFailed(false), [conversation.avatarUrl]);
   useEffect(() => {
-    if (!mentioned) { pulse.stopAnimation(); pulse.setValue(0); return; }
+    if (!mentioned || reducedMotion) { pulse.stopAnimation(); pulse.setValue(0); return; }
     const animation = Animated.loop(Animated.sequence([
       Animated.timing(pulse, { toValue: 1, duration: 1150, useNativeDriver: true }),
       Animated.timing(pulse, { toValue: 0, duration: 1150, useNativeDriver: true })
     ]));
     animation.start();
     return () => animation.stop();
-  }, [mentioned, pulse]);
+  }, [mentioned, pulse, reducedMotion]);
 
   const borderOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.62, 1] });
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.006] });

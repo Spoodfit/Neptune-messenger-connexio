@@ -1,17 +1,18 @@
-# Connexio Coworking — contrat backend V23
+# Connexio Coworking — contrat backend V24
 
 ## Objectif
 
-Le Coworking est un **lieu numérique permanent**, distinct du moteur d'appel 1-to-1 existant. Ouvrir l'écran Coworking sert uniquement à observer la présence et les espaces actifs. **Aucun accès caméra ou microphone ne doit être demandé tant que le membre n'a pas explicitement rejoint un espace.**
+Le Coworking est une **carte géographique réelle**, distincte du moteur d'appel 1-to-1 existant. Ouvrir l'écran Coworking ouvre directement la Map et démarre la publication caméra si la permission est déjà accordée. Le microphone reste coupé par défaut. La position affichée est une ville ou une zone approximative, jamais une adresse précise.
 
 ## Invariants UX et confidentialité
 
-1. `GET /v1/coworking` ne déclenche jamais de média.
-2. Le bouton `Entrer` ou le choix d'une room constitue l'action explicite de rejoindre.
-3. À l'entrée, le microphone démarre **coupé**.
-4. La caméra ne doit démarrer qu'après l'action d'entrée et selon la préférence utilisateur/appareil.
-5. Revenir au lobby ou à un autre écran Connexio ne quitte pas la session. Seule l'action `leave` retire la présence.
-6. Les règles d'accès privées sont contrôlées côté serveur. Les cadenas et invitations côté application ne constituent jamais une ACL de sécurité.
+1. `GET /v1/coworking` ne déclenche jamais de média et renvoie les présences, villes/zones approximatives et espaces actifs.
+2. L'ouverture de la Map appelle `POST /v1/coworking/map/enter` avec `camera_on: true` et `microphone_on: false`, sauf si le membre est déjà dans une room active.
+3. La Map n'affiche que deux états : `Disponible` (vert) et `Occupé` (rouge). Un groupe vidéo partagé produit un seul marqueur mosaïque.
+4. Le microphone démarre **coupé** dans la Map comme dans chaque room. La Salle générale applique un audio spatial selon la distance entre membres.
+5. `Toquer` est réservé aux marqueurs occupés et ne permet de rejoindre la room qu'après acceptation du destinataire. L'acceptation ajoute les deux membres au même flux SFU.
+6. Revenir à la Map depuis une room ne doit pas créer une seconde publication caméra. Seule l'action `leave` retire la présence de la room.
+7. Les règles d'accès privées sont contrôlées côté serveur. Les cadenas et invitations côté application ne constituent jamais une ACL de sécurité.
 
 ## API HTTP
 
@@ -53,6 +54,23 @@ Modes de présence : `focus`, `available`, `talk`, `break`.
 Types d'espace : `hub`, `open`, `private`, `focus`.
 
 Accès : `open`, `request`, `invite`.
+
+### `POST /v1/coworking/map/enter`
+
+Ouvre la présence média de la Map géographique. Le serveur doit renvoyer un jeton de publication limité à la Map et à l'utilisateur, sans demander de position précise.
+
+```json
+{
+  "camera_on": true,
+  "microphone_on": false
+}
+```
+
+Retour attendu : un bloc `media` avec `observer: false`. Le refus de permission caméra côté client ne doit pas supprimer la présence : la Map conserve les avatars et l'état disponible/occupé.
+
+### `POST /v1/coworking/map/leave`
+
+Ferme la publication média de la Map sans quitter une room éventuellement active.
 
 ### `POST /v1/coworking/presence`
 

@@ -42,6 +42,8 @@ interface CoworkingContextValue {
   updatePresence: (mode: CoworkingPresenceMode, statusText?: string) => Promise<void>;
   createSpace: (input: CreateCoworkingSpaceInput) => Promise<{ spaceId: string; media?: CoworkingMediaSession }>;
   mediaForSpace: (spaceId: string) => CoworkingMediaSession | undefined;
+  mediaStateForSpace: (spaceId: string) => { cameraOn: boolean; microphoneOn: boolean } | undefined;
+  updateMediaState: (spaceId: string, patch: Partial<{ cameraOn: boolean; microphoneOn: boolean }>) => void;
 }
 
 const EMPTY_SNAPSHOT: CoworkingSnapshot = {
@@ -96,66 +98,46 @@ function mockMediaSession(spaceId: string, userId: string): CoworkingMediaSessio
   };
 }
 
-function buildMockSnapshot(
-  memberIds: string[]
-): CoworkingSnapshot {
+function buildMockSnapshot(memberIds: string[]): CoworkingSnapshot {
   const ids = memberIds.slice(0, 9);
+  const hubParticipantIds = ids.slice(2, 3);
   const now = new Date();
   const joinedAt = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
-  const presenceModes: CoworkingPresenceMode[] = ["focus", "available", "focus", "talk", "available", "focus", "break", "available", "talk"];
   const participants = ids.map<CoworkingParticipantPresence>((userId, index) => ({
     userId,
-    mode: presenceModes[index] ?? "available",
-    statusText: index === 0 ? "Préparation lancement Connexio" : index === 1 ? "Disponible" : index === 2 ? "Prospection" : undefined,
-    cameraOn: index < 6,
-    microphoneOn: index === 3 || index === 8,
-    speaking: index === 3,
+    mode: "available",
+    statusText: index < 2 ? "En visio" : hubParticipantIds.includes(userId) ? "Salle générale" : "Disponible",
+    cameraOn: index < 2 || index === 3,
+    microphoneOn: index === 0,
+    speaking: index === 0,
     joinedAt: joinedAt(8 + index * 7)
   }));
-  const focusEnd = new Date(now.getTime() + 38 * 60_000).toISOString();
+
   return {
     hub: {
       id: "hub",
-      name: "Hub Neptune",
+      name: "Salle générale",
       kind: "hub",
       access: "open",
-      participantIds: ids.slice(0, Math.min(4, ids.length)),
-      activity: "Coworking ouvert",
+      participantIds: hubParticipantIds,
+      activity: "Rencontres spontanées",
       mediaEnabled: true
     },
-    spaces: [
-      {
-        id: "focus-commercial",
-        name: "Focus commercial",
-        kind: "focus",
-        access: "open",
-        participantIds: ids.slice(4, 6),
-        maxParticipants: 6,
-        activity: "50 min de concentration",
-        focusEndsAt: focusEnd,
-        mediaEnabled: true
-      },
-      {
-        id: "creation-contenu",
-        name: "Création contenu",
-        kind: "open",
-        access: "open",
-        participantIds: ids.slice(6, 8),
-        maxParticipants: 5,
-        activity: "On avance ensemble",
-        mediaEnabled: true
-      },
-      {
-        id: "direction",
-        name: "Direction",
-        kind: "private",
-        access: "invite",
-        participantIds: ids.slice(8, 9),
-        invitedUserIds: [],
-        maxParticipants: 5,
-        mediaEnabled: true
-      }
-    ],
+    spaces: ids.length >= 2
+      ? [
+          {
+            id: "visio-business",
+            name: "Échange en cours",
+            kind: "open",
+            access: "open",
+            ownerId: ids[0],
+            participantIds: ids.slice(0, 2),
+            maxParticipants: 6,
+            activity: "Visio en cours",
+            mediaEnabled: true
+          }
+        ]
+      : [],
     participants,
     updatedAt: now.toISOString()
   };
@@ -170,6 +152,7 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
   const mockInitializedRef = useRef(false);
   const [snapshot, setSnapshot] = useState<CoworkingSnapshot>(EMPTY_SNAPSHOT);
   const [mediaSessions, setMediaSessions] = useState<Record<string, CoworkingMediaSession>>({});
+  const [mediaStates, setMediaStates] = useState<Record<string, { cameraOn: boolean; microphoneOn: boolean }>>({});
   const [loading, setLoading] = useState(!env.mockMode && COWORKING_AVAILABLE);
   const [error, setError] = useState<string | null>(null);
 
@@ -214,7 +197,7 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
         const nextParticipants = ensurePresence(stripped.participants, currentUser.id, {
           cameraOn: true,
           microphoneOn: false,
-          mode: target.kind === "focus" ? "focus" : "available"
+          mode: "available"
         });
         nextMedia = mockMediaSession(spaceId, currentUser.id);
         return {
@@ -228,13 +211,17 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
       });
       const media = nextMedia ?? mockMediaSession(spaceId, currentUser.id);
       setMediaSessions((previous) => ({ ...previous, [spaceId]: media }));
+      setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
       return media;
     }
     if (!COWORKING_AVAILABLE || !api) return undefined;
     try {
       const result = await api.joinSpace(spaceId);
       setSnapshot(result.snapshot);
-      if (result.media) setMediaSessions((previous) => ({ ...previous, [spaceId]: result.media! }));
+      if (result.media) {
+        setMediaSessions((previous) => ({ ...previous, [spaceId]: result.media! }));
+        setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
+      }
       return result.media;
     } catch (joinError) {
       setError(joinError instanceof Error ? joinError.message : "Impossible de rejoindre cet espace.");
@@ -243,7 +230,10 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
   }, [api, currentUser.id]);
 
   const leaveCurrentSpace = useCallback(async () => {
-    const activeSpaceId = snapshot.currentUserSpaceId;
+    // Some backend snapshots expose membership without the optional
+    // `current_user_space_id`; derive the active room as a safe fallback so
+    // leaving never becomes a local-only navigation with a stale presence.
+    const activeSpaceId = snapshot.currentUserSpaceId ?? spaceForUser(snapshot, currentUser.id)?.id;
     if (!activeSpaceId) return;
     setError(null);
     if (env.mockMode) {
@@ -261,6 +251,11 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
         delete next[activeSpaceId];
         return next;
       });
+      setMediaStates((previous) => {
+        const next = { ...previous };
+        delete next[activeSpaceId];
+        return next;
+      });
       return;
     }
     if (!COWORKING_AVAILABLE || !api) return;
@@ -271,11 +266,16 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
         delete next[activeSpaceId];
         return next;
       });
+      setMediaStates((previous) => {
+        const next = { ...previous };
+        delete next[activeSpaceId];
+        return next;
+      });
     } catch (leaveError) {
       setError(leaveError instanceof Error ? leaveError.message : "Impossible de quitter le Coworking.");
       throw leaveError;
     }
-  }, [api, currentUser.id, snapshot.currentUserSpaceId]);
+  }, [api, currentUser.id, snapshot]);
 
   const updatePresence = useCallback(async (mode: CoworkingPresenceMode, statusText?: string) => {
     setError(null);
@@ -323,7 +323,7 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
           ...stripped,
           spaces: [...stripped.spaces, space],
           participants: ensurePresence(stripped.participants, currentUser.id, {
-            mode: input.kind === "focus" ? "focus" : "available",
+            mode: "available",
             cameraOn: true,
             microphoneOn: false
           }),
@@ -332,6 +332,7 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
         };
       });
       setMediaSessions((previous) => ({ ...previous, [spaceId]: media }));
+      setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
       return { spaceId, media };
     }
     if (!COWORKING_AVAILABLE || !api) throw new Error("Le Coworking n’est pas disponible.");
@@ -339,13 +340,26 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
     setSnapshot(result.snapshot);
     const spaceId = result.snapshot.currentUserSpaceId;
     if (!spaceId) throw new Error("L’espace a été créé mais n’a pas pu être rejoint.");
-    if (result.media) setMediaSessions((previous) => ({ ...previous, [spaceId]: result.media! }));
+    if (result.media) {
+      setMediaSessions((previous) => ({ ...previous, [spaceId]: result.media! }));
+      setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
+    }
     return { spaceId, media: result.media };
   }, [api, currentUser.id]);
 
   const currentSpace = useMemo(() => spaceForUser(snapshot, currentUser.id), [currentUser.id, snapshot]);
   const activeCount = useMemo(() => coworkingPresentCount(snapshot), [snapshot]);
   const mediaForSpace = useCallback((spaceId: string) => mediaSessions[spaceId], [mediaSessions]);
+  const mediaStateForSpace = useCallback((spaceId: string) => mediaStates[spaceId], [mediaStates]);
+  const updateMediaState = useCallback((spaceId: string, patch: Partial<{ cameraOn: boolean; microphoneOn: boolean }>) => {
+    setMediaStates((previous) => ({
+      ...previous,
+      [spaceId]: {
+        cameraOn: patch.cameraOn ?? previous[spaceId]?.cameraOn ?? true,
+        microphoneOn: patch.microphoneOn ?? previous[spaceId]?.microphoneOn ?? false
+      }
+    }));
+  }, []);
 
   const value = useMemo<CoworkingContextValue>(() => ({
     serviceAvailable: COWORKING_AVAILABLE,
@@ -359,8 +373,10 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
     leaveCurrentSpace,
     updatePresence,
     createSpace,
-    mediaForSpace
-  }), [activeCount, createSpace, currentSpace, error, joinSpace, leaveCurrentSpace, loading, mediaForSpace, refresh, snapshot, updatePresence]);
+    mediaForSpace,
+    mediaStateForSpace,
+    updateMediaState
+  }), [activeCount, createSpace, currentSpace, error, joinSpace, leaveCurrentSpace, loading, mediaForSpace, mediaStateForSpace, refresh, snapshot, updateMediaState]);
 
   return <CoworkingContext.Provider value={value}>{children}</CoworkingContext.Provider>;
 }

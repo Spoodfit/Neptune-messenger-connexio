@@ -12,21 +12,31 @@ export default function CoworkingMediaSurface({
   cameraOn,
   microphoneOn,
   mapMode = false,
+  spatialAudio = false,
   participantLayout,
   onConnected,
-  onError
+  onError,
+  onLocalMediaUnavailable
 }: CoworkingMediaSurfaceProps) {
   const theme = useAppTheme();
   const webViewRef = useRef<WebView>(null);
+  const latestMediaRef = useRef({ cameraOn, microphoneOn });
+  const latestLayoutRef = useRef(participantLayout);
+  latestMediaRef.current = { cameraOn, microphoneOn };
+  latestLayoutRef.current = participantLayout;
   const html = useMemo(
     () =>
       buildCoworkingMediaHtml(session, displayName, {
         cameraOn,
         microphoneOn,
         mapMode,
+        spatialAudio,
         participantLayout
       }),
-    [cameraOn, displayName, mapMode, microphoneOn, participantLayout, session]
+    // Media controls and spatial movement are applied through the bridge below.
+    // Rebuilding the WebView for every toggle/tap would reconnect the room and
+    // briefly interrupt both video and audio.
+    [displayName, mapMode, session, spatialAudio]
   );
 
   useEffect(() => {
@@ -39,6 +49,16 @@ export default function CoworkingMediaSurface({
     );
   }, [cameraOn, microphoneOn]);
 
+  useEffect(() => {
+    if (!participantLayout) return;
+    webViewRef.current?.injectJavaScript(
+      `window.__connexioCoworkingControl?.(${JSON.stringify({
+        type: "layout",
+        participantLayout
+      })});true;`
+    );
+  }, [participantLayout]);
+
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const payload = JSON.parse(event.nativeEvent.data) as {
@@ -48,6 +68,9 @@ export default function CoworkingMediaSurface({
       if (payload.type === "connected" || payload.type === "media-ready") {
         onConnected?.();
       }
+      if (payload.type === "local-media-unavailable") {
+        onLocalMediaUnavailable?.(payload.message ?? "Caméra ou microphone indisponible.");
+      }
       if (payload.type === "error") {
         onError?.(payload.message ?? "Connexion média impossible.");
       }
@@ -56,13 +79,15 @@ export default function CoworkingMediaSurface({
     }
   };
 
-  // The standalone/mock profile has presence data but no actual SFU client.
-  // In Map mode, keep the avatar/status layer visible instead of mounting an
-  // empty WebView that would report a fake media error or cover the Map.
-  if (mapMode && session.mock) return null;
+  if ((mapMode || spatialAudio) && session.mock) return null;
 
   return (
-    <View style={[styles.screen, { backgroundColor: mapMode ? "transparent" : theme.pageBackground }]}>
+    <View
+      style={[
+        styles.screen,
+        { backgroundColor: mapMode || spatialAudio ? "transparent" : theme.pageBackground }
+      ]}
+    >
       <WebView
         ref={webViewRef}
         source={{ html, baseUrl: new URL(session.socketUrl).origin }}
@@ -72,8 +97,21 @@ export default function CoworkingMediaSurface({
         allowFileAccess
         allowsInlineMediaPlayback
         originWhitelist={["https://*", "http://localhost*"]}
+        onLoadEnd={() => {
+          webViewRef.current?.injectJavaScript(
+            `window.__connexioCoworkingControl?.(${JSON.stringify({ type: "media", ...latestMediaRef.current })});true;`
+          );
+          if (latestLayoutRef.current) {
+            webViewRef.current?.injectJavaScript(
+              `window.__connexioCoworkingControl?.(${JSON.stringify({ type: "layout", participantLayout: latestLayoutRef.current })});true;`
+            );
+          }
+        }}
         onMessage={handleMessage}
-        style={[styles.webView, { backgroundColor: mapMode ? "transparent" : theme.pageBackground }]}
+        style={[
+          styles.webView,
+          { backgroundColor: mapMode || spatialAudio ? "transparent" : theme.pageBackground }
+        ]}
       />
     </View>
   );

@@ -2,6 +2,7 @@ import {
   normalizeRealtimeEvent,
   type RealtimeEvent
 } from "./realtimeEvents";
+import { emitCoworkingInteraction } from "../coworking/coworkingInteractionBus";
 
 export type { RealtimeEvent } from "./realtimeEvents";
 
@@ -32,6 +33,36 @@ function asSocketEventPayload(eventName: string, payload: unknown): unknown {
     return "type" in record ? record : { type: eventName, ...record };
   }
   return { type: eventName, payload };
+}
+
+function broadcastCoworkingInteraction(event: RealtimeEvent): void {
+  if (event.type === "coworking.hello") {
+    emitCoworkingInteraction({
+      type: "hello",
+      fromUserId: event.payload.fromUserId,
+      receivedAt: new Date().toISOString()
+    });
+    return;
+  }
+  if (event.type === "coworking.knock") {
+    emitCoworkingInteraction({
+      type: "knock",
+      requestId: event.payload.requestId,
+      fromUserId: event.payload.fromUserId,
+      spaceId: event.payload.spaceId,
+      receivedAt: new Date().toISOString()
+    });
+    return;
+  }
+  if (event.type === "coworking.knock.resolved") {
+    emitCoworkingInteraction({
+      type: "knock-resolved",
+      requestId: event.payload.requestId,
+      status: event.payload.status,
+      spaceId: event.payload.spaceId,
+      receivedAt: new Date().toISOString()
+    });
+  }
 }
 
 export class RealtimeClient {
@@ -98,7 +129,9 @@ export class RealtimeClient {
 
   private dispatchPayload(payload: unknown): void {
     const normalized = normalizeRealtimeEvent(payload);
-    if (normalized) this.options.onEvent(normalized);
+    if (!normalized) return;
+    broadcastCoworkingInteraction(normalized);
+    this.options.onEvent(normalized);
   }
 
   private handleFrame(socket: WebSocket, rawData: unknown): void {

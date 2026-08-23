@@ -29,6 +29,9 @@ export function useActionSounds() {
   const mentionPlayer = useAudioPlayer(
     require("../../../assets/audio/connexio_mention.mp3")
   );
+  const knockPlayer = useAudioPlayer(
+    require("../../../assets/audio/connexio_knock.wav")
+  );
 
   const playCallEnd = useCallback(
     () => replay(callEndPlayer, 0.72),
@@ -42,6 +45,10 @@ export function useActionSounds() {
     () => replay(mentionPlayer, 0.68),
     [mentionPlayer]
   );
+  const playKnock = useCallback(
+    () => replay(knockPlayer, 0.7),
+    [knockPlayer]
+  );
 
-  return { playCallEnd, playMessageSent, playMention };
+  return { playCallEnd, playMessageSent, playMention, playKnock };
 }
