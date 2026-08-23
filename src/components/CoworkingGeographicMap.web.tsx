@@ -1,6 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
 import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 import { buildCoworkingGeographicMapHtml } from "../services/coworking/geographicMapHtml";
@@ -8,9 +8,12 @@ import type { CoworkingGeographicMapProps } from "./CoworkingGeographicMap.types
 
 export default function CoworkingGeographicMap({
   markers,
+  events = [],
   mediaSession,
   selectedMarkerId,
+  selectedEventId,
   onSelectMarker,
+  onSelectEvent,
   onLocationUnavailable,
   onMediaUnavailable
 }: CoworkingGeographicMapProps) {
@@ -18,25 +21,34 @@ export default function CoworkingGeographicMap({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [locating, setLocating] = useState(false);
   const markersKey = JSON.stringify(markers);
+  const eventsKey = JSON.stringify(events);
   const mediaKey = JSON.stringify(mediaSession ?? null);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (event.data?.source !== "connexio-coworking-map") return;
-      if (event.data?.type === "marker-selected" && typeof event.data.id === "string") {
-        onSelectMarker(event.data.id);
-      }
+      if (event.data?.type === "marker-selected" && typeof event.data.id === "string") onSelectMarker(event.data.id);
+      if (event.data?.type === "event-selected" && typeof event.data.id === "string") onSelectEvent?.(event.data.id);
       if (event.data?.type === "media-unavailable") {
-        onMediaUnavailable?.(typeof event.data.message === "string" ? event.data.message : "La caméra n’a pas pu être activée.");
+        onMediaUnavailable?.(
+          typeof event.data.message === "string" ? event.data.message : "La caméra n’a pas pu être activée."
+        );
       }
     };
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
-  }, [onMediaUnavailable, onSelectMarker]);
+  }, [onMediaUnavailable, onSelectEvent, onSelectMarker]);
+
+  const postSelection = () => {
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: "selection", markerId: selectedMarkerId ?? null, eventId: selectedEventId ?? null },
+      "*"
+    );
+  };
 
   useEffect(() => {
-    iframeRef.current?.contentWindow?.postMessage({ type: "selection", id: selectedMarkerId ?? null }, "*");
-  }, [selectedMarkerId]);
+    postSelection();
+  }, [selectedEventId, selectedMarkerId]);
 
   const locate = () => {
     if (locating) return;
@@ -47,10 +59,13 @@ export default function CoworkingGeographicMap({
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        iframeRef.current?.contentWindow?.postMessage({
-          type: "locate",
-          location: { latitude: position.coords.latitude, longitude: position.coords.longitude }
-        }, "*");
+        iframeRef.current?.contentWindow?.postMessage(
+          {
+            type: "locate",
+            location: { latitude: position.coords.latitude, longitude: position.coords.longitude }
+          },
+          "*"
+        );
         setLocating(false);
       },
       () => {
@@ -65,6 +80,7 @@ export default function CoworkingGeographicMap({
     () =>
       buildCoworkingGeographicMapHtml({
         markers,
+        events,
         mediaSession,
         bridge: "web",
         theme: {
@@ -78,7 +94,7 @@ export default function CoworkingGeographicMap({
           isLight: theme.isLight
         }
       }),
-    [markersKey, mediaKey, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
+    [eventsKey, markersKey, mediaKey, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
   );
 
   return (
@@ -89,7 +105,7 @@ export default function CoworkingGeographicMap({
         },
         title: "Carte géographique du Coworking Connexio",
         srcDoc: html,
-        onLoad: () => iframeRef.current?.contentWindow?.postMessage({ type: "selection", id: selectedMarkerId ?? null }, "*"),
+        onLoad: postSelection,
         style: {
           width: "100%",
           height: "100%",
