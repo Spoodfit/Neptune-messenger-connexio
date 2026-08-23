@@ -96,66 +96,45 @@ function mockMediaSession(spaceId: string, userId: string): CoworkingMediaSessio
   };
 }
 
-function buildMockSnapshot(
-  memberIds: string[]
-): CoworkingSnapshot {
+function buildMockSnapshot(memberIds: string[]): CoworkingSnapshot {
   const ids = memberIds.slice(0, 9);
   const now = new Date();
   const joinedAt = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
-  const presenceModes: CoworkingPresenceMode[] = ["focus", "available", "focus", "talk", "available", "focus", "break", "available", "talk"];
   const participants = ids.map<CoworkingParticipantPresence>((userId, index) => ({
     userId,
-    mode: presenceModes[index] ?? "available",
-    statusText: index === 0 ? "Préparation lancement Connexio" : index === 1 ? "Disponible" : index === 2 ? "Prospection" : undefined,
-    cameraOn: index < 6,
-    microphoneOn: index === 3 || index === 8,
-    speaking: index === 3,
+    mode: "available",
+    statusText: index < 2 ? "En visio" : "Disponible",
+    cameraOn: index < 2 || index === 3,
+    microphoneOn: index === 0,
+    speaking: index === 0,
     joinedAt: joinedAt(8 + index * 7)
   }));
-  const focusEnd = new Date(now.getTime() + 38 * 60_000).toISOString();
+
   return {
     hub: {
       id: "hub",
-      name: "Hub Neptune",
+      name: "Salle générale",
       kind: "hub",
       access: "open",
-      participantIds: ids.slice(0, Math.min(4, ids.length)),
-      activity: "Coworking ouvert",
+      participantIds: [],
+      activity: "Rencontres spontanées",
       mediaEnabled: true
     },
-    spaces: [
-      {
-        id: "focus-commercial",
-        name: "Focus commercial",
-        kind: "focus",
-        access: "open",
-        participantIds: ids.slice(4, 6),
-        maxParticipants: 6,
-        activity: "50 min de concentration",
-        focusEndsAt: focusEnd,
-        mediaEnabled: true
-      },
-      {
-        id: "creation-contenu",
-        name: "Création contenu",
-        kind: "open",
-        access: "open",
-        participantIds: ids.slice(6, 8),
-        maxParticipants: 5,
-        activity: "On avance ensemble",
-        mediaEnabled: true
-      },
-      {
-        id: "direction",
-        name: "Direction",
-        kind: "private",
-        access: "invite",
-        participantIds: ids.slice(8, 9),
-        invitedUserIds: [],
-        maxParticipants: 5,
-        mediaEnabled: true
-      }
-    ],
+    spaces: ids.length >= 2
+      ? [
+          {
+            id: "visio-business",
+            name: "Échange en cours",
+            kind: "open",
+            access: "open",
+            ownerId: ids[0],
+            participantIds: ids.slice(0, 2),
+            maxParticipants: 6,
+            activity: "Visio en cours",
+            mediaEnabled: true
+          }
+        ]
+      : [],
     participants,
     updatedAt: now.toISOString()
   };
@@ -214,7 +193,7 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
         const nextParticipants = ensurePresence(stripped.participants, currentUser.id, {
           cameraOn: true,
           microphoneOn: false,
-          mode: target.kind === "focus" ? "focus" : "available"
+          mode: "available"
         });
         nextMedia = mockMediaSession(spaceId, currentUser.id);
         return {
@@ -323,7 +302,7 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
           ...stripped,
           spaces: [...stripped.spaces, space],
           participants: ensurePresence(stripped.participants, currentUser.id, {
-            mode: input.kind === "focus" ? "focus" : "available",
+            mode: "available",
             cameraOn: true,
             microphoneOn: false
           }),
