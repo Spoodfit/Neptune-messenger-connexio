@@ -94,6 +94,10 @@ async function auditMessages(page) {
   check(await page.getByPlaceholder("Rechercher un club ou un groupe…").isVisible(), "Messages : retour Groupes actif");
 }
 
+async function waitForMapSheet(page) {
+  await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "visible", timeout: 3500 }).catch(() => {});
+}
+
 async function auditMap(page) {
   await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
   const portal = await checkTarget(page.getByLabel("Ouvrir la Map", { exact: true }), "Map : portail central tactile");
@@ -119,9 +123,10 @@ async function auditMap(page) {
   check((await frame.locator(".cw-group .cw-satellite").count().catch(() => 0)) > 0, "Map : visio de groupe en cercles satellites");
   check((await frame.locator(".event-marker .event-flag").count().catch(() => 0)) > 0, "Map : événements en drapeaux");
 
-  const available = frame.locator(".cw-marker.available .cw-hit").first();
+  const available = frame.locator(".cw-marker.available").first();
   if (await available.isVisible().catch(() => false)) {
     await available.click();
+    await waitForMapSheet(page);
     await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Map disponible : Bonjour tactile");
     await checkTarget(page.getByLabel("Toquer et entrer", { exact: true }), "Map disponible : Toquer & entrer tactile");
     await checkTarget(page.getByLabel("Proposer un rendez-vous", { exact: true }), "Map disponible : rendez-vous tactile");
@@ -129,18 +134,20 @@ async function auditMap(page) {
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
-  const busy = frame.locator(".cw-marker.busy .cw-hit").first();
+  const busy = frame.locator(".cw-marker.busy").first();
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
+    await waitForMapSheet(page);
     await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Map occupée : Bonjour tactile");
     await checkTarget(page.getByLabel("Toquer et demander l’autorisation d’entrer", { exact: true }), "Map occupée : demande d’entrée tactile");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
-  const eventHit = frame.locator(".event-marker .event-hit").first();
-  if (await eventHit.isVisible().catch(() => false)) {
-    await eventHit.click();
+  const event = frame.locator(".event-marker").first();
+  if (await event.isVisible().catch(() => false)) {
+    await event.click();
+    await waitForMapSheet(page);
     await checkTarget(page.getByLabel("Voir l’évènement", { exact: true }), "Map événement : CTA tactile");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
@@ -191,10 +198,15 @@ async function auditSecondaryFlows(page) {
   check(await page.getByText("Langue de Connexio", { exact: true }).last().isVisible(), "Profil : sélecteur langue fonctionnel");
   await page.getByLabel("Fermer").last().click();
 
-  for (const route of ["/account", "/notification-settings", "/privacy", "/contacts", "/new-highlight"]) {
+  for (const route of ["/account", "/notification-settings", "/privacy", "/contacts"]) {
     await page.goto(`${BASE_URL}${route}`, { waitUntil: "networkidle" });
     check(pathOf(page).endsWith(route), `${route} : écran accessible`);
   }
+
+  await page.goto(`${BASE_URL}/new-highlight`, { waitUntil: "networkidle" });
+  const composeUrl = new URL(page.url());
+  check(composeUrl.pathname.replace(/\/$/, "").endsWith("/highlights") && composeUrl.searchParams.get("compose") === "1", "/new-highlight : redirection compositeur valide", page.url());
+  check(await page.getByLabel("Écrire une publication rapide", { exact: true }).isVisible().catch(() => false), "/new-highlight : compositeur visible après redirection");
 }
 
 async function run() {
