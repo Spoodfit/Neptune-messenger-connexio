@@ -70,6 +70,14 @@ async function checkGeometry(page, label, minimum = 44) {
       const rect = element.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && style.pointerEvents !== "none" && Number(style.opacity || "1") > 0.02 && rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < viewport.height && rect.right > 0 && rect.left < viewport.width && !element.closest('[aria-hidden="true"], [inert]');
     };
+    const rectObject = (rect) => ({
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height
+    });
     const clippedRect = (element) => {
       const raw = element.getBoundingClientRect();
       let left = Math.max(0, raw.left);
@@ -95,18 +103,20 @@ async function checkGeometry(page, label, minimum = 44) {
 
     const controls = [...document.querySelectorAll(selector)]
       .filter(visible)
-      .map((element) => ({ element, label: labelFor(element), rect: clippedRect(element) }))
+      .map((element) => ({
+        element,
+        label: labelFor(element),
+        raw: rectObject(element.getBoundingClientRect()),
+        rect: clippedRect(element)
+      }))
       .filter((item) => item.rect.width > 0 && item.rect.height > 0);
 
     const clipped = controls
-      .filter(({ element }) => {
-        const raw = element.getBoundingClientRect();
-        return raw.left < -1 || raw.right > viewport.width + 1;
-      })
+      .filter(({ raw, rect }) => raw.left < -1 || raw.right > viewport.width + 1 || rect.width + 1 < Math.min(raw.width, viewport.width))
       .map(({ label, rect }) => ({ label, ...rect }));
     const undersized = controls
-      .filter(({ rect }) => rect.width < minimum || rect.height < minimum)
-      .map(({ label, rect }) => ({ label, ...rect }));
+      .filter(({ raw }) => raw.width < minimum || raw.height < minimum)
+      .map(({ label, raw }) => ({ label, ...raw }));
     const overlaps = [];
     for (let i = 0; i < controls.length; i += 1) {
       for (let j = i + 1; j < controls.length; j += 1) {
@@ -128,7 +138,7 @@ async function checkGeometry(page, label, minimum = 44) {
   }, { minimum });
 
   if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal global`);
-  if (result.clipped.length) failures.push(`${label}: contrôles coupés: ${result.clipped.slice(0, 5).map((item) => item.label).join(", ")}`);
+  if (result.clipped.length) failures.push(`${label}: contrôles coupés horizontalement: ${result.clipped.slice(0, 5).map((item) => item.label).join(", ")}`);
   if (result.undersized.length) failures.push(`${label}: cibles < ${minimum}px: ${result.undersized.slice(0, 6).map((item) => `${item.label} ${Math.round(item.width)}x${Math.round(item.height)}`).join(", ")}`);
   if (result.overlaps.length) failures.push(`${label}: collisions indépendantes: ${result.overlaps.slice(0, 4).map((item) => `${item.a}/${item.b}`).join(", ")}`);
 }
@@ -174,7 +184,6 @@ async function auditInteractiveCoworking(page) {
   await page.waitForTimeout(850);
   const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
   const available = frame.locator(".cw-marker.available").first();
-  const busy = frame.locator(".cw-marker.busy").first();
 
   if (await available.isVisible().catch(() => false)) {
     await available.click();
@@ -183,14 +192,17 @@ async function auditInteractiveCoworking(page) {
     if ((await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).count()) > 0) failures.push("fiche disponible : Toquer proposé hors visio");
     await checkGeometry(page, "fiche personne disponible");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
+  const busy = frame.locator(".cw-marker.busy").first();
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
     await expectVisible(page.getByLabel("Toquer pour rejoindre la visio", { exact: true }), "fiche visio : Toquer");
     await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "fiche visio : Bonjour");
     await checkGeometry(page, "fiche groupe visio");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
   await page.getByLabel("Rejoindre la salle générale", { exact: true }).click();
@@ -223,7 +235,7 @@ async function auditMessaging(page) {
     if (!renderedText.includes(body)) failures.push("Chat : texte envoyé absent du rendu visuel de la bulle");
     const box = await sent.boundingBox().catch(() => null);
     const viewport = page.viewportSize();
-    if (!box || box.top < -1 || box.bottom > (viewport?.height ?? 844) + 1) failures.push("Chat : dernier message envoyé n’est pas suivi automatiquement à l’écran");
+    if (!box || box.y < -1 || box.y + box.height > (viewport?.height ?? 844) + 1) failures.push("Chat : dernier message envoyé n’est pas suivi automatiquement à l’écran");
   }
   await checkGeometry(page, "Chat après envoi");
 }
@@ -290,7 +302,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Product Audit passed: six viewport families, clipped geometry, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow, scheduled-call subject reuse, member profile, call scheduling, contact actions and core routes.");
+  console.log("Product Audit passed: six viewport families, true touch-target geometry, horizontal clipping, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow, scheduled-call subject reuse, member profile, call scheduling, contact actions and core routes.");
 }
 
 run().catch((error) => {
