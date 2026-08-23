@@ -128,8 +128,8 @@ async function auditMap(page, label, interactive = false) {
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
-  const mapNode = frame.locator("#map");
-  await mapNode.hover();
+  const zoomAnchor = await busy.isVisible().catch(() => false) ? busy : frame.locator("#map");
+  await zoomAnchor.hover();
   for (let i = 0; i < 6; i += 1) { await page.mouse.wheel(0, -900); await page.waitForTimeout(180); }
   await page.waitForTimeout(650);
   const visibleClusters = await frame.locator(".cluster-core").evaluateAll((nodes) => nodes.filter((node) => {
