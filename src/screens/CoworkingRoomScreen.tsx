@@ -82,7 +82,7 @@ export default function CoworkingRoomScreen() {
     [currentUser, members, space?.participantIds]
   );
   const selectedMember = participants.find((member) => member.id === selectedUserId);
-  const nodeSize = participants.length <= 6 ? 94 : participants.length <= 10 ? 80 : 68;
+  const nodeSize = participants.length <= 6 ? 80 : participants.length <= 10 ? 72 : 64;
   const nodeHeight = nodeSize + 30;
 
   const participantLayout = useMemo(() => {
@@ -200,8 +200,10 @@ export default function CoworkingRoomScreen() {
       >
         {isGeneralRoom ? (
           <View pointerEvents="none" style={styles.spatialBackdrop}>
-            <View style={[styles.proximityCircle, styles.proximityNear, { borderColor: theme.success }]} />
-            <View style={[styles.proximityCircle, styles.proximityFar, { borderColor: theme.borderSoft }]} />
+            <View style={[styles.proximityAnchor, { left: `${ownPosition.x}%`, top: `${ownPosition.y}%` }]}>
+              <View style={[styles.proximityCircle, styles.proximityNear, { borderColor: theme.success }]} />
+              <View style={[styles.proximityCircle, styles.proximityFar, { borderColor: theme.borderSoft }]} />
+            </View>
             <Text style={[styles.moveHint, { color: theme.pageTextMuted }]}>Touchez l’espace pour vous déplacer</Text>
           </View>
         ) : null}
@@ -375,9 +377,10 @@ const styles = StyleSheet.create({
   headerMeta: { marginTop: 2, maxWidth: "100%", fontSize: 10, lineHeight: 13, fontWeight: "700", textAlign: "center" },
   stage: { flex: 1, margin: 8, borderRadius: 28, borderWidth: 1, overflow: "hidden", position: "relative", minHeight: 280 },
   spatialBackdrop: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
-  proximityCircle: { position: "absolute", left: "50%", top: "54%", borderWidth: 1, opacity: 0.18, transform: [{ translateX: -130 }, { translateY: -130 }] },
-  proximityNear: { width: 260, height: 260, borderRadius: 130 },
-  proximityFar: { width: 420, height: 420, borderRadius: 210, transform: [{ translateX: -210 }, { translateY: -210 }] },
+  proximityAnchor: { position: "absolute", width: 0, height: 0 },
+  proximityCircle: { position: "absolute", borderWidth: 1, opacity: 0.18 },
+  proximityNear: { width: 260, height: 260, borderRadius: 130, left: -130, top: -130 },
+  proximityFar: { width: 420, height: 420, borderRadius: 210, left: -210, top: -210 },
   moveHint: { position: "absolute", top: 12, left: 14, right: 14, textAlign: "center", fontSize: 10, fontWeight: "800" },
   avatarLayer: { ...StyleSheet.absoluteFillObject },
   personVisual: { position: "absolute", borderWidth: 2, alignItems: "center", justifyContent: "center", overflow: "hidden" },
