@@ -34,6 +34,7 @@ import { canInitiatePrivateInteraction, canPublishInConversation } from "../../s
 import { buildSmartReplySuggestions } from "../../src/domain/smartReplies";
 import { useExperience } from "../../src/providers/ExperienceProvider";
 import { useGroupAdmin } from "../../src/providers/GroupAdminProvider";
+import { useReducedMotion } from "../../src/hooks/useReducedMotion";
 import { useMessaging } from "../../src/providers/MessagingProvider";
 import { useSession } from "../../src/providers/SessionProvider";
 import { type ConnexioTheme, useAppTheme } from "../../src/providers/ThemeProvider";
@@ -73,6 +74,7 @@ export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string; focusMention?: string; focusMessageId?: string; draft?: string }>();
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const conversationId = Array.isArray(params.id) ? (params.id[0] ?? "") : (params.id ?? "");
   const focusMention = (Array.isArray(params.focusMention) ? params.focusMention[0] : params.focusMention) === "1";
@@ -231,14 +233,19 @@ export default function ChatScreen() {
     setSpotlightMessageId(targetId);
     spotlightProgress.stopAnimation();
     spotlightProgress.setValue(0);
-    requestAnimationFrame(() => messageListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }));
+    requestAnimationFrame(() => messageListRef.current?.scrollToIndex({ index, animated: !reducedMotion, viewPosition: 0.5 }));
+    if (reducedMotion) {
+      spotlightProgress.setValue(1);
+      const clearTimer = setTimeout(() => setSpotlightMessageId(null), 1200);
+      return () => clearTimeout(clearTimer);
+    }
     Animated.sequence([
       Animated.timing(spotlightProgress, { toValue: 1, duration: 280, useNativeDriver: true }),
       Animated.timing(spotlightProgress, { toValue: 0.35, duration: 520, useNativeDriver: true }),
       Animated.timing(spotlightProgress, { toValue: 1, duration: 520, useNativeDriver: true }),
       Animated.timing(spotlightProgress, { toValue: 0, duration: 900, useNativeDriver: true })
     ]).start(({ finished }) => { if (finished) setSpotlightMessageId(null); });
-  }, [currentUser.id, focusMention, mentionAliases, messages, requestedFocusMessageId, spotlightProgress]);
+  }, [currentUser.id, focusMention, mentionAliases, messages, reducedMotion, requestedFocusMessageId, spotlightProgress]);
 
   if (!conversation) {
     return (

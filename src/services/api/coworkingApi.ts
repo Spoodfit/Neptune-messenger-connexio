@@ -125,7 +125,8 @@ function normalizeIceServers(value: unknown): RTCIceServer[] {
 
 function normalizeMedia(
   value: unknown,
-  fallbackSpaceId: string
+  fallbackSpaceId: string,
+  observerByDefault = false
 ): CoworkingMediaSession | undefined {
   if (!value || typeof value !== "object") return undefined;
   const item = asRecord(value);
@@ -144,7 +145,11 @@ function normalizeMedia(
     expiresAt: stringValue(item.expires_at) || undefined,
     mock: false,
     observer:
-      item.observer === true || item.listen_only === true || item.listenOnly === true
+      item.observer === false || item.publish === true || item.publisher === true
+        ? false
+        : item.observer === true || item.listen_only === true || item.listenOnly === true
+          ? true
+          : observerByDefault
   };
 }
 
@@ -178,7 +183,8 @@ export function normalizeCoworkingSnapshot(value: unknown): CoworkingSnapshot {
       stringValue(root.current_user_space_id ?? root.currentUserSpaceId) || undefined,
     observerMedia: normalizeMedia(
       root.observer_media ?? root.observerMedia,
-      "coworking-map"
+      "coworking-map",
+      true
     ),
     updatedAt: stringValue(root.updated_at ?? root.updatedAt, new Date().toISOString())
   };

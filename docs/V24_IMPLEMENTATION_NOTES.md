@@ -7,4 +7,4 @@ Scope:
 - unread badges for collapsed group sections;
 - compact/read vs expanded/unread Announcement state;
 - inline voice-note playback and transcription;
-- full-screen Coworking map with presence states and observer media support.
+- full-screen geographic Coworking Map with approximate member zones, green/red presence states, automatic camera publication, grouped video markers, hello/knock interactions, and a one-room General Room with proximity audio and microphone-off defaults.

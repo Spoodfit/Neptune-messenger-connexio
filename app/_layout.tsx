@@ -8,6 +8,7 @@ import { initialWindowMetrics, SafeAreaProvider } from "react-native-safe-area-c
 import { CoworkingInteractionOverlay } from "../src/components/CoworkingInteractionOverlay";
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
 import { env } from "../src/config/env";
+import { useReducedMotion } from "../src/hooks/useReducedMotion";
 import { CoworkingProvider } from "../src/providers/CoworkingProvider";
 import { ExperienceProvider } from "../src/providers/ExperienceProvider";
 import { GroupAdminProvider } from "../src/providers/GroupAdminProvider";
@@ -53,6 +54,7 @@ function openChatTarget(target: PendingChatTarget, replace = false) {
 function AuthenticatedApp() {
   const { sessionReady, isAuthenticated, accessToken, currentUser, getAccessToken } = useSession();
   const theme = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const segments = useSegments();
   const pendingChatTarget = useRef<PendingChatTarget | null>(null);
   const processedNotificationResponseId = useRef<string | null>(null);
@@ -145,7 +147,7 @@ function AuthenticatedApp() {
     <View style={[styles.application, { backgroundColor: theme.pageBackground }]}>
       <StatusBar style={theme.isLight ? "dark" : "light"} />
       <View style={styles.stackArea}>
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: "fade" }} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.pageBackground }, animation: reducedMotion ? "none" : "fade" }} />
       </View>
       <AppAlertHost />
     </View>

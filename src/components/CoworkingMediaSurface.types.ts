@@ -17,4 +17,5 @@ export interface CoworkingMediaSurfaceProps {
   participantLayout?: Record<string, CoworkingMediaLayoutItem>;
   onConnected?: () => void;
   onError?: (message: string) => void;
+  onLocalMediaUnavailable?: (message: string) => void;
 }

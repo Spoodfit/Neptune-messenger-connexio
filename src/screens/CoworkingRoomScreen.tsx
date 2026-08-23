@@ -101,7 +101,6 @@ export default function CoworkingRoomScreen() {
   const leave = async () => {
     try {
       await leaveCurrentSpace();
-    } finally {
       router.replace("/coworking");
     }
   };

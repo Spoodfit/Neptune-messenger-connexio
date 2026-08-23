@@ -15,10 +15,15 @@ export default function CoworkingMediaSurface({
   spatialAudio = false,
   participantLayout,
   onConnected,
-  onError
+  onError,
+  onLocalMediaUnavailable
 }: CoworkingMediaSurfaceProps) {
   const theme = useAppTheme();
   const webViewRef = useRef<WebView>(null);
+  const latestMediaRef = useRef({ cameraOn, microphoneOn });
+  const latestLayoutRef = useRef(participantLayout);
+  latestMediaRef.current = { cameraOn, microphoneOn };
+  latestLayoutRef.current = participantLayout;
   const html = useMemo(
     () =>
       buildCoworkingMediaHtml(session, displayName, {
@@ -60,6 +65,9 @@ export default function CoworkingMediaSurface({
       if (payload.type === "connected" || payload.type === "media-ready") {
         onConnected?.();
       }
+      if (payload.type === "local-media-unavailable") {
+        onLocalMediaUnavailable?.(payload.message ?? "Caméra ou microphone indisponible.");
+      }
       if (payload.type === "error") {
         onError?.(payload.message ?? "Connexion média impossible.");
       }
@@ -86,6 +94,16 @@ export default function CoworkingMediaSurface({
         allowFileAccess
         allowsInlineMediaPlayback
         originWhitelist={["https://*", "http://localhost*"]}
+        onLoadEnd={() => {
+          webViewRef.current?.injectJavaScript(
+            `window.__connexioCoworkingControl?.(${JSON.stringify({ type: "media", ...latestMediaRef.current })});true;`
+          );
+          if (latestLayoutRef.current) {
+            webViewRef.current?.injectJavaScript(
+              `window.__connexioCoworkingControl?.(${JSON.stringify({ type: "layout", participantLayout: latestLayoutRef.current })});true;`
+            );
+          }
+        }}
         onMessage={handleMessage}
         style={[
           styles.webView,
