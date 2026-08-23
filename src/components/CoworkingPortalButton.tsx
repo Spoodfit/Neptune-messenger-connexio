@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 
 import { useReducedMotion } from "../hooks/useReducedMotion";
 import { useCoworking } from "../providers/CoworkingProvider";
@@ -12,6 +12,8 @@ import { Text } from "./LocalizedText";
 
 export function CoworkingPortalButton() {
   const theme = useAppTheme();
+  const { width } = useWindowDimensions();
+  const compactBar = width < 310;
   const reducedMotion = useReducedMotion();
   const { activeCount } = useCoworking();
   const pulse = useRef(new Animated.Value(0)).current;
@@ -35,8 +37,8 @@ export function CoworkingPortalButton() {
   const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.14, 0.38] });
 
   return (
-    <View pointerEvents="box-none" style={styles.anchor}>
-      <View style={[styles.shell, { backgroundColor: theme.pageBackground }]}>
+    <View pointerEvents="box-none" style={[styles.anchor, compactBar && styles.compactAnchor]}>
+      <View style={[styles.shell, compactBar && styles.compactShell, { backgroundColor: theme.pageBackground }]}>
         {activeCount > 0 ? (
           <Animated.View pointerEvents="none" style={[styles.halo, { opacity: haloOpacity, borderColor: theme.violet }]} />
         ) : null}
@@ -45,10 +47,10 @@ export function CoworkingPortalButton() {
           accessibilityLabel="Ouvrir la Map"
           accessibilityHint="Afficher les membres connectés et les événements sur la carte"
           onPress={() => router.push("/coworking")}
-          style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.pressable, compactBar && styles.compactPressable, pressed && styles.pressed]}
         >
-          <LinearGradient colors={gradients.primary} style={styles.gradient}>
-            <Ionicons name="map-outline" size={27} color={colors.white} />
+          <LinearGradient colors={gradients.primary} style={[styles.gradient, compactBar && styles.compactGradient]}>
+            <Ionicons name="map-outline" size={compactBar ? 24 : 27} color={colors.white} />
             {activeCount > 0 ? (
               <View style={styles.countPill} pointerEvents="none">
                 <Text style={styles.countText}>{activeCount > 99 ? "99+" : String(activeCount)}</Text>
@@ -71,12 +73,14 @@ const styles = StyleSheet.create({
     zIndex: 1020,
     elevation: 50
   },
+  compactAnchor: { top: 4 },
   shell: {
     width: 62,
     height: 62,
     borderRadius: 31,
     padding: 4
   },
+  compactShell: { width: 54, height: 54, borderRadius: 27, padding: 3 },
   halo: {
     position: "absolute",
     left: -4,
@@ -87,6 +91,7 @@ const styles = StyleSheet.create({
     borderWidth: 2
   },
   pressable: { flex: 1, borderRadius: 27, overflow: "hidden" },
+  compactPressable: { borderRadius: 24 },
   pressed: { opacity: 0.88, transform: [{ scale: 0.96 }] },
   gradient: {
     flex: 1,
@@ -96,6 +101,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)"
   },
+  compactGradient: { borderRadius: 24 },
   countPill: {
     position: "absolute",
     right: -4,

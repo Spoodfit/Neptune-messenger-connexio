@@ -74,6 +74,24 @@ async function auditCenterMapButton(page, label) {
     const viewport = page.viewportSize();
     if (!box || !viewport || Math.abs(box.x + box.width / 2 - viewport.width / 2) > 2.5) failures.push(`${label}: bouton Map non centré`);
   }
+  const viewport = page.viewportSize();
+  const compact = Boolean(viewport && viewport.width < 310);
+  for (const [tabName, visibleLabel] of [["Messages", "Messages"], ["Temps forts", compact ? "Temps" : "Temps forts"]]) {
+    const labelNode = page.getByRole("tab", { name: tabName, exact: true }).getByText(visibleLabel, { exact: true });
+    if (await expectVisible(labelNode, `${label} libellé ${visibleLabel}`)) {
+      const box = await labelNode.boundingBox();
+      if (!box || box.height > 15) failures.push(`${label}: libellé ${visibleLabel} sur plusieurs lignes (${Math.round(box?.height ?? 0)}px)`);
+      const clipped = await labelNode.evaluate((node) => node.scrollWidth > node.clientWidth + 1);
+      if (clipped) failures.push(`${label}: libellé ${visibleLabel} tronqué horizontalement`);
+    }
+  }
+  if (compact && await button.isVisible().catch(() => false)) {
+    const [buttonBox, tabBox] = await Promise.all([
+      button.boundingBox(),
+      page.getByRole("tab", { name: "Messages", exact: true }).boundingBox()
+    ]);
+    if (!buttonBox || !tabBox || buttonBox.y < tabBox.y - 4) failures.push(`${label}: bouton Map compact déborde au-dessus de la navigation`);
+  }
   await checkGeometry(page, `${label} navigation`);
 }
 
@@ -104,6 +122,27 @@ async function auditMap(page, label, interactive = false) {
   const sizes = await frame.locator(".cw-core").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().width)).filter(Boolean));
   if (sizes.some((size) => size < 27 || size > 50)) failures.push(`${label}: taille adaptative des cercles hors bornes (${sizes.join(",")})`);
 
+  const faceGeometry = await frame.locator(".cw-face").evaluateAll((faces) => {
+    const inViewport = (rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
+    let visible = 0;
+    let blank = 0;
+    for (const face of faces) {
+      const rect = face.getBoundingClientRect();
+      if (!inViewport(rect)) continue;
+      visible += 1;
+      const fallback = face.querySelector(".cw-fallback");
+      const image = face.querySelector("img");
+      const video = face.querySelector("video.video-ready");
+      const fallbackVisible = Boolean(fallback && fallback.textContent?.trim() && Number(getComputedStyle(fallback).opacity) > .2);
+      const imageVisible = Boolean(image && image.complete && image.naturalWidth > 0 && Number(getComputedStyle(image).opacity) > .2);
+      const videoVisible = Boolean(video && Number(getComputedStyle(video).opacity) > .2);
+      if (!fallbackVisible && !imageVisible && !videoVisible) blank += 1;
+    }
+    return { visible, blank };
+  });
+  if (faceGeometry.visible === 0) failures.push(`${label}: aucun visage de membre réellement visible dans le viewport`);
+  if (faceGeometry.blank > 0) failures.push(`${label}: ${faceGeometry.blank} cercle(s) membre visuellement vide(s)`);
+
   if (!interactive) return;
 
   const available = frame.locator(".cw-marker.available").first();
@@ -128,12 +167,17 @@ async function auditMap(page, label, interactive = false) {
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
-  const zoomAnchor = await busy.isVisible().catch(() => false) ? busy : frame.locator("#map");
-  await zoomAnchor.hover();
-  for (let i = 0; i < 6; i += 1) { await page.mouse.wheel(0, -900); await page.waitForTimeout(180); }
+  for (let i = 0; i < 6; i += 1) {
+    const zoomAnchor = frame.locator(".cw-marker.busy:visible").first();
+    if (await zoomAnchor.isVisible().catch(() => false)) await zoomAnchor.hover();
+    else await frame.locator("#map").hover();
+    await page.mouse.wheel(0, -900);
+    await page.waitForTimeout(180);
+  }
   await page.waitForTimeout(650);
   const visibleClusters = await frame.locator(".cluster-core").evaluateAll((nodes) => nodes.filter((node) => {
-    const r = node.getBoundingClientRect(); const s = getComputedStyle(node); return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden";
+    const r = node.getBoundingClientRect(); const s = getComputedStyle(node);
+    return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight && s.display !== "none" && s.visibility !== "hidden";
   }).length);
   if (visibleClusters > 0) failures.push("Map zoomée: clusters encore visibles alors que l’espace permet le dégroupage automatique");
 
@@ -141,17 +185,18 @@ async function auditMap(page, label, interactive = false) {
     let visiblePeople = 0;
     let splitGroups = 0;
     let minimumGap = Infinity;
+    const inViewport = (rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
     for (const group of groups) {
       const core = group.querySelector(".cw-core");
       if (!core) continue;
       const coreRect = core.getBoundingClientRect();
-      if (coreRect.width <= 0 || coreRect.height <= 0) continue;
+      if (!inViewport(coreRect)) continue;
       splitGroups += 1;
       visiblePeople += 1;
       const coreCenter = { x: coreRect.left + coreRect.width / 2, y: coreRect.top + coreRect.height / 2 };
       for (const person of group.querySelectorAll(".cw-person-marker")) {
         const rect = person.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) continue;
+        if (!inViewport(rect)) continue;
         visiblePeople += 1;
         const distance = Math.hypot(rect.left + rect.width / 2 - coreCenter.x, rect.top + rect.height / 2 - coreCenter.y);
         minimumGap = Math.min(minimumGap, distance);
@@ -163,7 +208,7 @@ async function auditMap(page, label, interactive = false) {
   if (splitGeometry.splitGroups > 0 && splitGeometry.minimumGap < 42) failures.push(`Map zoomée: séparation des personnes insuffisante (${Math.round(splitGeometry.minimumGap)}px)`);
 
   const hostCollisions = await frame.locator(".cw-core").evaluateAll((nodes) => {
-    const rects = nodes.map((node) => node.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    const rects = nodes.map((node) => node.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight);
     let collisions = 0;
     for (let i = 0; i < rects.length; i += 1) for (let j = i + 1; j < rects.length; j += 1) {
       const a = rects[i], b = rects[j];

@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 
 import { AdvantageAdCard } from "../components/AdvantageAdCard";
 import { BrandHeader } from "../components/BrandHeader";
@@ -33,6 +33,8 @@ const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract)
 
 export default function HighlightsFeedScreenV24() {
   const theme = useAppTheme();
+  const { width } = useWindowDimensions();
+  const compactViewport = width < 320;
   const params = useLocalSearchParams<{ compose?: string; composeNonce?: string }>();
   const compose = Array.isArray(params.compose) ? params.compose[0] : params.compose;
   const composeNonce = Array.isArray(params.composeNonce) ? params.composeNonce[0] : params.composeNonce;
@@ -173,7 +175,7 @@ export default function HighlightsFeedScreenV24() {
     >
       <HighlightCard
         post={post}
-        compact={compact}
+        compact={compact || compactViewport}
         onReact={env.mockMode || BACKEND_CAPABILITIES.highlightsCommunity ? (emoji) => togglePostReaction(post.id, emoji) : undefined}
       />
       {post.updatedAt ? (

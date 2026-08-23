@@ -139,6 +139,27 @@ async function auditMap(page) {
   check(satelliteCount > 0, "Map : visio de groupe en cercles satellites");
   check(eventFlagCount > 0, "Map : événements en drapeaux");
 
+  const faceGeometry = await frame.locator(".cw-face").evaluateAll((faces) => {
+    const inViewport = (rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
+    let visible = 0;
+    let blank = 0;
+    for (const face of faces) {
+      const rect = face.getBoundingClientRect();
+      if (!inViewport(rect)) continue;
+      visible += 1;
+      const fallback = face.querySelector(".cw-fallback");
+      const image = face.querySelector("img");
+      const video = face.querySelector("video.video-ready");
+      const fallbackVisible = Boolean(fallback && fallback.textContent?.trim() && Number(getComputedStyle(fallback).opacity) > .2);
+      const imageVisible = Boolean(image && image.complete && image.naturalWidth > 0 && Number(getComputedStyle(image).opacity) > .2);
+      const videoVisible = Boolean(video && Number(getComputedStyle(video).opacity) > .2);
+      if (!fallbackVisible && !imageVisible && !videoVisible) blank += 1;
+    }
+    return { visible, blank };
+  });
+  check(faceGeometry.visible > 0, "Map : au moins un visage réellement visible dans le viewport");
+  check(faceGeometry.blank === 0, "Map : aucun cercle membre visuellement vide", `vides=${faceGeometry.blank}`);
+
   const available = availableMarkers.first();
   if (await available.isVisible().catch(() => false)) {
     await available.click();

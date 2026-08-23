@@ -23,6 +23,7 @@
     "src/config/backendCapabilities.ts",
     "src/services/realtime/realtimeEvents.ts",
     "src/services/calls/liveCaptions.ts",
+    "src/services/coworking/geographicMapHtml.ts",
     "src/storage/outboxStore.memory.ts",
     "src/storage/outboxStore.types.ts",
     "src/theme/**/*.ts",

@@ -58,10 +58,20 @@ async function run() {
       await shot(page, "map-event-flag-sheet-393x852");
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
     }
-    const zoomAnchor = await busy.isVisible().catch(() => false) ? busy : mapFrame.locator("#map");
-    await zoomAnchor.hover();
-    for (let i=0;i<6;i+=1) { await page.mouse.wheel(0,-900); await page.waitForTimeout(160); }
-    await mapFrame.locator(".cw-group.zoom-split").first().waitFor({ state:"visible", timeout:3000 }).catch(() => {});
+    for (let i=0;i<6;i+=1) {
+      const zoomAnchor = mapFrame.locator(".cw-marker.busy:visible").first();
+      if (await zoomAnchor.isVisible().catch(() => false)) await zoomAnchor.hover();
+      else await mapFrame.locator("#map").hover();
+      await page.mouse.wheel(0,-900);
+      await page.waitForTimeout(160);
+    }
+    const splitGroup = mapFrame.locator(".cw-group.zoom-split:visible").first();
+    await splitGroup.waitFor({ state:"visible", timeout:3000 });
+    const splitOnScreen = await splitGroup.evaluate((group) => {
+      const rect = group.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
+    });
+    if (!splitOnScreen) throw new Error("La capture zoomée ne contient aucun groupe visio dans le viewport");
     await page.mouse.move(20, 180);
     await shot(page, "map-zoomed-declustered-393x852");
     await page.close();
