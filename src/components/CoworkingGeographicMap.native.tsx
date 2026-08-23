@@ -10,9 +10,12 @@ import type { CoworkingGeographicMapProps } from "./CoworkingGeographicMap.types
 
 export default function CoworkingGeographicMap({
   markers,
+  events = [],
   mediaSession,
   selectedMarkerId,
+  selectedEventId,
   onSelectMarker,
+  onSelectEvent,
   onLocationUnavailable,
   onMediaUnavailable
 }: CoworkingGeographicMapProps) {
@@ -20,11 +23,13 @@ export default function CoworkingGeographicMap({
   const webViewRef = useRef<WebView>(null);
   const [locating, setLocating] = useState(false);
   const markersKey = JSON.stringify(markers);
+  const eventsKey = JSON.stringify(events);
   const mediaKey = JSON.stringify(mediaSession ?? null);
   const html = useMemo(
     () =>
       buildCoworkingGeographicMapHtml({
         markers,
+        events,
         mediaSession,
         bridge: "native",
         theme: {
@@ -38,17 +43,26 @@ export default function CoworkingGeographicMap({
           isLight: theme.isLight
         }
       }),
-    [markersKey, mediaKey, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
+    [eventsKey, markersKey, mediaKey, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
   );
 
+  const postSelection = () => {
+    webViewRef.current?.postMessage(JSON.stringify({
+      type: "selection",
+      markerId: selectedMarkerId ?? null,
+      eventId: selectedEventId ?? null
+    }));
+  };
+
   useEffect(() => {
-    webViewRef.current?.postMessage(JSON.stringify({ type: "selection", id: selectedMarkerId ?? null }));
-  }, [selectedMarkerId]);
+    postSelection();
+  }, [selectedEventId, selectedMarkerId]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const payload = JSON.parse(event.nativeEvent.data) as { type?: string; id?: string; message?: string };
       if (payload.type === "marker-selected" && payload.id) onSelectMarker(payload.id);
+      if (payload.type === "event-selected" && payload.id) onSelectEvent?.(payload.id);
       if (payload.type === "media-unavailable") onMediaUnavailable?.(payload.message ?? "La caméra n’a pas pu être activée.");
     } catch {}
   };
@@ -63,15 +77,10 @@ export default function CoworkingGeographicMap({
         return;
       }
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      webViewRef.current?.postMessage(
-        JSON.stringify({
-          type: "locate",
-          location: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          }
-        })
-      );
+      webViewRef.current?.postMessage(JSON.stringify({
+        type: "locate",
+        location: { latitude: position.coords.latitude, longitude: position.coords.longitude }
+      }));
     } catch {
       onLocationUnavailable?.();
     } finally {
@@ -85,7 +94,7 @@ export default function CoworkingGeographicMap({
         ref={webViewRef}
         source={{ html }}
         onMessage={handleMessage}
-        onLoadEnd={() => webViewRef.current?.postMessage(JSON.stringify({ type: "selection", id: selectedMarkerId ?? null }))}
+        onLoadEnd={postSelection}
         javaScriptEnabled
         domStorageEnabled
         mediaPlaybackRequiresUserAction={false}
@@ -104,11 +113,7 @@ export default function CoworkingGeographicMap({
           pressed && styles.pressed
         ]}
       >
-        {locating ? (
-          <ActivityIndicator size="small" color={theme.pageText} />
-        ) : (
-          <Ionicons name="locate" size={20} color={theme.pageText} />
-        )}
+        {locating ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="locate" size={20} color={theme.pageText} />}
       </Pressable>
     </View>
   );
@@ -117,17 +122,6 @@ export default function CoworkingGeographicMap({
 const styles = StyleSheet.create({
   wrap: { flex: 1, minHeight: 420, position: "relative", overflow: "hidden" },
   webView: { flex: 1 },
-  locate: {
-    position: "absolute",
-    right: 12,
-    top: 82,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 8
-  },
+  locate: { position: "absolute", right: 12, top: 82, width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center", elevation: 8 },
   pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] }
 });
