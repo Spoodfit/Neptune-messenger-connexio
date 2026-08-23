@@ -85,7 +85,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       icon: "./assets/icon.png",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
-        NSCameraUsageDescription: "Connexio utilise la caméra lorsque vous choisissez de prendre une photo, publier une vidéo ou participer à un appel vidéo.",
+        NSCameraUsageDescription: "Connexio utilise la caméra lorsque vous choisissez de prendre une photo, publier une vidéo, participer à un appel vidéo ou ouvrir la Map Coworking.",
         NSMicrophoneUsageDescription: MICROPHONE_PERMISSION,
         NSSpeechRecognitionUsageDescription: "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.",
         NSPhotoLibraryUsageDescription: "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.",
