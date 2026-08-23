@@ -27,7 +27,9 @@ export default function CoworkingGeographicMap({
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (event.data?.source !== "connexio-coworking-map") return;
-      if (event.data?.type === "marker-selected" && typeof event.data.id === "string") onSelectMarker(event.data.id);
+      if (event.data?.type === "marker-selected" && typeof event.data.id === "string") {
+        onSelectMarker(event.data.id, typeof event.data.memberId === "string" ? event.data.memberId : undefined);
+      }
       if (event.data?.type === "event-selected" && typeof event.data.id === "string") onSelectEvent?.(event.data.id);
       if (event.data?.type === "media-unavailable") {
         onMediaUnavailable?.(
@@ -46,9 +48,7 @@ export default function CoworkingGeographicMap({
     );
   };
 
-  useEffect(() => {
-    postSelection();
-  }, [selectedEventId, selectedMarkerId]);
+  useEffect(() => { postSelection(); }, [selectedEventId, selectedMarkerId]);
 
   const locate = () => {
     if (locating) return;
@@ -60,10 +60,7 @@ export default function CoworkingGeographicMap({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         iframeRef.current?.contentWindow?.postMessage(
-          {
-            type: "locate",
-            location: { latitude: position.coords.latitude, longitude: position.coords.longitude }
-          },
+          { type: "locate", location: { latitude: position.coords.latitude, longitude: position.coords.longitude } },
           "*"
         );
         setLocating(false);
@@ -77,53 +74,40 @@ export default function CoworkingGeographicMap({
   };
 
   const html = useMemo(
-    () =>
-      buildCoworkingGeographicMapHtml({
-        markers,
-        events,
-        mediaSession,
-        bridge: "web",
-        theme: {
-          pageBackground: theme.pageBackground,
-          surface: theme.surface,
-          surfaceStrong: theme.surfaceStrong,
-          pageText: theme.pageText,
-          pageTextMuted: theme.pageTextMuted,
-          border: theme.border,
-          shellBackground: theme.shellBackground,
-          isLight: theme.isLight
-        }
-      }),
+    () => buildCoworkingGeographicMapHtml({
+      markers,
+      events,
+      mediaSession,
+      bridge: "web",
+      theme: {
+        pageBackground: theme.pageBackground,
+        surface: theme.surface,
+        surfaceStrong: theme.surfaceStrong,
+        pageText: theme.pageText,
+        pageTextMuted: theme.pageTextMuted,
+        border: theme.border,
+        shellBackground: theme.shellBackground,
+        isLight: theme.isLight
+      }
+    }),
     [eventsKey, markersKey, mediaKey, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
   );
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.pageBackground }]}> 
       {createElement("iframe", {
-        ref: (node: HTMLIFrameElement | null) => {
-          iframeRef.current = node;
-        },
+        ref: (node: HTMLIFrameElement | null) => { iframeRef.current = node; },
         title: "Carte géographique du Coworking Connexio",
         srcDoc: html,
         onLoad: postSelection,
-        style: {
-          width: "100%",
-          height: "100%",
-          border: 0,
-          display: "block",
-          background: theme.pageBackground
-        },
+        style: { width: "100%", height: "100%", border: 0, display: "block", background: theme.pageBackground },
         allow: "camera; autoplay; geolocation"
       })}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Me localiser"
         onPress={locate}
-        style={({ pressed }) => [
-          styles.locate,
-          { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft },
-          pressed && styles.pressed
-        ]}
+        style={({ pressed }) => [styles.locate, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }, pressed && styles.pressed]}
       >
         {locating ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="locate" size={20} color={theme.pageText} />}
       </Pressable>
