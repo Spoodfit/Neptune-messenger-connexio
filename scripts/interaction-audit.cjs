@@ -13,7 +13,7 @@ function check(condition, label, detail = "") {
 
 async function waitRoute(page, suffix, label) {
   try {
-    await page.waitForURL((url) => url.pathname.replace(/\/$/, "").endsWith(suffix), { timeout: 5000 });
+    await page.waitForURL((url) => url.pathname.replace(/\/$/, "").endsWith(suffix), { timeout: 6000 });
   } catch {}
   check(pathOf(page).endsWith(suffix), label, `route obtenue: ${pathOf(page)}`);
 }
@@ -40,6 +40,12 @@ async function checkTarget(locator, label, minimum = 48) {
   }
   check(box.width >= minimum && box.height >= minimum, label, `${Math.round(box.width)}x${Math.round(box.height)} px, minimum ${minimum}`);
   return target;
+}
+
+async function sentMessageSurface(page, body) {
+  const candidate = page.locator(`[aria-label*="${body.replaceAll('"', '\\"')}"]`).first();
+  await candidate.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+  return (await candidate.isVisible().catch(() => false)) ? candidate : null;
 }
 
 async function auditMainNavigation(page) {
@@ -107,6 +113,9 @@ async function auditCoworking(page) {
   const allMarkers = frame.locator(".cw-marker");
   const markerCount = await allMarkers.count().catch(() => 0);
   check(markerCount > 0, "Coworking : membres connectés visibles sur la carte", `marqueurs: ${markerCount}`);
+  check((await frame.locator(".cw-marker.available").count().catch(() => 0)) > 0, "Coworking : au moins une personne disponible verte");
+  check((await frame.locator(".cw-marker.busy").count().catch(() => 0)) > 0, "Coworking : au moins une visio occupée rouge");
+  check((await frame.locator(".cw-media.group").count().catch(() => 0)) > 0, "Coworking : visio de groupe rendue en mosaïque");
 
   const busyMarker = frame.locator(".cw-marker.busy").first();
   const availableMarker = frame.locator(".cw-marker.available").first();
@@ -127,8 +136,9 @@ async function auditCoworking(page) {
 
   await page.getByLabel("Rejoindre la salle générale", { exact: true }).click();
   await waitRoute(page, "/coworking/hub", "Coworking : entrée Salle générale");
-  check(await page.getByText("Salle générale", { exact: true }).first().isVisible(), "Salle générale : titre visible");
-  check(await page.getByText("Touchez l’espace pour vous déplacer", { exact: true }).isVisible(), "Salle générale : mécanique spatiale compréhensible");
+  await page.getByText("Salle générale", { exact: true }).first().waitFor({ state: "visible", timeout: 7000 }).catch(() => {});
+  check(await page.getByText("Salle générale", { exact: true }).first().isVisible().catch(() => false), "Salle générale : titre visible");
+  check(await page.getByText("Touchez l’espace pour vous déplacer", { exact: true }).isVisible().catch(() => false), "Salle générale : mécanique spatiale compréhensible");
   await checkTarget(page.getByLabel("Espace de déplacement de la Salle générale", { exact: true }), "Salle générale : espace de déplacement tactile", 120);
   await checkTarget(page.getByLabel(/Couper le micro|Activer le micro/), "Salle générale : micro tactile");
   await checkTarget(page.getByLabel(/Couper la caméra|Activer la caméra/), "Salle générale : caméra tactile");
@@ -150,14 +160,20 @@ async function auditChat(page) {
   const body = `Audit suivi dernier message ${Date.now()}`;
   await composer.fill(body);
   await send.click();
-  const sent = page.getByText(body, { exact: true });
-  await sent.waitFor({ state: "visible", timeout: 4000 }).catch(() => {});
-  check(await sent.isVisible().catch(() => false), "Chat : message envoyé visible");
-  const box = await sent.boundingBox().catch(() => null);
-  if (box) {
-    const viewport = page.viewportSize();
-    check(box.bottom <= (viewport?.height ?? 852) + 1 && box.top >= -1, "Chat : écran suit automatiquement le dernier message envoyé", `top=${Math.round(box.top)}, bottom=${Math.round(box.bottom)}`);
-  } else failures.push("Chat : géométrie du dernier message indisponible");
+  const sent = await sentMessageSurface(page, body);
+  check(Boolean(sent), "Chat : message envoyé visible");
+  if (sent) {
+    const text = await sent.innerText().catch(() => "");
+    check(text.includes(body), "Chat : contenu du message réellement rendu", text.slice(0, 120));
+    const box = await sent.boundingBox().catch(() => null);
+    if (box) {
+      const viewport = page.viewportSize();
+      check(box.bottom <= (viewport?.height ?? 852) + 1 && box.top >= -1, "Chat : écran suit automatiquement le dernier message envoyé", `top=${Math.round(box.top)}, bottom=${Math.round(box.bottom)}`);
+    } else failures.push("Chat : géométrie du dernier message indisponible");
+  }
+
+  const translationToggle = page.getByLabel(/Afficher le contenu original|Afficher la traduction/).first();
+  if (await translationToggle.isVisible().catch(() => false)) await checkTarget(translationToggle, "Chat : bascule traduction tactile", 44);
 
   const voice = page.getByLabel("Lire le message vocal").first();
   if (await voice.isVisible().catch(() => false)) {
@@ -185,14 +201,10 @@ async function auditSecondaryFlows(page) {
   check(await page.getByText("Langue de Connexio", { exact: true }).last().isVisible(), "Profil : sélecteur langue fonctionnel");
   await page.getByLabel("Fermer").last().click();
 
-  await page.goto(`${BASE_URL}/account`, { waitUntil: "networkidle" });
-  check(pathOf(page).endsWith("/account"), "Compte : écran accessible");
-
-  await page.goto(`${BASE_URL}/notification-settings`, { waitUntil: "networkidle" });
-  check(pathOf(page).endsWith("/notification-settings"), "Notifications : écran accessible");
-
-  await page.goto(`${BASE_URL}/privacy`, { waitUntil: "networkidle" });
-  check(pathOf(page).endsWith("/privacy"), "Confidentialité : écran accessible");
+  for (const route of ["/account", "/notification-settings", "/privacy"]) {
+    await page.goto(`${BASE_URL}${route}`, { waitUntil: "networkidle" });
+    check(pathOf(page).endsWith(route), `${route} : écran accessible`);
+  }
 }
 
 async function run() {
@@ -231,7 +243,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: navigation, messaging auto-follow, unread/announcement UX, geographic Coworking, hello/knock, General Room spatial UX, chat voice, Feed/Map, calls, account, notifications and privacy.");
+  console.log("Interaction audit passed: navigation, messaging auto-follow, geographic Coworking, green/red presence, video mosaic, hello/knock, General Room spatial UX, chat voice, Feed/Map, calls, account, notifications and privacy.");
 }
 
 run().catch((error) => {
