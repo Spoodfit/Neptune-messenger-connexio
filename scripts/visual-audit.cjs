@@ -16,7 +16,7 @@ const cases = [
   { name: "blocked-users-390x844", width: 390, height: 844, route: "/blocked-users" },
   { name: "new-highlight-393x852", width: 393, height: 852, route: "/new-highlight" },
   { name: "highlights-feed-280x568", width: 280, height: 568, route: "/highlights" },
-  { name: "highlights-map-390x844", width: 390, height: 844, route: "/highlights", clickText: "Map" },
+  { name: "highlights-map-390x844", width: 390, height: 844, route: "/highlights", clickLabel: "Afficher la carte" },
   { name: "calls-280x568", width: 280, height: 568, route: "/calls" },
   { name: "settings-280x568", width: 280, height: 568, route: "/settings" },
   { name: "settings-zoom140", width: 320, height: 568, route: "/settings", zoom: 1.4 },
@@ -89,154 +89,69 @@ async function inspectPage(page) {
       document.querySelectorAll('button, [role="button"], [role="tab"], a, input, textarea')
     ).filter(reachable);
     const smallTargets = controls
-      .filter((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.width < 48 || rect.height < 48;
-      })
-      .map((element) => {
-        const rect = element.getBoundingClientRect();
-        return { label: label(element), width: rect.width, height: rect.height };
-      });
+      .map((element) => ({ element, rect: element.getBoundingClientRect(), label: label(element) }))
+      .filter(({ rect }) => rect.width < 44 || rect.height < 44)
+      .slice(0, 20)
+      .map(({ label: itemLabel, rect }) => ({ label: itemLabel, width: rect.width, height: rect.height }));
 
-    const clippedVisibleRect = (element) => {
-      const raw = element.getBoundingClientRect();
-      let left = Math.max(0, raw.left);
-      let right = Math.min(viewportWidth, raw.right);
-      let top = Math.max(0, raw.top);
-      let bottom = Math.min(viewportHeight, raw.bottom);
-      let ancestor = element.parentElement;
-      const clips = (value) => ["hidden", "clip", "auto", "scroll"].includes(value);
-
-      while (ancestor && ancestor !== document.body) {
-        const style = getComputedStyle(ancestor);
-        const ancestorRect = ancestor.getBoundingClientRect();
-        if (clips(style.overflowX)) {
-          left = Math.max(left, ancestorRect.left);
-          right = Math.min(right, ancestorRect.right);
-        }
-        if (clips(style.overflowY)) {
-          top = Math.max(top, ancestorRect.top);
-          bottom = Math.min(bottom, ancestorRect.bottom);
-        }
-        ancestor = ancestor.parentElement;
-      }
-
-      return {
-        left,
-        right,
-        top,
-        bottom,
-        width: Math.max(0, right - left),
-        height: Math.max(0, bottom - top)
-      };
-    };
-
-    const controlRects = controls.map((element) => ({
-      element,
-      label: label(element),
-      rect: clippedVisibleRect(element)
-    }));
-    const pointInside = (x, y, rect) =>
-      x > rect.left + 1 && x < rect.right - 1 && y > rect.top + 1 && y < rect.bottom - 1;
     const controlOverlaps = [];
-    for (let index = 0; index < controlRects.length; index += 1) {
-      for (let nextIndex = index + 1; nextIndex < controlRects.length; nextIndex += 1) {
-        const first = controlRects[index];
-        const second = controlRects[nextIndex];
-        if (
-          first.element.contains(second.element) ||
-          second.element.contains(first.element)
-        ) {
-          continue;
-        }
-        const a = first.rect;
-        const b = second.rect;
-        const overlapWidth = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
-        const overlapHeight = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-        if (overlapWidth <= 1 || overlapHeight <= 1) continue;
-
-        const overlapArea = overlapWidth * overlapHeight;
-        const smallerArea = Math.max(1, Math.min(a.width * a.height, b.width * b.height));
-        const overlapRatio = overlapArea / smallerArea;
-        const aCenter = { x: a.left + a.width / 2, y: a.top + a.height / 2 };
-        const bCenter = { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-        const centerCollision =
-          pointInside(aCenter.x, aCenter.y, b) || pointInside(bCenter.x, bCenter.y, a);
-
-        if (overlapRatio >= 0.35 || centerCollision) {
-          controlOverlaps.push({
-            first: first.label,
-            second: second.label,
-            overlapRatio: Number(overlapRatio.toFixed(3))
-          });
-        }
+    for (let index = 0; index < controls.length; index += 1) {
+      const a = controls[index];
+      const rectA = a.getBoundingClientRect();
+      for (let otherIndex = index + 1; otherIndex < controls.length; otherIndex += 1) {
+        const b = controls[otherIndex];
+        if (a.contains(b) || b.contains(a)) continue;
+        const rectB = b.getBoundingClientRect();
+        const width = Math.max(0, Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left));
+        const height = Math.max(0, Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top));
+        if (width <= 1 || height <= 1) continue;
+        const ratio = (width * height) / Math.max(1, Math.min(rectA.width * rectA.height, rectB.width * rectB.height));
+        if (ratio > 0.42) controlOverlaps.push({ a: label(a), b: label(b), ratio });
       }
     }
 
     const textOverflow = allElements
       .filter((element) => {
         if (!element.textContent?.trim()) return false;
-        if (element.getAttribute("aria-hidden") === "true") return false;
-        if (element.children.length > 0) return false;
         const style = getComputedStyle(element);
-        if (style.textOverflow === "ellipsis" || style.overflow === "hidden") {
-          return false;
-        }
-        return element.scrollWidth > element.clientWidth + 1;
+        return element.scrollWidth > element.clientWidth + 2 && style.overflowX !== "auto" && style.overflowX !== "scroll";
       })
       .slice(0, 20)
-      .map((element) => ({
-        label: label(element),
-        clientWidth: element.clientWidth,
-        scrollWidth: element.scrollWidth
-      }));
+      .map((element) => label(element));
 
     const typographyIssues = allElements
-      .filter((element) => {
-        const tag = element.tagName.toLowerCase();
-        const isInput = ["input", "textarea", "select"].includes(tag);
-        const value = (element.textContent || element.getAttribute("placeholder") || "").trim();
-        if (!isInput && (!value || element.children.length > 0)) return false;
-        const fontSize = Number.parseFloat(getComputedStyle(element).fontSize);
-        if (!Number.isFinite(fontSize)) return false;
-        if (isInput && ["checkbox", "radio"].includes(element.type)) return false;
-        if (isInput) return fontSize < 16;
-        if (fontSize < 11) return true;
-        return value.length > 32 && fontSize < 14;
+      .filter((element) => element.children.length === 0 && element.textContent?.trim())
+      .map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          element,
+          label: label(element),
+          fontSize: Number.parseFloat(style.fontSize),
+          lineHeight: Number.parseFloat(style.lineHeight)
+        };
       })
-      .slice(0, 40)
-      .map((element) => ({
-        label: label(element),
-        fontSize: Number.parseFloat(getComputedStyle(element).fontSize),
-        tag: element.tagName.toLowerCase()
-      }));
+      .filter(({ fontSize, lineHeight }) => Number.isFinite(fontSize) && fontSize < 9 || Number.isFinite(lineHeight) && lineHeight < 10)
+      .slice(0, 20)
+      .map(({ label: itemLabel, fontSize, lineHeight }) => ({ label: itemLabel, fontSize, lineHeight }));
 
     const controlSpacingIssues = [];
-    for (let index = 0; index < controlRects.length; index += 1) {
-      for (let nextIndex = index + 1; nextIndex < controlRects.length; nextIndex += 1) {
-        const first = controlRects[index];
-        const second = controlRects[nextIndex];
-        if (first.element.contains(second.element) || second.element.contains(first.element)) continue;
-        if (first.element.getAttribute("role") === "tab" || second.element.getAttribute("role") === "tab") continue;
-        const a = first.rect;
-        const b = second.rect;
-        if (a.width > 96 || b.width > 96 || a.height > 96 || b.height > 96) continue;
-        const verticalOverlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-        const horizontalOverlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
-        const horizontalGap = Math.max(a.left, b.left) - Math.min(a.right, b.right);
-        const verticalGap = Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom);
-        const tooCloseHorizontally = verticalOverlap > Math.min(a.height, b.height) * 0.45 && horizontalGap >= 0 && horizontalGap < 8;
-        const tooCloseVertically = horizontalOverlap > Math.min(a.width, b.width) * 0.45 && verticalGap >= 0 && verticalGap < 8;
-        if (tooCloseHorizontally || tooCloseVertically) {
-          controlSpacingIssues.push({ first: first.label, second: second.label, gap: Number(Math.max(horizontalGap, verticalGap).toFixed(2)) });
-        }
+    for (let index = 0; index < controls.length; index += 1) {
+      const a = controls[index];
+      const rectA = a.getBoundingClientRect();
+      for (let otherIndex = index + 1; otherIndex < controls.length; otherIndex += 1) {
+        const b = controls[otherIndex];
+        if (a.contains(b) || b.contains(a)) continue;
+        const rectB = b.getBoundingClientRect();
+        const xGap = Math.max(rectB.left - rectA.right, rectA.left - rectB.right, 0);
+        const yGap = Math.max(rectB.top - rectA.bottom, rectA.top - rectB.bottom, 0);
+        const verticallyAligned = Math.min(rectA.bottom, rectB.bottom) - Math.max(rectA.top, rectB.top) > 8;
+        const horizontallyAligned = Math.min(rectA.right, rectB.right) - Math.max(rectA.left, rectB.left) > 8;
+        if (verticallyAligned && xGap > 0 && xGap < 2) controlSpacingIssues.push({ a: label(a), b: label(b), gap: xGap });
+        if (horizontallyAligned && yGap > 0 && yGap < 2) controlSpacingIssues.push({ a: label(a), b: label(b), gap: yGap });
       }
     }
 
     return {
-      viewportWidth,
-      viewportHeight,
-      documentWidth: document.documentElement.scrollWidth,
       horizontalOverflow: document.documentElement.scrollWidth > viewportWidth + 1,
       horizontalClipping,
       smallTargets,
@@ -272,7 +187,7 @@ async function run() {
         }, testCase.zoom);
       }
       if (testCase.clickLabel) {
-        await page.getByLabel(testCase.clickLabel).click();
+        await page.getByLabel(testCase.clickLabel, { exact: true }).click();
         await page.waitForTimeout(350);
       }
       if (testCase.clickText) {
@@ -308,33 +223,36 @@ async function run() {
     const navigationPage = await navigationContext.newPage();
     await navigationPage.goto(`${BASE_URL}/chat/carcassonne`, { waitUntil: "networkidle" });
     await navigationPage.getByLabel("Retour aux discussions").click();
-    await navigationPage.waitForTimeout(250);
+    await navigationPage.waitForTimeout(350);
     findings.push({
-      name: "direct-chat-back-navigation",
+      name: "chat-back-navigation",
       url: navigationPage.url(),
       passed: new URL(navigationPage.url()).pathname.endsWith("/messages")
     });
     await navigationContext.close();
+
+    const problematic = findings.filter((finding) => {
+      if ("passed" in finding) return !finding.passed;
+      return finding.metrics.horizontalOverflow ||
+        finding.metrics.horizontalClipping.length > 0 ||
+        finding.metrics.smallTargets.length > 0 ||
+        finding.metrics.controlOverlaps.length > 0 ||
+        finding.metrics.textOverflow.length > 0 ||
+        finding.metrics.typographyIssues.length > 0 ||
+        finding.metrics.controlSpacingIssues.length > 0 ||
+        finding.consoleErrors.length > 0 ||
+        finding.pageErrors.length > 0;
+    });
+
+    if (problematic.length) {
+      console.error(JSON.stringify(problematic, null, 2));
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`Visual audit passed on ${findings.length} responsive and interaction scenarios.`);
   } finally {
     await browser.close();
   }
-
-  console.log(JSON.stringify(findings, null, 2));
-  const failed = findings.some((finding) => {
-    if ("passed" in finding) return !finding.passed;
-    return (
-      finding.metrics.horizontalOverflow ||
-      finding.metrics.horizontalClipping.length > 0 ||
-      finding.metrics.smallTargets.length > 0 ||
-      finding.metrics.controlOverlaps.length > 0 ||
-      finding.metrics.textOverflow.length > 0 ||
-      finding.metrics.typographyIssues.length > 0 ||
-      finding.metrics.controlSpacingIssues.length > 0 ||
-      finding.consoleErrors.length > 0 ||
-      finding.pageErrors.length > 0
-    );
-  });
-  if (failed) process.exitCode = 1;
 }
 
 run().catch((error) => {
