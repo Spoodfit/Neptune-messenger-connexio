@@ -59,6 +59,13 @@ async function open(page, route) {
   await settle(page, 500);
 }
 
+async function captureSimpleRoute(browser, route, name, fullPage = false) {
+  const page = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
+  await open(page, route);
+  await shot(page, name, fullPage);
+  await page.close();
+}
+
 async function run() {
   if (!fs.existsSync(path.join(root, "index.html"))) throw new Error("Build web-product-audit-dist absent");
   fs.rmSync(output, { recursive: true, force: true });
@@ -76,6 +83,11 @@ async function run() {
       const page = await browser.newPage({ viewport, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
       await open(page, "/messages");
       await shot(page, `messages-groups-${viewport.suffix}`);
+      const privateTab = page.getByRole("tab", { name: /Privées/ });
+      if (await privateTab.isVisible().catch(() => false)) {
+        await privateTab.click();
+        await shot(page, `messages-private-${viewport.suffix}`);
+      }
       await open(page, "/coworking");
       await shot(page, `coworking-map-${viewport.suffix}`);
       await page.close();
@@ -84,31 +96,31 @@ async function run() {
     const page = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
     await open(page, "/coworking");
     const mapFrame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
+
+    const availableMarker = mapFrame.locator(".cw-marker.available").first();
+    if (await availableMarker.isVisible().catch(() => false)) {
+      await availableMarker.click();
+      await shot(page, "coworking-available-person-sheet-393x852");
+      await page.getByLabel("Fermer la fiche", { exact: true }).click().catch(() => {});
+    }
+
     const busyMarker = mapFrame.locator(".cw-marker.busy").first();
     if (await busyMarker.isVisible().catch(() => false)) {
       await busyMarker.click();
-      await shot(page, "coworking-group-sheet-393x852");
+      await shot(page, "coworking-busy-group-sheet-393x852");
       await page.getByLabel("Fermer la fiche", { exact: true }).click().catch(() => {});
-    } else {
-      const anyMarker = mapFrame.locator(".cw-marker").first();
-      if (await anyMarker.isVisible().catch(() => false)) {
-        await anyMarker.click();
-        await shot(page, "coworking-person-sheet-393x852");
-        await page.getByLabel("Fermer la fiche", { exact: true }).click().catch(() => {});
-      }
     }
 
     const generalRoom = page.getByLabel("Rejoindre la salle générale", { exact: true });
     if (await generalRoom.isVisible().catch(() => false)) {
       await generalRoom.click();
-      await page.getByText("Salle générale", { exact: true }).first().waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+      await page.getByText("Salle générale", { exact: true }).first().waitFor({ state: "visible", timeout: 7000 }).catch(() => {});
       await shot(page, "coworking-general-room-393x852");
-      const roomMember = page.getByRole("button", { name: /caméra active|^[A-ZÀ-ÿ][^,]{2,}$/ }).filter({ hasNotText: "Quitter" }).first();
-      if (await roomMember.isVisible().catch(() => false)) {
-        await roomMember.click();
-        if (await page.getByLabel("Inviter dans un bureau privé", { exact: true }).isVisible().catch(() => false)) {
-          await shot(page, "coworking-general-room-member-393x852");
-        }
+      const stage = page.getByLabel("Espace de déplacement de la Salle générale", { exact: true });
+      const stageBox = await stage.boundingBox().catch(() => null);
+      if (stageBox) {
+        await page.mouse.click(stageBox.x + stageBox.width * 0.72, stageBox.y + stageBox.height * 0.68);
+        await shot(page, "coworking-general-room-after-move-393x852");
       }
     }
     await page.close();
@@ -120,6 +132,11 @@ async function run() {
     if (await voice.isVisible().catch(() => false)) {
       await voice.scrollIntoViewIfNeeded();
       await shot(chat, "chat-voice-player-393x852");
+    }
+    const translationToggle = chat.getByLabel(/Afficher le contenu original|Afficher la traduction/).first();
+    if (await translationToggle.isVisible().catch(() => false)) {
+      await translationToggle.scrollIntoViewIfNeeded();
+      await shot(chat, "chat-translation-toggle-393x852");
     }
     await chat.close();
 
@@ -133,24 +150,23 @@ async function run() {
     }
     await highlights.close();
 
-    const calls = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
-    await open(calls, "/calls");
-    await shot(calls, "calls-393x852");
-    await calls.close();
-
-    const settings = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
-    await open(settings, "/settings");
-    await shot(settings, "settings-393x852", true);
-    await settings.close();
-
-    const account = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
-    await open(account, "/account");
-    await shot(account, "account-393x852", true);
-    await account.close();
+    await captureSimpleRoute(browser, "/new-conversation", "new-conversation-393x852");
+    await captureSimpleRoute(browser, "/contacts", "contacts-393x852");
+    await captureSimpleRoute(browser, "/new-highlight", "new-highlight-393x852");
+    await captureSimpleRoute(browser, "/calls", "calls-393x852");
+    await captureSimpleRoute(browser, "/settings", "settings-393x852", true);
+    await captureSimpleRoute(browser, "/account", "account-393x852", true);
+    await captureSimpleRoute(browser, "/notification-settings", "notification-settings-393x852", true);
+    await captureSimpleRoute(browser, "/privacy", "privacy-393x852", true);
+    await captureSimpleRoute(browser, "/blocked-users", "blocked-users-393x852", true);
 
     fs.writeFileSync(
       path.join(output, "README.txt"),
-      "Captures réelles du build web V24 géographique + parcours principaux, générées avant toute nouvelle build Expo.\n"
+      [
+        "Captures réelles du build web V24 avant toute nouvelle build Expo.",
+        "Couverture : Messages Groupes/Privées 393 et 280, Map Coworking 393 et 280, fiche disponible, mosaïque occupée, Salle générale avant/après déplacement, chat/vocal/traduction, Temps forts Feed/Map, nouvelle conversation, contacts, nouveau Temps fort, appels, profil, compte, notifications, confidentialité et utilisateurs bloqués.",
+        ""
+      ].join("\n")
     );
     console.log(`V24 whole-app render review generated in ${output}`);
   } finally {
