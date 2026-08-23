@@ -32,29 +32,69 @@ async function inspectPage(page) {
   return page.evaluate(() => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
     const interactiveSelector = 'button,[role="button"],[role="tab"],[role="switch"],a[href],input,textarea';
+    const clips = (value) => ["hidden", "clip", "auto", "scroll"].includes(value);
+    const rectObject = (rect) => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height });
     const visible = (element) => {
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && style.pointerEvents !== "none" && Number(style.opacity || "1") > 0.02 && rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.left < viewport.width && rect.bottom > 0 && rect.top < viewport.height && !element.closest('[aria-hidden="true"],[inert]');
     };
     const label = (element) => (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().replace(/\s+/g, " ").slice(0, 100);
-    const rectObject = (rect) => ({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height });
+    const clippedRect = (element) => {
+      const raw = element.getBoundingClientRect();
+      let left = Math.max(0, raw.left);
+      let right = Math.min(viewport.width, raw.right);
+      let top = Math.max(0, raw.top);
+      let bottom = Math.min(viewport.height, raw.bottom);
+      let ancestor = element.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        const style = getComputedStyle(ancestor);
+        const rect = ancestor.getBoundingClientRect();
+        if (clips(style.overflowX)) {
+          left = Math.max(left, rect.left);
+          right = Math.min(right, rect.right);
+        }
+        if (clips(style.overflowY)) {
+          top = Math.max(top, rect.top);
+          bottom = Math.min(bottom, rect.bottom);
+        }
+        ancestor = ancestor.parentElement;
+      }
+      return {
+        left,
+        right,
+        top,
+        bottom,
+        width: Math.max(0, right - left),
+        height: Math.max(0, bottom - top)
+      };
+    };
     const controls = [...document.querySelectorAll(interactiveSelector)]
       .filter(visible)
-      .map((element) => ({ element, label: label(element), rect: rectObject(element.getBoundingClientRect()) }));
+      .map((element) => ({
+        element,
+        label: label(element),
+        raw: rectObject(element.getBoundingClientRect()),
+        rect: clippedRect(element)
+      }))
+      .filter(({ rect }) => rect.width > 1 && rect.height > 1);
 
     const smallTargets = controls
-      .filter(({ rect }) => {
-        const fullyInside = rect.top >= 8 && rect.bottom <= viewport.height - 8 && rect.left >= 0 && rect.right <= viewport.width;
-        return fullyInside && (rect.width < 44 || rect.height < 44);
+      .filter(({ raw, rect }) => {
+        const fullyRendered = Math.abs(raw.width - rect.width) <= 1 && Math.abs(raw.height - rect.height) <= 1;
+        const fullyInside = raw.top >= 8 && raw.bottom <= viewport.height - 8 && raw.left >= 0 && raw.right <= viewport.width;
+        return fullyRendered && fullyInside && (raw.width < 44 || raw.height < 44);
       })
       .slice(0, 12)
-      .map(({ label: itemLabel, rect }) => ({ label: itemLabel, width: rect.width, height: rect.height }));
+      .map(({ label: itemLabel, raw }) => ({ label: itemLabel, width: raw.width, height: raw.height }));
 
     const horizontalClipping = controls
-      .filter(({ rect }) => rect.left < -1 || rect.right > viewport.width + 1)
+      .filter(({ raw, rect }) => {
+        const cutByScrollableAncestor = rect.width + 1 < raw.width;
+        return !cutByScrollableAncestor && (raw.left < -1 || raw.right > viewport.width + 1);
+      })
       .slice(0, 12)
-      .map(({ label: itemLabel, rect }) => ({ label: itemLabel, left: rect.left, right: rect.right }));
+      .map(({ label: itemLabel, raw }) => ({ label: itemLabel, left: raw.left, right: raw.right }));
 
     const controlOverlaps = [];
     for (let index = 0; index < controls.length; index += 1) {
