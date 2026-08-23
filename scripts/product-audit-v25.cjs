@@ -76,8 +76,9 @@ async function auditCenterMapButton(page, label) {
   }
   const viewport = page.viewportSize();
   const compact = Boolean(viewport && viewport.width < 310);
-  for (const [tabName, visibleLabel] of [["Messages", "Messages"], ["Temps forts", compact ? "Temps" : "Temps forts"]]) {
-    const labelNode = page.getByRole("tab", { name: tabName, exact: true }).getByText(visibleLabel, { exact: true });
+  const messagesTab = page.getByRole("tab", { name: /^Messages(?:,|$)/ });
+  for (const [tab, visibleLabel] of [[messagesTab, "Messages"], [page.getByRole("tab", { name: "Temps forts", exact: true }), compact ? "Temps" : "Temps forts"]]) {
+    const labelNode = tab.getByText(visibleLabel, { exact: true });
     if (await expectVisible(labelNode, `${label} libellé ${visibleLabel}`)) {
       const box = await labelNode.boundingBox();
       if (!box || box.height > 15) failures.push(`${label}: libellé ${visibleLabel} sur plusieurs lignes (${Math.round(box?.height ?? 0)}px)`);
@@ -85,10 +86,10 @@ async function auditCenterMapButton(page, label) {
       if (clipped) failures.push(`${label}: libellé ${visibleLabel} tronqué horizontalement`);
     }
   }
-  if (compact && await button.isVisible().catch(() => false)) {
+  if (compact && await button.isVisible().catch(() => false) && await messagesTab.isVisible().catch(() => false)) {
     const [buttonBox, tabBox] = await Promise.all([
       button.boundingBox(),
-      page.getByRole("tab", { name: "Messages", exact: true }).boundingBox()
+      messagesTab.boundingBox()
     ]);
     if (!buttonBox || !tabBox || buttonBox.y < tabBox.y - 4) failures.push(`${label}: bouton Map compact déborde au-dessus de la navigation`);
   }
