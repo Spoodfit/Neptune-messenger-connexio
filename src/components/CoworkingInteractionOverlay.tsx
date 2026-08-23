@@ -1,12 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "./LocalizedText";
 import { StatusAvatar } from "./StatusAvatar";
-import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import { env } from "../config/env";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
@@ -14,10 +13,10 @@ import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { useActionSounds } from "../services/audio/actionSounds";
 import { CoworkingMapApi } from "../services/api/coworkingMapApi";
-import { NeptuneMessagingApi } from "../services/api/neptuneApi";
-import { RealtimeClient, type RealtimeEvent } from "../services/realtime/RealtimeClient";
-
-const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
+import {
+  subscribeCoworkingInteractions,
+  type CoworkingInteractionEvent
+} from "../services/coworking/coworkingInteractionBus";
 
 type HelloState = { fromUserId: string; nonce: number } | null;
 type KnockState = { requestId: string; fromUserId: string; spaceId: string } | null;
@@ -36,15 +35,10 @@ export function CoworkingInteractionOverlay() {
   const [hello, setHello] = useState<HelloState>(null);
   const [knock, setKnock] = useState<KnockState>(null);
   const [responding, setResponding] = useState(false);
-  const realtimeRef = useRef<RealtimeClient | null>(null);
   const helloTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const mapApi = useMemo(
     () => (env.mockMode || !accessToken ? null : new CoworkingMapApi(accessToken)),
-    [accessToken]
-  );
-  const messagingApi = useMemo(
-    () => (env.mockMode || !accessToken ? null : new NeptuneMessagingApi(accessToken)),
     [accessToken]
   );
 
@@ -68,55 +62,30 @@ export function CoworkingInteractionOverlay() {
   }, [hello]);
 
   useEffect(() => {
-    if (
-      env.mockMode ||
-      !messagingApi ||
-      !env.realtimeUrl ||
-      !BACKEND_CAPABILITIES.realtime
-    ) {
-      return;
-    }
-
-    let disposed = false;
-    const handleEvent = (event: RealtimeEvent) => {
-      if (event.type === "coworking.hello") {
-        if (event.payload.fromUserId === currentUser.id) return;
-        setHello({ fromUserId: event.payload.fromUserId, nonce: Date.now() });
+    const onInteraction = (event: CoworkingInteractionEvent) => {
+      if (event.type === "hello") {
+        if (event.fromUserId === currentUser.id) return;
+        setHello({ fromUserId: event.fromUserId, nonce: Date.now() });
         return;
       }
-      if (event.type === "coworking.knock") {
-        if (event.payload.fromUserId === currentUser.id) return;
-        setKnock(event.payload);
+      if (event.type === "knock") {
+        if (event.fromUserId === currentUser.id) return;
+        setKnock({
+          requestId: event.requestId,
+          fromUserId: event.fromUserId,
+          spaceId: event.spaceId
+        });
         void playKnock();
         return;
       }
-      if (event.type === "coworking.knock.resolved" && event.payload.status === "accepted" && event.payload.spaceId) {
-        void joinSpace(event.payload.spaceId)
-          .then(() => router.push(`/coworking/${encodeURIComponent(event.payload.spaceId!)}`))
+      if (event.type === "knock-resolved" && event.status === "accepted" && event.spaceId) {
+        void joinSpace(event.spaceId)
+          .then(() => router.push(`/coworking/${encodeURIComponent(event.spaceId!)}`))
           .catch(() => undefined);
       }
     };
-
-    const client = new RealtimeClient({
-      url: env.realtimeUrl,
-      ticketProvider: async () => (await messagingApi.requestRealtimeTicket()).ticket,
-      onEvent: handleEvent
-    });
-    realtimeRef.current = client;
-    if (AppState.currentState === "active") client.connect();
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") client.connect();
-      else client.disconnect();
-    });
-
-    return () => {
-      disposed = true;
-      subscription.remove();
-      client.disconnect();
-      if (!disposed && realtimeRef.current === client) realtimeRef.current = null;
-      if (realtimeRef.current === client) realtimeRef.current = null;
-    };
-  }, [currentUser.id, joinSpace, messagingApi, playKnock]);
+    return subscribeCoworkingInteractions(onInteraction);
+  }, [currentUser.id, joinSpace, playKnock]);
 
   const answerKnock = async (accepted: boolean) => {
     if (!knock || responding) return;
