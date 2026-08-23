@@ -16,16 +16,27 @@ export default function CoworkingGeographicMap({
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const onSelectMarkerRef = useRef(onSelectMarker);
+  const onSelectEventRef = useRef(onSelectEvent);
+
+  useEffect(() => {
+    onSelectMarkerRef.current = onSelectMarker;
+    onSelectEventRef.current = onSelectEvent;
+  }, [onSelectEvent, onSelectMarker]);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (event.data?.source !== "connexio-coworking-map") return;
-      if (event.data?.type === "marker-selected" && typeof event.data.id === "string") onSelectMarker(event.data.id);
-      if (event.data?.type === "event-selected" && typeof event.data.id === "string") onSelectEvent?.(event.data.id);
+      if (event.data?.type === "marker-selected" && typeof event.data.id === "string") {
+        onSelectMarkerRef.current(event.data.id);
+      }
+      if (event.data?.type === "event-selected" && typeof event.data.id === "string") {
+        onSelectEventRef.current?.(event.data.id);
+      }
     };
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
-  }, [onSelectEvent, onSelectMarker]);
+  }, []);
 
   const postSelection = () => {
     iframeRef.current?.contentWindow?.postMessage(
