@@ -60,6 +60,11 @@ async function intersectionRatio(locator) {
   })).catch(() => 0);
 }
 
+async function waitForFrameCount(locator, timeout = 7000) {
+  await locator.first().waitFor({ state: "attached", timeout }).catch(() => {});
+  return locator.count().catch(() => 0);
+}
+
 async function sentMessageSurface(page, body) {
   const candidate = page.locator(`[aria-label*="${body.replaceAll('"', '\\"')}"]`).first();
   await candidate.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
@@ -118,12 +123,23 @@ async function auditMap(page) {
   const mapRoot = frame.locator("#map");
   await mapRoot.waitFor({ state: "visible", timeout: 7000 }).catch(() => {});
   check(await mapRoot.isVisible().catch(() => false), "Map : carte Leaflet visible");
-  check((await frame.locator(".cw-marker.available").count().catch(() => 0)) > 0, "Map : au moins une personne disponible verte");
-  check((await frame.locator(".cw-marker.busy").count().catch(() => 0)) > 0, "Map : au moins une visio occupée rouge");
-  check((await frame.locator(".cw-group .cw-satellite").count().catch(() => 0)) > 0, "Map : visio de groupe en cercles satellites");
-  check((await frame.locator(".event-marker .event-flag").count().catch(() => 0)) > 0, "Map : événements en drapeaux");
 
-  const available = frame.locator(".cw-marker.available").first();
+  const availableMarkers = frame.locator(".cw-marker.available");
+  const busyMarkers = frame.locator(".cw-marker.busy");
+  const groupSatellites = frame.locator(".cw-group .cw-satellite");
+  const eventFlags = frame.locator(".event-marker .event-flag");
+  const [availableCount, busyCount, satelliteCount, eventFlagCount] = await Promise.all([
+    waitForFrameCount(availableMarkers),
+    waitForFrameCount(busyMarkers),
+    waitForFrameCount(groupSatellites),
+    waitForFrameCount(eventFlags)
+  ]);
+  check(availableCount > 0, "Map : au moins une personne disponible verte");
+  check(busyCount > 0, "Map : au moins une visio occupée rouge");
+  check(satelliteCount > 0, "Map : visio de groupe en cercles satellites");
+  check(eventFlagCount > 0, "Map : événements en drapeaux");
+
+  const available = availableMarkers.first();
   if (await available.isVisible().catch(() => false)) {
     await available.click();
     await waitForMapSheet(page);
@@ -134,7 +150,7 @@ async function auditMap(page) {
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
-  const busy = frame.locator(".cw-marker.busy").first();
+  const busy = busyMarkers.first();
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
     await waitForMapSheet(page);
