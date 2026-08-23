@@ -136,8 +136,31 @@ async function auditMap(page, label, interactive = false) {
     const r = node.getBoundingClientRect(); const s = getComputedStyle(node); return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden";
   }).length);
   if (visibleClusters > 0) failures.push("Map zoomée: clusters encore visibles alors que l’espace permet le dégroupage automatique");
-  const visiblePeople = await frame.locator(".cw-marker").evaluateAll((nodes) => nodes.filter((node) => node.getBoundingClientRect().width > 0).length);
-  if (visiblePeople < 2) failures.push("Map zoomée: utilisateurs non dégroupés automatiquement");
+
+  const splitGeometry = await frame.locator(".cw-group.zoom-split").evaluateAll((groups) => {
+    let visiblePeople = 0;
+    let splitGroups = 0;
+    let minimumGap = Infinity;
+    for (const group of groups) {
+      const core = group.querySelector(".cw-core");
+      if (!core) continue;
+      const coreRect = core.getBoundingClientRect();
+      if (coreRect.width <= 0 || coreRect.height <= 0) continue;
+      splitGroups += 1;
+      visiblePeople += 1;
+      const coreCenter = { x: coreRect.left + coreRect.width / 2, y: coreRect.top + coreRect.height / 2 };
+      for (const person of group.querySelectorAll(".cw-person-marker")) {
+        const rect = person.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        visiblePeople += 1;
+        const distance = Math.hypot(rect.left + rect.width / 2 - coreCenter.x, rect.top + rect.height / 2 - coreCenter.y);
+        minimumGap = Math.min(minimumGap, distance);
+      }
+    }
+    return { splitGroups, visiblePeople, minimumGap: Number.isFinite(minimumGap) ? minimumGap : 0 };
+  });
+  if (splitGeometry.splitGroups === 0 || splitGeometry.visiblePeople < 2) failures.push("Map zoomée: utilisateurs non dégroupés automatiquement");
+  if (splitGeometry.splitGroups > 0 && splitGeometry.minimumGap < 42) failures.push(`Map zoomée: séparation des personnes insuffisante (${Math.round(splitGeometry.minimumGap)}px)`);
 
   const hostCollisions = await frame.locator(".cw-core").evaluateAll((nodes) => {
     const rects = nodes.map((node) => node.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
@@ -191,7 +214,7 @@ async function run() {
     console.error("Product Audit V25 failed:\n" + failures.map((failure) => `- ${failure}`).join("\n"));
     process.exitCode = 1;
   } else {
-    console.log("Product Audit V25 passed: centered Map navigation, feed-only Temps forts, event flags, circular video satellites, adaptive marker density, automatic declustering, availability knock logic, no General Room, and core-route geometry.");
+    console.log("Product Audit V25 passed: centered Map navigation, feed-only Temps forts, event flags, circular video satellites, adaptive marker density, automatic zoom split, availability knock logic, no General Room, and core-route geometry.");
   }
 }
 
