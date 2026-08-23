@@ -51,13 +51,13 @@ export function CoworkingPortalButton() {
         >
           <LinearGradient colors={gradients.primary} style={[styles.gradient, compactBar && styles.compactGradient]}>
             <Ionicons name="map-outline" size={compactBar ? 24 : 27} color={colors.white} />
-            {activeCount > 0 ? (
-              <View style={styles.countPill} pointerEvents="none">
-                <Text style={styles.countText}>{activeCount > 99 ? "99+" : String(activeCount)}</Text>
-              </View>
-            ) : null}
           </LinearGradient>
         </Pressable>
+        {activeCount > 0 ? (
+          <View testID="coworking-active-count" style={styles.countPill} pointerEvents="none">
+            <Text style={styles.countText}>{activeCount > 99 ? "99+" : String(activeCount)}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -78,7 +78,8 @@ const styles = StyleSheet.create({
     width: 62,
     height: 62,
     borderRadius: 31,
-    padding: 4
+    padding: 4,
+    position: "relative"
   },
   compactShell: { width: 54, height: 54, borderRadius: 27, padding: 3 },
   halo: {
@@ -104,8 +105,8 @@ const styles = StyleSheet.create({
   compactGradient: { borderRadius: 24 },
   countPill: {
     position: "absolute",
-    right: -4,
-    top: -4,
+    right: -2,
+    top: -2,
     minWidth: 24,
     height: 20,
     paddingHorizontal: 5,
@@ -114,7 +115,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "rgba(255,255,255,0.34)",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    zIndex: 4,
+    elevation: 55
   },
   countText: { color: colors.white, fontSize: 10, lineHeight: 12, fontWeight: "900" }
 });

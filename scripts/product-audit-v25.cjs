@@ -74,6 +74,23 @@ async function auditCenterMapButton(page, label) {
     const viewport = page.viewportSize();
     if (!box || !viewport || Math.abs(box.x + box.width / 2 - viewport.width / 2) > 2.5) failures.push(`${label}: bouton Map non centré`);
   }
+  const countBadge = page.getByTestId("coworking-active-count");
+  if (await expectVisible(countBadge, `${label} compteur Map`)) {
+    const badgeVisibility = await countBadge.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      let visible = { left: Math.max(0, rect.left), top: Math.max(0, rect.top), right: Math.min(window.innerWidth, rect.right), bottom: Math.min(window.innerHeight, rect.bottom) };
+      for (let ancestor = node.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor);
+        if (!/(hidden|clip|scroll|auto)/.test(`${style.overflow} ${style.overflowX} ${style.overflowY}`)) continue;
+        const parentRect = ancestor.getBoundingClientRect();
+        visible = { left: Math.max(visible.left, parentRect.left), top: Math.max(visible.top, parentRect.top), right: Math.min(visible.right, parentRect.right), bottom: Math.min(visible.bottom, parentRect.bottom) };
+      }
+      const area = Math.max(0, visible.right - visible.left) * Math.max(0, visible.bottom - visible.top);
+      return { ratio: area / Math.max(1, rect.width * rect.height), text: node.textContent?.trim() ?? "" };
+    });
+    if (!/^\d+(?:\+)?$/.test(badgeVisibility.text)) failures.push(`${label}: compteur Map illisible (${badgeVisibility.text || "vide"})`);
+    if (badgeVisibility.ratio < .98) failures.push(`${label}: compteur Map rogné (${Math.round(badgeVisibility.ratio * 100)}% visible)`);
+  }
   const viewport = page.viewportSize();
   const compact = Boolean(viewport && viewport.width < 350);
   const messagesTab = page.getByRole("tab", { name: /^Messages(?:,|$)/ });
