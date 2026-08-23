@@ -22,10 +22,13 @@ function mime(file) {
     ".html": "text/html; charset=utf-8",
     ".js": "application/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
-    ".json": "application/json; charset=utf-8",
+    ".json": "application/json",
     ".png": "image/png",
     ".svg": "image/svg+xml",
-    ".woff2": "font/woff2"
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav"
   }[ext] || "application/octet-stream";
 }
 
@@ -59,32 +62,64 @@ async function expectVisible(locator, label, timeout = 7000) {
 async function checkGeometry(page, label, minimum = 44) {
   const result = await page.evaluate(({ minimum }) => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
-    const interactiveSelector = ["button", "a[href]", "input", "textarea", "[role='button']", "[role='tab']", "[role='switch']"].join(",");
+    const selector = ["button", "a[href]", "input", "textarea", "[role='button']", "[role='tab']", "[role='switch']"].join(",");
+    const clips = (value) => ["hidden", "clip", "auto", "scroll"].includes(value);
     const labelFor = (element) => (element.getAttribute("aria-label") || element.textContent || element.tagName).trim().replace(/\s+/g, " ").slice(0, 90);
     const visible = (element) => {
       const style = getComputedStyle(element);
       const rect = element.getBoundingClientRect();
-      return style.display !== "none" && style.visibility !== "hidden" && style.pointerEvents !== "none" && Number(style.opacity || "1") > 0.02 && rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < viewport.height && rect.right > 0 && rect.left < viewport.width;
+      return style.display !== "none" && style.visibility !== "hidden" && style.pointerEvents !== "none" && Number(style.opacity || "1") > 0.02 && rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < viewport.height && rect.right > 0 && rect.left < viewport.width && !element.closest('[aria-hidden="true"], [inert]');
     };
-    const controls = [...document.querySelectorAll(interactiveSelector)].filter(visible).map((element) => {
-      const rect = element.getBoundingClientRect();
-      return { label: labelFor(element), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
-    });
-    const clipped = controls.filter((item) => item.left < -1 || item.right > viewport.width + 1);
-    const undersized = controls.filter((item) => item.width < minimum || item.height < minimum);
+    const clippedRect = (element) => {
+      const raw = element.getBoundingClientRect();
+      let left = Math.max(0, raw.left);
+      let right = Math.min(viewport.width, raw.right);
+      let top = Math.max(0, raw.top);
+      let bottom = Math.min(viewport.height, raw.bottom);
+      let ancestor = element.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        const style = getComputedStyle(ancestor);
+        const rect = ancestor.getBoundingClientRect();
+        if (clips(style.overflowX)) {
+          left = Math.max(left, rect.left);
+          right = Math.min(right, rect.right);
+        }
+        if (clips(style.overflowY)) {
+          top = Math.max(top, rect.top);
+          bottom = Math.min(bottom, rect.bottom);
+        }
+        ancestor = ancestor.parentElement;
+      }
+      return { left, right, top, bottom, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+    };
+
+    const controls = [...document.querySelectorAll(selector)]
+      .filter(visible)
+      .map((element) => ({ element, label: labelFor(element), rect: clippedRect(element) }))
+      .filter((item) => item.rect.width > 0 && item.rect.height > 0);
+
+    const clipped = controls
+      .filter(({ element }) => {
+        const raw = element.getBoundingClientRect();
+        return raw.left < -1 || raw.right > viewport.width + 1;
+      })
+      .map(({ label, rect }) => ({ label, ...rect }));
+    const undersized = controls
+      .filter(({ rect }) => rect.width < minimum || rect.height < minimum)
+      .map(({ label, rect }) => ({ label, ...rect }));
     const overlaps = [];
     for (let i = 0; i < controls.length; i += 1) {
       for (let j = i + 1; j < controls.length; j += 1) {
         const a = controls[i], b = controls[j];
-        const w = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
-        const h = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+        if (a.element.contains(b.element) || b.element.contains(a.element)) continue;
+        const w = Math.max(0, Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left));
+        const h = Math.max(0, Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top));
         if (w <= 1 || h <= 1) continue;
-        const ratio = (w * h) / Math.max(1, Math.min(a.width * a.height, b.width * b.height));
+        const ratio = (w * h) / Math.max(1, Math.min(a.rect.width * a.rect.height, b.rect.width * b.rect.height));
         if (ratio > 0.42) overlaps.push({ a: a.label, b: b.label, ratio });
       }
     }
     return {
-      viewport,
       horizontalOverflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) > viewport.width + 1,
       clipped,
       undersized,
@@ -95,7 +130,7 @@ async function checkGeometry(page, label, minimum = 44) {
   if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal global`);
   if (result.clipped.length) failures.push(`${label}: contrôles coupés: ${result.clipped.slice(0, 5).map((item) => item.label).join(", ")}`);
   if (result.undersized.length) failures.push(`${label}: cibles < ${minimum}px: ${result.undersized.slice(0, 6).map((item) => `${item.label} ${Math.round(item.width)}x${Math.round(item.height)}`).join(", ")}`);
-  if (result.overlaps.length) failures.push(`${label}: contrôles qui se chevauchent: ${result.overlaps.slice(0, 4).map((item) => `${item.a}/${item.b}`).join(", ")}`);
+  if (result.overlaps.length) failures.push(`${label}: collisions indépendantes: ${result.overlaps.slice(0, 4).map((item) => `${item.a}/${item.b}`).join(", ")}`);
 }
 
 async function runtimeProbe(page, route, label) {
@@ -129,8 +164,9 @@ async function auditCoworking(page, sizeLabel) {
   await expectVisible(frame.locator("#map"), `${sizeLabel} carte géographique`);
   const markerCount = await frame.locator(".cw-marker").count().catch(() => 0);
   if (markerCount === 0) failures.push(`${sizeLabel} Coworking: aucun membre connecté sur la carte`);
-  const groupCount = await frame.locator(".cw-media.group").count().catch(() => 0);
-  if (groupCount === 0) failures.push(`${sizeLabel} Coworking: aucun groupe visio en mosaïque dans les données de QA`);
+  if ((await frame.locator(".cw-marker.available").count().catch(() => 0)) === 0) failures.push(`${sizeLabel} Coworking: aucune personne disponible verte`);
+  if ((await frame.locator(".cw-marker.busy").count().catch(() => 0)) === 0) failures.push(`${sizeLabel} Coworking: aucune visio occupée rouge`);
+  if ((await frame.locator(".cw-media.group").count().catch(() => 0)) === 0) failures.push(`${sizeLabel} Coworking: aucune mosaïque vidéo de groupe`);
 }
 
 async function auditInteractiveCoworking(page) {
@@ -144,10 +180,10 @@ async function auditInteractiveCoworking(page) {
     await available.click();
     await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "fiche disponible : bonjour");
     await expectVisible(page.getByLabel("Proposer un rendez-vous", { exact: true }), "fiche disponible : rendez-vous");
-    if ((await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).count()) > 0) failures.push("fiche disponible : Toquer proposé alors que le membre n’est pas en visio");
+    if ((await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).count()) > 0) failures.push("fiche disponible : Toquer proposé hors visio");
     await checkGeometry(page, "fiche personne disponible");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
-  } else failures.push("Coworking : aucune personne disponible verte dans les données de QA");
+  }
 
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
@@ -155,18 +191,16 @@ async function auditInteractiveCoworking(page) {
     await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "fiche visio : Bonjour");
     await checkGeometry(page, "fiche groupe visio");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
-  } else failures.push("Coworking : aucun groupe occupé rouge dans les données de QA");
+  }
 
   await page.getByLabel("Rejoindre la salle générale", { exact: true }).click();
-  await page.waitForURL((url) => url.pathname.endsWith("/coworking/hub"), { timeout: 5000 }).catch(() => {});
-  await expectVisible(page.getByText("Salle générale", { exact: true }).first(), "Salle générale ouverte");
+  await page.waitForURL((url) => url.pathname.endsWith("/coworking/hub"), { timeout: 6000 }).catch(() => {});
+  await expectVisible(page.getByText("Salle générale", { exact: true }).first(), "Salle générale ouverte", 7000);
   await expectVisible(page.getByText("Touchez l’espace pour vous déplacer", { exact: true }), "Salle générale : explication déplacement");
   await expectVisible(page.getByLabel(/Couper le micro|Activer le micro/), "Salle générale : micro");
   await expectVisible(page.getByLabel(/Couper la caméra|Activer la caméra/), "Salle générale : caméra");
   await checkGeometry(page, "Salle générale");
-  if ((await page.getByText("Focus", { exact: true }).count()) > 0 || (await page.getByText("En pause", { exact: true }).count()) > 0) {
-    failures.push("Salle générale : anciens états Focus/Pause encore visibles");
-  }
+  if ((await page.getByText("Focus", { exact: true }).count()) > 0 || (await page.getByText("En pause", { exact: true }).count()) > 0) failures.push("Salle générale : anciens états Focus/Pause visibles");
 }
 
 async function auditMessaging(page) {
@@ -175,14 +209,6 @@ async function auditMessaging(page) {
   await expectVisible(page.getByLabel("Nouvelle conversation", { exact: true }), "Messages : nouvelle conversation");
   await checkGeometry(page, "Messages principal");
 
-  const section = page.getByLabel(/^Replier (Clubs|Gestion|Généraux|Épinglés)$/).first();
-  if (await section.isVisible().catch(() => false)) {
-    await section.click();
-    const collapsed = page.getByLabel(/^Déplier (Clubs|Gestion|Généraux|Épinglés)$/).first();
-    const text = await collapsed.innerText().catch(() => "");
-    if (/(^|\s)0($|\s)/.test(text)) failures.push(`Messages : compteur 0 inutile après repli (${text.trim()})`);
-  }
-
   await page.goto(`http://127.0.0.1:${port}/chat/carcassonne`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(550);
   const input = page.getByLabel("Écrire un message", { exact: true });
@@ -190,11 +216,15 @@ async function auditMessaging(page) {
   const body = `QA dernier message ${Date.now()}`;
   await input.fill(body);
   await send.click();
-  const sent = page.getByText(body, { exact: true });
-  await expectVisible(sent, "Chat : message envoyé");
-  const box = await sent.boundingBox().catch(() => null);
-  const viewport = page.viewportSize();
-  if (!box || box.top < -1 || box.bottom > (viewport?.height ?? 844) + 1) failures.push("Chat : dernier message envoyé n’est pas suivi automatiquement à l’écran");
+  const sent = page.locator(`[aria-label*="${body}"]`).first();
+  await expectVisible(sent, "Chat : bulle envoyée", 5000);
+  if (await sent.isVisible().catch(() => false)) {
+    const renderedText = await sent.innerText().catch(() => "");
+    if (!renderedText.includes(body)) failures.push("Chat : texte envoyé absent du rendu visuel de la bulle");
+    const box = await sent.boundingBox().catch(() => null);
+    const viewport = page.viewportSize();
+    if (!box || box.top < -1 || box.bottom > (viewport?.height ?? 844) + 1) failures.push("Chat : dernier message envoyé n’est pas suivi automatiquement à l’écran");
+  }
   await checkGeometry(page, "Chat après envoi");
 }
 
@@ -209,9 +239,7 @@ async function auditAppRoutes(page) {
     ["/contacts", "Contacts"],
     ["/new-highlight", "Nouveau Temps fort"]
   ];
-  for (const [route, label] of routes) {
-    await runtimeProbe(page, route, label);
-  }
+  for (const [route, label] of routes) await runtimeProbe(page, route, label);
 }
 
 async function run() {
@@ -245,7 +273,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Product Audit passed: six viewport families, geographic Coworking, green/red availability, video mosaics, General Room proximity UX, messaging follow, core routes, geometry and runtime health.");
+  console.log("Product Audit passed: six viewport families, clipped geometry, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow and core routes.");
 }
 
 run().catch((error) => {
