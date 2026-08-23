@@ -52,10 +52,17 @@ async function run() {
     const busy = mapFrame.locator(".cw-marker.busy").first();
     if (await busy.isVisible().catch(() => false)) { await busy.click(); await shot(page, "map-video-satellites-393x852"); await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {}); }
     const event = mapFrame.locator(".event-marker").first();
-    if (await event.isVisible().catch(() => false)) { await event.click(); await shot(page, "map-event-flag-sheet-393x852"); await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {}); }
-    const mapNode = mapFrame.locator("#map");
-    await mapNode.hover();
+    if (await event.isVisible().catch(() => false)) {
+      await event.click();
+      await page.mouse.move(20, 180);
+      await shot(page, "map-event-flag-sheet-393x852");
+      await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
+    }
+    const zoomAnchor = await busy.isVisible().catch(() => false) ? busy : mapFrame.locator("#map");
+    await zoomAnchor.hover();
     for (let i=0;i<6;i+=1) { await page.mouse.wheel(0,-900); await page.waitForTimeout(160); }
+    await mapFrame.locator(".cw-group.zoom-split").first().waitFor({ state:"visible", timeout:3000 }).catch(() => {});
+    await page.mouse.move(20, 180);
     await shot(page, "map-zoomed-declustered-393x852");
     await page.close();
 
@@ -69,7 +76,7 @@ async function run() {
       await open(p, route); await shot(p, name, full); await p.close();
     }
 
-    fs.writeFileSync(path.join(output, "README.txt"), "Captures réelles du build V24 réorienté : Temps forts feed-only, bouton Map central, Map unifiée membres/visios/évènements, dégroupage au zoom et principaux parcours.\n");
+    fs.writeFileSync(path.join(output, "README.txt"), "Captures réelles du build V25 : Temps forts feed-only, bouton Map central, Map unifiée membres/visios/évènements, dégroupage au zoom et principaux parcours.\n");
     console.log(`V25 render review generated in ${output}`);
   } finally {
     await browser.close(); await new Promise((resolve) => server.close(resolve));
