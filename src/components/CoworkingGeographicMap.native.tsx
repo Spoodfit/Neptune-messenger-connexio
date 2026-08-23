@@ -1,7 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { useAppTheme } from "../providers/ThemeProvider";
@@ -10,9 +10,12 @@ import type { CoworkingGeographicMapProps } from "./CoworkingGeographicMap.types
 
 export default function CoworkingGeographicMap({
   markers,
+  events = [],
   mediaSession,
   selectedMarkerId,
+  selectedEventId,
   onSelectMarker,
+  onSelectEvent,
   onLocationUnavailable
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
@@ -22,6 +25,7 @@ export default function CoworkingGeographicMap({
     () =>
       buildCoworkingGeographicMapHtml({
         markers,
+        events,
         mediaSession,
         bridge: "native",
         theme: {
@@ -35,17 +39,29 @@ export default function CoworkingGeographicMap({
           isLight: theme.isLight
         }
       }),
-    [markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
+    [events, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
   );
 
+  const postSelection = () => {
+    webViewRef.current?.postMessage(
+      JSON.stringify({
+        type: "selection",
+        markerId: selectedMarkerId ?? null,
+        eventId: selectedEventId ?? null
+      })
+    );
+  };
+
   useEffect(() => {
-    webViewRef.current?.postMessage(JSON.stringify({ type: "selection", id: selectedMarkerId ?? null }));
-  }, [selectedMarkerId]);
+    postSelection();
+  }, [selectedEventId, selectedMarkerId]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const payload = JSON.parse(event.nativeEvent.data) as { type?: string; id?: string };
-      if (payload.type === "marker-selected" && payload.id) onSelectMarker(payload.id);
+      if (!payload.id) return;
+      if (payload.type === "marker-selected") onSelectMarker(payload.id);
+      if (payload.type === "event-selected") onSelectEvent?.(payload.id);
     } catch {}
   };
 
@@ -81,7 +97,7 @@ export default function CoworkingGeographicMap({
         ref={webViewRef}
         source={{ html }}
         onMessage={handleMessage}
-        onLoadEnd={() => webViewRef.current?.postMessage(JSON.stringify({ type: "selection", id: selectedMarkerId ?? null }))}
+        onLoadEnd={postSelection}
         javaScriptEnabled
         domStorageEnabled
         mediaPlaybackRequiresUserAction={false}
