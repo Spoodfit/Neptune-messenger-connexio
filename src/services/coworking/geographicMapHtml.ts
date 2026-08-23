@@ -66,14 +66,14 @@ export function buildCoworkingGeographicMapHtml({
 :root{--bg:${theme.pageBackground};--surface:${theme.surface};--surfaceStrong:${theme.surfaceStrong};--text:${theme.pageText};--muted:${theme.pageTextMuted};--border:${theme.border};--shell:${theme.shellBackground};--available:#35D58B;--busy:#FF5868}
 *{box-sizing:border-box}html,body,#map{height:100%;width:100%;margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}.leaflet-control-attribution{background:rgba(0,0,0,.12)!important;color:var(--muted)!important;font-size:7px!important}.leaflet-control-attribution a{color:var(--muted)!important}.leaflet-pane.leaflet-marker-pane{z-index:620}.leaflet-tooltip{background:var(--shell)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:11px!important;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.16)!important;padding:6px 9px!important}
 .cw-marker{--offset-x:0px;--offset-y:0px;--core-size:42px;--sat-size:23px;position:relative;width:100%;height:100%;transform:translate(var(--offset-x),var(--offset-y)) scale(1);transform-origin:center;transition:transform .2s ease,filter .2s ease;filter:drop-shadow(0 7px 15px rgba(0,0,0,.25));pointer-events:none}.cw-marker.selected{transform:translate(var(--offset-x),var(--offset-y)) scale(1.12);filter:drop-shadow(0 10px 21px rgba(0,0,0,.36))}.cw-hit{position:absolute;left:50%;top:50%;width:52px;height:52px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:auto;cursor:pointer}.cw-group .cw-hit{width:92px;height:88px}.cw-core,.cw-satellite{position:absolute;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--surfaceStrong);color:var(--text);font-weight:900;border:3px solid var(--status);box-shadow:0 0 0 2px color-mix(in srgb,var(--status) 14%,transparent),0 6px 15px rgba(0,0,0,.26)}.cw-core{left:50%;top:50%;width:var(--core-size);height:var(--core-size);transform:translate(-50%,-50%);z-index:4;font-size:10px}.cw-group .cw-core{top:38%}.cw-satellite{width:var(--sat-size);height:var(--sat-size);transform:translate(-50%,-50%);z-index:5;border-width:2px;font-size:7px}.cw-face{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,var(--surfaceStrong),var(--surface));overflow:hidden}.cw-face img,.cw-face video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}.cw-face img{z-index:1}.cw-face video{z-index:2;background:var(--surfaceStrong)}.cw-extra{position:absolute;display:grid;place-items:center;border-radius:50%;width:var(--sat-size);height:var(--sat-size);background:var(--shell);border:2px solid var(--status);color:var(--text);font-size:8px;font-weight:900;z-index:7;transform:translate(-50%,-50%)}.cw-marker.available .cw-core{animation:cwPulse 3.4s ease-out infinite}.cw-marker.busy .cw-core{box-shadow:0 0 0 3px color-mix(in srgb,var(--busy) 15%,transparent),0 7px 18px rgba(0,0,0,.28)}
-.event-leaflet-icon{background:transparent!important;border:none!important;pointer-events:none!important}.event-marker{width:46px;height:50px;position:relative;--event:#3479aa;--wave:5.2s;--pulse:.12;transform-origin:14px 42px;transition:transform .18s ease,filter .18s ease;pointer-events:none}.event-marker.past24h{--event:#6f9dbe;--wave:5.8s;--pulse:.1}.event-marker.later{--event:#3479aa}.event-marker.within7d{--event:#248fc0;--wave:4.2s;--pulse:.2}.event-marker.within48h{--event:#12b9cc;--wave:2.9s;--pulse:.36}.event-marker.live{--event:#19e0c8;--wave:2s;--pulse:.55}.event-marker.selected{transform:translateY(-2px) scale(1.12);filter:drop-shadow(0 7px 12px color-mix(in srgb,var(--event) 45%,transparent))}.event-pole{position:absolute;left:11px;top:7px;width:3px;height:38px;border-radius:3px;background:linear-gradient(180deg,#f8fbff,#8da9bb);box-shadow:0 2px 8px rgba(0,0,0,.24);z-index:2}.event-flag{position:absolute;left:14px;top:7px;width:28px;height:20px;background:linear-gradient(115deg,var(--event),color-mix(in srgb,var(--event) 70%,white));clip-path:polygon(0 0,100% 10%,86% 50%,100% 90%,0 100%);border-radius:2px 6px 6px 2px;transform-origin:0 50%;animation:flagWave var(--wave) ease-in-out infinite;box-shadow:0 4px 11px color-mix(in srgb,var(--event) 40%,transparent);z-index:3;pointer-events:auto;cursor:pointer}.event-pulse{position:absolute;left:1px;bottom:0;width:28px;height:12px;border-radius:50%;border:2px solid var(--event);opacity:var(--pulse);animation:eventPulse calc(var(--wave) * .92) ease-out infinite}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.9);background:var(--shell);color:var(--text);display:grid;place-items:center;font-size:11px;font-weight:900;box-shadow:0 7px 17px rgba(0,0,0,.25)}
+.event-leaflet-icon{background:transparent!important;border:none!important;pointer-events:none!important}.event-marker{--event-offset-x:0px;--event-offset-y:0px;width:46px;height:50px;position:relative;--event:#3479aa;--wave:5.2s;--pulse:.12;transform:translate(var(--event-offset-x),var(--event-offset-y));transform-origin:14px 42px;transition:transform .18s ease,filter .18s ease;pointer-events:none}.event-marker.past24h{--event:#6f9dbe;--wave:5.8s;--pulse:.1}.event-marker.later{--event:#3479aa}.event-marker.within7d{--event:#248fc0;--wave:4.2s;--pulse:.2}.event-marker.within48h{--event:#12b9cc;--wave:2.9s;--pulse:.36}.event-marker.live{--event:#19e0c8;--wave:2s;--pulse:.55}.event-marker.selected{transform:translate(var(--event-offset-x),var(--event-offset-y)) translateY(-2px) scale(1.12);filter:drop-shadow(0 7px 12px color-mix(in srgb,var(--event) 45%,transparent))}.event-hit{position:absolute;left:0;top:1px;width:46px;height:48px;border-radius:16px;pointer-events:auto;cursor:pointer;z-index:6}.event-pole{position:absolute;left:11px;top:7px;width:3px;height:38px;border-radius:3px;background:linear-gradient(180deg,#f8fbff,#8da9bb);box-shadow:0 2px 8px rgba(0,0,0,.24);z-index:2}.event-flag{position:absolute;left:14px;top:7px;width:28px;height:20px;background:linear-gradient(115deg,var(--event),color-mix(in srgb,var(--event) 70%,white));clip-path:polygon(0 0,100% 10%,86% 50%,100% 90%,0 100%);border-radius:2px 6px 6px 2px;transform-origin:0 50%;animation:flagWave var(--wave) ease-in-out infinite;box-shadow:0 4px 11px color-mix(in srgb,var(--event) 40%,transparent);z-index:3;pointer-events:none}.event-pulse{position:absolute;left:1px;bottom:0;width:28px;height:12px;border-radius:50%;border:2px solid var(--event);opacity:var(--pulse);animation:eventPulse calc(var(--wave) * .92) ease-out infinite}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.9);background:var(--shell);color:var(--text);display:grid;place-items:center;font-size:11px;font-weight:900;box-shadow:0 7px 17px rgba(0,0,0,.25)}
 @keyframes cwPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--available) 30%,transparent),0 6px 15px rgba(0,0,0,.26)}72%,100%{box-shadow:0 0 0 9px transparent,0 6px 15px rgba(0,0,0,.26)}}@keyframes flagWave{0%,100%{transform:perspective(70px) rotateY(0deg) skewY(-1deg)}50%{transform:perspective(70px) rotateY(-18deg) skewY(2deg)}}@keyframes eventPulse{0%{transform:scale(.72);opacity:var(--pulse)}78%,100%{transform:scale(1.7);opacity:0}}@media(prefers-reduced-motion:reduce){.cw-marker.available .cw-core,.event-flag,.event-pulse{animation:none!important}}
 </style>
 </head>
 <body>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.js"></script>
 ${clientScript}
 <script>
 (() => {
@@ -84,6 +84,7 @@ ${clientScript}
   const eventNodes=new Map();
   const videoNodes=new Map();
   const markerEntries=[];
+  const eventEntries=[];
   const escapeText=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
   const post=payload=>{try{${postExpression}}catch{}};
   const map=L.map('map',{zoomControl:false,minZoom:4,maxZoom:18,zoomSnap:.25,attributionControl:true});
@@ -146,11 +147,12 @@ ${clientScript}
 
   const eventLayer=L.layerGroup().addTo(map);
   eventData.forEach(event=>{
-    const html='<div class="event-marker '+escapeText(event.proximity)+'" data-event-id="'+escapeText(event.id)+'"><div class="event-pulse"></div><div class="event-pole"></div><div class="event-flag"></div></div>';
-    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:-250,keyboard:true});
+    const html='<div class="event-marker '+escapeText(event.proximity)+'" data-event-id="'+escapeText(event.id)+'"><div class="event-hit"></div><div class="event-pulse"></div><div class="event-pole"></div><div class="event-flag"></div></div>';
+    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:120,keyboard:true});
     marker.on('add',()=>{const node=marker.getElement()?.querySelector('.event-marker');if(node)eventNodes.set(event.id,node)});
     marker.on('click',()=>post({type:'event-selected',id:event.id}));
     marker.bindTooltip(escapeText(event.title),{direction:'bottom',offset:[13,8],opacity:.96});
+    eventEntries.push({id:event.id,marker});
     marker.addTo(eventLayer);
     bounds.push([event.latitude,event.longitude]);
   });
@@ -188,36 +190,82 @@ ${clientScript}
     root.style.setProperty('--offset-x',Math.round(x)+'px');
     root.style.setProperty('--offset-y',Math.round(y)+'px');
   }
+  function setEventOffset(root,x,y){
+    root.style.setProperty('--event-offset-x',Math.round(x)+'px');
+    root.style.setProperty('--event-offset-y',Math.round(y)+'px');
+  }
+  function intersects(a,b,gap=5){
+    return a.left-gap<b.right&&a.right+gap>b.left&&a.top-gap<b.bottom&&a.bottom+gap>b.top;
+  }
+  function shiftedRect(rect,x,y){
+    return {left:rect.left+x,right:rect.right+x,top:rect.top+y,bottom:rect.bottom+y,width:rect.width,height:rect.height};
+  }
+  function visibleRect(node){
+    if(!node||!node.isConnected)return null;
+    const style=getComputedStyle(node);
+    const rect=node.getBoundingClientRect();
+    if(style.display==='none'||style.visibility==='hidden'||rect.width<=0||rect.height<=0)return null;
+    return rect;
+  }
+  function applyEventOffsets(){
+    eventNodes.forEach(node=>setEventOffset(node,0,0));
+    const occupied=[];
+    markerNodes.forEach(node=>{
+      const rect=visibleRect(node);
+      if(rect)occupied.push(rect);
+    });
+    const viewport={width:window.innerWidth,height:window.innerHeight};
+    const candidates=[[0,0],[58,-34],[-58,-34],[58,34],[-58,34],[0,-68],[0,68],[78,0],[-78,0],[82,-48],[-82,-48]];
+    eventEntries.forEach(entry=>{
+      const node=eventNodes.get(entry.id);
+      const raw=visibleRect(node);
+      if(!node||!raw)return;
+      let best=candidates[0];
+      let bestScore=-Infinity;
+      for(const candidate of candidates){
+        const rect=shiftedRect(raw,candidate[0],candidate[1]);
+        const inside=rect.left>=4&&rect.right<=viewport.width-4&&rect.top>=4&&rect.bottom<=viewport.height-4;
+        const collisionCount=occupied.reduce((count,target)=>count+(intersects(rect,target,6)?1:0),0);
+        const score=(inside?1000:0)-collisionCount*400-Math.hypot(candidate[0],candidate[1]);
+        if(score>bestScore){bestScore=score;best=candidate;}
+        if(inside&&collisionCount===0){best=candidate;break;}
+      }
+      setEventOffset(node,best[0],best[1]);
+      occupied.push(shiftedRect(raw,best[0],best[1]));
+    });
+  }
   function applyCollisionOffsets(){
     markerNodes.forEach(node=>{setOffset(node,0,0);updateMarkerVisual(node)});
-    if(map.getZoom()<12)return;
-    const visible=markerEntries.map(entry=>({entry,node:entry.marker.getElement()?.querySelector('.cw-marker'),point:map.latLngToLayerPoint(entry.marker.getLatLng())})).filter(item=>item.node);
-    const visited=new Set();
-    for(let i=0;i<visible.length;i+=1){
-      if(visited.has(i))continue;
-      const group=[i];visited.add(i);
-      for(let cursor=0;cursor<group.length;cursor+=1){
-        const source=visible[group[cursor]];
-        for(let j=0;j<visible.length;j+=1){
-          if(visited.has(j))continue;
-          const target=visible[j];
-          const dx=source.point.x-target.point.x,dy=source.point.y-target.point.y;
-          if(Math.hypot(dx,dy)<42){visited.add(j);group.push(j)}
+    if(map.getZoom()>=12){
+      const visible=markerEntries.map(entry=>({entry,node:entry.marker.getElement()?.querySelector('.cw-marker'),point:map.latLngToLayerPoint(entry.marker.getLatLng())})).filter(item=>item.node);
+      const visited=new Set();
+      for(let i=0;i<visible.length;i+=1){
+        if(visited.has(i))continue;
+        const group=[i];visited.add(i);
+        for(let cursor=0;cursor<group.length;cursor+=1){
+          const source=visible[group[cursor]];
+          for(let j=0;j<visible.length;j+=1){
+            if(visited.has(j))continue;
+            const target=visible[j];
+            const dx=source.point.x-target.point.x,dy=source.point.y-target.point.y;
+            if(Math.hypot(dx,dy)<42){visited.add(j);group.push(j)}
+          }
         }
+        if(group.length<2)continue;
+        const first=visible[group[0]];setOffset(first.node,0,0);
+        const around=group.slice(1);
+        around.forEach((index,slot)=>{
+          const ring=Math.floor(slot/7);
+          const position=slot%7;
+          const count=Math.min(7,around.length-ring*7);
+          const radius=31+ring*24;
+          const angle=Math.PI/2+(position/count)*Math.PI*2;
+          const item=visible[index];
+          setOffset(item.node,Math.cos(angle)*radius,Math.sin(angle)*radius);
+        });
       }
-      if(group.length<2)continue;
-      const first=visible[group[0]];setOffset(first.node,0,0);
-      const around=group.slice(1);
-      around.forEach((index,slot)=>{
-        const ring=Math.floor(slot/7);
-        const position=slot%7;
-        const count=Math.min(7,around.length-ring*7);
-        const radius=31+ring*24;
-        const angle=Math.PI/2+(position/count)*Math.PI*2;
-        const item=visible[index];
-        setOffset(item.node,Math.cos(angle)*radius,Math.sin(angle)*radius);
-      });
     }
+    requestAnimationFrame(applyEventOffsets);
   }
   const updateSelection=(markerId,eventId)=>{
     markerNodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(markerId)&&key===markerId));
