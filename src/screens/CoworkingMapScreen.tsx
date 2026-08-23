@@ -145,13 +145,17 @@ export default function CoworkingMapScreen() {
         .map((member) => ({ member, moment: momentByUserId.get(member.id) }))
         .filter((item): item is { member: AppUser; moment: NonNullable<ReturnType<typeof momentByUserId.get>> } => Boolean(item.moment));
       if (located.length === 0) continue;
-      const latitude = located.reduce((sum, item) => sum + item.moment.latitude, 0) / located.length;
-      const longitude = located.reduce((sum, item) => sum + item.moment.longitude, 0) / located.length;
+      const space = snapshot.hub.id === spaceId
+        ? snapshot.hub
+        : snapshot.spaces.find((candidate) => candidate.id === spaceId);
+      const preferredAnchorId = space?.ownerId ?? space?.participantIds[0];
+      const anchor = located.find(({ member }) => member.id === preferredAnchorId) ?? located[0];
+      if (!anchor) continue;
       result.push({
         id: `space:${spaceId}`,
-        latitude,
-        longitude,
-        city: located[0]?.member.city,
+        latitude: anchor.moment.latitude,
+        longitude: anchor.moment.longitude,
+        city: anchor.member.city,
         availability: "busy",
         spaceId,
         members: located.map(({ member }) => {
