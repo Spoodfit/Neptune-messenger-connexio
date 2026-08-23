@@ -52,6 +52,12 @@ export interface CoworkingKnockResult {
   status: "sent" | "accepted" | "declined";
 }
 
+export interface CoworkingKnockResponse {
+  status: "accepted" | "declined";
+  spaceId?: string;
+  media?: CoworkingMediaSession;
+}
+
 export class CoworkingMapApi {
   constructor(private readonly fallbackAccessToken?: string | null) {}
 
@@ -102,6 +108,23 @@ export class CoworkingMapApi {
     return {
       requestId: stringValue(payload.request_id ?? payload.id) || undefined,
       status: rawStatus === "accepted" || rawStatus === "declined" ? rawStatus : "sent"
+    };
+  }
+
+  async respondToKnock(requestId: string, accepted: boolean): Promise<CoworkingKnockResponse> {
+    const payload = await authenticatedRequest<Record<string, unknown>>(
+      `/v1/coworking/knock/${encodeURIComponent(requestId)}/respond`,
+      {
+        method: "POST",
+        body: JSON.stringify({ accepted })
+      },
+      this.fallbackAccessToken
+    );
+    const status = accepted ? "accepted" : "declined";
+    return {
+      status,
+      spaceId: stringValue(payload.space_id ?? payload.spaceId) || undefined,
+      media: normalizeMedia(payload.media, false)
     };
   }
 }
