@@ -1,0 +1,48 @@
+name: Complete V25 Map translations
+
+on:
+  push:
+    branches:
+      - fix/v24-geographic-coworking
+    paths:
+      - .github/workflows/fix-v25-i18n.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/v24-geographic-coworking
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Complete UI catalog
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/i18n/uiTranslationsV24.ts')
+          s = p.read_text()
+          marker = '  "Actualisation…": { en: "Refreshing…", es: "Actualizando…", de: "Aktualisierung…", it: "Aggiornamento…", pt: "A atualizar…" },\n'
+          additions = '''  "Actualiser la Map": { en: "Refresh Map", es: "Actualizar el mapa", de: "Karte aktualisieren", it: "Aggiorna la mappa", pt: "Atualizar o mapa" },
+  "Afficher les membres connectés et les événements sur la carte": { en: "Show connected members and events on the map", es: "Mostrar miembros conectados y eventos en el mapa", de: "Verbundene Mitglieder und Veranstaltungen auf der Karte anzeigen", it: "Mostra membri connessi ed eventi sulla mappa", pt: "Mostrar membros ligados e eventos no mapa" },
+  "Espace de déplacement de la Salle générale": { en: "General room movement area", es: "Zona de desplazamiento de la sala general", de: "Bewegungsbereich des allgemeinen Raums", it: "Area di movimento della sala generale", pt: "Área de movimento da sala geral" },
+  "Fermer la Map": { en: "Close Map", es: "Cerrar el mapa", de: "Karte schließen", it: "Chiudi la mappa", pt: "Fechar o mapa" },
+  "Impossible de quitter la salle": { en: "Unable to leave the room", es: "No se puede salir de la sala", de: "Raum kann nicht verlassen werden", it: "Impossibile uscire dalla sala", pt: "Não foi possível sair da sala" },
+  "Ouvrir la Map": { en: "Open Map", es: "Abrir el mapa", de: "Karte öffnen", it: "Apri la mappa", pt: "Abrir o mapa" },
+  "Publications, besoins et offres Neptune.": { en: "Neptune posts, needs and offers.", es: "Publicaciones, necesidades y ofertas de Neptune.", de: "Neptune-Beiträge, Bedarfe und Angebote.", it: "Pubblicazioni, esigenze e offerte Neptune.", pt: "Publicações, necessidades e ofertas Neptune." },
+  "Toquer & entrer": { en: "Knock & enter", es: "Llamar y entrar", de: "Anklopfen & eintreten", it: "Bussa ed entra", pt: "Bater e entrar" },
+'''
+          if '"Actualiser la Map"' not in s:
+              if marker not in s:
+                  raise SystemExit('catalog insertion marker missing')
+              s = s.replace(marker, marker + additions, 1)
+              p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/i18n/uiTranslationsV24.ts
+          git commit -m "fix(i18n): translate unified Map interface" || exit 0
+          git push origin HEAD:fix/v24-geographic-coworking
