@@ -206,7 +206,9 @@ async function auditSecondaryFlows(page) {
   await page.goto(`${BASE_URL}/new-highlight`, { waitUntil: "networkidle" });
   const composeUrl = new URL(page.url());
   check(composeUrl.pathname.replace(/\/$/, "").endsWith("/highlights") && composeUrl.searchParams.get("compose") === "1", "/new-highlight : redirection compositeur valide", page.url());
-  check(await page.getByLabel("Écrire une publication rapide", { exact: true }).isVisible().catch(() => false), "/new-highlight : compositeur visible après redirection");
+  const openComposer = page.getByPlaceholder("Partagez simplement ce que vous voulez…", { exact: true });
+  await openComposer.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+  check(await openComposer.isVisible().catch(() => false), "/new-highlight : compositeur ouvert et prêt à saisir après redirection");
 }
 
 async function run() {
