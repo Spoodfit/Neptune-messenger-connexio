@@ -5,6 +5,7 @@ const EAS_PROJECT_ID = "1e85dc3a-4114-4387-8e15-2463a82e68fd";
 const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
 const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
 const PUBLIC_POLICY_BASE_URL = "https://spoodfit.github.io/Neptune-messenger-connexio";
+const MICROPHONE_PERMISSION = "Connexio utilise le microphone uniquement lorsque vous choisissez d’envoyer un message vocal, d’enregistrer une vidéo, de dicter l’objet d’un appel ou de participer à un appel ou au Coworking.";
 const LEGACY_STORE_URLS = new Set([
   "https://neptunebusiness.com/confidentialite",
   "https://www.neptunebusiness.com/confidentialite",
@@ -85,7 +86,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription: "Connexio utilise la caméra lorsque vous choisissez de prendre une photo, publier une vidéo ou participer à un appel vidéo.",
-        NSMicrophoneUsageDescription: "Connexio utilise le microphone uniquement lorsque vous choisissez de dicter l’objet d’un appel.",
+        NSMicrophoneUsageDescription: MICROPHONE_PERMISSION,
         NSSpeechRecognitionUsageDescription: "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.",
         NSPhotoLibraryUsageDescription: "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.",
         NSLocationWhenInUseUsageDescription: "Connexio utilise votre position uniquement à votre demande pour la carte ou le partage d’un lieu.",
@@ -114,13 +115,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "expo-audio",
       "expo-font",
       "expo-asset",
-      ["expo-speech-recognition", { microphonePermission: "Connexio utilise le microphone uniquement lorsque vous choisissez de dicter l’objet d’un appel.", speechRecognitionPermission: "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.", androidSpeechServicePackages: ["com.google.android.googlequicksearchbox", "com.google.android.as"] }],
+      ["expo-speech-recognition", { microphonePermission: MICROPHONE_PERMISSION, speechRecognitionPermission: "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.", androidSpeechServicePackages: ["com.google.android.googlequicksearchbox", "com.google.android.as"] }],
       ["expo-contacts", { contactsPermission: "Connexio ouvre vos contacts uniquement lorsque vous choisissez explicitement une personne à inviter ou recommander." }],
       "expo-secure-store",
       "expo-system-ui",
       ["expo-sqlite", { useSQLCipher: true }],
       ["expo-notifications", { defaultChannel: "messages", icon: "./assets/notification-icon.png", color: "#0048BA", sounds: [NOTIFICATION_SOUND, MENTION_SOUND] }],
-      ["expo-image-picker", { photosPermission: "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.", cameraPermission: "Connexio utilise la caméra lorsque vous choisissez de créer un contenu.", microphonePermission: "Connexio utilise le microphone uniquement lors d’un enregistrement vidéo choisi." }],
+      ["expo-image-picker", { photosPermission: "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.", cameraPermission: "Connexio utilise la caméra lorsque vous choisissez de créer un contenu.", microphonePermission: MICROPHONE_PERMISSION }],
       ["expo-location", { locationWhenInUsePermission: "Connexio utilise votre position uniquement à votre demande." }],
       "expo-document-picker"
     ],
