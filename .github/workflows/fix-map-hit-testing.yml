@@ -1,0 +1,49 @@
+name: Fix unified Map hit testing
+
+on:
+  push:
+    branches:
+      - fix/v24-geographic-coworking
+    paths:
+      - .github/workflows/fix-map-hit-testing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/v24-geographic-coworking
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Keep event decorations from blocking members
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/services/coworking/geographicMapHtml.ts')
+          s = p.read_text()
+          old = '.event-marker{width:46px;height:50px;position:relative;--event:#3479aa;--wave:5.2s;--pulse:.12;transform-origin:14px 42px;transition:transform .18s ease,filter .18s ease}'
+          new = '.event-leaflet-icon{background:transparent!important;border:none!important;pointer-events:none!important}.event-marker{width:46px;height:50px;position:relative;--event:#3479aa;--wave:5.2s;--pulse:.12;transform-origin:14px 42px;transition:transform .18s ease,filter .18s ease;pointer-events:none}'
+          if old not in s:
+              raise SystemExit('event marker CSS marker missing')
+          s = s.replace(old, new, 1)
+          old = 'box-shadow:0 4px 11px color-mix(in srgb,var(--event) 40%,transparent);z-index:3}'
+          new = 'box-shadow:0 4px 11px color-mix(in srgb,var(--event) 40%,transparent);z-index:3;pointer-events:auto;cursor:pointer}'
+          if old not in s:
+              raise SystemExit('event flag CSS marker missing')
+          s = s.replace(old, new, 1)
+          old = "icon:L.divIcon({className:'',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:350,keyboard:true"
+          new = "icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:-250,keyboard:true"
+          if old not in s:
+              raise SystemExit('event Leaflet marker marker missing')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/services/coworking/geographicMapHtml.ts
+          git commit -m "fix(map): prevent event flags from blocking member taps"
+          git push origin HEAD:fix/v24-geographic-coworking

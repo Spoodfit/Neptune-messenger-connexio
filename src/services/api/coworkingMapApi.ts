@@ -14,9 +14,7 @@ function normalizeIceServers(value: unknown): RTCIceServer[] {
   return value.flatMap((raw) => {
     const item = asRecord(raw);
     const urls = item.urls;
-    if (typeof urls !== "string" && !(Array.isArray(urls) && urls.every((entry) => typeof entry === "string"))) {
-      return [];
-    }
+    if (typeof urls !== "string" && !(Array.isArray(urls) && urls.every((entry) => typeof entry === "string"))) return [];
     return [{
       urls: urls as string | string[],
       ...(typeof item.username === "string" ? { username: item.username } : {}),
@@ -50,6 +48,7 @@ function normalizeMedia(value: unknown, observerByDefault: boolean): CoworkingMe
 export interface CoworkingKnockResult {
   requestId?: string;
   status: "sent" | "accepted" | "declined";
+  spaceId?: string;
 }
 
 export interface CoworkingKnockResponse {
@@ -64,30 +63,20 @@ export class CoworkingMapApi {
   async enterMap(): Promise<{ media?: CoworkingMediaSession }> {
     const payload = await authenticatedRequest<Record<string, unknown>>(
       "/v1/coworking/map/enter",
-      {
-        method: "POST",
-        body: JSON.stringify({ camera_on: true, microphone_on: false })
-      },
+      { method: "POST", body: JSON.stringify({ camera_on: true, microphone_on: false }) },
       this.fallbackAccessToken
     );
     return { media: normalizeMedia(payload.media ?? payload.map_media, false) };
   }
 
   async leaveMap(): Promise<void> {
-    await authenticatedRequest(
-      "/v1/coworking/map/leave",
-      { method: "POST" },
-      this.fallbackAccessToken
-    );
+    await authenticatedRequest("/v1/coworking/map/leave", { method: "POST" }, this.fallbackAccessToken);
   }
 
   async sayHello(userId: string): Promise<void> {
     await authenticatedRequest(
       "/v1/coworking/hello",
-      {
-        method: "POST",
-        body: JSON.stringify({ user_id: userId })
-      },
+      { method: "POST", body: JSON.stringify({ user_id: userId }) },
       this.fallbackAccessToken
     );
   }
@@ -97,27 +86,22 @@ export class CoworkingMapApi {
       "/v1/coworking/knock",
       {
         method: "POST",
-        body: JSON.stringify({
-          user_id: input.userId ?? null,
-          space_id: input.spaceId ?? null
-        })
+        body: JSON.stringify({ user_id: input.userId ?? null, space_id: input.spaceId ?? null })
       },
       this.fallbackAccessToken
     );
     const rawStatus = stringValue(payload.status);
     return {
       requestId: stringValue(payload.request_id ?? payload.id) || undefined,
-      status: rawStatus === "accepted" || rawStatus === "declined" ? rawStatus : "sent"
+      status: rawStatus === "accepted" || rawStatus === "declined" ? rawStatus : "sent",
+      spaceId: stringValue(payload.space_id ?? payload.spaceId) || undefined
     };
   }
 
   async respondToKnock(requestId: string, accepted: boolean): Promise<CoworkingKnockResponse> {
     const payload = await authenticatedRequest<Record<string, unknown>>(
       `/v1/coworking/knock/${encodeURIComponent(requestId)}/respond`,
-      {
-        method: "POST",
-        body: JSON.stringify({ accepted })
-      },
+      { method: "POST", body: JSON.stringify({ accepted }) },
       this.fallbackAccessToken
     );
     const status = accepted ? "accepted" : "declined";

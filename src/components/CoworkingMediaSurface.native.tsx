@@ -33,10 +33,7 @@ export default function CoworkingMediaSurface({
         spatialAudio,
         participantLayout
       }),
-    // Media controls and spatial movement are applied through the bridge below.
-    // Rebuilding the WebView for every toggle/tap would reconnect the room and
-    // briefly interrupt both video and audio.
-    [displayName, mapMode, session, spatialAudio]
+    [cameraOn, displayName, mapMode, microphoneOn, participantLayout, session, spatialAudio]
   );
 
   useEffect(() => {

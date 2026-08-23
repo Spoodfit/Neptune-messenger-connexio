@@ -46,16 +46,9 @@ export default function CoworkingMapScreen() {
     snapshot,
     loading,
     refresh,
-    joinSpace,
-    currentSpace,
-    mediaForSpace,
-    mediaStateForSpace
+    joinSpace
   } = useCoworking();
   const mapApi = useMemo(() => (env.mockMode ? null : new CoworkingMapApi(accessToken)), [accessToken]);
-  const currentSpaceId = currentSpace?.id;
-  const currentSpaceMedia = currentSpaceId ? mediaForSpace(currentSpaceId) : undefined;
-  const currentSpaceMediaState = currentSpaceId ? mediaStateForSpace(currentSpaceId) : undefined;
-  const observerMediaKey = JSON.stringify(snapshot.observerMedia ?? null);
   const [mapMedia, setMapMedia] = useState<CoworkingMediaSession | undefined>();
   const [mapCameraActive, setMapCameraActive] = useState(env.mockMode);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
@@ -65,14 +58,9 @@ export default function CoworkingMapScreen() {
 
   useEffect(() => {
     let active = true;
-    if (!mapApi || currentSpaceId) {
-      // Returning to the Map from a room must not start a second publisher.
-      // Use the backend-provided listen-only map session when available.
-      setMapMedia(currentSpaceId ? snapshot.observerMedia : undefined);
-      setMapCameraActive(currentSpaceId ? currentSpaceMediaState?.cameraOn ?? Boolean(currentSpaceMedia) : env.mockMode);
-      return () => {
-        if (!currentSpaceId && !env.mockMode) setMapCameraActive(false);
-      };
+    if (!mapApi) {
+      setMapCameraActive(true);
+      return () => setMapCameraActive(false);
     }
     void mapApi
       .enterMap()
@@ -90,7 +78,7 @@ export default function CoworkingMapScreen() {
       setMapCameraActive(false);
       void mapApi.leaveMap().catch(() => undefined);
     };
-  }, [currentSpaceId, currentSpaceMedia, currentSpaceMediaState, mapApi, observerMediaKey, refresh, snapshot.observerMedia]);
+  }, [mapApi, refresh]);
 
   useEffect(() => {
     if (!notice) return;
@@ -115,13 +103,13 @@ export default function CoworkingMapScreen() {
   );
 
   const markers = useMemo<CoworkingMapMarker[]>(() => {
-    const online = allMembers.filter((member) => (member.online || presenceByUserId.has(member.id)) && momentByUserId.has(member.id));
+    const online = allMembers.filter((member) => member.online && momentByUserId.has(member.id));
     const grouped = new Map<string, AppUser[]>();
     const singles: AppUser[] = [];
 
     for (const member of online) {
       const space = spaceForUser(member.id, snapshot.hub, snapshot.spaces);
-      if (!space || !space.mediaEnabled) {
+      if (!space) {
         singles.push(member);
         continue;
       }
@@ -224,7 +212,7 @@ export default function CoworkingMapScreen() {
   };
 
   const knock = async () => {
-    if (!selection?.space?.mediaEnabled || actionBusy) return;
+    if (!selection?.space || actionBusy) return;
     setActionBusy("knock");
     try {
       if (!mapApi) {
@@ -277,7 +265,7 @@ export default function CoworkingMapScreen() {
   }
 
   const generalRoomCount = snapshot.hub.participantIds.length;
-  const onlineCount = allMembers.filter((member) => member.online || presenceByUserId.has(member.id)).length;
+  const onlineCount = allMembers.filter((member) => member.online).length;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.pageBackground }]}>
@@ -287,11 +275,6 @@ export default function CoworkingMapScreen() {
         selectedMarkerId={selectedMarkerId}
         onSelectMarker={selectMarker}
         onLocationUnavailable={() => AppAlert.alert("Localisation indisponible", "Activez la localisation pour recentrer la carte autour de vous.")}
-        onMediaUnavailable={(message) => {
-          setMapMedia(undefined);
-          setMapCameraActive(false);
-          setNotice(message);
-        }}
       />
 
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10), paddingHorizontal: 10 }]} pointerEvents="box-none">
@@ -383,7 +366,7 @@ export default function CoworkingMapScreen() {
               <Ionicons name="hand-left-outline" size={20} color={theme.violet} />
               <Text style={[styles.actionText, { color: theme.pageText }]}>Dire bonjour</Text>
             </Pressable>
-            {selection.space?.mediaEnabled ? (
+            {selection.space ? (
               <Pressable accessibilityRole="button" accessibilityLabel="Toquer pour rejoindre la visio" disabled={Boolean(actionBusy)} onPress={() => void knock()} style={[styles.action, styles.primaryAction, { backgroundColor: theme.violet }]}>
                 {actionBusy === "knock" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />}
                 <Text style={styles.primaryActionText}>Toquer</Text>

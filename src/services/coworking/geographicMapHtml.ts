@@ -1,4 +1,7 @@
-import type { CoworkingMapMarker } from "../../components/CoworkingGeographicMap.types";
+import type {
+  CoworkingMapEventMarker,
+  CoworkingMapMarker
+} from "../../components/CoworkingGeographicMap.types";
 import type { CoworkingMediaSession } from "../../types/coworking";
 
 interface GeographicMapTheme {
@@ -14,6 +17,7 @@ interface GeographicMapTheme {
 
 interface GeographicMapHtmlOptions {
   markers: CoworkingMapMarker[];
+  events?: CoworkingMapEventMarker[];
   mediaSession?: CoworkingMediaSession;
   theme: GeographicMapTheme;
   bridge: "native" | "web";
@@ -25,6 +29,7 @@ function escapeJson(value: unknown): string {
 
 export function buildCoworkingGeographicMapHtml({
   markers,
+  events = [],
   mediaSession,
   theme,
   bridge
@@ -59,9 +64,10 @@ export function buildCoworkingGeographicMapHtml({
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 <style>
 :root{--bg:${theme.pageBackground};--surface:${theme.surface};--surfaceStrong:${theme.surfaceStrong};--text:${theme.pageText};--muted:${theme.pageTextMuted};--border:${theme.border};--shell:${theme.shellBackground};--available:#35D58B;--busy:#FF5868}
-*{box-sizing:border-box}html,body,#map{height:100%;width:100%;margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}.leaflet-control-attribution{background:rgba(0,0,0,.12)!important;color:var(--muted)!important;font-size:7px!important}.leaflet-control-attribution a{color:var(--muted)!important}.leaflet-pane.leaflet-marker-pane{z-index:620}.leaflet-tooltip{background:var(--shell)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:11px!important;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.16)!important;padding:6px 9px!important}
-.cw-marker{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;filter:drop-shadow(0 8px 18px rgba(0,0,0,.28));transform-origin:50% 72%;transition:transform .18s ease,filter .18s ease}.cw-marker.selected{transform:scale(1.09);filter:drop-shadow(0 11px 24px rgba(0,0,0,.38))}.cw-media{position:relative;background:var(--surfaceStrong);border:3px solid var(--status);overflow:hidden;display:grid;box-shadow:0 0 0 3px color-mix(in srgb,var(--status) 18%,transparent),0 8px 20px rgba(0,0,0,.28)}.cw-media.single{width:58px;height:58px;border-radius:50%}.cw-media.group{width:82px;height:62px;border-radius:19px;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:1px}.cw-cell{position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--surfaceStrong);display:grid;place-items:center;color:var(--text);font-size:11px;font-weight:900}.cw-cell img,.cw-cell video{width:100%;height:100%;object-fit:cover;display:block}.cw-cell video{position:absolute;inset:0;background:var(--surfaceStrong)}.cw-cell .fallback{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,var(--surfaceStrong),var(--surface));z-index:0}.cw-cell img{position:relative;z-index:1}.cw-cell video{z-index:2}.cw-camera{position:absolute;right:-4px;top:-5px;width:22px;height:22px;border-radius:11px;background:var(--shell);border:2px solid var(--status);display:grid;place-items:center;z-index:8;color:var(--text);font-size:11px}.cw-count{position:absolute;right:-6px;bottom:-5px;min-width:25px;height:25px;padding:0 6px;border-radius:13px;background:var(--shell);border:2px solid var(--status);display:grid;place-items:center;color:var(--text);font-size:10px;font-weight:900;z-index:8}.cw-status{margin-top:5px;height:22px;max-width:94px;padding:0 7px;border-radius:11px;background:var(--shell);border:1px solid color-mix(in srgb,var(--status) 72%,transparent);display:flex;align-items:center;gap:5px;color:var(--text);font-size:9px;font-weight:900;white-space:nowrap}.cw-dot{width:7px;height:7px;border-radius:50%;background:var(--status);box-shadow:0 0 10px color-mix(in srgb,var(--status) 75%,transparent)}.cw-pulse{position:absolute;inset:-7px;border-radius:28px;border:2px solid var(--status);opacity:0;animation:cwPulse 3s ease-out infinite;pointer-events:none}.cw-marker.busy .cw-pulse{animation:none;opacity:.16}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{width:44px;height:44px;border-radius:22px;border:3px solid rgba(255,255,255,.92);background:var(--shell);color:var(--text);display:grid;place-items:center;font-weight:900;box-shadow:0 7px 18px rgba(0,0,0,.25)}@keyframes cwPulse{0%{opacity:.32;transform:scale(.82)}75%,100%{opacity:0;transform:scale(1.2)}}@media(prefers-reduced-motion:reduce){.cw-pulse{animation:none!important;opacity:.16}}
-.cw-cell video{opacity:0;transition:opacity .18s ease}.cw-cell video.ready{opacity:1}
+*{box-sizing:border-box}html,body,#map{height:100%;width:100%;margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}.leaflet-control-attribution{background:rgba(0,0,0,.12)!important;color:var(--muted)!important;font-size:7px!important}.leaflet-control-attribution a{color:var(--muted)!important}.leaflet-pane.leaflet-marker-pane{z-index:620}.leaflet-tooltip{max-width:min(240px,calc(100vw - 24px));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--shell)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:11px!important;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.16)!important;padding:6px 9px!important}
+.cw-marker{--offset-x:0px;--offset-y:0px;--core-size:42px;--sat-size:23px;position:relative;width:100%;height:100%;transform:translate(var(--offset-x),var(--offset-y)) scale(1);transform-origin:center;transition:transform .2s ease,filter .2s ease;filter:drop-shadow(0 7px 15px rgba(0,0,0,.25));pointer-events:none}.cw-marker.selected{transform:translate(var(--offset-x),var(--offset-y)) scale(1.12);filter:drop-shadow(0 10px 21px rgba(0,0,0,.36))}.cw-hit{position:absolute;left:50%;top:50%;width:52px;height:52px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:auto;cursor:pointer}.cw-group .cw-hit{width:92px;height:88px}.cw-core,.cw-satellite{position:absolute;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--surfaceStrong);color:var(--text);font-weight:900;border:3px solid var(--status);box-shadow:0 0 0 2px color-mix(in srgb,var(--status) 14%,transparent),0 6px 15px rgba(0,0,0,.26);transition:left .22s ease,top .22s ease,width .22s ease,height .22s ease,border-width .22s ease}.cw-core{left:50%;top:50%;width:var(--core-size);height:var(--core-size);transform:translate(-50%,-50%);z-index:4;font-size:10px}.cw-group .cw-core{top:38%}.cw-satellite{width:var(--sat-size);height:var(--sat-size);transform:translate(-50%,-50%);z-index:5;border-width:2px;font-size:7px}.cw-group.zoom-split .cw-core{top:50%}.cw-group.zoom-split .cw-hit{width:154px;height:154px}.cw-group.zoom-split .cw-satellite{z-index:8;border-width:3px}.cw-face{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,var(--surfaceStrong),var(--surface));overflow:hidden}.cw-fallback{position:relative;z-index:1;opacity:1;transition:opacity .16s ease}.cw-face img,.cw-face video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.cw-face img{z-index:2}.cw-face.avatar-ready img{opacity:1}.cw-face.avatar-ready .cw-fallback{opacity:0}.cw-face video{z-index:3;background:transparent}.cw-face video.video-ready{opacity:1;background:var(--surfaceStrong)}.cw-extra{position:absolute;display:grid;place-items:center;border-radius:50%;width:var(--sat-size);height:var(--sat-size);background:var(--shell);border:2px solid var(--status);color:var(--text);font-size:8px;font-weight:900;z-index:7;transform:translate(-50%,-50%);transition:left .22s ease,top .22s ease,width .22s ease,height .22s ease}.cw-marker.available .cw-core{animation:cwPulse 3.4s ease-out infinite}.cw-marker.busy .cw-core{box-shadow:0 0 0 3px color-mix(in srgb,var(--busy) 15%,transparent),0 7px 18px rgba(0,0,0,.28)}
+.event-leaflet-icon{background:transparent!important;border:none!important;pointer-events:none!important}.event-marker{--event-offset-x:0px;--event-offset-y:0px;width:46px;height:50px;position:relative;--event:#3479aa;--wave:5.2s;--pulse:.12;transform:translate(var(--event-offset-x),var(--event-offset-y));transform-origin:14px 42px;transition:transform .18s ease,filter .18s ease;pointer-events:none}.event-marker.past24h{--event:#6f9dbe;--wave:5.8s;--pulse:.1}.event-marker.later{--event:#3479aa}.event-marker.within7d{--event:#248fc0;--wave:4.2s;--pulse:.2}.event-marker.within48h{--event:#12b9cc;--wave:2.9s;--pulse:.36}.event-marker.live{--event:#19e0c8;--wave:2s;--pulse:.55}.event-marker.selected{transform:translate(var(--event-offset-x),var(--event-offset-y)) translateY(-2px) scale(1.12);filter:drop-shadow(0 7px 12px color-mix(in srgb,var(--event) 45%,transparent))}.event-hit{position:absolute;left:0;top:1px;width:46px;height:48px;border-radius:16px;pointer-events:auto;cursor:pointer;z-index:6}.event-pole{position:absolute;left:11px;top:7px;width:3px;height:38px;border-radius:3px;background:linear-gradient(180deg,#f8fbff,#8da9bb);box-shadow:0 2px 8px rgba(0,0,0,.24);z-index:2}.event-flag{position:absolute;left:14px;top:7px;width:28px;height:20px;background:linear-gradient(115deg,var(--event),color-mix(in srgb,var(--event) 70%,white));clip-path:polygon(0 0,100% 10%,86% 50%,100% 90%,0 100%);border-radius:2px 6px 6px 2px;transform-origin:0 50%;animation:flagWave var(--wave) ease-in-out infinite;box-shadow:0 4px 11px color-mix(in srgb,var(--event) 40%,transparent);z-index:3;pointer-events:none}.event-pulse{position:absolute;left:1px;bottom:0;width:28px;height:12px;border-radius:50%;border:2px solid var(--event);opacity:var(--pulse);animation:eventPulse calc(var(--wave) * .92) ease-out infinite}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.9);background:var(--shell);color:var(--text);display:grid;place-items:center;font-size:11px;font-weight:900;box-shadow:0 7px 17px rgba(0,0,0,.25)}
+@keyframes cwPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--available) 30%,transparent),0 6px 15px rgba(0,0,0,.26)}72%,100%{box-shadow:0 0 0 9px transparent,0 6px 15px rgba(0,0,0,.26)}}@keyframes flagWave{0%,100%{transform:perspective(70px) rotateY(0deg) skewY(-1deg)}50%{transform:perspective(70px) rotateY(-18deg) skewY(2deg)}}@keyframes eventPulse{0%{transform:scale(.72);opacity:var(--pulse)}78%,100%{transform:scale(1.7);opacity:0}}@media(prefers-reduced-motion:reduce){.cw-marker.available .cw-core,.event-flag,.event-pulse{animation:none!important}.cw-core,.cw-satellite,.cw-extra{transition:none!important}}
 </style>
 </head>
 <body>
@@ -72,88 +78,233 @@ ${clientScript}
 <script>
 (() => {
   const markerData=${escapeJson(markers)};
+  const eventData=${escapeJson(events)};
   const session=${escapeJson(session)};
-  const nodes=new Map();
+  const markerNodes=new Map();
+  const eventNodes=new Map();
   const videoNodes=new Map();
-  const participantStreams=new Map();
+  const markerEntries=[];
+  const eventEntries=[];
   const escapeText=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
   const post=payload=>{try{${postExpression}}catch{}};
   const map=L.map('map',{zoomControl:false,minZoom:4,maxZoom:18,zoomSnap:.25,attributionControl:true});
   L.tileLayer('https://{s}.basemaps.cartocdn.com/${tileStyle}/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
-  const cluster=L.markerClusterGroup({maxClusterRadius:60,spiderfyOnMaxZoom:true,showCoverageOnHover:false,iconCreateFunction:c=>L.divIcon({className:'custom-cluster',html:'<div class="cluster-core" role="button" tabindex="0" aria-label="'+c.getChildCount()+' membres dans cette zone">'+c.getChildCount()+'</div>',iconSize:[44,44]})});
+  const cluster=L.markerClusterGroup({
+    maxClusterRadius:zoom=>zoom<7?58:zoom<10?46:32,
+    disableClusteringAtZoom:12,
+    spiderfyOnMaxZoom:false,
+    showCoverageOnHover:false,
+    removeOutsideVisibleBounds:true,
+    iconCreateFunction:c=>L.divIcon({className:'custom-cluster',html:'<div class="cluster-core">'+c.getChildCount()+'</div>',iconSize:[40,40]})
+  });
   const bounds=[];
-  const cellHtml=member=>{
-    const fallback='<div class="fallback">'+escapeText(member.initials||'?')+'</div>';
-    const avatar=member.avatarUrl?'<img src="'+escapeText(member.avatarUrl)+'" alt=""/>':'';
-    const video=member.cameraOn?'<video data-user-id="'+escapeText(member.id)+'" autoplay playsinline muted></video>':'';
-    return '<div class="cw-cell" data-member-id="'+escapeText(member.id)+'">'+fallback+avatar+video+'</div>';
+  const faceHtml=member=>{
+    const fallback='<span class="cw-fallback">'+escapeText(member.initials||'?')+'</span>';
+    const avatar=member.avatarUrl?'<img src="'+escapeText(member.avatarUrl)+'" alt="" onload="this.parentElement.classList.add(&quot;avatar-ready&quot;)" onerror="this.remove()"/>':'';
+    const video=member.cameraOn?'<video data-user-id="'+escapeText(member.id)+'" autoplay playsinline muted onplaying="this.classList.add(&quot;video-ready&quot;)" onpause="this.classList.remove(&quot;video-ready&quot;)" onemptied="this.classList.remove(&quot;video-ready&quot;)"></video>':'';
+    return '<div class="cw-face" data-member-id="'+escapeText(member.id)+'">'+fallback+avatar+video+'</div>';
   };
-  const attachVideo=(participantId,video)=>{
-    const stream=participantStreams.get(participantId);
-    if(!stream||!video)return;
-    if(video.srcObject!==stream)video.srcObject=stream;
-    video.play?.().catch(()=>{});
-    if(video.readyState>=2)video.classList.add('ready');
+  const satelliteAngles=[90,55,125,20,160,-15,195,235,305];
+  const markerHtml=item=>{
+    const group=item.members.length>1;
+    const status=item.availability==='busy'?'#FF5868':'#35D58B';
+    const host=item.members[0];
+    let satellites='';
+    if(group){
+      const visibleGuests=item.members.slice(1,9);
+      satellites=visibleGuests.map((member,index)=>{
+        const angle=(satelliteAngles[index]??(90+index*47))*Math.PI/180;
+        return '<div class="cw-satellite cw-person-marker" data-angle="'+angle+'">'+faceHtml(member)+'</div>';
+      }).join('');
+      if(item.members.length>9) satellites+='<div class="cw-extra" data-extra="1">+'+(item.members.length-9)+'</div>';
+    }
+    return '<div class="cw-marker '+(group?'cw-group ':'cw-single ')+(item.availability==='busy'?'busy':'available')+'" data-marker-id="'+escapeText(item.id)+'" style="--status:'+status+'"><div class="cw-hit"></div><div class="cw-core">'+faceHtml(host)+'</div>'+satellites+'</div>';
   };
   markerData.forEach(item=>{
     const group=item.members.length>1;
-    const status=item.availability==='busy'?'#FF5868':'#35D58B';
-    const first=item.members[0];
-    const anyCamera=item.members.some(member=>member.cameraOn);
-    const media='<div class="cw-media '+(group?'group':'single')+'" style="--status:'+status+'">'+item.members.slice(0,4).map(cellHtml).join('')+'</div>';
-    const camera=anyCamera?'<div class="cw-camera">●</div>':'';
-    const count=group?'<div class="cw-count">'+item.members.length+'</div>':'';
-    const label=item.availability==='busy'?'Occupé':'Disponible';
-    const markerLabel=group?'Visio occupée avec '+item.members.map(member=>member.name).join(', '):(first?.name||'Membre Connexio')+'. '+label;
-    const html='<div class="cw-marker '+(item.availability==='busy'?'busy':'available')+'" role="button" tabindex="0" aria-label="'+escapeText(markerLabel)+'" data-marker-id="'+escapeText(item.id)+'" style="--status:'+status+'"><div class="cw-pulse"></div>'+media+camera+count+'<div class="cw-status"><span class="cw-dot"></span>'+label+'</div></div>';
-    const width=group?96:74;const height=group?102:96;
-    const marker=L.marker([item.latitude,item.longitude],{icon:L.divIcon({className:'',html,iconSize:[width,height],iconAnchor:[width/2,height-19]}),title:group?item.members.map(m=>m.name).join(', '):first?.name||'Membre Connexio'});
+    const width=group?116:72;
+    const height=group?108:72;
+    const marker=L.marker([item.latitude,item.longitude],{
+      icon:L.divIcon({className:'',html:markerHtml(item),iconSize:[width,height],iconAnchor:[width/2,height/2]}),
+      title:group?item.members.map(m=>m.name).join(', '):(item.members[0]?.name||'Membre Connexio'),
+      keyboard:true
+    });
     marker.on('add',()=>{
       const root=marker.getElement()?.querySelector('.cw-marker');
-      if(root){nodes.set(item.id,root);root.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();post({type:'marker-selected',id:item.id});}});root.querySelectorAll('video[data-user-id]').forEach(video=>{const participantId=video.dataset.userId;const showVideo=()=>video.classList.add('ready');video.addEventListener('loadeddata',showVideo,{once:true});video.addEventListener('playing',showVideo,{once:true});videoNodes.set(participantId,video);attachVideo(participantId,video);});}
+      if(root){
+        markerNodes.set(item.id,root);
+        root.querySelectorAll('video[data-user-id]').forEach(video=>videoNodes.set(video.dataset.userId,video));
+        updateMarkerVisual(root);
+      }
     });
     marker.on('click',()=>post({type:'marker-selected',id:item.id}));
-    marker.bindTooltip(escapeText(group?item.members.map(member=>member.name.split(' ')[0]).join(' · '):(first?.name||'Membre Connexio')),{direction:'bottom',offset:[0,12],opacity:.96});
-    cluster.addLayer(marker);bounds.push([item.latitude,item.longitude]);
+    marker.bindTooltip(escapeText(group?item.members.map(member=>member.name.split(' ')[0]).join(' · '):(item.members[0]?.name||'Membre Connexio')),{direction:'auto',offset:[0,10],opacity:.96});
+    markerEntries.push({id:item.id,marker});
+    cluster.addLayer(marker);
+    bounds.push([item.latitude,item.longitude]);
   });
   map.addLayer(cluster);
-  if(bounds.length){map.fitBounds(bounds,{padding:[52,52],maxZoom:9})}else{map.setView([46.5,2.2],5.6)}
-  const updateSelection=id=>nodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(id)&&key===id));
-  const handle=raw=>{try{const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.type==='selection')updateSelection(data.id||null);if(data?.type==='locate'&&data.location){const point=[data.location.latitude,data.location.longitude];map.flyTo(point,11,{duration:.65});}}catch{}};
-  window.addEventListener('message',event=>handle(event.data));document.addEventListener('message',event=>handle(event.data));
+
+  const eventLayer=L.layerGroup().addTo(map);
+  eventData.forEach(event=>{
+    const html='<div class="event-marker '+escapeText(event.proximity)+'" data-event-id="'+escapeText(event.id)+'"><div class="event-hit"></div><div class="event-pulse"></div><div class="event-pole"></div><div class="event-flag"></div></div>';
+    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:120,keyboard:true});
+    marker.on('add',()=>{const node=marker.getElement()?.querySelector('.event-marker');if(node)eventNodes.set(event.id,node)});
+    marker.on('click',()=>post({type:'event-selected',id:event.id}));
+    marker.bindTooltip(escapeText(event.title),{direction:'auto',offset:[0,10],opacity:.96});
+    eventEntries.push({id:event.id,marker});
+    marker.addTo(eventLayer);
+    bounds.push([event.latitude,event.longitude]);
+  });
+
+  if(bounds.length){map.fitBounds(bounds,{padding:[48,48],maxZoom:9})}else{map.setView([46.5,2.2],5.6)}
+
+  function visualCoreSize(){
+    const count=markerData.length;
+    const zoom=map.getZoom();
+    let size=count>120?28:count>70?31:count>38?34:count>20?38:42;
+    if(zoom>=13)size+=4;
+    if(zoom>=15)size+=3;
+    if(zoom<=7)size-=3;
+    return Math.max(27,Math.min(49,size));
+  }
+  function updateMarkerVisual(root){
+    const core=visualCoreSize();
+    const split=map.getZoom()>=12&&root.classList.contains('cw-group');
+    const satellite=split
+      ?Math.max(30,Math.min(42,Math.round(core*.9)))
+      :Math.max(19,Math.min(27,Math.round(core*.56)));
+    const radius=split
+      ?Math.max(48,Math.round(core*1.34))
+      :Math.max(27,Math.round(core*.76));
+    const centerY=split?'50%':'38%';
+    root.classList.toggle('zoom-split',split);
+    root.style.setProperty('--core-size',core+'px');
+    root.style.setProperty('--sat-size',satellite+'px');
+    root.querySelectorAll('.cw-satellite[data-angle]').forEach(node=>{
+      const angle=Number(node.dataset.angle||0);
+      node.style.left='calc(50% + '+Math.cos(angle)*radius+'px)';
+      node.style.top='calc('+centerY+' + '+Math.sin(angle)*radius+'px)';
+    });
+    const extra=root.querySelector('.cw-extra[data-extra]');
+    if(extra){
+      const angle=270*Math.PI/180;
+      extra.style.left='calc(50% + '+Math.cos(angle)*radius+'px)';
+      extra.style.top='calc('+centerY+' + '+Math.sin(angle)*radius+'px)';
+    }
+  }
+  function setOffset(root,x,y){
+    root.style.setProperty('--offset-x',Math.round(x)+'px');
+    root.style.setProperty('--offset-y',Math.round(y)+'px');
+  }
+  function setEventOffset(root,x,y){
+    root.style.setProperty('--event-offset-x',Math.round(x)+'px');
+    root.style.setProperty('--event-offset-y',Math.round(y)+'px');
+  }
+  function intersects(a,b,gap=5){
+    return a.left-gap<b.right&&a.right+gap>b.left&&a.top-gap<b.bottom&&a.bottom+gap>b.top;
+  }
+  function shiftedRect(rect,x,y){
+    return {left:rect.left+x,right:rect.right+x,top:rect.top+y,bottom:rect.bottom+y,width:rect.width,height:rect.height};
+  }
+  function visibleRect(node){
+    if(!node||!node.isConnected)return null;
+    const style=getComputedStyle(node);
+    const rect=node.getBoundingClientRect();
+    if(style.display==='none'||style.visibility==='hidden'||rect.width<=0||rect.height<=0)return null;
+    return rect;
+  }
+  function applyEventOffsets(){
+    eventNodes.forEach(node=>setEventOffset(node,0,0));
+    const occupied=[];
+    markerNodes.forEach(node=>{
+      const rect=visibleRect(node);
+      if(rect)occupied.push(rect);
+    });
+    const viewport={width:window.innerWidth,height:window.innerHeight};
+    const candidates=[[0,0],[58,-34],[-58,-34],[58,34],[-58,34],[0,-68],[0,68],[78,0],[-78,0],[82,-48],[-82,-48]];
+    eventEntries.forEach(entry=>{
+      const node=eventNodes.get(entry.id);
+      const raw=visibleRect(node);
+      if(!node||!raw)return;
+      let best=candidates[0];
+      let bestScore=-Infinity;
+      for(const candidate of candidates){
+        const rect=shiftedRect(raw,candidate[0],candidate[1]);
+        const inside=rect.left>=4&&rect.right<=viewport.width-4&&rect.top>=4&&rect.bottom<=viewport.height-4;
+        const collisionCount=occupied.reduce((count,target)=>count+(intersects(rect,target,6)?1:0),0);
+        const score=(inside?1000:0)-collisionCount*400-Math.hypot(candidate[0],candidate[1]);
+        if(score>bestScore){bestScore=score;best=candidate;}
+        if(inside&&collisionCount===0){best=candidate;break;}
+      }
+      setEventOffset(node,best[0],best[1]);
+      occupied.push(shiftedRect(raw,best[0],best[1]));
+    });
+  }
+  function applyCollisionOffsets(){
+    markerNodes.forEach(node=>{setOffset(node,0,0);updateMarkerVisual(node)});
+    if(map.getZoom()>=12){
+      const visible=markerEntries.map(entry=>({entry,node:entry.marker.getElement()?.querySelector('.cw-marker'),point:map.latLngToLayerPoint(entry.marker.getLatLng())})).filter(item=>item.node);
+      const visited=new Set();
+      for(let i=0;i<visible.length;i+=1){
+        if(visited.has(i))continue;
+        const group=[i];visited.add(i);
+        for(let cursor=0;cursor<group.length;cursor+=1){
+          const source=visible[group[cursor]];
+          for(let j=0;j<visible.length;j+=1){
+            if(visited.has(j))continue;
+            const target=visible[j];
+            const dx=source.point.x-target.point.x,dy=source.point.y-target.point.y;
+            if(Math.hypot(dx,dy)<42){visited.add(j);group.push(j)}
+          }
+        }
+        if(group.length<2)continue;
+        const first=visible[group[0]];setOffset(first.node,0,0);
+        const around=group.slice(1);
+        around.forEach((index,slot)=>{
+          const ring=Math.floor(slot/7);
+          const position=slot%7;
+          const count=Math.min(7,around.length-ring*7);
+          const radius=31+ring*24;
+          const angle=Math.PI/2+(position/count)*Math.PI*2;
+          const item=visible[index];
+          setOffset(item.node,Math.cos(angle)*radius,Math.sin(angle)*radius);
+        });
+      }
+    }
+    requestAnimationFrame(applyEventOffsets);
+  }
+  const updateSelection=(markerId,eventId)=>{
+    markerNodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(markerId)&&key===markerId));
+    eventNodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(eventId)&&key===eventId));
+  };
+  const handle=raw=>{try{const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.type==='selection')updateSelection(data.markerId||null,data.eventId||null);if(data?.type==='locate'&&data.location){const point=[data.location.latitude,data.location.longitude];map.flyTo(point,12.5,{duration:.65});}}catch{}};
+  window.addEventListener('message',event=>handle(event.data));
+  document.addEventListener('message',event=>handle(event.data));
+  map.on('zoomend moveend',()=>requestAnimationFrame(applyCollisionOffsets));
+  cluster.on('animationend',()=>requestAnimationFrame(applyCollisionOffsets));
+  setTimeout(applyCollisionOffsets,80);
 
   async function connectMedia(){
     if(!session||session.mock)return;
     const adapter=window.ConnexioCoworkingClient;
-    if(!adapter||typeof adapter.connect!=='function'){
-      post({type:'media-unavailable',message:'Le client caméra du Coworking est indisponible.'});
-      return;
-    }
+    if(!adapter||typeof adapter.connect!=='function')return;
     let localStream=null;
     try{
-      if(!session.observer&&navigator.mediaDevices?.getUserMedia){
-        localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});
-        participantStreams.set(session.participantId,localStream);
-        const ownVideo=videoNodes.get(session.participantId);
-        attachVideo(session.participantId,ownVideo);
-      }
+      if(!session.observer&&navigator.mediaDevices?.getUserMedia){localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});}
       await adapter.connect({
         ...session,
         localStream,
         observer:Boolean(session.observer),
         mapMode:true,
         onParticipantStream:participant=>{
-          if(!participant?.id||!participant?.stream)return;
-          participantStreams.set(participant.id,participant.stream);
-          attachVideo(participant.id,videoNodes.get(participant.id));
+          const video=videoNodes.get(participant?.id);
+          if(video&&participant?.stream){video.srcObject=participant.stream;video.play?.().catch(()=>{});}
         },
-        onParticipantLeft:participantId=>{
-          participantStreams.delete(participantId);
-          const video=videoNodes.get(participantId);if(video){video.srcObject=null;video.classList.remove('ready');}
-        },
+        onParticipantLeft:participantId=>{const video=videoNodes.get(participantId);if(video)video.srcObject=null;},
         onConnected:()=>post({type:'media-connected'})
       });
-    }catch(error){post({type:'media-unavailable',message:error instanceof Error?error.message:'La caméra n’a pas pu être activée.'});}
+    }catch{}
   }
   connectMedia();
 })();

@@ -40,12 +40,12 @@ jobs:
           EXPO_PUBLIC_EAS_PROJECT_ID: ""
           EXPO_PUBLIC_GITHUB_PAGES: "false"
         run: npx expo export --platform web --output-dir web-product-audit-dist
-      - name: Run product audit
-        run: node scripts/product-audit.cjs
+      - name: Run dedicated Map product audit
+        run: node scripts/product-audit-v25.cjs
       - name: Run full multilingual audit
         run: node scripts/i18n-product-audit.cjs
-      - name: Capture V24 render review
-        run: node scripts/v24-render-capture.cjs
+      - name: Capture dedicated Map render review
+        run: node scripts/v25-render-capture.cjs
       - name: Upload V24 render review
         uses: actions/upload-artifact@v4
         with:
@@ -59,7 +59,7 @@ jobs:
           cat > web-product-audit-dist/README_TEST.txt <<'EOF'
           CONNEXIO V24 — VERSION WEB DE DEMONSTRATION
 
-          Cette archive contient le build web validé par Product Audit, y compris le parcours multilingue complet.
+          Cette archive contient le build web validé par Product Audit, y compris la Map dédiée et le parcours multilingue complet.
           Pour un test immédiat sans backend, utilisez de préférence l'adresse GitHub Pages indiquée dans TESTER_EN_UN_CLIC.md.
           Pour lancer le projet complet depuis le dépôt sous Windows, utilisez TESTER_CONNEXIO.bat à la racine du dépôt.
           EOF

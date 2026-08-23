@@ -1,1 +1,1 @@
-export { default } from "@/screens/CoworkingMapScreen";
+export { default } from "@/screens/UnifiedMapScreenV24";

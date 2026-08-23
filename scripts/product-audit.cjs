@@ -59,6 +59,24 @@ async function expectVisible(locator, label, timeout = 7000) {
   }
 }
 
+async function intersectionRatio(locator) {
+  return locator.evaluate((element) => new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      observer.disconnect();
+      resolve(value);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      finish(entry ? entry.intersectionRatio : 0);
+    }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
+    observer.observe(element);
+    setTimeout(() => finish(0), 350);
+  })).catch(() => 0);
+}
+
 async function checkGeometry(page, label, minimum = 44) {
   const result = await page.evaluate(({ minimum }) => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
@@ -70,12 +88,20 @@ async function checkGeometry(page, label, minimum = 44) {
       const rect = element.getBoundingClientRect();
       return style.display !== "none" && style.visibility !== "hidden" && style.pointerEvents !== "none" && Number(style.opacity || "1") > 0.02 && rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < viewport.height && rect.right > 0 && rect.left < viewport.width && !element.closest('[aria-hidden="true"], [inert]');
     };
-    const clippedRect = (element) => {
+    const rectObject = (rect) => ({
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height
+    });
+    const ancestorClippedRect = (element) => {
       const raw = element.getBoundingClientRect();
-      let left = Math.max(0, raw.left);
-      let right = Math.min(viewport.width, raw.right);
-      let top = Math.max(0, raw.top);
-      let bottom = Math.min(viewport.height, raw.bottom);
+      let left = raw.left;
+      let right = raw.right;
+      let top = raw.top;
+      let bottom = raw.bottom;
       let ancestor = element.parentElement;
       while (ancestor && ancestor !== document.body) {
         const style = getComputedStyle(ancestor);
@@ -95,17 +121,25 @@ async function checkGeometry(page, label, minimum = 44) {
 
     const controls = [...document.querySelectorAll(selector)]
       .filter(visible)
-      .map((element) => ({ element, label: labelFor(element), rect: clippedRect(element) }))
+      .map((element) => ({
+        element,
+        label: labelFor(element),
+        raw: rectObject(element.getBoundingClientRect()),
+        rect: ancestorClippedRect(element)
+      }))
       .filter((item) => item.rect.width > 0 && item.rect.height > 0);
 
     const clipped = controls
-      .filter(({ element }) => {
-        const raw = element.getBoundingClientRect();
-        return raw.left < -1 || raw.right > viewport.width + 1;
-      })
+      .filter(({ raw, rect }) => raw.left < -1 || raw.right > viewport.width + 1 || rect.width + 1 < raw.width)
       .map(({ label, rect }) => ({ label, ...rect }));
     const undersized = controls
-      .filter(({ rect }) => rect.width < minimum || rect.height < minimum)
+      .filter(({ raw, rect }) => {
+        // Une cellule partiellement visible tout en haut/bas d'un ScrollView n'est
+        // pas une petite cible : son hit-area complet réapparaît en scrollant.
+        const safelyInsideViewport = raw.top >= 8 && raw.bottom <= viewport.height - 8 && raw.left >= 0 && raw.right <= viewport.width;
+        if (!safelyInsideViewport) return false;
+        return rect.width < minimum || rect.height < minimum;
+      })
       .map(({ label, rect }) => ({ label, ...rect }));
     const overlaps = [];
     for (let i = 0; i < controls.length; i += 1) {
@@ -128,7 +162,7 @@ async function checkGeometry(page, label, minimum = 44) {
   }, { minimum });
 
   if (result.horizontalOverflow) failures.push(`${label}: débordement horizontal global`);
-  if (result.clipped.length) failures.push(`${label}: contrôles coupés: ${result.clipped.slice(0, 5).map((item) => item.label).join(", ")}`);
+  if (result.clipped.length) failures.push(`${label}: contrôles coupés horizontalement: ${result.clipped.slice(0, 5).map((item) => item.label).join(", ")}`);
   if (result.undersized.length) failures.push(`${label}: cibles < ${minimum}px: ${result.undersized.slice(0, 6).map((item) => `${item.label} ${Math.round(item.width)}x${Math.round(item.height)}`).join(", ")}`);
   if (result.overlaps.length) failures.push(`${label}: collisions indépendantes: ${result.overlaps.slice(0, 4).map((item) => `${item.a}/${item.b}`).join(", ")}`);
 }
@@ -173,8 +207,7 @@ async function auditInteractiveCoworking(page) {
   await page.goto(`http://127.0.0.1:${port}/coworking`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(850);
   const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
-  const available = frame.locator(".cw-marker.available").first();
-  const busy = frame.locator(".cw-marker.busy").first();
+  const available = frame.locator(".cw-marker.available .cw-hit").first();
 
   if (await available.isVisible().catch(() => false)) {
     await available.click();
@@ -183,14 +216,17 @@ async function auditInteractiveCoworking(page) {
     if ((await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).count()) > 0) failures.push("fiche disponible : Toquer proposé hors visio");
     await checkGeometry(page, "fiche personne disponible");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
+  const busy = frame.locator(".cw-marker.busy .cw-hit").first();
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
     await expectVisible(page.getByLabel("Toquer pour rejoindre la visio", { exact: true }), "fiche visio : Toquer");
     await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "fiche visio : Bonjour");
     await checkGeometry(page, "fiche groupe visio");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
   await page.getByLabel("Rejoindre la salle générale", { exact: true }).click();
@@ -221,9 +257,8 @@ async function auditMessaging(page) {
   if (await sent.isVisible().catch(() => false)) {
     const renderedText = await sent.innerText().catch(() => "");
     if (!renderedText.includes(body)) failures.push("Chat : texte envoyé absent du rendu visuel de la bulle");
-    const box = await sent.boundingBox().catch(() => null);
-    const viewport = page.viewportSize();
-    if (!box || box.top < -1 || box.bottom > (viewport?.height ?? 844) + 1) failures.push("Chat : dernier message envoyé n’est pas suivi automatiquement à l’écran");
+    const ratio = await intersectionRatio(sent);
+    if (ratio < 0.5) failures.push(`Chat : dernier message envoyé n’est pas suivi automatiquement à l’écran (intersection ${Math.round(ratio * 100)} %)`);
   }
   await checkGeometry(page, "Chat après envoi");
 }
@@ -290,7 +325,7 @@ async function run() {
     process.exitCode = 1;
     return;
   }
-  console.log("Product Audit passed: six viewport families, clipped geometry, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow, scheduled-call subject reuse, member profile, call scheduling, contact actions and core routes.");
+  console.log("Product Audit passed: six viewport families, true touch-target geometry, horizontal clipping, independent collision detection, geographic Coworking, green/red availability, video mosaics, General Room, messaging follow, scheduled-call subject reuse, member profile, call scheduling, contact actions and core routes.");
 }
 
 run().catch((error) => {

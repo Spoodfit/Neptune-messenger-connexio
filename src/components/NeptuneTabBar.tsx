@@ -27,7 +27,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const { width } = useWindowDimensions();
-  const compactBar = width < 310;
+  const compactBar = width < 350;
   const { serviceAvailable: coworkingAvailable } = useCoworking();
   const currentKey = state.routes[state.index]?.key;
   const routesByName = useMemo(() => new Map(state.routes.map((route) => [route.name, route])), [state.routes]);
@@ -38,6 +38,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
     const focused = route.key === currentKey;
     const options = descriptors[route.key]?.options;
     const icon = ICONS[route.name as keyof typeof ICONS] ?? ICONS.messages;
+    const visibleLabel = compactBar && route.name === "highlights" ? "Temps" : icon.label;
     const badge = options?.tabBarBadge;
     return (
       <Pressable
@@ -57,7 +58,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
           <Ionicons name={focused ? icon.active : icon.inactive} size={21} color={focused ? theme.accent : theme.navInactive} />
           {badge !== undefined ? <View style={[styles.badge, { borderColor: theme.navBackground }]}><Text style={styles.badgeText}>{String(badge)}</Text></View> : null}
         </View>
-        <Text numberOfLines={compactBar ? 2 : 1} style={[styles.label, compactBar && styles.compactLabel, { color: focused ? theme.pageText : theme.navInactive }]}>{icon.label}</Text>
+        <Text numberOfLines={1} style={[styles.label, compactBar && styles.compactLabel, { color: focused ? theme.pageText : theme.navInactive }]}>{visibleLabel}</Text>
       </Pressable>
     );
   };
@@ -100,7 +101,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
   iconWrap: { position: "relative", width: 28, alignItems: "center" },
   label: { maxWidth: "100%", fontSize: 11, lineHeight: 13, fontWeight: "800", textAlign: "center" },
-  compactLabel: { lineHeight: 12 },
+  compactLabel: { fontSize: 10, lineHeight: 12, letterSpacing: -0.2 },
   badge: { position: "absolute", right: -13, top: -8, minWidth: 21, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: colors.magenta, borderWidth: 2 },
   badgeText: { color: colors.white, fontSize: 11, fontWeight: "900" },
   fallbackShell: { position: "absolute", left: "50%", marginLeft: -31, top: -13, width: 62, height: 62, borderRadius: 31, padding: 4, zIndex: 1020, elevation: 50 },

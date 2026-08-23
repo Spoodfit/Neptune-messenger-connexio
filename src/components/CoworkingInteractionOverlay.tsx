@@ -13,7 +13,6 @@ import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { useActionSounds } from "../services/audio/actionSounds";
 import { CoworkingMapApi } from "../services/api/coworkingMapApi";
-import { AppAlert } from "../services/ui/AppAlert";
 import {
   subscribeCoworkingInteractions,
   type CoworkingInteractionEvent
@@ -94,8 +93,6 @@ export function CoworkingInteractionOverlay() {
     try {
       if (mapApi) await mapApi.respondToKnock(knock.requestId, accepted);
       setKnock(null);
-    } catch (error) {
-      AppAlert.alert("Réponse non envoyée", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     } finally {
       setResponding(false);
     }

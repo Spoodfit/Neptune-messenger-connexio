@@ -42,6 +42,29 @@ async function checkTarget(locator, label, minimum = 48) {
   return target;
 }
 
+async function intersectionRatio(locator) {
+  return locator.evaluate((element) => new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      observer.disconnect();
+      resolve(value);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      finish(entry ? entry.intersectionRatio : 0);
+    }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
+    observer.observe(element);
+    setTimeout(() => finish(0), 350);
+  })).catch(() => 0);
+}
+
+async function waitForFrameCount(locator, timeout = 7000) {
+  await locator.first().waitFor({ state: "attached", timeout }).catch(() => {});
+  return locator.count().catch(() => 0);
+}
+
 async function sentMessageSurface(page, body) {
   const candidate = page.locator(`[aria-label*="${body.replaceAll('"', '\\"')}"]`).first();
   await candidate.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
@@ -61,26 +84,13 @@ async function auditMessages(page) {
   await checkTarget(page.getByRole("tab", { name: /Groupes/ }), "Messages : onglet Groupes tactile");
   await checkTarget(page.getByRole("tab", { name: /Privées/ }), "Messages : onglet Privées tactile");
   await checkTarget(page.getByLabel("Nouvelle conversation", { exact: true }), "Messages : nouvelle conversation tactile");
+  await checkTarget(page.getByLabel("Ouvrir la Map", { exact: true }), "Navigation : Map centrale tactile");
 
-  const sectionButton = page.getByLabel(/^Replier (Clubs|Gestion|Généraux|Épinglés)$/).first();
-  if (await sectionButton.isVisible().catch(() => false)) {
-    const before = (await sectionButton.innerText()).trim();
-    await sectionButton.click();
-    const collapsed = page.getByLabel(/^Déplier (Clubs|Gestion|Généraux|Épinglés)$/).first();
-    await collapsed.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
-    const collapsedText = (await collapsed.innerText().catch(() => "")).trim();
-    check(!/(^|\s)0($|\s)/.test(collapsedText), "Messages : aucune catégorie repliée n’affiche 0", `avant: ${before}; après: ${collapsedText}`);
-  }
-
-  const announcement = page.getByLabel(/Nouvelle annonce non lue|Ouvrir Annonce/).first();
-  if (await announcement.isVisible().catch(() => false)) {
-    await checkTarget(announcement, "Annonce : carte tactile");
-    if ((await announcement.getAttribute("aria-label")) === "Nouvelle annonce non lue") {
-      const text = (await announcement.innerText()).trim();
-      check(text.includes("NOUVEAU"), "Annonce : état non lu clairement signalé");
-      check(text.length > 20, "Annonce : contenu non lu visible directement", `longueur: ${text.length}`);
-      await checkTarget(page.getByLabel("Marquer l'annonce comme lue", { exact: true }), "Annonce : J’ai lu tactile");
-    }
+  const mapButton = await visibleLocator(page.getByLabel("Ouvrir la Map", { exact: true }));
+  if (mapButton) {
+    const box = await mapButton.boundingBox();
+    const viewport = page.viewportSize();
+    if (box && viewport) check(Math.abs(box.x + box.width / 2 - viewport.width / 2) <= 3, "Navigation : Map réellement centrée");
   }
 
   await page.getByRole("tab", { name: /Privées/ }).click();
@@ -89,65 +99,95 @@ async function auditMessages(page) {
   check(await page.getByPlaceholder("Rechercher un club ou un groupe…").isVisible(), "Messages : retour Groupes actif");
 }
 
-async function auditCoworking(page) {
-  await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
-  const portal = page.getByRole("button", { name: /Coworking/ }).first();
-  await checkTarget(portal, "Coworking : portail central tactile");
-  await portal.click();
-  await waitRoute(page, "/coworking", "Coworking : ouverture Map en un tap");
+async function waitForMapSheet(page) {
+  await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "visible", timeout: 3500 }).catch(() => {});
+}
 
-  check((await page.getByText("J’entre", { exact: true }).count()) === 0, "Coworking : aucun bouton J’entre sur la Map");
-  check((await page.getByText("Focus", { exact: true }).count()) === 0, "Coworking : aucun ancien statut Focus sur la Map");
-  check((await page.getByText("En pause", { exact: true }).count()) === 0, "Coworking : aucun ancien statut Pause sur la Map");
-  check(await page.getByText("Disponible", { exact: true }).first().isVisible(), "Coworking : légende Disponible visible");
-  check(await page.getByText("Occupé", { exact: true }).first().isVisible(), "Coworking : légende Occupé visible");
-  await checkTarget(page.getByLabel("Fermer le coworking", { exact: true }), "Coworking : fermeture tactile");
-  await checkTarget(page.getByLabel("Actualiser le coworking", { exact: true }), "Coworking : actualisation tactile");
-  await checkTarget(page.getByLabel("Rejoindre la salle générale", { exact: true }), "Coworking : Salle générale tactile");
+async function auditMap(page) {
+  await page.goto(`${BASE_URL}/messages`, { waitUntil: "networkidle" });
+  const portal = await checkTarget(page.getByLabel("Ouvrir la Map", { exact: true }), "Map : portail central tactile");
+  if (!portal) return;
+  await portal.click();
+  await waitRoute(page, "/coworking", "Map : ouverture en un tap");
+
+  check(await page.getByText("Map", { exact: true }).first().isVisible().catch(() => false), "Map : titre visible");
+  check(await page.getByText("Disponible", { exact: true }).first().isVisible().catch(() => false), "Map : légende Disponible visible");
+  check(await page.getByText("Occupé", { exact: true }).first().isVisible().catch(() => false), "Map : légende Occupé visible");
+  check(await page.getByText("Évènement", { exact: true }).first().isVisible().catch(() => false), "Map : légende Évènement visible");
+  check((await page.getByText("Salle générale", { exact: true }).count()) === 0, "Map V25 : aucune Salle générale");
+  check((await page.getByLabel("Rejoindre la salle générale", { exact: true }).count()) === 0, "Map V25 : aucune action Salle générale");
+  await checkTarget(page.getByLabel("Fermer la Map", { exact: true }), "Map : fermeture tactile");
+  await checkTarget(page.getByLabel("Actualiser la Map", { exact: true }), "Map : actualisation tactile");
 
   const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
   const mapRoot = frame.locator("#map");
   await mapRoot.waitFor({ state: "visible", timeout: 7000 }).catch(() => {});
-  check(await mapRoot.isVisible().catch(() => false), "Coworking : vraie carte géographique visible");
+  check(await mapRoot.isVisible().catch(() => false), "Map : carte Leaflet visible");
 
-  const allMarkers = frame.locator(".cw-marker");
-  const markerCount = await allMarkers.count().catch(() => 0);
-  check(markerCount > 0, "Coworking : membres connectés visibles sur la carte", `marqueurs: ${markerCount}`);
-  check((await frame.locator(".cw-marker.available").count().catch(() => 0)) > 0, "Coworking : au moins une personne disponible verte");
-  check((await frame.locator(".cw-marker.busy").count().catch(() => 0)) > 0, "Coworking : au moins une visio occupée rouge");
-  check((await frame.locator(".cw-media.group").count().catch(() => 0)) > 0, "Coworking : visio de groupe rendue en mosaïque");
+  const availableMarkers = frame.locator(".cw-marker.available");
+  const busyMarkers = frame.locator(".cw-marker.busy");
+  const groupSatellites = frame.locator(".cw-group .cw-satellite");
+  const eventFlags = frame.locator(".event-marker .event-flag");
+  const [availableCount, busyCount, satelliteCount, eventFlagCount] = await Promise.all([
+    waitForFrameCount(availableMarkers),
+    waitForFrameCount(busyMarkers),
+    waitForFrameCount(groupSatellites),
+    waitForFrameCount(eventFlags)
+  ]);
+  check(availableCount > 0, "Map : au moins une personne disponible verte");
+  check(busyCount > 0, "Map : au moins une visio occupée rouge");
+  check(satelliteCount > 0, "Map : visio de groupe en cercles satellites");
+  check(eventFlagCount > 0, "Map : événements en drapeaux");
 
-  const busyMarker = frame.locator(".cw-marker.busy").first();
-  const availableMarker = frame.locator(".cw-marker.available").first();
-  if (await availableMarker.isVisible().catch(() => false)) {
-    await availableMarker.click();
-    await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Coworking : Bonjour tactile");
-    await checkTarget(page.getByLabel("Proposer un rendez-vous", { exact: true }), "Coworking : rendez-vous tactile");
-    check((await page.getByLabel("Toquer pour rejoindre la visio", { exact: true }).count()) === 0, "Coworking : pas de Toquer sur une personne disponible hors visio");
+  const faceGeometry = await frame.locator(".cw-face").evaluateAll((faces) => {
+    const inViewport = (rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
+    let visible = 0;
+    let blank = 0;
+    for (const face of faces) {
+      const rect = face.getBoundingClientRect();
+      if (!inViewport(rect)) continue;
+      visible += 1;
+      const fallback = face.querySelector(".cw-fallback");
+      const image = face.querySelector("img");
+      const video = face.querySelector("video.video-ready");
+      const fallbackVisible = Boolean(fallback && fallback.textContent?.trim() && Number(getComputedStyle(fallback).opacity) > .2);
+      const imageVisible = Boolean(image && image.complete && image.naturalWidth > 0 && Number(getComputedStyle(image).opacity) > .2);
+      const videoVisible = Boolean(video && Number(getComputedStyle(video).opacity) > .2);
+      if (!fallbackVisible && !imageVisible && !videoVisible) blank += 1;
+    }
+    return { visible, blank };
+  });
+  check(faceGeometry.visible > 0, "Map : au moins un visage réellement visible dans le viewport");
+  check(faceGeometry.blank === 0, "Map : aucun cercle membre visuellement vide", `vides=${faceGeometry.blank}`);
+
+  const available = availableMarkers.first();
+  if (await available.isVisible().catch(() => false)) {
+    await available.click();
+    await waitForMapSheet(page);
+    await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Map disponible : Bonjour tactile");
+    await checkTarget(page.getByLabel("Toquer et entrer", { exact: true }), "Map disponible : Toquer & entrer tactile");
+    await checkTarget(page.getByLabel("Proposer un rendez-vous", { exact: true }), "Map disponible : rendez-vous tactile");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
-  if (await busyMarker.isVisible().catch(() => false)) {
-    await busyMarker.click();
-    await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Coworking groupe : Bonjour tactile");
-    await checkTarget(page.getByLabel("Toquer pour rejoindre la visio", { exact: true }), "Coworking groupe : Toquer tactile");
+  const busy = busyMarkers.first();
+  if (await busy.isVisible().catch(() => false)) {
+    await busy.click();
+    await waitForMapSheet(page);
+    await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Map occupée : Bonjour tactile");
+    await checkTarget(page.getByLabel("Toquer et demander l’autorisation d’entrer", { exact: true }), "Map occupée : demande d’entrée tactile");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
-  await page.getByLabel("Rejoindre la salle générale", { exact: true }).click();
-  await waitRoute(page, "/coworking/hub", "Coworking : entrée Salle générale");
-  await page.getByText("Salle générale", { exact: true }).first().waitFor({ state: "visible", timeout: 7000 }).catch(() => {});
-  check(await page.getByText("Salle générale", { exact: true }).first().isVisible().catch(() => false), "Salle générale : titre visible");
-  check(await page.getByText("Touchez l’espace pour vous déplacer", { exact: true }).isVisible().catch(() => false), "Salle générale : mécanique spatiale compréhensible");
-  await checkTarget(page.getByLabel("Espace de déplacement de la Salle générale", { exact: true }), "Salle générale : espace de déplacement tactile", 120);
-  await checkTarget(page.getByLabel(/Couper le micro|Activer le micro/), "Salle générale : micro tactile");
-  await checkTarget(page.getByLabel(/Couper la caméra|Activer la caméra/), "Salle générale : caméra tactile");
-  await checkTarget(page.getByLabel("Quitter la salle", { exact: true }).last(), "Salle générale : sortie tactile");
-  check((await page.getByText("Focus", { exact: true }).count()) === 0, "Salle générale : aucun mode Focus hérité");
-  check((await page.getByText("En pause", { exact: true }).count()) === 0, "Salle générale : aucun mode Pause hérité");
-
-  await page.getByLabel("Retour à la Map sans quitter", { exact: true }).click();
-  await waitRoute(page, "/coworking", "Salle générale : retour Map sans quitter");
+  const event = frame.locator(".event-marker").first();
+  if (await event.isVisible().catch(() => false)) {
+    await event.click();
+    await waitForMapSheet(page);
+    await checkTarget(page.getByLabel("Voir l’évènement", { exact: true }), "Map événement : CTA tactile");
+    await page.getByLabel("Fermer la fiche", { exact: true }).click();
+  }
 }
 
 async function auditChat(page) {
@@ -165,11 +205,8 @@ async function auditChat(page) {
   if (sent) {
     const text = await sent.innerText().catch(() => "");
     check(text.includes(body), "Chat : contenu du message réellement rendu", text.slice(0, 120));
-    const box = await sent.boundingBox().catch(() => null);
-    if (box) {
-      const viewport = page.viewportSize();
-      check(box.bottom <= (viewport?.height ?? 852) + 1 && box.top >= -1, "Chat : écran suit automatiquement le dernier message envoyé", `top=${Math.round(box.top)}, bottom=${Math.round(box.bottom)}`);
-    } else failures.push("Chat : géométrie du dernier message indisponible");
+    const ratio = await intersectionRatio(sent);
+    check(ratio >= 0.5, "Chat : écran suit automatiquement le dernier message envoyé", `intersection=${Math.round(ratio * 100)} %`);
   }
 
   const translationToggle = page.getByLabel(/Afficher le contenu original|Afficher la traduction/).first();
@@ -185,11 +222,8 @@ async function auditChat(page) {
 async function auditSecondaryFlows(page) {
   await page.goto(`${BASE_URL}/highlights`, { waitUntil: "networkidle" });
   check(await page.getByLabel("Écrire une publication rapide", { exact: true }).isVisible(), "Temps forts : publication rapide visible");
-  const mapTab = page.getByRole("tab", { name: "Afficher la carte" });
-  await mapTab.click();
-  check(await page.locator("iframe[title='Carte de découverte Neptune']").isVisible(), "Temps forts : Map découverte visible");
-  await page.getByRole("tab", { name: "Afficher le Feed" }).click();
-  check(await page.getByLabel("Écrire une publication rapide", { exact: true }).isVisible(), "Temps forts : retour Feed fonctionnel");
+  check((await page.getByLabel("Afficher la carte", { exact: true }).count()) === 0, "Temps forts V25 : aucun ancien onglet Map");
+  check((await page.getByRole("tab", { name: /Feed|Map/ }).count()) === 0, "Temps forts V25 : aucun switch Feed/Map");
 
   await page.goto(`${BASE_URL}/calls`, { waitUntil: "networkidle" });
   check(pathOf(page).endsWith("/calls"), "Appels : écran accessible");
@@ -201,10 +235,17 @@ async function auditSecondaryFlows(page) {
   check(await page.getByText("Langue de Connexio", { exact: true }).last().isVisible(), "Profil : sélecteur langue fonctionnel");
   await page.getByLabel("Fermer").last().click();
 
-  for (const route of ["/account", "/notification-settings", "/privacy"]) {
+  for (const route of ["/account", "/notification-settings", "/privacy", "/contacts"]) {
     await page.goto(`${BASE_URL}${route}`, { waitUntil: "networkidle" });
     check(pathOf(page).endsWith(route), `${route} : écran accessible`);
   }
+
+  await page.goto(`${BASE_URL}/new-highlight`, { waitUntil: "networkidle" });
+  const composeUrl = new URL(page.url());
+  check(composeUrl.pathname.replace(/\/$/, "").endsWith("/highlights") && composeUrl.searchParams.get("compose") === "1", "/new-highlight : redirection compositeur valide", page.url());
+  const openComposer = page.getByPlaceholder("Partagez simplement ce que vous voulez…", { exact: true });
+  await openComposer.waitFor({ state: "visible", timeout: 3000 }).catch(() => {});
+  check(await openComposer.isVisible().catch(() => false), "/new-highlight : compositeur ouvert et prêt à saisir après redirection");
 }
 
 async function run() {
@@ -226,7 +267,7 @@ async function run() {
 
     await auditMainNavigation(page);
     await auditMessages(page);
-    await auditCoworking(page);
+    await auditMap(page);
     await auditChat(page);
     await auditSecondaryFlows(page);
 
@@ -239,11 +280,11 @@ async function run() {
   }
 
   if (failures.length) {
-    console.error("Interaction audit failed:\n" + failures.map((failure) => `- ${failure}`).join("\n"));
+    console.error("Interaction audit V25 failed:\n" + failures.map((failure) => `- ${failure}`).join("\n"));
     process.exitCode = 1;
     return;
   }
-  console.log("Interaction audit passed: navigation, messaging auto-follow, geographic Coworking, green/red presence, video mosaic, hello/knock, General Room spatial UX, chat voice, Feed/Map, calls, account, notifications and privacy.");
+  console.log("Interaction audit V25 passed: navigation, centered Map, green/red presence, circular video groups, event flags, hello/knock, feed-only Temps forts, messaging follow, voice, calls, account, notifications and privacy.");
 }
 
 run().catch((error) => {

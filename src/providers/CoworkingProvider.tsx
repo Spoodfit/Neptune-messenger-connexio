@@ -106,7 +106,7 @@ function buildMockSnapshot(memberIds: string[]): CoworkingSnapshot {
   const participants = ids.map<CoworkingParticipantPresence>((userId, index) => ({
     userId,
     mode: "available",
-    statusText: index < 2 ? "En visio" : hubParticipantIds.includes(userId) ? "Salle générale" : "Disponible",
+    statusText: index < 2 ? "En visio" : "Disponible",
     cameraOn: index < 2 || index === 3,
     microphoneOn: index === 0,
     speaking: index === 0,
@@ -119,7 +119,7 @@ function buildMockSnapshot(memberIds: string[]): CoworkingSnapshot {
       name: "Salle générale",
       kind: "hub",
       access: "open",
-      participantIds: hubParticipantIds,
+      participantIds: [],
       activity: "Rencontres spontanées",
       mediaEnabled: true
     },
