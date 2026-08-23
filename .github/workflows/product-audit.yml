@@ -44,8 +44,8 @@ jobs:
         run: node scripts/product-audit-v25.cjs
       - name: Run full multilingual audit
         run: node scripts/i18n-product-audit.cjs
-      - name: Capture V24 render review
-        run: node scripts/v24-render-capture.cjs
+      - name: Capture dedicated Map render review
+        run: node scripts/v25-render-capture.cjs
       - name: Upload V24 render review
         uses: actions/upload-artifact@v4
         with:
