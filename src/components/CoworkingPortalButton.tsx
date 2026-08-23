@@ -13,7 +13,7 @@ import { Text } from "./LocalizedText";
 export function CoworkingPortalButton() {
   const theme = useAppTheme();
   const { width } = useWindowDimensions();
-  const compactBar = width < 310;
+  const compactBar = width < 350;
   const reducedMotion = useReducedMotion();
   const { activeCount } = useCoworking();
   const pulse = useRef(new Animated.Value(0)).current;

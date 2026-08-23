@@ -75,7 +75,7 @@ async function auditCenterMapButton(page, label) {
     if (!box || !viewport || Math.abs(box.x + box.width / 2 - viewport.width / 2) > 2.5) failures.push(`${label}: bouton Map non centré`);
   }
   const viewport = page.viewportSize();
-  const compact = Boolean(viewport && viewport.width < 310);
+  const compact = Boolean(viewport && viewport.width < 350);
   const messagesTab = page.getByRole("tab", { name: /^Messages(?:,|$)/ });
   for (const [tab, visibleLabel] of [[messagesTab, "Messages"], [page.getByRole("tab", { name: "Temps forts", exact: true }), compact ? "Temps" : "Temps forts"]]) {
     const labelNode = tab.getByText(visibleLabel, { exact: true });

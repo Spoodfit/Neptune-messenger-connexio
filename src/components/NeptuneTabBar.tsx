@@ -27,7 +27,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
   const insets = useSafeAreaInsets();
   const theme = useAppTheme();
   const { width } = useWindowDimensions();
-  const compactBar = width < 310;
+  const compactBar = width < 350;
   const { serviceAvailable: coworkingAvailable } = useCoworking();
   const currentKey = state.routes[state.index]?.key;
   const routesByName = useMemo(() => new Map(state.routes.map((route) => [route.name, route])), [state.routes]);
