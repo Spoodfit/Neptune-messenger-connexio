@@ -35,7 +35,7 @@ export interface CoworkingGeographicMapProps {
   mediaSession?: CoworkingMediaSession;
   selectedMarkerId?: string | null;
   selectedEventId?: string | null;
-  onSelectMarker: (markerId: string) => void;
+  onSelectMarker: (markerId: string, memberId?: string) => void;
   onSelectEvent?: (eventId: string) => void;
   onLocationUnavailable?: () => void;
   onMediaUnavailable?: (message: string) => void;
