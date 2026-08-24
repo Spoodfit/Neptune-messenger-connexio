@@ -17,7 +17,7 @@ import {
   visibleDiscoveryEvents,
   type DiscoveryEvent
 } from "../domain/discoveryEvents";
-import { coworkingAvailability, coworkingSpaceHostId, participantPresence } from "../domain/coworking";
+import { coworkingAvailability, coworkingMapPrimaryAction, coworkingSpaceHostId, participantPresence } from "../domain/coworking";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
 import { useAppLanguage } from "../providers/LanguageProvider";
@@ -84,7 +84,7 @@ export default function UnifiedMapScreenV24() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [actionBusy, setActionBusy] = useState<"hello" | "knock" | "presence" | null>(null);
+  const [actionBusy, setActionBusy] = useState<"hello" | "invite" | "knock" | "presence" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const loadEvents = async () => {
@@ -310,25 +310,27 @@ export default function UnifiedMapScreenV24() {
     router.push(`/coworking/${encodeURIComponent(created.spaceId)}`);
   };
 
-  const knock = async () => {
+  const runPrimaryAction = async () => {
     if (!selection || actionBusy || selection.member.id === currentUser.id) return;
-    const busy = Boolean(selection.space);
-    setActionBusy("knock");
+    const primaryAction = coworkingMapPrimaryAction(selection.marker.availability, selection.space);
+    if (primaryAction === "none") return;
+    setActionBusy(primaryAction === "invite-video" ? "invite" : "knock");
     try {
-      if (!busy && !mapApi) {
+      if (primaryAction === "invite-video") {
         await createDirectSpace(selection.member);
         return;
       }
-      if (busy && !mapApi) {
-        const hostId = selection.space ? coworkingSpaceHostId(selection.space) : undefined;
+
+      const targetSpace = selection.space;
+      if (!targetSpace) return;
+      if (!mapApi) {
+        const hostId = coworkingSpaceHostId(targetSpace);
         const host = hostId ? allMembers.find((member) => member.id === hostId) : undefined;
         setNotice(`Demande envoyée à ${host ? firstName(host.name) : "l’hôte"} · en attente d’autorisation…`);
         return;
       }
 
-      const result = await mapApi!.knock(selection.space
-        ? { spaceId: selection.space.id }
-        : { userId: selection.member.id });
+      const result = await mapApi.knock({ spaceId: targetSpace.id });
 
       if (result.status === "declined") {
         setNotice(`${firstName(selection.member.name)} n’est pas disponible maintenant.`);
@@ -336,20 +338,14 @@ export default function UnifiedMapScreenV24() {
       }
 
       if (result.status === "accepted") {
-        const destination = result.spaceId ?? selection.space?.id;
+        const destination = result.spaceId ?? targetSpace.id;
         if (destination) {
           await enterSpace(destination);
           return;
         }
-        await createDirectSpace(selection.member);
-        return;
       }
 
-      setNotice(
-        busy
-          ? `Tu as toqué à l’espace · autorisation de l’hôte demandée.`
-          : `Tu as toqué chez ${firstName(selection.member.name)} · connexion en cours…`
-      );
+      setNotice("Tu as toqué à l’espace · autorisation de l’hôte demandée.");
     } catch (error) {
       AppAlert.alert("Impossible de toquer", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     } finally {
@@ -366,6 +362,9 @@ export default function UnifiedMapScreenV24() {
   const compactHeader = viewportWidth < 340;
   const ownPresence = participantPresence(snapshot, currentUser.id);
   const ownAvailability = coworkingAvailability(ownPresence, currentSpace);
+  const selectionPrimaryAction = selection
+    ? coworkingMapPrimaryAction(selection.marker.availability, selection.space)
+    : "none";
 
   const applyAvailability = async (next: "available" | "busy") => {
     if (actionBusy) return;
@@ -461,7 +460,7 @@ export default function UnifiedMapScreenV24() {
               <View style={styles.identityCopy}>
                 <View style={styles.identityLine}>
                   <Text numberOfLines={1} style={[styles.memberName, { color: theme.pageText }]}>{selection.member.name}</Text>
-                  <Text style={[styles.availabilityText, { color: selection.space ? BUSY : AVAILABLE }]}>{selection.space ? "Occupé" : "Disponible"}</Text>
+                  <Text style={[styles.availabilityText, { color: selection.marker.availability === "busy" ? BUSY : AVAILABLE }]}>{selection.marker.availability === "busy" ? "Occupé" : "Disponible"}</Text>
                 </View>
                 <Text numberOfLines={1} style={[styles.memberMeta, { color: theme.pageTextMuted }]}>{selection.member.company}{selection.member.city ? ` · ${selection.member.city}` : ""}</Text>
               </View>
@@ -491,10 +490,18 @@ export default function UnifiedMapScreenV24() {
                 <Ionicons name="hand-left-outline" size={19} color={theme.violet} />
                 <Text style={[styles.actionText, { color: theme.pageText }]}>{selection.space ? "Bonjour au groupe" : "Bonjour"}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={selection.space ? "Toquer à l’espace et demander l’autorisation d’entrer" : "Toquer et entrer"} disabled={Boolean(actionBusy)} onPress={() => void knock()} style={[styles.action, styles.primaryAction, { backgroundColor: selection.space ? BUSY : AVAILABLE }]}>
-                {actionBusy === "knock" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name={selection.space ? "notifications-outline" : "enter-outline"} size={19} color="#FFFFFF" />}
-                <Text style={styles.primaryActionText}>{selection.space ? "Toquer à l’espace" : "Toquer & entrer"}</Text>
-              </Pressable>
+              {selectionPrimaryAction !== "none" ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={selectionPrimaryAction === "knock-space" ? "Toquer à l’espace et demander l’autorisation d’entrer" : "Inviter en visio"}
+                  disabled={Boolean(actionBusy)}
+                  onPress={() => void runPrimaryAction()}
+                  style={[styles.action, styles.primaryAction, { backgroundColor: selectionPrimaryAction === "knock-space" ? BUSY : AVAILABLE }]}
+                >
+                  {actionBusy === "knock" || actionBusy === "invite" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name={selectionPrimaryAction === "knock-space" ? "notifications-outline" : "videocam-outline"} size={19} color="#FFFFFF" />}
+                  <Text style={styles.primaryActionText}>{selectionPrimaryAction === "knock-space" ? "Toquer à l’espace" : "Inviter en visio"}</Text>
+                </Pressable>
+              ) : null}
               <Pressable accessibilityRole="button" accessibilityLabel="Proposer un rendez-vous" onPress={() => router.push({ pathname: "/schedule-call", params: { memberId: selection.member.id, mode: "video" } })} style={[styles.iconAction, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
                 <Ionicons name="calendar-outline" size={20} color={theme.pageText} />
               </Pressable>

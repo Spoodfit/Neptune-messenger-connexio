@@ -66,11 +66,17 @@ export interface CoworkingKnockResponse {
   media?: CoworkingMediaSession;
 }
 
-function targetBody(input: { userId?: string; spaceId?: string }): { user_id: string } | { space_id: string } {
+function helloTargetBody(input: { userId?: string; spaceId?: string }): { user_id: string } | { space_id: string } {
   const userId = input.userId?.trim();
   const spaceId = input.spaceId?.trim();
   if (Boolean(userId) === Boolean(spaceId)) throw new Error("Choisissez un membre ou un espace Coworking, pas les deux.");
   return spaceId ? { space_id: spaceId } : { user_id: userId! };
+}
+
+function spaceTargetBody(spaceId: string): { space_id: string } {
+  const normalized = spaceId.trim();
+  if (!normalized) throw new Error("L’espace Coworking à rejoindre est requis.");
+  return { space_id: normalized };
 }
 
 export class CoworkingMapApi {
@@ -94,18 +100,18 @@ export class CoworkingMapApi {
       "/v1/coworking/hello",
       {
         method: "POST",
-        body: JSON.stringify(targetBody(input))
+        body: JSON.stringify(helloTargetBody(input))
       },
       this.fallbackAccessToken
     );
   }
 
-  async knock(input: { userId?: string; spaceId?: string }): Promise<CoworkingKnockResult> {
+  async knock(input: { spaceId: string }): Promise<CoworkingKnockResult> {
     const payload = await authenticatedRequest<Record<string, unknown>>(
       "/v1/coworking/knock",
       {
         method: "POST",
-        body: JSON.stringify(targetBody(input))
+        body: JSON.stringify(spaceTargetBody(input.spaceId))
       },
       this.fallbackAccessToken
     );

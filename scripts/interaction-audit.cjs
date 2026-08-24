@@ -172,7 +172,7 @@ async function auditMap(page) {
     await available.click();
     await waitForMapSheet(page);
     await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Map disponible : Bonjour tactile");
-    await checkTarget(page.getByLabel("Toquer et entrer", { exact: true }), "Map disponible : Toquer & entrer tactile");
+    await checkTarget(page.getByLabel("Inviter en visio", { exact: true }), "Map disponible : Inviter en visio tactile");
     await checkTarget(page.getByLabel("Proposer un rendez-vous", { exact: true }), "Map disponible : rendez-vous tactile");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});

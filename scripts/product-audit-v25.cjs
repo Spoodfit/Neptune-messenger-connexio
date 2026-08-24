@@ -180,7 +180,8 @@ async function auditMap(page, label, interactive = false) {
   const available = frame.locator(".cw-marker.available").first();
   if (await available.isVisible().catch(() => false)) {
     await available.click();
-    await expectVisible(page.getByLabel("Toquer et entrer", { exact: true }), "Disponible: Toquer & entrer");
+    await expectVisible(page.getByLabel("Inviter en visio", { exact: true }), "Disponible: invitation visio sans toquement");
+    if (await page.getByLabel(/Toquer/, { exact: false }).count()) failures.push("Disponible: Toquer proposé hors espace actif");
     await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "Disponible: Bonjour");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }

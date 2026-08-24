@@ -65,6 +65,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Souhaite rejoindre votre échange": { en: "Wants to join your conversation", es: "Quiere unirse a vuestra conversación", de: "Möchte eurem Gespräch beitreten", it: "Vuole unirsi alla vostra conversazione", pt: "Quer juntar-se à vossa conversa" },
   "Toquer": { en: "Knock", es: "Llamar", de: "Anklopfen", it: "Bussa", pt: "Bater à porta" },
   "Toquer & entrer": { en: "Knock & enter", es: "Llamar y entrar", de: "Anklopfen & eintreten", it: "Bussa ed entra", pt: "Bater e entrar" },
+  "Inviter en visio": { en: "Invite to video", es: "Invitar a videollamada", de: "Zum Video einladen", it: "Invita alla videochiamata", pt: "Convidar para vídeo" },
   "Toquer pour rejoindre la visio": { en: "Knock to join the video call", es: "Llamar para unirse a la videollamada", de: "Anklopfen, um dem Videoanruf beizutreten", it: "Bussa per entrare nella videochiamata", pt: "Bater à porta para entrar na videochamada" },
   "toque à votre bureau": { en: "is knocking at your office", es: "llama a vuestra oficina", de: "klopft an euer Büro", it: "bussa al vostro ufficio", pt: "está a bater à porta do vosso escritório" },
   "Touchez l’espace pour vous déplacer": { en: "Tap the space to move", es: "Toca el espacio para moverte", de: "Tippe in den Raum, um dich zu bewegen", it: "Tocca lo spazio per spostarti", pt: "Toque no espaço para se mover" },

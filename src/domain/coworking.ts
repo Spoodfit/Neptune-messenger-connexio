@@ -32,6 +32,16 @@ export function coworkingAvailability(
   return presence && presence.mode !== "available" ? "busy" : "available";
 }
 
+export type CoworkingMapPrimaryAction = "invite-video" | "knock-space" | "none";
+
+export function coworkingMapPrimaryAction(
+  availability: "available" | "busy",
+  activeSpace: CoworkingSpace | undefined
+): CoworkingMapPrimaryAction {
+  if (activeSpace) return "knock-space";
+  return availability === "available" ? "invite-video" : "none";
+}
+
 export function coworkingSpaceHostId(space: CoworkingSpace): string | undefined {
   return space.ownerId && space.participantIds.includes(space.ownerId)
     ? space.ownerId
