@@ -76,8 +76,8 @@ test("les drapeaux restent ancrés à leurs coordonnées après un déplacement 
   match(html, /event-cluster-core/);
 });
 
-test("les événements restent cliquables sans bloquer les membres superposés", () => {
+test("les événements et les membres superposés gardent chacun leur cible tactile", () => {
   match(html, /zIndexOffset:500/);
-  match(html, /title:event\.title,zIndexOffset:-250,keyboard:true/);
-  match(html, /\.event-hit\{[^}]+pointer-events:auto/);
+  match(html, /title:event\.title,zIndexOffset:750,keyboard:true/);
+  match(html, /\.event-hit\{[^}]+left:2px;top:-2px;width:44px;height:44px[^}]+pointer-events:auto/);
 });
