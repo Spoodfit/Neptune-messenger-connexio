@@ -1,4 +1,6 @@
 import { authenticatedRequest } from "./authenticatedRequest";
+import { env } from "../../config/env";
+import { assertCandidateMediaTransport } from "../../domain/mediaTransport";
 import type {
   CoworkingMediaSession,
   CoworkingParticipantPresence,
@@ -134,15 +136,22 @@ function normalizeMedia(
   const token = stringValue(item.token ?? item.room_token);
   const participantId = stringValue(item.participant_id ?? item.user_id);
   if (!socketUrl || !token || !participantId) return undefined;
+  const clientScriptUrl = stringValue(item.client_script_url) || undefined;
+  const iceServers = normalizeIceServers(item.ice_servers);
+  const expiresAt = stringValue(item.expires_at) || undefined;
+  assertCandidateMediaTransport(
+    { signalingUrl: socketUrl, clientScriptUrl, iceServers, expiresAt },
+    env.releaseStage === "release-candidate" || env.releaseStage === "production"
+  );
   return {
     spaceId: stringValue(item.space_id, fallbackSpaceId),
     socketUrl,
     socketPath: stringValue(item.socket_path, "/socket.io"),
-    clientScriptUrl: stringValue(item.client_script_url) || undefined,
+    clientScriptUrl,
     token,
     participantId,
-    iceServers: normalizeIceServers(item.ice_servers),
-    expiresAt: stringValue(item.expires_at) || undefined,
+    iceServers,
+    expiresAt,
     mock: false,
     observer:
       item.observer === false || item.publish === true || item.publisher === true

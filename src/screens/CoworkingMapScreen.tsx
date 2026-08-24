@@ -202,7 +202,7 @@ export default function CoworkingMapScreen() {
     if (!selection || actionBusy) return;
     setActionBusy("hello");
     try {
-      if (mapApi) await mapApi.sayHello(selection.member.id);
+      if (mapApi) await mapApi.sayHello(selection.space ? { spaceId: selection.space.id } : { userId: selection.member.id });
       setNotice(`Bonjour envoyé à ${firstName(selection.member.name)} 👋`);
     } catch (error) {
       AppAlert.alert("Bonjour non envoyé", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
@@ -219,7 +219,7 @@ export default function CoworkingMapScreen() {
         setNotice(`Tu as toqué chez ${firstName(selection.member.name)} · en attente…`);
         return;
       }
-      const result = await mapApi.knock({ userId: selection.member.id, spaceId: selection.space.id });
+      const result = await mapApi.knock({ spaceId: selection.space.id });
       if (result.status === "accepted") {
         await joinSpace(selection.space.id);
         closeSelection();

@@ -33,6 +33,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const supportUrl = process.env.EXPO_PUBLIC_SUPPORT_URL ?? "mailto:contact@neptunebusiness.com";
   const backendContract = process.env.EXPO_PUBLIC_BACKEND_CONTRACT ?? "neptune-web-v1";
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
+  const coworkingEnabled = process.env.EXPO_PUBLIC_COWORKING_ENABLED === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
   const buildRef = process.env.EAS_BUILD_GIT_COMMIT_HASH ?? process.env.GITHUB_SHA ?? "local";
   const isProduction = buildProfile === "production";
@@ -53,7 +54,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     if (mockMode) throw new Error("EXPO_PUBLIC_MOCK_MODE doit être false pour une build store.");
     if (missing.length > 0) throw new Error(`Configuration Connexio store incomplète : ${missing.join(", ")}`);
     if (backendContract !== "neptune-web-v1" && backendContract !== "connexio-v1") throw new Error("EXPO_PUBLIC_BACKEND_CONTRACT doit valoir neptune-web-v1 ou connexio-v1.");
-    if (isProduction && backendContract !== "connexio-v1") throw new Error("Build Store bloquée : le backend ne déclare pas encore le contrat sécurisé connexio-v1.");
+    if (backendContract !== "connexio-v1") throw new Error("Build candidate/Store bloquée : le backend ne déclare pas encore le contrat sécurisé connexio-v1.");
     requireHttps("EXPO_PUBLIC_API_BASE_URL", apiBaseUrl);
     if (backendContract === "connexio-v1" && !realtimeUrl.startsWith("wss://") && !realtimeUrl.startsWith("https://")) throw new Error("EXPO_PUBLIC_REALTIME_URL doit utiliser WSS ou HTTPS pour une build store.");
     requireHttps("EXPO_PUBLIC_BUSINESS_WEB_BASE_URL", businessWebBaseUrl);
@@ -125,6 +126,28 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ["expo-location", { locationWhenInUsePermission: "Connexio utilise votre position uniquement à votre demande." }],
       "expo-document-picker"
     ],
-    extra: { apiBaseUrl, realtimeUrl, businessWebBaseUrl, privacyPolicyUrl, termsUrl, accountDeletionUrl, supportUrl, backendContract, mockMode, buildProfile, buildRef, eas: { projectId: easProjectId } }
+    extra: {
+      apiBaseUrl,
+      realtimeUrl,
+      businessWebBaseUrl,
+      privacyPolicyUrl,
+      termsUrl,
+      accountDeletionUrl,
+      supportUrl,
+      backendContract,
+      mockMode,
+      coworkingEnabled,
+      standaloneMode: buildProfile === "standalone",
+      buildProfile,
+      buildRef,
+      releaseStage:
+        buildProfile === "preview" ||
+        buildProfile === "standalone" ||
+        buildProfile === "release-candidate" ||
+        buildProfile === "production"
+          ? buildProfile
+          : "development",
+      eas: { projectId: easProjectId }
+    }
   };
 };

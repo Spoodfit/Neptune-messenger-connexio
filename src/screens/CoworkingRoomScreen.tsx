@@ -7,7 +7,9 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
   type GestureResponderEvent,
@@ -66,6 +68,8 @@ export default function CoworkingRoomScreen() {
   const [cameraOn, setCameraOn] = useState(savedMediaState?.cameraOn ?? true);
   const [microphoneOn, setMicrophoneOn] = useState(savedMediaState?.microphoneOn ?? false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [pinnedUserId, setPinnedUserId] = useState<string | null>(null);
+  const [roomViewMode, setRoomViewMode] = useState<"stage" | "overview">("stage");
   const [ownPosition, setOwnPosition] = useState({ x: 50, y: 54 });
   const [stageSize, setStageSize] = useState({ width: 1, height: 1 });
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -85,6 +89,12 @@ export default function CoworkingRoomScreen() {
     [currentUser, members, space?.participantIds]
   );
   const selectedMember = participants.find((member) => member.id === selectedUserId);
+  const remoteParticipants = participants.filter((member) => member.id !== currentUser.id);
+  const focusedMember = remoteParticipants.find((member) => member.id === pinnedUserId)
+    ?? remoteParticipants.find((member) => participantPresence(snapshot, member.id)?.speaking)
+    ?? remoteParticipants.find((member) => member.id === space?.ownerId)
+    ?? remoteParticipants[0];
+  const focusedPresence = focusedMember ? participantPresence(snapshot, focusedMember.id) : undefined;
   const nodeSize = participants.length <= 6 ? 80 : participants.length <= 10 ? 72 : 64;
   const nodeHeight = nodeSize + 30;
 
@@ -105,6 +115,12 @@ export default function CoworkingRoomScreen() {
     if (!media) return;
     updateMediaState(spaceId, { cameraOn, microphoneOn });
   }, [cameraOn, media, microphoneOn, spaceId, updateMediaState]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 2600);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   const leave = async () => {
     try {
@@ -130,11 +146,17 @@ export default function CoworkingRoomScreen() {
   };
 
   const sayHello = async () => {
-    if (!selectedMember || busyAction) return;
+    if (!selectedMember || !space || busyAction) return;
     setBusyAction("hello");
     try {
-      if (mapApi) await mapApi.sayHello(selectedMember.id);
-      setNotice(`Bonjour envoyé à ${firstName(selectedMember.name)} 👋`);
+      if (mapApi) {
+        await mapApi.sayHello(isGeneralRoom
+          ? { userId: selectedMember.id }
+          : { spaceId: space.id });
+      }
+      setNotice(isGeneralRoom
+        ? `Bonjour envoyé à ${firstName(selectedMember.name)} 👋`
+        : "Bonjour envoyé à tout l’espace 👋");
       setSelectedUserId(null);
     } catch (error) {
       AppAlert.alert("Bonjour non envoyé", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
@@ -192,7 +214,11 @@ export default function CoworkingRoomScreen() {
             <Text numberOfLines={1} style={[styles.headerTitle, { color: theme.pageText }]}>{isGeneralRoom ? "Salle générale" : space.name}</Text>
           </View>
           <Text style={[styles.headerMeta, { color: theme.pageTextMuted }]}>
-            {isGeneralRoom ? `${participants.length} ici · rapproche-toi pour mieux entendre` : `${participants.length} participant${participants.length > 1 ? "s" : ""}`}
+            {isGeneralRoom
+              ? `${participants.length} ici · rapproche-toi pour mieux entendre`
+              : remoteParticipants.length === 0
+                ? "En attente d’un participant"
+                : `${participants.length} participant${participants.length > 1 ? "s" : ""}`}
           </Text>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Quitter la salle" onPress={() => void leave()} style={[styles.headerButton, { backgroundColor: theme.dangerSoft }]}>
@@ -200,7 +226,7 @@ export default function CoworkingRoomScreen() {
         </Pressable>
       </View>
 
-      <View onLayout={onStageLayout} style={[styles.stage, { borderColor: theme.borderSoft }]}>
+      <View testID="coworking-room-stage" onLayout={onStageLayout} style={[styles.stage, { borderColor: theme.borderSoft }]}>
         {isGeneralRoom ? (
           <Pressable
             accessibilityRole="button"
@@ -218,93 +244,240 @@ export default function CoworkingRoomScreen() {
           </Pressable>
         ) : null}
 
-        <View pointerEvents="none" style={styles.avatarLayer}>
-          {participants.map((member) => {
-            const position = participantLayout[member.id];
-            if (!position) return null;
-            const presence = participantPresence(snapshot, member.id);
-            const isMe = member.id === currentUser.id;
-            return (
-              <View
-                key={`fallback-${member.id}`}
-                style={[
-                  styles.personVisual,
-                  {
-                    left: `${position.x}%`,
-                    top: `${position.y}%`,
-                    width: nodeSize,
-                    height: nodeSize,
-                    marginLeft: -nodeSize / 2,
-                    marginTop: -nodeSize / 2,
-                    borderColor: presence?.speaking ? theme.success : isMe ? theme.violet : theme.borderSoft,
-                    backgroundColor: theme.surfaceStrong,
-                    borderRadius: Math.max(18, nodeSize * 0.28)
-                  }
-                ]}
-              >
-                <StatusAvatar user={member} size={Math.max(42, nodeSize - 20)} accessible={false} />
+        {isGeneralRoom ? (
+          <>
+            <View pointerEvents="none" style={styles.avatarLayer}>
+              {participants.map((member) => {
+                const position = participantLayout[member.id];
+                if (!position) return null;
+                const presence = participantPresence(snapshot, member.id);
+                const isMe = member.id === currentUser.id;
+                return (
+                  <View
+                    key={`fallback-${member.id}`}
+                    style={[
+                      styles.personVisual,
+                      {
+                        left: `${position.x}%`,
+                        top: `${position.y}%`,
+                        width: nodeSize,
+                        height: nodeSize,
+                        marginLeft: -nodeSize / 2,
+                        marginTop: -nodeSize / 2,
+                        borderColor: presence?.speaking ? theme.success : isMe ? theme.violet : theme.borderSoft,
+                        backgroundColor: theme.surfaceStrong,
+                        borderRadius: Math.max(18, nodeSize * 0.28)
+                      }
+                    ]}
+                  >
+                    <StatusAvatar user={member} size={Math.max(42, nodeSize - 20)} accessible={false} />
+                  </View>
+                );
+              })}
+            </View>
+
+            {media && !media.mock ? (
+              <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <CoworkingMediaSurface
+                  session={media}
+                  displayName={currentUser.name}
+                  cameraOn={cameraOn}
+                  microphoneOn={microphoneOn}
+                  spatialAudio
+                  participantLayout={participantLayout}
+                  onError={setMediaError}
+                  onLocalMediaUnavailable={(message) => {
+                    setCameraOn(false);
+                    setMicrophoneOn(false);
+                    setMediaError(message);
+                  }}
+                />
               </View>
-            );
-          })}
-        </View>
+            ) : null}
 
-        {media && !media.mock ? (
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            <CoworkingMediaSurface
-              session={media}
-              displayName={currentUser.name}
-              cameraOn={cameraOn}
-              microphoneOn={microphoneOn}
-              spatialAudio={isGeneralRoom}
-              participantLayout={isGeneralRoom ? participantLayout : undefined}
-              onError={setMediaError}
-              onLocalMediaUnavailable={(message) => {
-                setCameraOn(false);
-                setMicrophoneOn(false);
-                setMediaError(message);
-              }}
-            />
-          </View>
-        ) : null}
-
-        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-          {participants.map((member) => {
-            const position = participantLayout[member.id];
-            if (!position) return null;
-            const presence = participantPresence(snapshot, member.id);
-            const isMe = member.id === currentUser.id;
-            return (
-              <Pressable
-                key={member.id}
-                accessibilityRole="button"
-                accessibilityLabel={`${isMe ? "Moi" : member.name}${presence?.cameraOn ? ", caméra active" : ""}`}
-                disabled={isMe}
-                onPress={() => setSelectedUserId(member.id)}
-                style={({ pressed }) => [
-                  styles.personHit,
-                  {
-                    left: `${position.x}%`,
-                    top: `${position.y}%`,
-                    width: nodeSize + 18,
-                    height: nodeHeight,
-                    marginLeft: -(nodeSize + 18) / 2,
-                    marginTop: -nodeSize / 2
-                  },
-                  pressed && styles.pressed
-                ]}
-              >
-                <View style={styles.personNameRow}>
-                  {presence?.speaking ? <View style={[styles.speakingDot, { backgroundColor: theme.success }]} /> : null}
-                  <Text numberOfLines={1} style={[styles.personName, { color: theme.pageText }]}>{isMe ? "Moi" : firstName(member.name)}</Text>
-                  {!presence?.microphoneOn ? <Ionicons name="mic-off" size={10} color={theme.pageTextMuted} /> : null}
+            <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+              {participants.map((member) => {
+                const position = participantLayout[member.id];
+                if (!position) return null;
+                const presence = participantPresence(snapshot, member.id);
+                const isMe = member.id === currentUser.id;
+                return (
+                  <Pressable
+                    key={member.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isMe ? "Moi" : member.name}${presence?.cameraOn ? ", caméra active" : ""}`}
+                    disabled={isMe}
+                    onPress={() => setSelectedUserId(member.id)}
+                    style={({ pressed }) => [
+                      styles.personHit,
+                      {
+                        left: `${position.x}%`,
+                        top: `${position.y}%`,
+                        width: nodeSize + 18,
+                        height: nodeHeight,
+                        marginLeft: -(nodeSize + 18) / 2,
+                        marginTop: -nodeSize / 2
+                      },
+                      pressed && styles.pressed
+                    ]}
+                  >
+                    <View style={styles.personNameRow}>
+                      {presence?.speaking ? <View style={[styles.speakingDot, { backgroundColor: theme.success }]} /> : null}
+                      <Text numberOfLines={1} style={[styles.personName, { color: theme.pageText }]}>{isMe ? "Moi" : firstName(member.name)}</Text>
+                      {!presence?.microphoneOn ? <Ionicons name="mic-off" size={10} color={theme.pageTextMuted} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : (
+          <>
+            <View pointerEvents="none" style={[styles.privateBackdrop, { backgroundColor: theme.surfaceStrong }]}>
+              {roomViewMode === "stage" && focusedMember ? (
+                <View testID="coworking-focus-remote" style={styles.focusFallback}>
+                  <View testID="coworking-focus-video" style={[styles.focusVideoSurface, { backgroundColor: theme.surface }]}>
+                    <View style={styles.focusCameraFallback}>
+                      <View testID="coworking-focus-avatar" style={[styles.focusAvatarShell, { borderColor: focusedPresence?.speaking ? theme.success : theme.borderSoft, backgroundColor: theme.surfaceStrong }]}>
+                        <StatusAvatar user={focusedMember} size={116} accessible={false} />
+                      </View>
+                      {!focusedPresence?.cameraOn ? <Ionicons name="videocam-off-outline" size={24} color={theme.pageTextMuted} /> : null}
+                    </View>
+                    {focusedPresence?.cameraOn && focusedMember.avatarUrl ? (
+                      <Image
+                        source={{ uri: focusedMember.avatarUrl }}
+                        resizeMode="cover"
+                        accessibilityIgnoresInvertColors
+                        style={styles.focusVideoImage}
+                      />
+                    ) : null}
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={["rgba(2,7,19,0.02)", "rgba(2,7,19,0.78)"]}
+                      locations={[0.46, 1]}
+                      style={styles.focusVideoShade}
+                    />
+                  </View>
+                  <View style={[styles.focusName, { backgroundColor: theme.shellBackground }]}>
+                    {focusedPresence?.speaking ? <View style={[styles.speakingDot, { backgroundColor: theme.success }]} /> : null}
+                    <Text numberOfLines={1} style={[styles.focusNameText, { color: theme.pageText }]}>{focusedMember.name}</Text>
+                    {!focusedPresence?.microphoneOn ? <Ionicons name="mic-off" size={13} color={theme.pageTextMuted} /> : null}
+                  </View>
                 </View>
+              ) : roomViewMode === "stage" ? (
+                <View style={styles.waitingState}>
+                  <Ionicons name="videocam-outline" size={42} color={theme.pageTextMuted} />
+                  <Text style={[styles.waitingTitle, { color: theme.pageText }]}>En attente de la personne invitée</Text>
+                  <Text style={[styles.waitingText, { color: theme.pageTextMuted }]}>La visio apparaîtra ici dès qu’elle aura rejoint l’échange.</Text>
+                </View>
+              ) : null}
+
+              {roomViewMode === "overview" && (!media || media.mock) ? (
+                <View testID="coworking-overview-grid" style={styles.overviewGrid}>
+                  {participants.map((member) => {
+                    const presence = participantPresence(snapshot, member.id);
+                    const isMe = member.id === currentUser.id;
+                    return (
+                      <Pressable
+                        key={`overview-${member.id}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={isMe ? "Moi" : `Afficher ${member.name} en grand`}
+                        disabled={isMe}
+                        onPress={() => {
+                          setPinnedUserId(member.id);
+                          setRoomViewMode("stage");
+                        }}
+                        style={({ pressed }) => [styles.overviewPerson, pressed && styles.pressed]}
+                      >
+                        <View style={[styles.overviewAvatar, { borderColor: presence?.speaking ? theme.success : isMe ? theme.violet : theme.borderSoft, backgroundColor: theme.surface }]}>
+                          <StatusAvatar user={member} size={72} accessible={false} />
+                        </View>
+                        <View style={styles.overviewNameRow}>
+                          <Text numberOfLines={1} style={[styles.overviewName, { color: theme.pageText }]}>{isMe ? "Moi" : firstName(member.name)}</Text>
+                          {!presence?.microphoneOn ? <Ionicons name="mic-off" size={10} color={theme.pageTextMuted} /> : null}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+
+            {media && !media.mock ? (
+              <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                <CoworkingMediaSurface
+                  session={media}
+                  displayName={currentUser.name}
+                  cameraOn={cameraOn}
+                  microphoneOn={microphoneOn}
+                  roomViewMode={roomViewMode}
+                  focusParticipantId={focusedMember?.id}
+                  onError={setMediaError}
+                  onLocalMediaUnavailable={(message) => {
+                    setCameraOn(false);
+                    setMicrophoneOn(false);
+                    setMediaError(message);
+                  }}
+                />
+              </View>
+            ) : null}
+
+            <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={roomViewMode === "stage" ? "Afficher la vue d’ensemble" : "Afficher la vue principale"}
+                onPress={() => setRoomViewMode((value) => value === "stage" ? "overview" : "stage")}
+                style={[styles.viewToggle, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}
+              >
+                <Ionicons name={roomViewMode === "stage" ? "grid-outline" : "scan-outline"} size={20} color={theme.pageText} />
+                <Text style={[styles.viewToggleText, { color: theme.pageText }]}>{roomViewMode === "stage" ? "Ensemble" : "Principale"}</Text>
               </Pressable>
-            );
-          })}
-        </View>
+
+              {roomViewMode === "stage" && (!media || media.mock) ? (
+                <View testID="coworking-self-preview" pointerEvents="none" style={[styles.selfPreview, { backgroundColor: theme.surface, borderColor: theme.violet }]}>
+                  <StatusAvatar user={currentUser} size={48} accessible={false} />
+                  <Text style={[styles.selfPreviewText, { color: theme.pageText }]}>Moi</Text>
+                  {!microphoneOn ? <Ionicons name="mic-off" size={11} color={theme.pageTextMuted} /> : null}
+                </View>
+              ) : null}
+
+              <View testID="coworking-participant-rail" style={[styles.participantRail, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.participantRailContent}>
+                  {participants.map((member) => {
+                    const isMe = member.id === currentUser.id;
+                    const active = member.id === focusedMember?.id && roomViewMode === "stage";
+                    const presence = participantPresence(snapshot, member.id);
+                    return (
+                      <Pressable
+                        key={`rail-${member.id}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={isMe ? "Moi" : active ? `Ouvrir la fiche de ${member.name}` : `Afficher ${member.name} en grand`}
+                        disabled={isMe}
+                        onPress={() => {
+                          if (active) {
+                            setSelectedUserId(member.id);
+                            return;
+                          }
+                          setPinnedUserId(member.id);
+                          setRoomViewMode("stage");
+                        }}
+                        style={({ pressed }) => [styles.railPerson, pressed && styles.pressed]}
+                      >
+                        <View style={[styles.railAvatar, { borderColor: active ? theme.violet : presence?.speaking ? theme.success : theme.borderSoft, backgroundColor: theme.surface }]}>
+                          <StatusAvatar user={member} size={38} accessible={false} />
+                        </View>
+                        <Text numberOfLines={1} style={[styles.railName, { color: theme.pageText }]}>{isMe ? "Moi" : firstName(member.name)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
+          </>
+        )}
 
         {mediaError ? (
-          <View pointerEvents="none" style={[styles.mediaWarning, { backgroundColor: theme.dangerSoft, borderColor: theme.danger }]}>
+          <View pointerEvents="none" style={[styles.mediaWarning, { bottom: isGeneralRoom ? 12 : 92, backgroundColor: theme.dangerSoft, borderColor: theme.danger }]}>
             <Ionicons name="alert-circle-outline" size={16} color={theme.danger} />
             <Text numberOfLines={2} style={[styles.mediaWarningText, { color: theme.pageText }]}>Connexion média réduite. La présence reste disponible.</Text>
           </View>
@@ -324,9 +497,9 @@ export default function CoworkingRoomScreen() {
             </Pressable>
           </View>
           <View style={styles.sheetActions}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Dire bonjour" disabled={Boolean(busyAction)} onPress={() => void sayHello()} style={[styles.sheetAction, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={isGeneralRoom ? "Dire bonjour" : "Dire bonjour à l’espace"} disabled={Boolean(busyAction)} onPress={() => void sayHello()} style={[styles.sheetAction, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
               <Ionicons name="hand-left-outline" size={19} color={theme.violet} />
-              <Text style={[styles.sheetActionText, { color: theme.pageText }]}>Bonjour</Text>
+              <Text style={[styles.sheetActionText, { color: theme.pageText }]}>{isGeneralRoom ? "Bonjour" : "Bonjour à l’espace"}</Text>
             </Pressable>
             {isGeneralRoom ? (
               <Pressable accessibilityRole="button" accessibilityLabel="Inviter dans un bureau privé" disabled={Boolean(busyAction)} onPress={() => void createPrivateOffice()} style={[styles.sheetAction, { backgroundColor: theme.violet, borderColor: theme.violet }]}>
@@ -386,9 +559,9 @@ const styles = StyleSheet.create({
   header: { minHeight: 70, paddingHorizontal: 10, paddingBottom: 8, borderBottomWidth: 1, flexDirection: "row", alignItems: "flex-end", gap: 9 },
   headerButton: { width: 48, height: 48, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1, minWidth: 0, minHeight: 48, justifyContent: "center", alignItems: "center" },
-  headerTitleLine: { maxWidth: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  headerTitleLine: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   liveDot: { width: 7, height: 7, borderRadius: 4 },
-  headerTitle: { maxWidth: "82%", fontSize: 15, lineHeight: 19, fontWeight: "900" },
+  headerTitle: { flexShrink: 1, fontSize: 14, lineHeight: 18, fontWeight: "900", textAlign: "center" },
   headerMeta: { marginTop: 2, maxWidth: "100%", fontSize: 10, lineHeight: 13, fontWeight: "700", textAlign: "center" },
   stage: { flex: 1, margin: 8, borderRadius: 28, borderWidth: 1, overflow: "hidden", position: "relative", minHeight: 280 },
   spatialBackdrop: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
@@ -403,6 +576,32 @@ const styles = StyleSheet.create({
   personNameRow: { minHeight: 24, maxWidth: "100%", borderRadius: 12, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, backgroundColor: "rgba(2,10,26,0.78)" },
   personName: { maxWidth: 72, fontSize: 10, lineHeight: 13, fontWeight: "900" },
   speakingDot: { width: 7, height: 7, borderRadius: 4 },
+  privateBackdrop: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  focusFallback: { ...StyleSheet.absoluteFillObject },
+  focusVideoSurface: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
+  focusVideoImage: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, width: "100%", height: "100%" },
+  focusVideoShade: { position: "absolute", left: 0, right: 0, top: "38%", bottom: 0 },
+  focusCameraFallback: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 12, paddingBottom: 76 },
+  focusAvatarShell: { width: 148, height: 148, borderRadius: 74, borderWidth: 3, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  focusName: { position: "absolute", left: 14, right: 104, bottom: 94, minHeight: 38, borderRadius: 19, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  focusNameText: { flexShrink: 1, fontSize: 13, lineHeight: 17, fontWeight: "900" },
+  waitingState: { maxWidth: 300, alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 22, paddingBottom: 72 },
+  waitingTitle: { fontSize: 15, lineHeight: 20, fontWeight: "900", textAlign: "center" },
+  waitingText: { fontSize: 11, lineHeight: 16, fontWeight: "700", textAlign: "center" },
+  overviewGrid: { width: "100%", paddingHorizontal: 18, paddingBottom: 84, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 18 },
+  overviewPerson: { width: 100, minHeight: 116, alignItems: "center", justifyContent: "center", gap: 7 },
+  overviewAvatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  overviewNameRow: { maxWidth: 100, minHeight: 20, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  overviewName: { maxWidth: 78, fontSize: 10, lineHeight: 13, fontWeight: "900" },
+  viewToggle: { position: "absolute", top: 12, right: 12, minWidth: 104, minHeight: 48, borderRadius: 17, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  viewToggleText: { fontSize: 10, lineHeight: 13, fontWeight: "900" },
+  selfPreview: { position: "absolute", right: 14, bottom: 92, width: 76, height: 88, borderRadius: 23, borderWidth: 2, alignItems: "center", justifyContent: "center", gap: 2, overflow: "hidden" },
+  selfPreviewText: { fontSize: 9, lineHeight: 12, fontWeight: "900" },
+  participantRail: { position: "absolute", left: 12, right: 12, bottom: 12, minHeight: 70, borderRadius: 22, borderWidth: 1, overflow: "hidden" },
+  participantRailContent: { minHeight: 70, alignItems: "center", gap: 6, paddingHorizontal: 8 },
+  railPerson: { width: 58, minHeight: 64, alignItems: "center", justifyContent: "center", gap: 2 },
+  railAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  railName: { maxWidth: 56, fontSize: 8, lineHeight: 10, fontWeight: "900", textAlign: "center" },
   mediaWarning: { position: "absolute", left: 12, right: 12, bottom: 12, minHeight: 42, borderRadius: 15, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   mediaWarningText: { flex: 1, fontSize: 10, lineHeight: 14, fontWeight: "800" },
   memberSheet: { position: "absolute", left: 10, right: 10, borderRadius: 22, borderWidth: 1, padding: 10, gap: 9, elevation: 16, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 7 } },

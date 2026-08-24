@@ -14,6 +14,7 @@ import type {
   MessageAttachment
 } from "../../types/messaging";
 import { authenticatedRequest } from "./authenticatedRequest";
+import { requireHttpsUrl } from "../../domain/secureUrl";
 import { ApiError } from "./httpClient";
 import { env } from "../../config/env";
 import { normalizeAppUser } from "./wireExtensions";
@@ -350,14 +351,22 @@ export class NeptuneExperienceApi {
     );
   }
 
-  shareHighlight(
+  async shareHighlight(
     postId: string
   ): Promise<{ url: string; shareCount: number }> {
-    return authenticatedRequest(
+    const payload = await authenticatedRequest<Record<string, unknown>>(
       `/v1/highlights/${encodeURIComponent(postId)}/share`,
       { method: "POST" },
       this.fallbackAccessToken
     );
+    const count = payload.shareCount ?? payload.share_count;
+    return {
+      url: requireHttpsUrl(payload.url, "URL de partage"),
+      shareCount:
+        typeof count === "number" && Number.isFinite(count)
+          ? Math.max(0, Math.trunc(count))
+          : 0
+    };
   }
 
   listMapMoments(bounds?: string, zoom?: number): Promise<MapMemberMoment[]> {

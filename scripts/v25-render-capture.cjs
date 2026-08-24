@@ -4,7 +4,7 @@ const path = require("node:path");
 const { chromium } = require("playwright-core");
 
 const root = path.resolve(process.cwd(), "web-product-audit-dist");
-const output = path.resolve(process.cwd(), "v24-render-review");
+const output = path.resolve(process.cwd(), "v26-render-review");
 const port = 4193;
 
 function resolveFile(urlPath) {
@@ -18,7 +18,7 @@ function mime(file) {
   return ({ ".html":"text/html; charset=utf-8", ".js":"application/javascript; charset=utf-8", ".css":"text/css; charset=utf-8", ".json":"application/json", ".png":"image/png", ".jpg":"image/jpeg", ".svg":"image/svg+xml", ".ttf":"font/ttf", ".mp3":"audio/mpeg" })[path.extname(file).toLowerCase()] || "application/octet-stream";
 }
 function browserExecutable() {
-  return [process.env.CHROMIUM_PATH, "/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/bin/google-chrome"].filter(Boolean).find((candidate) => fs.existsSync(candidate));
+  return [process.env.CHROMIUM_PATH, chromium.executablePath(), "/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/bin/google-chrome"].filter(Boolean).find((candidate) => fs.existsSync(candidate));
 }
 const server = http.createServer((request, response) => {
   const file = resolveFile(request.url);
@@ -41,6 +41,17 @@ async function run() {
       await open(page, "/messages"); await shot(page, `navigation-map-centered-${viewport.suffix}`);
       await open(page, "/highlights"); await shot(page, `temps-forts-feed-only-${viewport.suffix}`);
       await open(page, "/coworking"); await shot(page, `map-dedicated-${viewport.suffix}`);
+      await open(page, "/coworking/visio-business");
+      await page.getByTestId("coworking-focus-video").waitFor({ state:"visible", timeout:10000 }).catch(() => {});
+      await shot(page, `private-video-main-${viewport.suffix}`);
+      const overview = page.getByLabel("Afficher la vue d’ensemble", { exact:true });
+      if (await overview.isVisible().catch(() => false)) {
+        await overview.click();
+        await page.getByTestId("coworking-overview-grid").waitFor({ state:"visible", timeout:3000 }).catch(() => {});
+        await shot(page, `private-video-overview-${viewport.suffix}`);
+      }
+      await open(page, "/schedule-call?memberId=user-lea&mode=video");
+      await shot(page, `schedule-call-${viewport.suffix}`);
       await page.close();
     }
 
@@ -87,8 +98,8 @@ async function run() {
       await open(p, route); await shot(p, name, full); await p.close();
     }
 
-    fs.writeFileSync(path.join(output, "README.txt"), "Captures réelles du build V25 : Temps forts feed-only, bouton Map central, Map unifiée membres/visios/évènements, dégroupage au zoom et principaux parcours.\n");
-    console.log(`V25 render review generated in ${output}`);
+    fs.writeFileSync(path.join(output, "README.txt"), "Captures réelles V26 avant toute build Expo : Map, disponibilité, événements, visio principale et vue d’ensemble circulaire, programmation d’appel et principaux parcours.\n");
+    console.log(`V26 render review generated in ${output}`);
   } finally {
     await browser.close(); await new Promise((resolve) => server.close(resolve));
   }

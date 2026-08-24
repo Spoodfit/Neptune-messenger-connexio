@@ -1,4 +1,4 @@
-# Connexio V14 — contrat de remise backend
+# Connexio V26 — contrat de remise backend
 
 ## État réel du backend Neptune (11 août 2026)
 
@@ -89,7 +89,7 @@ Le client autorise au maximum **10 contenus** et **120 Mo cumulés** par message
 - vidéo : 80 Mo maximum ;
 - document ou fichier : 50 Mo maximum.
 
-Flux attendu : préparation d’upload, URL pré-signée, envoi vers le stockage privé, finalisation, puis message contenant les identifiants de fichiers. La réponse doit fournir `download_url` et, pour les médias, `thumbnail_url` temporaires.
+Flux attendu : préparation d’upload, URL pré-signée, envoi vers le stockage privé, finalisation, puis message contenant les identifiants de fichiers. La préparation fournit `expires_at`. La finalisation fournit `download_url`, `download_expires_at` et, pour les médias, `thumbnail_url` temporaires. Le client RC/production refuse les URLs non HTTPS, avec identifiants intégrés, sans expiration ou déjà proches de l’expiration.
 
 Le serveur revérifie nombre, taille, MIME réel, droits d’accès et antivirus.
 
@@ -249,3 +249,9 @@ La recherche de lieu est exécutée côté backend afin de ne jamais exposer la 
 8. tests d’autorisation par statut ;
 9. tests sur au moins deux Android et un iPhone ;
 10. appels entre Wi-Fi, 4G/5G et NAT restrictifs.
+
+### Attestation consommée par la CI
+
+Le backend expose également `GET /v1/connexio/readiness`. Cette route publique ne contient aucun secret : elle atteste le SHA déployé, l’environnement, les capacités, les dépendances critiques et les contrôles d’exploitation. Son schéma exact et les règles bloquantes figurent dans `PRODUCTION_BACKEND_READINESS.md`.
+
+Les workflows natifs interrogent cette route puis vérifient qu’une requête anonyme reçoit `401`/`403` (ou `429` sous limitation anti-abus) sur `/v1/auth/me`, `/v1/conversations`, `/v1/realtime/ticket`, `/v1/coworking` et `/v1/devices/push-tokens`. Une validation `400`/`422` ne suffit pas : elle pourrait être exécutée avant le contrôle d’accès. Un simple changement de variable vers `connexio-v1` ne suffit donc plus à déclencher un build.

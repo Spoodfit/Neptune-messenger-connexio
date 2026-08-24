@@ -36,6 +36,8 @@ jobs:
         run: npm run verify --silent
       - name: Store release policy audit
         run: npm run audit:rc --silent
+      - name: Production profile audit
+        run: npm run audit:production --silent
       - name: Expo dependency compatibility
         run: npx expo install --check
       - name: Expo public configuration audit

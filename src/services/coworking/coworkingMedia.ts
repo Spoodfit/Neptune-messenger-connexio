@@ -9,6 +9,8 @@ export interface CoworkingMediaBridgeConfig {
     string,
     { x: number; y: number; width: number; height: number }
   >;
+  roomViewMode?: "stage" | "overview";
+  focusParticipantId?: string;
 }
 
 function escapeJson(value: unknown): string {
@@ -39,6 +41,8 @@ export function buildCoworkingMediaHtml(
     mapMode: initial.mapMode === true,
     spatialAudio: initial.spatialAudio === true,
     participantLayout: initial.participantLayout ?? {},
+    roomViewMode: initial.roomViewMode,
+    focusParticipantId: initial.focusParticipantId,
     observer: session.observer === true
   };
   const clientScript = session.clientScriptUrl
@@ -60,6 +64,18 @@ export function buildCoworkingMediaHtml(
     .remote .name{position:absolute;left:10px;bottom:10px;max-width:75%;padding:5px 8px;border-radius:999px;background:rgba(2,7,19,.72);font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #local{position:absolute;right:14px;bottom:14px;width:92px;height:118px;border-radius:24px;object-fit:cover;background:#071127;border:2px solid rgba(107,79,234,.75);box-shadow:0 14px 36px rgba(0,0,0,.35);z-index:5;transition:left .18s ease,top .18s ease,opacity .18s ease}
     #empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#aeb8d2;text-align:center;padding:24px}
+    #remoteGrid.room-stage{display:block;padding:0}
+    #remoteGrid.room-stage .remote{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:26px}
+    #remoteGrid.room-stage .remote:not(.focused){display:none}
+    #remoteGrid.room-stage .remote .name{bottom:92px;max-width:calc(100% - 118px)}
+    #remoteGrid.room-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,112px));grid-auto-rows:112px;place-content:center;gap:18px;padding:24px 18px 116px}
+    #remoteGrid.room-overview .remote{width:100%;height:100%;border-radius:50%;border:3px solid rgba(255,255,255,.72);box-shadow:0 12px 28px rgba(0,0,0,.28)}
+    #remoteGrid.room-overview .remote .name{left:8px;right:8px;bottom:6px;max-width:none;text-align:center;padding:4px 6px;font-size:10px}
+    #local.room-stage{bottom:92px}
+    #local.room-overview{width:92px;height:92px;bottom:92px;border-radius:50%}
+    #remoteGrid.room-stage .remote,#remoteGrid.room-overview .remote{background:transparent}
+    #remoteGrid.room-stage .remote video,#remoteGrid.room-overview .remote video{opacity:0;background:transparent;transition:opacity .16s ease}
+    #remoteGrid.room-stage .remote video.video-ready,#remoteGrid.room-overview .remote video.video-ready{opacity:1;background:#071127}
   </style>
 </head>
 <body>
@@ -77,6 +93,7 @@ export function buildCoworkingMediaHtml(
 
     const spatial=()=>Boolean(cfg.spatialAudio);
     const freeLayout=()=>Boolean(cfg.mapMode||cfg.spatialAudio);
+    const roomView=()=>cfg.roomViewMode==='stage'||cfg.roomViewMode==='overview';
     if(freeLayout()){
       grid.style.display='block';
       grid.style.padding='0';
@@ -86,7 +103,22 @@ export function buildCoworkingMediaHtml(
     }
 
     const post=(type,payload={})=>{try{window.ReactNativeWebView?.postMessage(JSON.stringify({type,...payload}))}catch{}};
-    const updateEmpty=()=>{empty.style.display=freeLayout()?'none':remoteNodes.size?'none':'flex'};
+    const updateEmpty=()=>{empty.style.display=freeLayout()||roomView()?'none':remoteNodes.size?'none':'flex'};
+    const applyRoomView=()=>{
+      const mode=cfg.roomViewMode;
+      grid.classList.toggle('room-stage',mode==='stage');
+      grid.classList.toggle('room-overview',mode==='overview');
+      local.classList.toggle('room-stage',mode==='stage');
+      local.classList.toggle('room-overview',mode==='overview');
+      if(!roomView())return;
+      const requested=cfg.focusParticipantId?remoteNodes.get(cfg.focusParticipantId):null;
+      const focused=requested||remoteNodes.values().next().value||null;
+      remoteNodes.forEach(node=>{
+        node.classList.toggle('focused',mode==='stage'&&node===focused);
+        node.style.display=mode==='stage'&&node!==focused?'none':'';
+      });
+      updateEmpty();
+    };
     const positionNode=(node,participantId)=>{
       if(!freeLayout())return;
       const pos=cfg.participantLayout?.[participantId];
@@ -142,6 +174,7 @@ export function buildCoworkingMediaHtml(
       remoteNodes.forEach((node,participantId)=>positionNode(node,participantId));
       positionLocal();
       updateSpatialAudio();
+      applyRoomView();
     };
     const setTracks=(cameraOn,microphoneOn)=>{
       cfg.cameraOn=Boolean(cameraOn);cfg.microphoneOn=Boolean(microphoneOn);
@@ -167,14 +200,21 @@ export function buildCoworkingMediaHtml(
       }
       const video=node.querySelector('video');
       video.srcObject=participant.stream;
+      const videoTracks=participant.stream.getVideoTracks?.()||[];
+      const refreshVideo=()=>video.classList.toggle('video-ready',videoTracks.some(track=>track.readyState==='live'&&!track.muted));
+      videoTracks.forEach(track=>{track.addEventListener?.('mute',refreshVideo);track.addEventListener?.('unmute',refreshVideo);track.addEventListener?.('ended',refreshVideo)});
+      video.onplaying=refreshVideo;
+      video.onemptied=()=>video.classList.remove('video-ready');
+      refreshVideo();
       video.muted=!spatial();
       if(spatial())video.volume=spatialGain(participant.id);
       video.play?.().catch(()=>{});
       node.querySelector('.name').textContent=participant.displayName||'Membre Neptune';
+      applyRoomView();
       updateEmpty();
     };
     const removeRemote=(participantId)=>{
-      const node=remoteNodes.get(participantId);if(node)node.remove();remoteNodes.delete(participantId);updateEmpty();updateSpatialAudio();
+      const node=remoteNodes.get(participantId);if(node)node.remove();remoteNodes.delete(participantId);applyRoomView();updateEmpty();updateSpatialAudio();
     };
     const stop=()=>{
       try{client?.disconnect?.()}catch{}
@@ -189,6 +229,11 @@ export function buildCoworkingMediaHtml(
         cfg.participantLayout=command.participantLayout||{};
         applyLayout();
         if(client&&typeof client.setSpatialLayout==='function')client.setSpatialLayout(cfg.participantLayout);
+      }
+      if(command.type==='room-view'){
+        cfg.roomViewMode=command.roomViewMode;
+        cfg.focusParticipantId=command.focusParticipantId;
+        applyRoomView();
       }
       if(command.type==='leave'){stop();post('left')}
     };
@@ -223,6 +268,7 @@ export function buildCoworkingMediaHtml(
           onError:(error)=>post('error',{message:error?.message||String(error||'Connexion média impossible')})
         });
         applyLayout();
+        applyRoomView();
         post('media-ready');
       }catch(error){
         stop();

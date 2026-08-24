@@ -1,6 +1,7 @@
 import type { AppUser } from "../../types/messaging";
 import { authenticatedRequest } from "./authenticatedRequest";
 import { normalizeAppUser } from "./wireExtensions";
+import { requireFutureIsoDate, requireHttpsUrl } from "../../domain/secureUrl";
 
 export interface AccountSession {
   id: string;
@@ -48,12 +49,22 @@ export class NeptuneAccountApi {
     );
   }
 
-  requestDataExport(): Promise<{ downloadUrl: string; expiresAt: string }> {
-    return authenticatedRequest(
+  async requestDataExport(): Promise<{ downloadUrl: string; expiresAt: string }> {
+    const payload = await authenticatedRequest<Record<string, unknown>>(
       "/v1/account/export",
       { method: "POST" },
       this.fallbackAccessToken
     );
+    return {
+      downloadUrl: requireHttpsUrl(
+        payload.downloadUrl ?? payload.download_url,
+        "URL d’export"
+      ),
+      expiresAt: requireFutureIsoDate(
+        payload.expiresAt ?? payload.expires_at,
+        "Expiration de l’export"
+      )
+    };
   }
 
   async resyncProfile(): Promise<AppUser> {

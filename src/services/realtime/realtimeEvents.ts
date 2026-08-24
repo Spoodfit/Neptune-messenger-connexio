@@ -27,7 +27,7 @@ export type RealtimeEvent =
     }
   | {
       type: "coworking.hello";
-      payload: { fromUserId: string };
+      payload: { fromUserId: string; spaceId?: string };
     }
   | {
       type: "coworking.knock";
@@ -121,7 +121,8 @@ export function normalizeRealtimeEvent(value: unknown): RealtimeEvent | null {
         return {
           type: value.type,
           payload: {
-            fromUserId: requireString(payload, "fromUserId", "from_user_id", "userId", "user_id")
+            fromUserId: requireString(payload, "fromUserId", "from_user_id", "userId", "user_id"),
+            spaceId: optionalString(payload, "spaceId", "space_id")
           }
         };
       case "coworking.knock":

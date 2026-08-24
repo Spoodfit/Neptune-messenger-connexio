@@ -118,6 +118,13 @@ async function auditMap(page) {
   check((await page.getByLabel("Rejoindre la salle générale", { exact: true }).count()) === 0, "Map V25 : aucune action Salle générale");
   await checkTarget(page.getByLabel("Fermer la Map", { exact: true }), "Map : fermeture tactile");
   await checkTarget(page.getByLabel("Actualiser la Map", { exact: true }), "Map : actualisation tactile");
+  const availability = await checkTarget(page.getByLabel(/^Ma disponibilité : (Disponible|Occupé)$/), "Map : disponibilité personnelle tactile");
+  if (availability) {
+    const initialLabel = await availability.getAttribute("aria-label");
+    await availability.click();
+    const nextLabel = initialLabel?.endsWith("Disponible") ? "Ma disponibilité : Occupé" : "Ma disponibilité : Disponible";
+    if (nextLabel) check(await page.getByLabel(nextLabel, { exact: true }).isVisible().catch(() => false), "Map : disponibilité modifiable en un toucher");
+  }
 
   const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
   const mapRoot = frame.locator("#map");
@@ -165,7 +172,7 @@ async function auditMap(page) {
     await available.click();
     await waitForMapSheet(page);
     await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Map disponible : Bonjour tactile");
-    await checkTarget(page.getByLabel("Toquer et entrer", { exact: true }), "Map disponible : Toquer & entrer tactile");
+    await checkTarget(page.getByLabel("Inviter en visio", { exact: true }), "Map disponible : Inviter en visio tactile");
     await checkTarget(page.getByLabel("Proposer un rendez-vous", { exact: true }), "Map disponible : rendez-vous tactile");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
@@ -175,8 +182,8 @@ async function auditMap(page) {
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
     await waitForMapSheet(page);
-    await checkTarget(page.getByLabel("Dire bonjour", { exact: true }), "Map occupée : Bonjour tactile");
-    await checkTarget(page.getByLabel("Toquer et demander l’autorisation d’entrer", { exact: true }), "Map occupée : demande d’entrée tactile");
+    await checkTarget(page.getByLabel("Dire bonjour au groupe", { exact: true }), "Map occupée : Bonjour adressé au groupe");
+    await checkTarget(page.getByLabel("Toquer à l’espace et demander l’autorisation d’entrer", { exact: true }), "Map occupée : demande adressée à l’espace");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }

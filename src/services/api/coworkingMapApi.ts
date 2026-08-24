@@ -1,4 +1,6 @@
 import { authenticatedRequest } from "./authenticatedRequest";
+import { env } from "../../config/env";
+import { assertCandidateMediaTransport } from "../../domain/mediaTransport";
 import type { CoworkingMediaSession } from "../../types/coworking";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -29,17 +31,24 @@ function normalizeMedia(value: unknown, observerByDefault: boolean): CoworkingMe
   const token = stringValue(item.token ?? item.room_token);
   const participantId = stringValue(item.participant_id ?? item.user_id);
   if (!socketUrl || !token || !participantId) return undefined;
+  const clientScriptUrl = stringValue(item.client_script_url) || undefined;
+  const iceServers = normalizeIceServers(item.ice_servers);
+  const expiresAt = stringValue(item.expires_at) || undefined;
+  assertCandidateMediaTransport(
+    { signalingUrl: socketUrl, clientScriptUrl, iceServers, expiresAt },
+    env.releaseStage === "release-candidate" || env.releaseStage === "production"
+  );
   const explicitObserver = item.observer === true || item.listen_only === true || item.listenOnly === true;
   const explicitPublisher = item.observer === false || item.publish === true || item.publisher === true;
   return {
     spaceId: stringValue(item.space_id) || "coworking-map",
     socketUrl,
     socketPath: stringValue(item.socket_path) || "/socket.io",
-    clientScriptUrl: stringValue(item.client_script_url) || undefined,
+    clientScriptUrl,
     token,
     participantId,
-    iceServers: normalizeIceServers(item.ice_servers),
-    expiresAt: stringValue(item.expires_at) || undefined,
+    iceServers,
+    expiresAt,
     observer: explicitPublisher ? false : explicitObserver ? true : observerByDefault,
     mock: false
   };
@@ -55,6 +64,19 @@ export interface CoworkingKnockResponse {
   status: "accepted" | "declined";
   spaceId?: string;
   media?: CoworkingMediaSession;
+}
+
+function helloTargetBody(input: { userId?: string; spaceId?: string }): { user_id: string } | { space_id: string } {
+  const userId = input.userId?.trim();
+  const spaceId = input.spaceId?.trim();
+  if (Boolean(userId) === Boolean(spaceId)) throw new Error("Choisissez un membre ou un espace Coworking, pas les deux.");
+  return spaceId ? { space_id: spaceId } : { user_id: userId! };
+}
+
+function spaceTargetBody(spaceId: string): { space_id: string } {
+  const normalized = spaceId.trim();
+  if (!normalized) throw new Error("L’espace Coworking à rejoindre est requis.");
+  return { space_id: normalized };
 }
 
 export class CoworkingMapApi {
@@ -73,20 +95,23 @@ export class CoworkingMapApi {
     await authenticatedRequest("/v1/coworking/map/leave", { method: "POST" }, this.fallbackAccessToken);
   }
 
-  async sayHello(userId: string): Promise<void> {
+  async sayHello(input: { userId?: string; spaceId?: string }): Promise<void> {
     await authenticatedRequest(
       "/v1/coworking/hello",
-      { method: "POST", body: JSON.stringify({ user_id: userId }) },
+      {
+        method: "POST",
+        body: JSON.stringify(helloTargetBody(input))
+      },
       this.fallbackAccessToken
     );
   }
 
-  async knock(input: { userId?: string; spaceId?: string }): Promise<CoworkingKnockResult> {
+  async knock(input: { spaceId: string }): Promise<CoworkingKnockResult> {
     const payload = await authenticatedRequest<Record<string, unknown>>(
       "/v1/coworking/knock",
       {
         method: "POST",
-        body: JSON.stringify({ user_id: input.userId ?? null, space_id: input.spaceId ?? null })
+        body: JSON.stringify(spaceTargetBody(input.spaceId))
       },
       this.fallbackAccessToken
     );

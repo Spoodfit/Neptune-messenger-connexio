@@ -14,6 +14,8 @@ export default function CoworkingMediaSurface({
   mapMode = false,
   spatialAudio = false,
   participantLayout,
+  roomViewMode,
+  focusParticipantId,
   onConnected,
   onError,
   onLocalMediaUnavailable
@@ -22,8 +24,10 @@ export default function CoworkingMediaSurface({
   const webViewRef = useRef<WebView>(null);
   const latestMediaRef = useRef({ cameraOn, microphoneOn });
   const latestLayoutRef = useRef(participantLayout);
+  const latestRoomViewRef = useRef({ roomViewMode, focusParticipantId });
   latestMediaRef.current = { cameraOn, microphoneOn };
   latestLayoutRef.current = participantLayout;
+  latestRoomViewRef.current = { roomViewMode, focusParticipantId };
   const html = useMemo(
     () =>
       buildCoworkingMediaHtml(session, displayName, {
@@ -31,9 +35,14 @@ export default function CoworkingMediaSurface({
         microphoneOn,
         mapMode,
         spatialAudio,
-        participantLayout
+        participantLayout,
+        roomViewMode,
+        focusParticipantId
       }),
-    [cameraOn, displayName, mapMode, microphoneOn, participantLayout, session, spatialAudio]
+    // Les états média, la disposition et le mode de vue sont ensuite injectés
+    // dans la WebView. Les ajouter aux dépendances reconnecterait le SFU à
+    // chaque bascule de caméra ou de mosaïque.
+    [displayName, mapMode, session, spatialAudio]
   );
 
   useEffect(() => {
@@ -56,6 +65,17 @@ export default function CoworkingMediaSurface({
     );
   }, [participantLayout]);
 
+  useEffect(() => {
+    if (!roomViewMode) return;
+    webViewRef.current?.injectJavaScript(
+      `window.__connexioCoworkingControl?.(${JSON.stringify({
+        type: "room-view",
+        roomViewMode,
+        focusParticipantId
+      })});true;`
+    );
+  }, [focusParticipantId, roomViewMode]);
+
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const payload = JSON.parse(event.nativeEvent.data) as {
@@ -76,13 +96,15 @@ export default function CoworkingMediaSurface({
     }
   };
 
-  if ((mapMode || spatialAudio) && session.mock) return null;
+  if (session.mock) return null;
+
+  const transparent = mapMode || spatialAudio || Boolean(roomViewMode);
 
   return (
     <View
       style={[
         styles.screen,
-        { backgroundColor: mapMode || spatialAudio ? "transparent" : theme.pageBackground }
+        { backgroundColor: transparent ? "transparent" : theme.pageBackground }
       ]}
     >
       <WebView
@@ -103,11 +125,19 @@ export default function CoworkingMediaSurface({
               `window.__connexioCoworkingControl?.(${JSON.stringify({ type: "layout", participantLayout: latestLayoutRef.current })});true;`
             );
           }
+          if (latestRoomViewRef.current.roomViewMode) {
+            webViewRef.current?.injectJavaScript(
+              `window.__connexioCoworkingControl?.(${JSON.stringify({
+                type: "room-view",
+                ...latestRoomViewRef.current
+              })});true;`
+            );
+          }
         }}
         onMessage={handleMessage}
         style={[
           styles.webView,
-          { backgroundColor: mapMode || spatialAudio ? "transparent" : theme.pageBackground }
+          { backgroundColor: transparent ? "transparent" : theme.pageBackground }
         ]}
       />
     </View>

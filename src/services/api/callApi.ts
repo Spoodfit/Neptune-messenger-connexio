@@ -1,5 +1,7 @@
 import { getTranslationRequestLanguage } from "../../i18n/translationLocale";
 import { normalizeLanguageCode } from "../../i18n/languages";
+import { env } from "../../config/env";
+import { assertCandidateMediaTransport } from "../../domain/mediaTransport";
 import type { CallMode, IntegratedCallSession } from "../calls/callRoom";
 import { authenticatedRequest } from "./authenticatedRequest";
 
@@ -78,6 +80,17 @@ function normalizeSession(
     payload.socket_url ?? payload.signaling_url,
     "socket_url"
   );
+  const clientScriptUrl =
+    typeof payload.client_script_url === "string"
+      ? payload.client_script_url
+      : undefined;
+  const iceServers = normalizeIceServers(payload.ice_servers);
+  const expiresAt =
+    typeof payload.expires_at === "string" ? payload.expires_at : undefined;
+  assertCandidateMediaTransport(
+    { signalingUrl: socketUrl, clientScriptUrl, iceServers, expiresAt },
+    env.releaseStage === "release-candidate" || env.releaseStage === "production"
+  );
   const requestedLanguage = getTranslationRequestLanguage();
   return {
     id: requiredString(payload.id ?? payload.call_id, "call_id"),
@@ -98,15 +111,11 @@ function normalizeSession(
       typeof payload.socket_path === "string" && payload.socket_path.trim()
         ? payload.socket_path.trim()
         : "/socket.io",
-    clientScriptUrl:
-      typeof payload.client_script_url === "string"
-        ? payload.client_script_url
-        : undefined,
+    clientScriptUrl,
     token: requiredString(payload.token ?? payload.call_token, "call_token"),
     initiator: payload.initiator !== false,
-    iceServers: normalizeIceServers(payload.ice_servers),
-    expiresAt:
-      typeof payload.expires_at === "string" ? payload.expires_at : undefined,
+    iceServers,
+    expiresAt,
     captioningEnabled:
       payload.captioning_enabled === true || payload.captions_enabled === true,
     captionTargetLanguage: normalizeLanguageCode(

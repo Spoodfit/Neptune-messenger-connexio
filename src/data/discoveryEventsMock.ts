@@ -42,8 +42,8 @@ export const discoveryEventsMock: DiscoveryEvent[] = [
     id: "event-montpellier-recent",
     title: "Atelier business · Montpellier",
     summary: "Atelier terminé récemment : retrouvez les membres encore présents dans les environs.",
-    startsAt: isoFromNow(-8 * HOUR),
-    endsAt: isoFromNow(-6 * HOUR),
+    startsAt: isoFromNow(-150 * 60 * 1000),
+    endsAt: isoFromNow(-30 * 60 * 1000),
     latitude: 43.611,
     longitude: 3.877,
     city: "Montpellier",
@@ -66,6 +66,7 @@ export const discoveryEventsMock: DiscoveryEvent[] = [
     clubName: "Neptune Narbonne",
     organizer: "Neptune Business",
     webUrl: "https://neptunebusiness.com",
+    publicationState: "voting",
     source: "neptune-business"
   }
 ];

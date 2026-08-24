@@ -3,9 +3,13 @@ import { test } from "node:test";
 
 import {
   canJoinCoworkingSpace,
+  coworkingAvailability,
+  coworkingMapPrimaryAction,
   coworkingPresentCount,
   coworkingPresentUserIds,
+  coworkingSpaceHostId,
   orderedCoworkingSpaces,
+  removeCoworkingParticipant,
   roomOccupancyLabel,
   spaceForUser
 } from "../src/domain/coworking";
@@ -78,4 +82,28 @@ test("la présence retrouve l’espace du membre et expose une occupation compac
   strictEqual(spaceForUser(snapshot, "u3")?.id, "open");
   strictEqual(spaceForUser(snapshot, "u1")?.id, "hub");
   strictEqual(roomOccupancyLabel(openRoom), "2/5");
+});
+
+test("la Map sépare la disponibilité choisie de l’occupation d’une visio", () => {
+  strictEqual(coworkingAvailability(undefined, undefined), "available");
+  strictEqual(coworkingAvailability({ userId: "u", mode: "focus", cameraOn: false, microphoneOn: false, speaking: false, joinedAt: new Date(0).toISOString() }, undefined), "busy");
+  strictEqual(coworkingAvailability({ userId: "u", mode: "talk", cameraOn: false, microphoneOn: true, speaking: true, joinedAt: new Date(0).toISOString() }, undefined), "busy");
+  strictEqual(coworkingAvailability({ userId: "u", mode: "break", cameraOn: false, microphoneOn: false, speaking: false, joinedAt: new Date(0).toISOString() }, undefined), "busy");
+  strictEqual(coworkingAvailability({ userId: "u", mode: "available", cameraOn: true, microphoneOn: false, speaking: false, joinedAt: new Date(0).toISOString() }, openRoom), "busy");
+});
+
+test("la Map réserve Toquer aux espaces et invite directement une personne disponible", () => {
+  strictEqual(coworkingMapPrimaryAction("available", undefined), "invite-video");
+  strictEqual(coworkingMapPrimaryAction("busy", undefined), "none");
+  strictEqual(coworkingMapPrimaryAction("busy", openRoom), "knock-space");
+  strictEqual(coworkingMapPrimaryAction("available", openRoom), "knock-space");
+});
+
+test("le départ de l’hôte transfère explicitement la visio au membre suivant", () => {
+  const hosted = { ...openRoom, ownerId: "u2", participantIds: ["u2", "u3", "u4"] };
+  strictEqual(coworkingSpaceHostId(hosted), "u2");
+  const afterLeave = removeCoworkingParticipant(hosted, "u2");
+  deepStrictEqual(afterLeave.participantIds, ["u3", "u4"]);
+  strictEqual(afterLeave.ownerId, "u3");
+  strictEqual(coworkingSpaceHostId(afterLeave), "u3");
 });

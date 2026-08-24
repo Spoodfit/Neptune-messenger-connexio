@@ -13,8 +13,8 @@
 | Appels | Bloqué côté serveur | Onglet masqué | Signalisation autorisée, STUN/TURN et tests réseau réels |
 | Notifications push | Bloqué côté serveur/stores | Aucun token envoyé au backend actuel | Routes device-token, APNs, FCM, credentials et tests appareil fermé |
 | Confidentialité et suppression | Connecté | Documents Connexio et suppression avec mot de passe | Relecture juridique et test avec compte dédié |
-| IPA / AAB | Bloqué volontairement | Le profil production refuse `neptune-web-v1` | Backend `connexio-v1`, accès EAS, certificats Apple et clé Google Play |
+| IPA / AAB | Bloqué jusqu’à certification backend | Les profils RC/production ciblent `connexio-v1`, mais le workflow exécute un préflight serveur bloquant avant EAS | Attestation `/v1/connexio/readiness`, certificats Apple, clé Google Play et tests appareils |
 
 ## Règle de communication
 
-Une fonctionnalité est décrite comme **connectée** uniquement après une preuve sur l’environnement Neptune réel. Le profil `release-candidate` permet les essais internes des fonctions réellement disponibles. Le profil `production` reste bloqué tant que `EXPO_PUBLIC_BACKEND_CONTRACT` ne vaut pas `connexio-v1`.
+Une fonctionnalité est décrite comme **connectée** uniquement après une preuve sur l’environnement Neptune réel. Le profil `backend-smoke` teste le périmètre historique `neptune-web-v1`. Les profils `release-candidate` et `production` utilisent exclusivement `connexio-v1` et ne doivent être lancés qu’après réussite de `npm run smoke:production`.

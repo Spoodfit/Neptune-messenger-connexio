@@ -24,11 +24,12 @@ interface VoicePromptInputProps {
   maxLength: number;
   suggestions?: string[];
   onSubmit?: () => void;
+  autoFocus?: boolean;
 }
 
 const DEFAULT_SUGGESTIONS = ["Faire un point rapide", "Valider une décision", "Demander un retour"];
 
-export function VoicePromptInput({ value, onChangeText, placeholder, maxLength, suggestions = DEFAULT_SUGGESTIONS, onSubmit }: VoicePromptInputProps) {
+export function VoicePromptInput({ value, onChangeText, placeholder, maxLength, suggestions = DEFAULT_SUGGESTIONS, onSubmit, autoFocus = false }: VoicePromptInputProps) {
   const theme = useAppTheme();
   const [listening, setListening] = useState(false);
   const [volume, setVolume] = useState(0);
@@ -65,7 +66,7 @@ export function VoicePromptInput({ value, onChangeText, placeholder, maxLength, 
     <View>
       <View style={[styles.field, { borderColor: listening ? theme.violet : theme.border, backgroundColor: theme.inputBackground }]}>
         <TextInput
-          autoFocus
+          autoFocus={autoFocus}
           autoCapitalize="sentences"
           accessibilityLabel="Objet de l’appel"
           accessibilityHint="Écrivez la raison de l’appel ou utilisez le microphone"
@@ -75,6 +76,8 @@ export function VoicePromptInput({ value, onChangeText, placeholder, maxLength, 
           placeholder={placeholder}
           placeholderTextColor={theme.pageTextMuted}
           maxLength={maxLength}
+          multiline={false}
+          numberOfLines={1}
           returnKeyType="go"
           style={[styles.input, { color: theme.pageText }]}
         />

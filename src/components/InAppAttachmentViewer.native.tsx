@@ -100,7 +100,7 @@ export default function InAppAttachmentViewer({
           ) : (
             <WebView
               source={{ uri }}
-              originWhitelist={["https://*", "http://*", "file://*", "data:*", "blob:*"]}
+              originWhitelist={["https://*", "file://*", "data:*", "blob:*"]}
               allowsInlineMediaPlayback
               allowingReadAccessToURL={uri}
               style={styles.webView}

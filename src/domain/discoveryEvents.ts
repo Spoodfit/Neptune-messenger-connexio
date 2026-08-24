@@ -1,6 +1,6 @@
-export type DiscoveryEventState = "past24h" | "live" | "upcoming" | "expired";
+export type DiscoveryEventState = "voting" | "recent" | "live" | "upcoming" | "expired";
 export type DiscoveryEventWindow = "all" | Exclude<DiscoveryEventState, "expired">;
-export type DiscoveryEventProximity = "past24h" | "live" | "within48h" | "within7d" | "later" | "expired";
+export type DiscoveryEventProximity = "voting" | "recent" | "live" | "within48h" | "within7d" | "later" | "expired";
 
 export interface DiscoveryEvent {
   id: string;
@@ -16,12 +16,14 @@ export interface DiscoveryEvent {
   webUrl?: string;
   organizer?: string;
   clubName?: string;
+  publicationState?: "voting" | "published" | "cancelled";
   source: "neptune-business" | "connexio";
 }
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const DEFAULT_DURATION_MS = 2 * HOUR_MS;
+export const RECENT_EVENT_VISIBILITY_MS = HOUR_MS;
 
 function timestamp(value?: string): number | null {
   if (!value) return null;
@@ -34,6 +36,8 @@ export function getDiscoveryEventState(
   now: number | Date = Date.now()
 ): DiscoveryEventState {
   const current = typeof now === "number" ? now : now.getTime();
+  if (event.publicationState === "cancelled") return "expired";
+  if (event.publicationState === "voting") return "voting";
   const start = timestamp(event.startsAt);
   if (start === null) return "expired";
   const explicitEnd = timestamp(event.endsAt);
@@ -41,7 +45,7 @@ export function getDiscoveryEventState(
 
   if (current < start) return "upcoming";
   if (current <= end) return "live";
-  if (current - end <= DAY_MS) return "past24h";
+  if (current - end < RECENT_EVENT_VISIBILITY_MS) return "recent";
   return "expired";
 }
 
@@ -50,11 +54,13 @@ export function getDiscoveryEventProximity(
   now: number | Date = Date.now()
 ): DiscoveryEventProximity {
   const current = typeof now === "number" ? now : now.getTime();
+  if (event.publicationState === "cancelled") return "expired";
+  if (event.publicationState === "voting") return "voting";
   const start = timestamp(event.startsAt);
   if (start === null) return "expired";
   const end = timestamp(event.endsAt) ?? start + DEFAULT_DURATION_MS;
   if (current >= start && current <= end) return "live";
-  if (current > end) return current - end <= DAY_MS ? "past24h" : "expired";
+  if (current > end) return current - end < RECENT_EVENT_VISIBILITY_MS ? "recent" : "expired";
   const untilStart = start - current;
   if (untilStart <= 48 * HOUR_MS) return "within48h";
   if (untilStart <= 7 * DAY_MS) return "within7d";
@@ -76,4 +82,23 @@ export function visibleDiscoveryEvents(
 
 export function isDiscoveryEventActive(event: DiscoveryEvent, now: number | Date = Date.now()): boolean {
   return getDiscoveryEventState(event, now) === "live";
+}
+
+export function nextDiscoveryEventTransitionAt(
+  events: readonly DiscoveryEvent[],
+  now: number | Date = Date.now()
+): number | null {
+  const current = typeof now === "number" ? now : now.getTime();
+  let next: number | null = null;
+  for (const event of events) {
+    if (event.publicationState === "cancelled" || event.publicationState === "voting") continue;
+    const start = timestamp(event.startsAt);
+    if (start === null) continue;
+    const end = timestamp(event.endsAt) ?? start + DEFAULT_DURATION_MS;
+    for (const transition of [start, end + 1, end + RECENT_EVENT_VISIBILITY_MS]) {
+      if (transition <= current) continue;
+      if (next === null || transition < next) next = transition;
+    }
+  }
+  return next;
 }

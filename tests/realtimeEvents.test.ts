@@ -67,11 +67,11 @@ test("normalise Bonjour et Toquer du Coworking en snake_case", () => {
   assert.deepEqual(
     normalizeRealtimeEvent({
       type: "coworking.hello",
-      payload: { from_user_id: "member-2" }
+      payload: { from_user_id: "member-2", space_id: "visio-business" }
     }),
     {
       type: "coworking.hello",
-      payload: { fromUserId: "member-2" }
+      payload: { fromUserId: "member-2", spaceId: "visio-business" }
     }
   );
 

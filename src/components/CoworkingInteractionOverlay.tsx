@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "./LocalizedText";
 import { StatusAvatar } from "./StatusAvatar";
 import { env } from "../config/env";
+import { coworkingSpaceHostId } from "../domain/coworking";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
 import { useSession } from "../providers/SessionProvider";
@@ -30,7 +31,7 @@ export function CoworkingInteractionOverlay() {
   const theme = useAppTheme();
   const { accessToken, currentUser } = useSession();
   const { members } = useExperience();
-  const { joinSpace } = useCoworking();
+  const { joinSpace, snapshot } = useCoworking();
   const { playKnock } = useActionSounds();
   const [hello, setHello] = useState<HelloState>(null);
   const [knock, setKnock] = useState<KnockState>(null);
@@ -65,11 +66,21 @@ export function CoworkingInteractionOverlay() {
     const onInteraction = (event: CoworkingInteractionEvent) => {
       if (event.type === "hello") {
         if (event.fromUserId === currentUser.id) return;
+        if (event.spaceId) {
+          const targetSpace = snapshot.hub.id === event.spaceId
+            ? snapshot.hub
+            : snapshot.spaces.find((space) => space.id === event.spaceId);
+          if (!targetSpace?.participantIds.includes(currentUser.id)) return;
+        }
         setHello({ fromUserId: event.fromUserId, nonce: Date.now() });
         return;
       }
       if (event.type === "knock") {
         if (event.fromUserId === currentUser.id) return;
+        const targetSpace = snapshot.hub.id === event.spaceId
+          ? snapshot.hub
+          : snapshot.spaces.find((space) => space.id === event.spaceId);
+        if (!targetSpace || coworkingSpaceHostId(targetSpace) !== currentUser.id) return;
         setKnock({
           requestId: event.requestId,
           fromUserId: event.fromUserId,
@@ -85,7 +96,7 @@ export function CoworkingInteractionOverlay() {
       }
     };
     return subscribeCoworkingInteractions(onInteraction);
-  }, [currentUser.id, joinSpace, playKnock]);
+  }, [currentUser.id, joinSpace, playKnock, snapshot.hub, snapshot.spaces]);
 
   const answerKnock = async (accepted: boolean) => {
     if (!knock || responding) return;
@@ -148,7 +159,7 @@ export function CoworkingInteractionOverlay() {
             </View>
             <StatusAvatar user={knockMember} size={46} accessible={false} />
             <View style={styles.copy}>
-              <Text style={[styles.knockTitle, { color: theme.pageText }]}>{firstName(knockMember.name)} toque à votre bureau</Text>
+              <Text style={[styles.knockTitle, { color: theme.pageText }]}>{firstName(knockMember.name)} toque à votre espace</Text>
               <Text numberOfLines={1} style={[styles.knockMeta, { color: theme.pageTextMuted }]}>
                 Souhaite rejoindre votre échange
               </Text>

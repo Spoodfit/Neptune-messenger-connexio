@@ -7,16 +7,19 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "environment": "development"
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "environment": "preview"
     },
     "standalone": {
       "developmentClient": false,
       "distribution": "internal",
       "autoIncrement": true,
+      "environment": "preview",
       "env": {
         "EXPO_PUBLIC_MOCK_MODE": "true",
         "EXPO_PUBLIC_BACKEND_CONTRACT": "connexio-v1",
@@ -30,10 +33,10 @@
         "buildType": "apk"
       }
     },
-    "release-candidate": {
+    "backend-smoke": {
       "distribution": "internal",
-      "channel": "release-candidate",
-      "autoIncrement": true,
+      "channel": "backend-smoke",
+      "environment": "preview",
       "env": {
         "EXPO_PUBLIC_MOCK_MODE": "false",
         "EXPO_PUBLIC_BACKEND_CONTRACT": "neptune-web-v1",
@@ -47,13 +50,36 @@
         "image": "sdk-57"
       }
     },
+    "release-candidate": {
+      "distribution": "internal",
+      "channel": "release-candidate",
+      "autoIncrement": true,
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_MOCK_MODE": "false",
+        "EXPO_PUBLIC_BACKEND_CONTRACT": "connexio-v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.neptunebusiness.com/api",
+        "EXPO_PUBLIC_REALTIME_URL": "https://api.neptunebusiness.com",
+        "EXPO_PUBLIC_COWORKING_ENABLED": "true",
+        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL": "https://neptunebusiness.com"
+      },
+      "ios": {
+        "image": "sdk-57"
+      },
+      "android": {
+        "image": "sdk-57"
+      }
+    },
     "production": {
       "channel": "production",
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_MOCK_MODE": "false",
-        "EXPO_PUBLIC_BACKEND_CONTRACT": "neptune-web-v1",
+        "EXPO_PUBLIC_BACKEND_CONTRACT": "connexio-v1",
         "EXPO_PUBLIC_API_BASE_URL": "https://api.neptunebusiness.com/api",
+        "EXPO_PUBLIC_REALTIME_URL": "https://api.neptunebusiness.com",
+        "EXPO_PUBLIC_COWORKING_ENABLED": "true",
         "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL": "https://neptunebusiness.com"
       },
       "ios": {
