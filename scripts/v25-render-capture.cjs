@@ -42,7 +42,7 @@ async function run() {
       await open(page, "/highlights"); await shot(page, `temps-forts-feed-only-${viewport.suffix}`);
       await open(page, "/coworking"); await shot(page, `map-dedicated-${viewport.suffix}`);
       await open(page, "/coworking/visio-business");
-      await page.getByTestId("coworking-focus-avatar").waitFor({ state:"visible", timeout:10000 }).catch(() => {});
+      await page.getByTestId("coworking-focus-video").waitFor({ state:"visible", timeout:10000 }).catch(() => {});
       await shot(page, `private-video-main-${viewport.suffix}`);
       const overview = page.getByLabel("Afficher la vue d’ensemble", { exact:true });
       if (await overview.isVisible().catch(() => false)) {

@@ -7,6 +7,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -93,6 +94,7 @@ export default function CoworkingRoomScreen() {
     ?? remoteParticipants.find((member) => participantPresence(snapshot, member.id)?.speaking)
     ?? remoteParticipants.find((member) => member.id === space?.ownerId)
     ?? remoteParticipants[0];
+  const focusedPresence = focusedMember ? participantPresence(snapshot, focusedMember.id) : undefined;
   const nodeSize = participants.length <= 6 ? 80 : participants.length <= 10 ? 72 : 64;
   const nodeHeight = nodeSize + 30;
 
@@ -334,13 +336,32 @@ export default function CoworkingRoomScreen() {
             <View pointerEvents="none" style={[styles.privateBackdrop, { backgroundColor: theme.surfaceStrong }]}>
               {roomViewMode === "stage" && focusedMember ? (
                 <View testID="coworking-focus-remote" style={styles.focusFallback}>
-                  <View testID="coworking-focus-avatar" style={[styles.focusAvatarShell, { borderColor: participantPresence(snapshot, focusedMember.id)?.speaking ? theme.success : theme.borderSoft, backgroundColor: theme.surface }]}>
-                    <StatusAvatar user={focusedMember} size={116} accessible={false} />
+                  <View testID="coworking-focus-video" style={[styles.focusVideoSurface, { backgroundColor: theme.surface }]}>
+                    <View style={styles.focusCameraFallback}>
+                      <View testID="coworking-focus-avatar" style={[styles.focusAvatarShell, { borderColor: focusedPresence?.speaking ? theme.success : theme.borderSoft, backgroundColor: theme.surfaceStrong }]}>
+                        <StatusAvatar user={focusedMember} size={116} accessible={false} />
+                      </View>
+                      {!focusedPresence?.cameraOn ? <Ionicons name="videocam-off-outline" size={24} color={theme.pageTextMuted} /> : null}
+                    </View>
+                    {focusedPresence?.cameraOn && focusedMember.avatarUrl ? (
+                      <Image
+                        source={{ uri: focusedMember.avatarUrl }}
+                        resizeMode="cover"
+                        accessibilityIgnoresInvertColors
+                        style={styles.focusVideoImage}
+                      />
+                    ) : null}
+                    <LinearGradient
+                      pointerEvents="none"
+                      colors={["rgba(2,7,19,0.02)", "rgba(2,7,19,0.78)"]}
+                      locations={[0.46, 1]}
+                      style={styles.focusVideoShade}
+                    />
                   </View>
                   <View style={[styles.focusName, { backgroundColor: theme.shellBackground }]}>
-                    {participantPresence(snapshot, focusedMember.id)?.speaking ? <View style={[styles.speakingDot, { backgroundColor: theme.success }]} /> : null}
+                    {focusedPresence?.speaking ? <View style={[styles.speakingDot, { backgroundColor: theme.success }]} /> : null}
                     <Text numberOfLines={1} style={[styles.focusNameText, { color: theme.pageText }]}>{focusedMember.name}</Text>
-                    {!participantPresence(snapshot, focusedMember.id)?.microphoneOn ? <Ionicons name="mic-off" size={13} color={theme.pageTextMuted} /> : null}
+                    {!focusedPresence?.microphoneOn ? <Ionicons name="mic-off" size={13} color={theme.pageTextMuted} /> : null}
                   </View>
                 </View>
               ) : roomViewMode === "stage" ? (
@@ -538,9 +559,9 @@ const styles = StyleSheet.create({
   header: { minHeight: 70, paddingHorizontal: 10, paddingBottom: 8, borderBottomWidth: 1, flexDirection: "row", alignItems: "flex-end", gap: 9 },
   headerButton: { width: 48, height: 48, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   headerCopy: { flex: 1, minWidth: 0, minHeight: 48, justifyContent: "center", alignItems: "center" },
-  headerTitleLine: { maxWidth: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  headerTitleLine: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   liveDot: { width: 7, height: 7, borderRadius: 4 },
-  headerTitle: { maxWidth: "82%", fontSize: 15, lineHeight: 19, fontWeight: "900" },
+  headerTitle: { flexShrink: 1, fontSize: 14, lineHeight: 18, fontWeight: "900", textAlign: "center" },
   headerMeta: { marginTop: 2, maxWidth: "100%", fontSize: 10, lineHeight: 13, fontWeight: "700", textAlign: "center" },
   stage: { flex: 1, margin: 8, borderRadius: 28, borderWidth: 1, overflow: "hidden", position: "relative", minHeight: 280 },
   spatialBackdrop: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
@@ -556,10 +577,14 @@ const styles = StyleSheet.create({
   personName: { maxWidth: 72, fontSize: 10, lineHeight: 13, fontWeight: "900" },
   speakingDot: { width: 7, height: 7, borderRadius: 4 },
   privateBackdrop: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
-  focusFallback: { alignItems: "center", justifyContent: "center", gap: 14, paddingHorizontal: 24, paddingBottom: 70, transform: [{ translateY: -36 }] },
+  focusFallback: { ...StyleSheet.absoluteFillObject },
+  focusVideoSurface: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
+  focusVideoImage: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, width: "100%", height: "100%" },
+  focusVideoShade: { position: "absolute", left: 0, right: 0, top: "38%", bottom: 0 },
+  focusCameraFallback: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 12, paddingBottom: 76 },
   focusAvatarShell: { width: 148, height: 148, borderRadius: 74, borderWidth: 3, alignItems: "center", justifyContent: "center", overflow: "hidden" },
-  focusName: { maxWidth: "82%", minHeight: 38, borderRadius: 19, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  focusNameText: { maxWidth: 210, fontSize: 13, lineHeight: 17, fontWeight: "900" },
+  focusName: { position: "absolute", left: 14, right: 104, bottom: 94, minHeight: 38, borderRadius: 19, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  focusNameText: { flexShrink: 1, fontSize: 13, lineHeight: 17, fontWeight: "900" },
   waitingState: { maxWidth: 300, alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 22, paddingBottom: 72 },
   waitingTitle: { fontSize: 15, lineHeight: 20, fontWeight: "900", textAlign: "center" },
   waitingText: { fontSize: 11, lineHeight: 16, fontWeight: "700", textAlign: "center" },

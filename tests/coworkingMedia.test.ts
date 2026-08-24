@@ -19,7 +19,7 @@ const html = buildCoworkingMediaHtml({
 });
 
 test("la visio privée démarre avec une personne distante en scène et une vue d’ensemble circulaire", () => {
-  match(html, /#remoteGrid\.room-stage \.remote\{position:absolute;inset:0/);
+  match(html, /#remoteGrid\.room-stage \.remote\{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:26px/);
   match(html, /#remoteGrid\.room-overview \.remote\{[^}]*border-radius:50%/);
   match(html, /#remoteGrid\.room-stage \.remote \.name\{bottom:92px/);
   match(html, /video\.video-ready[^}]*opacity:1/);

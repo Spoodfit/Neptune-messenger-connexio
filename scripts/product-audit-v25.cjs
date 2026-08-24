@@ -257,12 +257,16 @@ async function auditMap(page, label, interactive = false) {
 
 async function auditPrivateRoom(page) {
   await open(page, "/coworking/visio-business");
-  const focusAvatar = page.getByTestId("coworking-focus-avatar");
-  if (await expectVisible(focusAvatar, "Visio privée: personne rejointe affichée en grand", 10000)) {
+  const focusVideo = page.getByTestId("coworking-focus-video");
+  if (await expectVisible(focusVideo, "Visio privée: personne rejointe affichée en vue principale", 10000)) {
     const stage = page.getByTestId("coworking-room-stage");
-    const [avatarBox, stageBox] = await Promise.all([focusAvatar.boundingBox(), stage.boundingBox()]);
-    if (!avatarBox || !stageBox || avatarBox.y < stageBox.y + 24 || avatarBox.y + avatarBox.height > stageBox.y + stageBox.height - 86) {
-      failures.push("Visio privée: personne principale rognée ou collée au bord de la scène");
+    const [videoBox, stageBox] = await Promise.all([focusVideo.boundingBox(), stage.boundingBox()]);
+    if (!videoBox || !stageBox
+      || videoBox.width < stageBox.width * .9
+      || videoBox.height < stageBox.height * .9
+      || Math.abs(videoBox.x - stageBox.x) > 3
+      || Math.abs(videoBox.y - stageBox.y) > 3) {
+      failures.push("Visio privée: la vue principale ne remplit pas correctement la scène");
     }
   }
   await expectVisible(page.getByTestId("coworking-self-preview"), "Visio privée: aperçu de soi");
