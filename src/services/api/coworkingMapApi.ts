@@ -57,6 +57,13 @@ export interface CoworkingKnockResponse {
   media?: CoworkingMediaSession;
 }
 
+function targetBody(input: { userId?: string; spaceId?: string }): { user_id: string } | { space_id: string } {
+  const userId = input.userId?.trim();
+  const spaceId = input.spaceId?.trim();
+  if (Boolean(userId) === Boolean(spaceId)) throw new Error("Choisissez un membre ou un espace Coworking, pas les deux.");
+  return spaceId ? { space_id: spaceId } : { user_id: userId! };
+}
+
 export class CoworkingMapApi {
   constructor(private readonly fallbackAccessToken?: string | null) {}
 
@@ -73,10 +80,13 @@ export class CoworkingMapApi {
     await authenticatedRequest("/v1/coworking/map/leave", { method: "POST" }, this.fallbackAccessToken);
   }
 
-  async sayHello(userId: string): Promise<void> {
+  async sayHello(input: { userId?: string; spaceId?: string }): Promise<void> {
     await authenticatedRequest(
       "/v1/coworking/hello",
-      { method: "POST", body: JSON.stringify({ user_id: userId }) },
+      {
+        method: "POST",
+        body: JSON.stringify(targetBody(input))
+      },
       this.fallbackAccessToken
     );
   }
@@ -86,7 +96,7 @@ export class CoworkingMapApi {
       "/v1/coworking/knock",
       {
         method: "POST",
-        body: JSON.stringify({ user_id: input.userId ?? null, space_id: input.spaceId ?? null })
+        body: JSON.stringify(targetBody(input))
       },
       this.fallbackAccessToken
     );

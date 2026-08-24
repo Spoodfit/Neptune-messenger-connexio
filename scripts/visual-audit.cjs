@@ -12,6 +12,10 @@ const cases = [
   { name: "map-280x568", width: 280, height: 568, route: "/coworking" },
   { name: "map-390x844", width: 390, height: 844, route: "/coworking" },
   { name: "map-tablet-768x1024", width: 768, height: 1024, route: "/coworking" },
+  { name: "private-video-280x568", width: 280, height: 568, route: "/coworking/visio-business", waitMs: 1200 },
+  { name: "private-video-393x852", width: 393, height: 852, route: "/coworking/visio-business", waitMs: 1200 },
+  { name: "schedule-call-280x568", width: 280, height: 568, route: "/schedule-call?memberId=user-lea&mode=video" },
+  { name: "schedule-call-393x852", width: 393, height: 852, route: "/schedule-call?memberId=user-lea&mode=video" },
   { name: "highlights-feed-280x568", width: 280, height: 568, route: "/highlights" },
   { name: "highlights-feed-393x852", width: 393, height: 852, route: "/highlights" },
   { name: "contacts-360x800", width: 360, height: 800, route: "/contacts" },
@@ -138,6 +142,7 @@ async function run() {
       });
       page.on("pageerror", (error) => pageErrors.push(String(error)));
       await page.goto(`${BASE_URL}${testCase.route}`, { waitUntil: "networkidle" });
+      if (testCase.waitMs) await page.waitForTimeout(testCase.waitMs);
       if (testCase.zoom) {
         await page.evaluate((zoom) => {
           document.documentElement.style.zoom = String(zoom);

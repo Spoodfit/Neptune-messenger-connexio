@@ -5,12 +5,12 @@ import { Text } from "./LocalizedText";
 import { useAppTheme } from "../providers/ThemeProvider";
 import type { CoworkingMediaSurfaceProps } from "./CoworkingMediaSurface.types";
 
-export default function CoworkingMediaSurfaceWeb({ session, mapMode = false, spatialAudio = false }: CoworkingMediaSurfaceProps) {
+export default function CoworkingMediaSurfaceWeb({ session, mapMode = false, spatialAudio = false, roomViewMode }: CoworkingMediaSurfaceProps) {
   const theme = useAppTheme();
 
   // Geographic Map and the General Room render their own spatial participant
   // layer in the web preview. Never cover it with a technical placeholder.
-  if (mapMode || spatialAudio || session.mock) return null;
+  if (mapMode || spatialAudio || roomViewMode || session.mock) return null;
 
   return (
     <View style={[styles.stage, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>

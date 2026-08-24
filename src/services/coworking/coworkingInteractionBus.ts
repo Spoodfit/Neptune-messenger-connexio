@@ -2,6 +2,7 @@ export type CoworkingInteractionEvent =
   | {
       type: "hello";
       fromUserId: string;
+      spaceId?: string;
       receivedAt: string;
     }
   | {

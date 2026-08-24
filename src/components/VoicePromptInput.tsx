@@ -75,6 +75,8 @@ export function VoicePromptInput({ value, onChangeText, placeholder, maxLength, 
           placeholder={placeholder}
           placeholderTextColor={theme.pageTextMuted}
           maxLength={maxLength}
+          multiline={false}
+          numberOfLines={1}
           returnKeyType="go"
           style={[styles.input, { color: theme.pageText }]}
         />

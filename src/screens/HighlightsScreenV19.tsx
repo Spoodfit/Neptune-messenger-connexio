@@ -42,7 +42,7 @@ const MAP_FILTERS = [
 ] as const;
 const EVENT_WINDOWS: Array<{ value: DiscoveryEventWindow; label: string }> = [
   { value: "all", label: "Tous" },
-  { value: "past24h", label: "Dernières 24 h" },
+  { value: "recent", label: "Terminés depuis moins d’une heure" },
   { value: "live", label: "En cours" },
   { value: "upcoming", label: "À venir" }
 ];
@@ -129,8 +129,8 @@ export default function HighlightsScreenV19() {
   };
 
   const eventState = selectedEvent ? getDiscoveryEventState(selectedEvent) : null;
-  const eventColor = eventState === "live" ? theme.success : eventState === "past24h" ? theme.warning : theme.accent;
-  const eventLabel = eventState === "live" ? "En cours maintenant" : eventState === "past24h" ? "Terminé il y a moins de 24 h" : "À venir";
+  const eventColor = eventState === "live" ? theme.success : eventState === "recent" ? theme.warning : eventState === "voting" ? theme.violet : theme.accent;
+  const eventLabel = eventState === "live" ? "En cours maintenant" : eventState === "recent" ? "Terminé il y a moins d’une heure" : eventState === "voting" ? "Vote en cours" : "À venir";
 
   return <LinearGradient colors={theme.pageGradient} style={styles.screen}>
     <BrandHeader title="Temps forts" subtitle="Découvrir, demander un coup de main et créer des opportunités." />

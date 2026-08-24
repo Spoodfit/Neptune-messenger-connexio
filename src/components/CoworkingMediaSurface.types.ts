@@ -7,6 +7,8 @@ export interface CoworkingMediaLayoutItem {
   height: number;
 }
 
+export type CoworkingRoomViewMode = "stage" | "overview";
+
 export interface CoworkingMediaSurfaceProps {
   session: CoworkingMediaSession;
   displayName: string;
@@ -15,6 +17,8 @@ export interface CoworkingMediaSurfaceProps {
   mapMode?: boolean;
   spatialAudio?: boolean;
   participantLayout?: Record<string, CoworkingMediaLayoutItem>;
+  roomViewMode?: CoworkingRoomViewMode;
+  focusParticipantId?: string;
   onConnected?: () => void;
   onError?: (message: string) => void;
   onLocalMediaUnavailable?: (message: string) => void;

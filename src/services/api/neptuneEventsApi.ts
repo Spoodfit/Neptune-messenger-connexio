@@ -33,6 +33,14 @@ function eventItems(payload: unknown): unknown[] {
   return [];
 }
 
+function publicationState(value: unknown): DiscoveryEvent["publicationState"] {
+  if (typeof value !== "string") return "published";
+  const normalized = value.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  if (["voting", "vote", "poll", "polling", "invote"].includes(normalized)) return "voting";
+  if (["cancelled", "canceled", "annule", "annulé", "expired", "archived"].includes(normalized)) return "cancelled";
+  return "published";
+}
+
 export function normalizeBusinessEvent(value: unknown): DiscoveryEvent | null {
   const source = record(value);
   if (!source) return null;
@@ -95,6 +103,7 @@ export function normalizeBusinessEvent(value: unknown): DiscoveryEvent | null {
     webUrl: stringValue(source.web_url, source.webUrl, source.url, source.public_url),
     organizer: stringValue(source.organizer, source.organizer_name, source.host_name),
     clubName: stringValue(source.club_name, source.clubName, source.club),
+    publicationState: publicationState(source.publication_state ?? source.publicationState ?? source.status ?? source.state),
     source: "neptune-business"
   };
 }
@@ -103,7 +112,7 @@ export class NeptuneEventsApi {
   constructor(private readonly fallbackAccessToken?: string | null) {}
 
   async listDiscoveryEvents(): Promise<DiscoveryEvent[]> {
-    const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const from = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const to = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString();
     const query = new URLSearchParams({ from, to, limit: "250", visible: "true" });
     const payload = await authenticatedRequest<unknown>(

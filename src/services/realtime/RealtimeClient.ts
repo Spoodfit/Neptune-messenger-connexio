@@ -40,6 +40,7 @@ function broadcastCoworkingInteraction(event: RealtimeEvent): void {
     emitCoworkingInteraction({
       type: "hello",
       fromUserId: event.payload.fromUserId,
+      spaceId: event.payload.spaceId,
       receivedAt: new Date().toISOString()
     });
     return;

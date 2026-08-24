@@ -11,7 +11,7 @@ import {
 
 import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import { env } from "../config/env";
-import { coworkingPresentCount, spaceForUser } from "../domain/coworking";
+import { coworkingPresentCount, removeCoworkingParticipant, spaceForUser } from "../domain/coworking";
 import { useExperience } from "./ExperienceProvider";
 import { useSession } from "./SessionProvider";
 import { NeptuneCoworkingApi } from "../services/api/coworkingApi";
@@ -64,7 +64,7 @@ function removeUserFromSpaces(snapshot: CoworkingSnapshot, userId: string): Cowo
   return {
     ...snapshot,
     hub: { ...snapshot.hub, participantIds: snapshot.hub.participantIds.filter((id) => id !== userId) },
-    spaces: snapshot.spaces.map((space) => ({ ...space, participantIds: space.participantIds.filter((id) => id !== userId) }))
+    spaces: snapshot.spaces.map((space) => removeCoworkingParticipant(space, userId))
   };
 }
 
@@ -309,7 +309,10 @@ export function CoworkingProvider({ children }: PropsWithChildren) {
         kind: input.kind,
         access: input.access,
         ownerId: currentUser.id,
-        participantIds: [currentUser.id],
+        participantIds: [
+          currentUser.id,
+          ...(input.kind === "private" ? (input.invitedUserIds ?? []).filter((id) => id !== currentUser.id) : [])
+        ],
         invitedUserIds: input.invitedUserIds ?? [],
         maxParticipants: input.kind === "focus" ? 6 : 5,
         activity: input.activity?.trim() || undefined,

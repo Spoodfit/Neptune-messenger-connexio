@@ -31,7 +31,7 @@ const server = http.createServer((request, response) => {
 });
 
 function browserExecutable() {
-  return [process.env.CHROMIUM_PATH, "/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/bin/google-chrome"]
+  return [process.env.CHROMIUM_PATH, chromium.executablePath(), "/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/bin/google-chrome"]
     .filter(Boolean).find((candidate) => fs.existsSync(candidate));
 }
 
@@ -125,6 +125,11 @@ async function auditFeedOnly(page) {
 async function auditMap(page, label, interactive = false) {
   await open(page, "/coworking");
   await expectVisible(page.getByText("Map", { exact: true }).first(), `${label} Map`);
+  const availability = page.getByLabel(/^Ma disponibilité : (Disponible|Occupé)$/);
+  if (await expectVisible(availability, `${label} disponibilité personnelle`)) {
+    const box = await availability.boundingBox();
+    if (!box || box.width < 48 || box.height < 48) failures.push(`${label}: changement de disponibilité trop petit (${Math.round(box?.width ?? 0)}x${Math.round(box?.height ?? 0)}px)`);
+  }
   if (await page.getByText("Salle générale", { exact: true }).count()) failures.push(`${label}: Salle générale encore visible`);
   if (await page.getByLabel("Rejoindre la salle générale", { exact: true }).count()) failures.push(`${label}: action Salle générale encore accessible`);
   await checkGeometry(page, `${label} écran Map`);
@@ -163,6 +168,15 @@ async function auditMap(page, label, interactive = false) {
 
   if (!interactive) return;
 
+  const initialAvailabilityLabel = await availability.getAttribute("aria-label").catch(() => null);
+  if (initialAvailabilityLabel) {
+    await availability.click();
+    const expectedAvailabilityLabel = initialAvailabilityLabel.endsWith("Disponible")
+      ? "Ma disponibilité : Occupé"
+      : "Ma disponibilité : Disponible";
+    await expectVisible(page.getByLabel(expectedAvailabilityLabel, { exact: true }), "Disponibilité: bascule en un toucher");
+  }
+
   const available = frame.locator(".cw-marker.available").first();
   if (await available.isVisible().catch(() => false)) {
     await available.click();
@@ -174,7 +188,8 @@ async function auditMap(page, label, interactive = false) {
   const busy = frame.locator(".cw-marker.busy").first();
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
-    await expectVisible(page.getByLabel("Toquer et demander l’autorisation d’entrer", { exact: true }), "Occupé: demande d'autorisation");
+    await expectVisible(page.getByLabel("Dire bonjour au groupe", { exact: true }), "Occupé: Bonjour adressé au groupe");
+    await expectVisible(page.getByLabel("Toquer à l’espace et demander l’autorisation d’entrer", { exact: true }), "Occupé: demande adressée à l’espace");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
@@ -240,6 +255,38 @@ async function auditMap(page, label, interactive = false) {
   if (hostCollisions > 0) failures.push(`Map zoomée: ${hostCollisions} chevauchement(s) important(s) entre cercles principaux`);
 }
 
+async function auditPrivateRoom(page) {
+  await open(page, "/coworking/visio-business");
+  const focusAvatar = page.getByTestId("coworking-focus-avatar");
+  if (await expectVisible(focusAvatar, "Visio privée: personne rejointe affichée en grand", 10000)) {
+    const stage = page.getByTestId("coworking-room-stage");
+    const [avatarBox, stageBox] = await Promise.all([focusAvatar.boundingBox(), stage.boundingBox()]);
+    if (!avatarBox || !stageBox || avatarBox.y < stageBox.y + 24 || avatarBox.y + avatarBox.height > stageBox.y + stageBox.height - 86) {
+      failures.push("Visio privée: personne principale rognée ou collée au bord de la scène");
+    }
+  }
+  await expectVisible(page.getByTestId("coworking-self-preview"), "Visio privée: aperçu de soi");
+  await expectVisible(page.getByTestId("coworking-participant-rail"), "Visio privée: rail des participants");
+  const overview = page.getByLabel("Afficher la vue d’ensemble", { exact: true });
+  if (await expectVisible(overview, "Visio privée: réduction en vue d’ensemble")) {
+    await overview.click();
+    await expectVisible(page.getByTestId("coworking-overview-grid"), "Visio privée: participants en cercles");
+    await expectVisible(page.getByLabel("Afficher la vue principale", { exact: true }), "Visio privée: retour à la vue principale");
+  }
+  await checkGeometry(page, "Visio privée");
+}
+
+async function auditScheduleCall(page) {
+  await open(page, "/schedule-call?memberId=user-lea&mode=video");
+  if (await page.getByText(/Standalone\s*:/).count()) failures.push("Programmer appel: texte technique Standalone encore visible");
+  const subject = page.getByPlaceholder("Ex. Valider le partenariat", { exact: true });
+  if (await expectVisible(subject, "Programmer appel: objet lisible sur une ligne")) {
+    const wraps = await subject.evaluate((node) => node.scrollHeight > node.clientHeight + 1);
+    if (wraps) failures.push("Programmer appel: placeholder de l’objet encore rogné ou multiligne");
+  }
+  await checkGeometry(page, "Programmer appel");
+}
+
 async function auditCoreRoutes(page) {
   for (const [route, label] of [
     ["/chat/carcassonne", "Chat"], ["/calls", "Appels"], ["/settings", "Profil"],
@@ -268,6 +315,8 @@ async function run() {
     const page = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
     await auditFeedOnly(page);
     await auditMap(page, "393x852 interactif", true);
+    await auditPrivateRoom(page);
+    await auditScheduleCall(page);
     await auditCoreRoutes(page);
     await page.close();
   } finally {
@@ -278,7 +327,7 @@ async function run() {
     console.error("Product Audit V25 failed:\n" + failures.map((failure) => `- ${failure}`).join("\n"));
     process.exitCode = 1;
   } else {
-    console.log("Product Audit V25 passed: centered Map navigation, feed-only Temps forts, event flags, circular video satellites, adaptive marker density, automatic zoom split, availability knock logic, no General Room, and core-route geometry.");
+    console.log("Product Audit V26 passed: anchored event flags, one-touch availability, space-wide hello/knock, centered private video, circular overview, clean scheduling, and core-route geometry.");
   }
 }
 

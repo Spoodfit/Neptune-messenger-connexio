@@ -19,6 +19,13 @@ const html = buildCoworkingGeographicMapHtml({
       cameraOn: true
     }]
   }],
+  events: [{
+    id: "event:test",
+    title: "Rencontre test",
+    latitude: 43.22,
+    longitude: 2.36,
+    proximity: "within48h"
+  }],
   mediaSession: {
     spaceId: "test",
     socketUrl: "wss://example.com",
@@ -59,4 +66,12 @@ test("chaque script injecté dans l’iframe reste du JavaScript syntaxiquement 
 
   ok(scripts.length > 0);
   for (const script of scripts) doesNotThrow(() => new Function(script));
+});
+
+test("les drapeaux restent ancrés à leurs coordonnées après un déplacement de carte", () => {
+  ok(!html.includes("--event-offset-x"));
+  ok(!html.includes("applyEventOffsets"));
+  match(html, /L\.marker\(\[event\.latitude,event\.longitude\]/);
+  match(html, /L\.markerClusterGroup\(\{/);
+  match(html, /event-cluster-core/);
 });

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   getDiscoveryEventProximity,
   getDiscoveryEventState,
+  nextDiscoveryEventTransitionAt,
   visibleDiscoveryEvents,
   type DiscoveryEvent
 } from "../src/domain/discoveryEvents";
@@ -28,10 +29,10 @@ test("classifie un évènement en cours", () => {
   assert.equal(getDiscoveryEventProximity(item, NOW), "live");
 });
 
-test("conserve un évènement terminé depuis moins de 24 heures", () => {
-  const item = event("recent", "2026-08-16T18:00:00.000Z", "2026-08-16T20:00:00.000Z");
-  assert.equal(getDiscoveryEventState(item, NOW), "past24h");
-  assert.equal(getDiscoveryEventProximity(item, NOW), "past24h");
+test("conserve un évènement terminé depuis moins d’une heure", () => {
+  const item = event("recent", "2026-08-17T08:00:00.000Z", "2026-08-17T09:15:00.000Z");
+  assert.equal(getDiscoveryEventState(item, NOW), "recent");
+  assert.equal(getDiscoveryEventProximity(item, NOW), "recent");
 });
 
 test("distingue les évènements dans 48 h, dans une semaine et plus tard", () => {
@@ -40,11 +41,29 @@ test("distingue les évènements dans 48 h, dans une semaine et plus tard", () =
   assert.equal(getDiscoveryEventProximity(event("later", "2026-08-30T10:00:00.000Z"), NOW), "later");
 });
 
-test("masque un évènement terminé depuis plus de 24 heures", () => {
-  const item = event("expired", "2026-08-15T06:00:00.000Z", "2026-08-15T08:00:00.000Z");
+test("masque un évènement terminé depuis plus d’une heure", () => {
+  const item = event("expired", "2026-08-17T07:00:00.000Z", "2026-08-17T08:59:59.000Z");
   assert.equal(getDiscoveryEventState(item, NOW), "expired");
   assert.equal(getDiscoveryEventProximity(item, NOW), "expired");
   assert.deepEqual(visibleDiscoveryEvents([item], "all", NOW), []);
+});
+
+test("retire un évènement dès que l’heure suivant sa fin est atteinte", () => {
+  const item = event("boundary", "2026-08-17T07:00:00.000Z", "2026-08-17T09:00:00.000Z");
+  assert.equal(getDiscoveryEventState(item, NOW - 1), "recent");
+  assert.equal(getDiscoveryEventState(item, NOW), "expired");
+});
+
+test("conserve un évènement en cours de vote sans l’assimiler à un évènement daté", () => {
+  const item = { ...event("vote", "2026-08-30T10:00:00.000Z"), publicationState: "voting" as const };
+  assert.equal(getDiscoveryEventState(item, NOW), "voting");
+  assert.equal(getDiscoveryEventProximity(item, NOW), "voting");
+  assert.deepEqual(visibleDiscoveryEvents([item], "all", NOW).map((candidate) => candidate.id), ["vote"]);
+});
+
+test("programme le prochain retrait automatique à fin plus une heure", () => {
+  const item = event("recent", "2026-08-17T08:00:00.000Z", "2026-08-17T09:15:00.000Z");
+  assert.equal(nextDiscoveryEventTransitionAt([item], NOW), Date.parse("2026-08-17T10:15:00.000Z"));
 });
 
 test("sépare les évènements à venir des évènements en cours", () => {

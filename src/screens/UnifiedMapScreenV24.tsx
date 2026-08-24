@@ -2,7 +2,7 @@ import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CoworkingGeographicMap from "../components/CoworkingGeographicMap";
@@ -10,7 +10,14 @@ import type { CoworkingMapEventMarker, CoworkingMapMarker } from "../components/
 import { StatusAvatar } from "../components/StatusAvatar";
 import { env } from "../config/env";
 import { discoveryEventsMock } from "../data/discoveryEventsMock";
-import { getDiscoveryEventProximity, getDiscoveryEventState, visibleDiscoveryEvents, type DiscoveryEvent } from "../domain/discoveryEvents";
+import {
+  getDiscoveryEventProximity,
+  getDiscoveryEventState,
+  nextDiscoveryEventTransitionAt,
+  visibleDiscoveryEvents,
+  type DiscoveryEvent
+} from "../domain/discoveryEvents";
+import { coworkingAvailability, coworkingSpaceHostId, participantPresence } from "../domain/coworking";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
 import { useAppLanguage } from "../providers/LanguageProvider";
@@ -35,12 +42,20 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || name;
 }
 
+function firstNameList(names: string[]): string {
+  const unique = [...new Set(names.map(firstName).filter(Boolean))];
+  if (unique.length <= 1) return unique[0] ?? "le groupe";
+  if (unique.length === 2) return `${unique[0]} et ${unique[1]}`;
+  return `${unique.slice(0, -1).join(", ")} et ${unique.at(-1)}`;
+}
+
 function activeSpaceForUser(userId: string, spaces: CoworkingSpace[]): CoworkingSpace | undefined {
   return spaces.find((space) => space.participantIds.includes(userId));
 }
 
 export default function UnifiedMapScreenV24() {
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth } = useWindowDimensions();
   const theme = useAppTheme();
   const { localeTag } = useAppLanguage();
   const { currentUser, accessToken } = useSession();
@@ -51,7 +66,10 @@ export default function UnifiedMapScreenV24() {
     loading,
     refresh,
     joinSpace,
-    createSpace
+    createSpace,
+    currentSpace,
+    updatePresence,
+    leaveCurrentSpace
   } = useCoworking();
   const mapApi = useMemo(
     () => (!env.mockMode && serviceAvailable ? new CoworkingMapApi(accessToken) : null),
@@ -59,13 +77,14 @@ export default function UnifiedMapScreenV24() {
   );
   const eventsApi = useMemo(() => (env.mockMode ? null : new NeptuneEventsApi(accessToken)), [accessToken]);
   const [events, setEvents] = useState<DiscoveryEvent[]>(env.mockMode ? discoveryEventsMock : []);
+  const [eventClock, setEventClock] = useState(() => Date.now());
   const [eventsLoading, setEventsLoading] = useState(false);
   const [mapMedia, setMapMedia] = useState<CoworkingMediaSession | undefined>();
   const [mapCameraActive, setMapCameraActive] = useState(env.mockMode);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [actionBusy, setActionBusy] = useState<"hello" | "knock" | null>(null);
+  const [actionBusy, setActionBusy] = useState<"hello" | "knock" | "presence" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const loadEvents = async () => {
@@ -83,6 +102,15 @@ export default function UnifiedMapScreenV24() {
   useEffect(() => {
     void loadEvents();
   }, [eventsApi]);
+
+  useEffect(() => {
+    const next = nextDiscoveryEventTransitionAt(events, eventClock);
+    const delay = next === null
+      ? 60_000
+      : Math.max(250, Math.min(60_000, next - Date.now() + 25));
+    const timer = setTimeout(() => setEventClock(Date.now()), delay);
+    return () => clearTimeout(timer);
+  }, [eventClock, events]);
 
   useEffect(() => {
     let active = true;
@@ -155,7 +183,7 @@ export default function UnifiedMapScreenV24() {
         latitude: moment.latitude,
         longitude: moment.longitude,
         city: member.city,
-        availability: "available",
+        availability: coworkingAvailability(presence, undefined),
         members: [{
           id: member.id,
           name: member.name,
@@ -201,16 +229,16 @@ export default function UnifiedMapScreenV24() {
     return result;
   }, [allMembers, currentUser.id, mapCameraActive, momentByUserId, presenceByUserId, snapshot.spaces]);
 
-  const visibleEvents = useMemo(() => visibleDiscoveryEvents(events, "all"), [events]);
+  const visibleEvents = useMemo(() => visibleDiscoveryEvents(events, "all", eventClock), [eventClock, events]);
   const eventMarkers = useMemo<CoworkingMapEventMarker[]>(
     () => visibleEvents.map((event) => ({
       id: event.id,
       title: event.title,
       latitude: event.latitude,
       longitude: event.longitude,
-      proximity: getDiscoveryEventProximity(event)
+      proximity: getDiscoveryEventProximity(event, eventClock)
     })),
-    [visibleEvents]
+    [eventClock, visibleEvents]
   );
 
   const selectedMarker = markers.find((marker) => marker.id === selectedMarkerId) ?? null;
@@ -248,8 +276,15 @@ export default function UnifiedMapScreenV24() {
     if (!selection || actionBusy || selection.member.id === currentUser.id) return;
     setActionBusy("hello");
     try {
-      if (mapApi) await mapApi.sayHello(selection.member.id);
-      setNotice(`Bonjour envoyé à ${firstName(selection.member.name)} 👋`);
+      if (mapApi) {
+        await mapApi.sayHello(selection.space
+          ? { spaceId: selection.space.id }
+          : { userId: selection.member.id });
+      }
+      const recipients = selection.space
+        ? firstNameList(selection.marker.members.map((member) => member.name))
+        : firstName(selection.member.name);
+      setNotice(`Bonjour envoyé à ${recipients} 👋`);
     } catch (error) {
       AppAlert.alert("Bonjour non envoyé", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     } finally {
@@ -285,14 +320,15 @@ export default function UnifiedMapScreenV24() {
         return;
       }
       if (busy && !mapApi) {
-        setNotice(`Demande envoyée à ${firstName(selection.member.name)} · en attente d’autorisation…`);
+        const hostId = selection.space ? coworkingSpaceHostId(selection.space) : undefined;
+        const host = hostId ? allMembers.find((member) => member.id === hostId) : undefined;
+        setNotice(`Demande envoyée à ${host ? firstName(host.name) : "l’hôte"} · en attente d’autorisation…`);
         return;
       }
 
-      const result = await mapApi!.knock({
-        userId: selection.member.id,
-        spaceId: selection.space?.id
-      });
+      const result = await mapApi!.knock(selection.space
+        ? { spaceId: selection.space.id }
+        : { userId: selection.member.id });
 
       if (result.status === "declined") {
         setNotice(`${firstName(selection.member.name)} n’est pas disponible maintenant.`);
@@ -311,7 +347,7 @@ export default function UnifiedMapScreenV24() {
 
       setNotice(
         busy
-          ? `Tu as toqué chez ${firstName(selection.member.name)} · autorisation demandée.`
+          ? `Tu as toqué à l’espace · autorisation de l’hôte demandée.`
           : `Tu as toqué chez ${firstName(selection.member.name)} · connexion en cours…`
       );
     } catch (error) {
@@ -327,6 +363,48 @@ export default function UnifiedMapScreenV24() {
 
   const onlineCount = allMembers.filter((member) => member.online && momentByUserId.has(member.id)).length;
   const refreshing = loading || eventsLoading;
+  const compactHeader = viewportWidth < 340;
+  const ownPresence = participantPresence(snapshot, currentUser.id);
+  const ownAvailability = coworkingAvailability(ownPresence, currentSpace);
+
+  const applyAvailability = async (next: "available" | "busy") => {
+    if (actionBusy) return;
+    setActionBusy("presence");
+    try {
+      await updatePresence(next === "available" ? "available" : "focus", next === "available" ? "Disponible" : "Occupé");
+      setNotice(next === "available" ? "Vous êtes maintenant disponible" : "Vous êtes maintenant occupé");
+    } catch (error) {
+      AppAlert.alert("Disponibilité non modifiée", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
+    } finally {
+      setActionBusy(null);
+    }
+  };
+
+  const toggleAvailability = () => {
+    if (!currentSpace) {
+      void applyAvailability(ownAvailability === "available" ? "busy" : "available");
+      return;
+    }
+    AppAlert.alert(
+      "Quitter l’échange pour devenir disponible ?",
+      "Vous ne pouvez pas apparaître disponible tout en restant dans une visio active.",
+      [
+        { text: "Rester dans l’échange", style: "cancel" },
+        {
+          text: "Quitter et passer disponible",
+          style: "destructive",
+          onPress: () => {
+            setActionBusy("presence");
+            void leaveCurrentSpace()
+              .then(() => updatePresence("available", "Disponible"))
+              .then(() => setNotice("Vous êtes maintenant disponible"))
+              .catch((error: unknown) => AppAlert.alert("Disponibilité non modifiée", error instanceof Error ? error.message : "Réessayez dans quelques instants."))
+              .finally(() => setActionBusy(null));
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.pageBackground }]}>
@@ -348,9 +426,21 @@ export default function UnifiedMapScreenV24() {
         <View style={[styles.titlePill, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
           <View style={styles.titleCopy}>
             <Text style={[styles.title, { color: theme.pageText }]}>Map</Text>
-            <Text style={[styles.subtitle, { color: theme.pageTextMuted }]}>{`${onlineCount} en ligne · ${visibleEvents.length} évènement${visibleEvents.length > 1 ? "s" : ""}`}</Text>
+            {!compactHeader ? <Text style={[styles.subtitle, { color: theme.pageTextMuted }]}>{`${onlineCount} en ligne · ${visibleEvents.length} évènement${visibleEvents.length > 1 ? "s" : ""}`}</Text> : null}
           </View>
-          {mapCameraActive ? <Ionicons name="videocam" size={16} color={theme.success} /> : null}
+          <Pressable
+            accessibilityRole="switch"
+            accessibilityLabel={`Ma disponibilité : ${ownAvailability === "available" ? "Disponible" : "Occupé"}`}
+            accessibilityHint="Touchez pour modifier votre disponibilité"
+            accessibilityState={{ checked: ownAvailability === "available", disabled: Boolean(actionBusy) }}
+            disabled={Boolean(actionBusy)}
+            onPress={toggleAvailability}
+            style={[styles.ownStatus, { backgroundColor: theme.surfaceStrong, borderColor: ownAvailability === "available" ? AVAILABLE : BUSY }]}
+          >
+            {actionBusy === "presence" ? <ActivityIndicator size="small" color={theme.pageText} /> : <View style={[styles.ownStatusDot, { backgroundColor: ownAvailability === "available" ? AVAILABLE : BUSY }]} />}
+            <Text numberOfLines={1} style={[styles.ownStatusText, { color: theme.pageText }]}>{ownAvailability === "available" ? "Dispo" : "Occupé"}</Text>
+            {mapCameraActive && !compactHeader ? <Ionicons name="videocam" size={12} color={theme.success} /> : null}
+          </Pressable>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="Actualiser la Map" onPress={() => void refreshAll()} style={[styles.circleButton, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
           {refreshing ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="refresh" size={19} color={theme.pageText} />}
@@ -397,13 +487,13 @@ export default function UnifiedMapScreenV24() {
 
           {selection.member.id !== currentUser.id ? (
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Dire bonjour" disabled={Boolean(actionBusy)} onPress={() => void sayHello()} style={[styles.action, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={selection.space ? "Dire bonjour au groupe" : "Dire bonjour"} disabled={Boolean(actionBusy)} onPress={() => void sayHello()} style={[styles.action, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
                 <Ionicons name="hand-left-outline" size={19} color={theme.violet} />
-                <Text style={[styles.actionText, { color: theme.pageText }]}>Bonjour</Text>
+                <Text style={[styles.actionText, { color: theme.pageText }]}>{selection.space ? "Bonjour au groupe" : "Bonjour"}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={selection.space ? "Toquer et demander l’autorisation d’entrer" : "Toquer et entrer"} disabled={Boolean(actionBusy)} onPress={() => void knock()} style={[styles.action, styles.primaryAction, { backgroundColor: selection.space ? BUSY : AVAILABLE }]}>
+              <Pressable accessibilityRole="button" accessibilityLabel={selection.space ? "Toquer à l’espace et demander l’autorisation d’entrer" : "Toquer et entrer"} disabled={Boolean(actionBusy)} onPress={() => void knock()} style={[styles.action, styles.primaryAction, { backgroundColor: selection.space ? BUSY : AVAILABLE }]}>
                 {actionBusy === "knock" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name={selection.space ? "notifications-outline" : "enter-outline"} size={19} color="#FFFFFF" />}
-                <Text style={styles.primaryActionText}>{selection.space ? "Toquer" : "Toquer & entrer"}</Text>
+                <Text style={styles.primaryActionText}>{selection.space ? "Toquer à l’espace" : "Toquer & entrer"}</Text>
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel="Proposer un rendez-vous" onPress={() => router.push({ pathname: "/schedule-call", params: { memberId: selection.member.id, mode: "video" } })} style={[styles.iconAction, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
                 <Ionicons name="calendar-outline" size={20} color={theme.pageText} />
@@ -420,7 +510,13 @@ export default function UnifiedMapScreenV24() {
             <View style={styles.identityCopy}>
               <Text numberOfLines={2} style={[styles.eventTitle, { color: theme.pageText }]}>{selectedEvent.title}</Text>
               <Text numberOfLines={1} style={[styles.memberMeta, { color: theme.pageTextMuted }]}>
-                {getDiscoveryEventState(selectedEvent) === "live" ? "En cours" : new Date(selectedEvent.startsAt).toLocaleString(localeTag, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{selectedEvent.city ? ` · ${selectedEvent.city}` : ""}
+                {getDiscoveryEventState(selectedEvent, eventClock) === "live"
+                  ? "En cours"
+                  : getDiscoveryEventState(selectedEvent, eventClock) === "recent"
+                    ? "Terminé récemment"
+                    : getDiscoveryEventState(selectedEvent, eventClock) === "voting"
+                      ? "Vote en cours"
+                      : new Date(selectedEvent.startsAt).toLocaleString(localeTag, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}{selectedEvent.city ? ` · ${selectedEvent.city}` : ""}
               </Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Fermer la fiche" onPress={closeSelection} style={styles.closeSheet}><Ionicons name="close" size={20} color={theme.pageTextMuted} /></Pressable>
@@ -447,10 +543,13 @@ const styles = StyleSheet.create({
   screen: { flex: 1, position: "relative", overflow: "hidden" },
   topBar: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
   circleButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  titlePill: { flex: 1, minHeight: 48, maxWidth: 244, paddingHorizontal: 12, borderRadius: 19, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 9 },
+  titlePill: { flex: 1, minHeight: 52, maxWidth: 252, paddingLeft: 12, paddingRight: 4, borderRadius: 20, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 4 },
   titleCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 15, lineHeight: 18, fontWeight: "900" },
   subtitle: { marginTop: 1, fontSize: 10, lineHeight: 13, fontWeight: "700" },
+  ownStatus: { minWidth: 68, minHeight: 48, borderRadius: 18, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  ownStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  ownStatusText: { maxWidth: 44, fontSize: 9, lineHeight: 12, fontWeight: "900" },
   legend: { position: "absolute", left: 12, minHeight: 34, paddingHorizontal: 9, borderRadius: 15, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 10 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },

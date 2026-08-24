@@ -1,4 +1,4 @@
-# Connexio Coworking — contrat backend V24
+# Connexio Coworking — contrat backend V26
 
 ## Objectif
 
@@ -8,9 +8,9 @@ Le Coworking est une **carte géographique réelle**, distincte du moteur d'appe
 
 1. `GET /v1/coworking` ne déclenche jamais de média et renvoie les présences, villes/zones approximatives et espaces actifs.
 2. L'ouverture de la Map appelle `POST /v1/coworking/map/enter` avec `camera_on: true` et `microphone_on: false`, sauf si le membre est déjà dans une room active.
-3. La Map n'affiche que deux états : `Disponible` (vert) et `Occupé` (rouge). Un groupe vidéo partagé produit un seul marqueur mosaïque.
+3. La Map n'affiche que deux états : `Disponible` (vert) et `Occupé` (rouge). Le membre peut modifier son propre état en un toucher depuis l'en-tête de la Map. Toute présence dans une room est toujours `Occupé`, quel que soit le dernier mode déclaré.
 4. Le microphone démarre **coupé** dans la Map comme dans chaque room. La Salle générale applique un audio spatial selon la distance entre membres.
-5. `Toquer` est réservé aux marqueurs occupés et ne permet de rejoindre la room qu'après acceptation du destinataire. L'acceptation ajoute les deux membres au même flux SFU.
+5. Un marqueur vidéo représente un **espace**, pas une collection d'interactions individuelles. `Bonjour` est diffusé à tous les autres membres de cet espace. `Toquer` vise l'espace et seul son hôte canonique peut accepter ou refuser.
 6. Revenir à la Map depuis une room ne doit pas créer une seconde publication caméra. Seule l'action `leave` retire la présence de la room.
 7. Les règles d'accès privées sont contrôlées côté serveur. Les cadenas et invitations côté application ne constituent jamais une ACL de sécurité.
 
@@ -83,6 +83,43 @@ Ferme la publication média de la Map sans quitter une room éventuellement acti
 
 Retour : snapshot Coworking à jour.
 
+Règles de projection sur la Map :
+
+- `available` hors de tout espace → `Disponible` ;
+- `focus`, `talk` ou `break` → `Occupé` ;
+- membre présent dans `hub` ou dans un espace → `Occupé`, même si son mode mémorisé vaut encore `available` ;
+- passer à `Disponible` pendant une visio exige d'abord de quitter explicitement cette visio.
+
+### `POST /v1/coworking/hello`
+
+La requête contient **exactement une** cible :
+
+```json
+{ "user_id": "user-2" }
+```
+
+pour un bonjour individuel, ou :
+
+```json
+{ "space_id": "visio-business" }
+```
+
+pour un bonjour collectif. Dans ce second cas, le serveur émet `coworking.hello` à tous les `participant_ids` de l'espace sauf l'émetteur, avec `from_user_id` et `space_id`. Il ne doit ni choisir le membre actuellement sélectionné dans l'interface, ni envoyer le signal à des personnes extérieures à l'espace.
+
+### `POST /v1/coworking/knock`
+
+Pour rejoindre une visio existante, la requête contient uniquement :
+
+```json
+{ "space_id": "visio-business" }
+```
+
+Le serveur résout l'hôte depuis `owner_id`. Si ce champ est momentanément absent, le premier `participant_id` constitue le repli déterministe et doit être persisté comme nouvel hôte. Seul cet hôte reçoit `coworking.knock` et peut appeler :
+
+`POST /v1/coworking/knock/:requestId/respond`
+
+Une acceptation ajoute le demandeur au même espace/SFU et émet `coworking.knock.resolved` **uniquement au demandeur**. Un refus ne modifie pas les participants. Le départ de l'hôte transfère atomiquement `owner_id` au participant restant le plus ancien ; si l'espace devient vide, il est fermé.
+
 ### `POST /v1/coworking/spaces`
 
 ```json
@@ -131,7 +168,19 @@ Exemple de bloc `media` :
 
 ### `POST /v1/coworking/spaces/:spaceId/leave`
 
-Retire la présence du membre de l'espace et ferme/révoque son jeton média. Retour : snapshot à jour.
+Retire la présence du membre de l'espace et ferme/révoque son jeton média. Si ce membre est `owner_id`, le serveur applique le transfert d'hôte décrit ci-dessus. Retour : snapshot à jour.
+
+## Évènements affichés sur la Map
+
+`GET /v1/events` doit renvoyer des coordonnées géographiques stables ainsi qu'un état de publication canonique : `voting`, `published` ou `cancelled`.
+
+- `voting` : visible sans être assimilé à un évènement daté ;
+- `published` à venir : visible ;
+- `published` entre `starts_at` et `ends_at` : en cours ;
+- `published` après `ends_at` : visible pendant exactement une heure, puis retiré ;
+- `cancelled` : jamais visible.
+
+Si `ends_at` manque, Connexio applique provisoirement une durée de deux heures. Le backend doit donc fournir une fin explicite dès que possible. Les drapeaux sont ancrés strictement à `latitude`/`longitude` ; tout décalage destiné à éviter une collision doit utiliser le clustering géographique et ne jamais réécrire leurs coordonnées lors d'un panoramique.
 
 ## Contrat du client média SFU
 
@@ -183,6 +232,9 @@ Le frontend possède un polling de secours toutes les 15 secondes. En production
 - `coworking:space-updated`
 - `coworking:space-closed`
 - `coworking:join-requested`
+- `coworking.hello`
+- `coworking.knock`
+- `coworking.knock.resolved`
 
 Le snapshot serveur reste la source de vérité après reconnexion.
 

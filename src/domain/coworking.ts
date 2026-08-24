@@ -24,6 +24,31 @@ export function participantPresence(
   return snapshot.participants.find((participant) => participant.userId === userId);
 }
 
+export function coworkingAvailability(
+  presence: CoworkingParticipantPresence | undefined,
+  activeSpace: CoworkingSpace | undefined
+): "available" | "busy" {
+  if (activeSpace) return "busy";
+  return presence && presence.mode !== "available" ? "busy" : "available";
+}
+
+export function coworkingSpaceHostId(space: CoworkingSpace): string | undefined {
+  return space.ownerId && space.participantIds.includes(space.ownerId)
+    ? space.ownerId
+    : space.participantIds[0];
+}
+
+export function removeCoworkingParticipant(
+  space: CoworkingSpace,
+  userId: string
+): CoworkingSpace {
+  const participantIds = space.participantIds.filter((id) => id !== userId);
+  const ownerId = space.ownerId === userId || !space.ownerId || !participantIds.includes(space.ownerId)
+    ? participantIds[0]
+    : space.ownerId;
+  return { ...space, participantIds, ownerId };
+}
+
 export function spaceForUser(
   snapshot: CoworkingSnapshot,
   userId: string
