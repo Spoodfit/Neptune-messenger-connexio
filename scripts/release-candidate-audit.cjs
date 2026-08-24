@@ -12,7 +12,12 @@ const requiredFiles = [
   "assets/audio/connexio_notification.mp3",
   "app.config.ts",
   "eas.json",
+  "scripts/connexio-readiness.cjs",
+  "scripts/production-config-audit.cjs",
+  "scripts/neptune-backend-smoke.cjs",
   "docs/INTEGRATION_MATRIX.md",
+  "docs/DEPENDENCY_RISK_ACCEPTANCE.md",
+  "docs/PRODUCTION_BACKEND_READINESS.md",
   "src/config/backendCapabilities.ts",
   "src/config/integrationRegistry.ts",
   "src/domain/accessPolicy.ts",
@@ -74,10 +79,12 @@ for (const marker of [
   "EXPO_PUBLIC_PRIVACY_POLICY_URL",
   "EXPO_PUBLIC_TERMS_URL",
   "EXPO_PUBLIC_BACKEND_CONTRACT",
-  "Build Store bloquée",
+  "Build candidate/Store bloquée",
   "PUBLIC_POLICY_BASE_URL",
   "blockedPermissions",
-  "android.permission.ACCESS_FINE_LOCATION"
+  "android.permission.ACCESS_FINE_LOCATION",
+  "coworkingEnabled",
+  "releaseStage"
 ]) {
   if (!appConfig.includes(marker)) {
     throw new Error(`Configuration store incomplète : ${marker}`);
@@ -85,6 +92,39 @@ for (const marker of [
 }
 if (appConfig.includes('"ACCESS_FINE_LOCATION"')) {
   throw new Error("Permission Android ACCESS_FINE_LOCATION interdite sans besoin produit prouvé.");
+}
+
+const canonicalProjectId = "1e85dc3a-4114-4387-8e15-2463a82e68fd";
+if (!appConfig.includes(canonicalProjectId)) {
+  throw new Error("Projet EAS Connexio canonique absent de app.config.ts.");
+}
+const staleProjectId = "d2288b09-8249-4879-810f-7cb0072baeeb";
+const staleProjectReferences = repositoryFiles.filter((file) => {
+  if (file === "scripts/release-candidate-audit.cjs") return false;
+  if (file.startsWith("builds/")) return false;
+  const extension = path.extname(file);
+  if (![".ts", ".tsx", ".js", ".cjs", ".mjs", ".json", ".md", ".yml", ".yaml"].includes(extension)) {
+    return false;
+  }
+  return fs.readFileSync(path.join(root, file), "utf8").includes(staleProjectId);
+});
+if (staleProjectReferences.length) {
+  throw new Error(`Ancien projet EAS encore référencé : ${staleProjectReferences.join(", ")}`);
+}
+
+const eas = JSON.parse(fs.readFileSync(path.join(root, "eas.json"), "utf8"));
+for (const profileName of ["release-candidate", "production"]) {
+  const profile = eas.build?.[profileName];
+  if (!profile) throw new Error(`Profil EAS ${profileName} manquant.`);
+  if (profile.env?.EXPO_PUBLIC_MOCK_MODE !== "false") {
+    throw new Error(`Le profil ${profileName} ne doit jamais utiliser le mock.`);
+  }
+  if (profile.env?.EXPO_PUBLIC_BACKEND_CONTRACT !== "connexio-v1") {
+    throw new Error(`Le profil ${profileName} doit utiliser connexio-v1.`);
+  }
+  if (!profile.env?.EXPO_PUBLIC_REALTIME_URL) {
+    throw new Error(`Le profil ${profileName} doit définir le temps réel.`);
+  }
 }
 
 const accessPolicy = fs.readFileSync(path.join(root, "src/domain/accessPolicy.ts"), "utf8");

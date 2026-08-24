@@ -79,7 +79,7 @@ Aucune publication publique tant que chaque gate n'est pas prouvée sur préprod
 ### Sécurité et confidentialité
 
 - TLS obligatoire ;
-- ticket WebSocket court plutôt que JWT long dans l'URL ;
+- ticket temps réel court et à usage unique, transmis dans l'auth Socket.IO et jamais dans l'URL ;
 - base locale SQLCipher, clé dans SecureStore ;
 - aucune donnée de message dans les logs ;
 - blocage, signalement, limitation de débit et modération opérationnels ;

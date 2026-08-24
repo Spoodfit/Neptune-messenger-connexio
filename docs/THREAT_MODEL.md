@@ -18,7 +18,9 @@
 | Rejeu d'un message | `client_message_id` unique et contrainte serveur |
 | Double envoi après reconnexion | outbox persistante, idempotence et réconciliation REST/temps réel |
 | Accès à un groupe après exclusion | autorisation serveur à chaque lecture/écriture et événement de révocation |
-| JWT exposé dans URL WebSocket | ticket à durée courte, usage unique |
+| Secret temps réel exposé dans une URL ou des journaux proxy | ticket à durée courte et usage unique, transmis uniquement dans la trame d'authentification Socket.IO, jamais dans la query string |
+| Redirection API vers une origine inattendue | redirections HTTP refusées par le client authentifié ; URL HTTPS imposée en RC/production |
+| Requête web inter-origine non autorisée | origines CORS explicitement autorisées, cookies éventuels `Secure`, `HttpOnly`, `SameSite` et protection CSRF côté backend |
 | Fuite dans les logs | redaction récursive des tokens, corps, codes et secrets |
 | Push visible sur écran verrouillé | contenu minimal, préférence utilisateur et catégorie privée |
 | Spam ou harcèlement | rate limiting, blocage, signalement, suspension et audit administrateur |

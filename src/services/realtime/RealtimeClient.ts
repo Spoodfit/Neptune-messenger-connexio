@@ -2,6 +2,7 @@ import {
   normalizeRealtimeEvent,
   type RealtimeEvent
 } from "./realtimeEvents";
+import { buildSocketIoWebSocketUrl } from "../../domain/realtimeTransport";
 import { emitCoworkingInteraction } from "../coworking/coworkingInteractionBus";
 
 export type { RealtimeEvent } from "./realtimeEvents";
@@ -13,18 +14,6 @@ interface RealtimeClientOptions {
   onConnectionChange?: (connected: boolean) => void;
   random?: () => number;
   connectionTimeoutMs?: number;
-}
-
-function buildSocketIoWebSocketUrl(baseUrl: string, ticket: string): string {
-  const url = new URL(baseUrl);
-  url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
-  if (!url.pathname.includes("socket.io")) {
-    url.pathname = `${url.pathname.replace(/\/$/, "")}/socket.io/`;
-  }
-  url.searchParams.set("EIO", "4");
-  url.searchParams.set("transport", "websocket");
-  url.searchParams.set("ticket", ticket);
-  return url.toString();
 }
 
 function asSocketEventPayload(eventName: string, payload: unknown): unknown {
@@ -187,7 +176,10 @@ export class RealtimeClient {
       const ticket = await this.options.ticketProvider();
       if (this.closedByClient || generation !== this.generation) return;
       this.activeTicket = ticket;
-      const socket = new WebSocket(buildSocketIoWebSocketUrl(this.options.url, ticket));
+      // Le ticket éphémère ne doit jamais apparaître dans l'URL : les reverse
+      // proxies, CDN et outils d'observabilité journalisent fréquemment les
+      // query strings. Il est transmis uniquement dans la trame d'auth Socket.IO.
+      const socket = new WebSocket(buildSocketIoWebSocketUrl(this.options.url));
       this.socket = socket;
       this.connectionTimer = setTimeout(() => {
         if (socket !== this.socket) return;

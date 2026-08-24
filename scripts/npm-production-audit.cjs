@@ -1,3 +1,5 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const ALLOWED_UNPATCHED_ADVISORIES = new Set([
@@ -5,6 +7,36 @@ const ALLOWED_UNPATCHED_ADVISORIES = new Set([
   "GHSA-5p2g-fcmc-qvqq"
 ]);
 const BLOCKING_SEVERITIES = new Set(["high", "critical"]);
+const root = path.resolve(__dirname, "..");
+const riskAcceptancePath = path.join(
+  root,
+  "docs",
+  "DEPENDENCY_RISK_ACCEPTANCE.md"
+);
+
+if (!fs.existsSync(riskAcceptancePath)) {
+  throw new Error("Acceptation de risque dépendances manquante.");
+}
+const riskAcceptance = fs.readFileSync(riskAcceptancePath, "utf8");
+for (const advisory of ALLOWED_UNPATCHED_ADVISORIES) {
+  if (!riskAcceptance.includes(advisory)) {
+    throw new Error(`L’exception ${advisory} n’est pas documentée.`);
+  }
+}
+
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(root, "package.json"), "utf8")
+);
+if (packageJson.dependencies?.["image-size"]) {
+  throw new Error("image-size ne doit pas devenir une dépendance directe de l’application.");
+}
+const lock = JSON.parse(fs.readFileSync(path.join(root, "package-lock.json"), "utf8"));
+const auditedImageSizeVersion = lock.packages?.["node_modules/image-size"]?.version;
+if (auditedImageSizeVersion !== "1.2.1") {
+  throw new Error(
+    `Version image-size modifiée (${auditedImageSizeVersion ?? "absente"}) : réévaluer explicitement les exceptions de sécurité.`
+  );
+}
 
 const audit = spawnSync(
   process.platform === "win32" ? "npm.cmd" : "npm",

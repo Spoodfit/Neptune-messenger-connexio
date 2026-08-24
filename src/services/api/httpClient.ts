@@ -124,7 +124,11 @@ export async function apiRequest<T>(
     const response = await fetch(joinUrl(env.apiBaseUrl, path), {
       ...options,
       headers,
-      signal: controller.signal
+      signal: controller.signal,
+      // Une API authentifiée ne doit jamais suivre silencieusement une
+      // redirection vers une autre origine : cela masque les erreurs de
+      // routage et peut exposer des métadonnées de requête.
+      redirect: "error"
     });
     const payload = await parsePayload(response);
     const requestId = response.headers.get("x-request-id") ?? undefined;

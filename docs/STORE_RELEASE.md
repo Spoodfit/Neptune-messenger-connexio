@@ -2,7 +2,7 @@
 
 ## Avant toute soumission
 
-- utiliser le projet EAS Connexio déjà lié (`d2288b09-8249-4879-810f-7cb0072baeeb`) ;
+- utiliser exclusivement le projet EAS Connexio `1e85dc3a-4114-4387-8e15-2463a82e68fd` ;
 - ajouter les identifiants Apple Developer et Google Play Console ;
 - configurer APNs et FCM v1 ;
 - ajouter l’icône 1024 × 1024, le splash screen et les captures ;
@@ -19,14 +19,15 @@
 ## Builds
 
 ```bash
-npx eas-cli project:info
-npx eas-cli credentials --platform android
-npx eas build --profile development --platform all
-npx eas build --profile preview --platform all
+npx eas-cli@21.7.1 project:info
+npx eas-cli@21.7.1 credentials --platform android
+npm run verify:rc
+npm run smoke:production
 npx eas build --profile production --platform all
 ```
 
 Ne pas relancer `eas init` : le dépôt est déjà relié au projet EAS Connexio.
+Le workflow manuel `Build native production binaries` exécute ces contrôles dans cet ordre et construit toujours depuis `release/connexio-rc1`. Il ne soumet jamais automatiquement le binaire aux Stores.
 
 ## Publication
 

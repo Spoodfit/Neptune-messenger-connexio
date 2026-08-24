@@ -3,18 +3,6 @@
   "version": "1.0.0-rc.1",
   "private": true,
   "main": "expo-router/entry",
-  "expo": {
-    "install": {
-      "exclude": [
-        "expo",
-        "expo-image-picker",
-        "expo-location",
-        "expo-notifications",
-        "expo-router",
-        "expo-splash-screen"
-      ]
-    }
-  },
   "scripts": {
     "start": "expo start",
     "start:tunnel": "expo start --tunnel",
@@ -26,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test:clean": "node -e \"require('fs').rmSync('.test-dist',{recursive:true,force:true})\"",
     "test:compile": "npm run test:clean && tsc -p tsconfig.tests.json",
-    "test": "npm run test:compile && node --test .test-dist/tests/*.test.js",
+    "test": "npm run test:compile && node --test .test-dist/tests/*.test.js tests-node/*.test.cjs",
     "test:domain": "npm test",
     "audit:i18n": "node scripts/i18n-coverage-audit.cjs",
     "audit:i18n-locale": "node scripts/i18n-locale-audit.cjs",
@@ -35,11 +23,14 @@
     "prebuild": "expo prebuild",
     "audit:dependencies": "node scripts/npm-production-audit.cjs",
     "audit:rc": "node scripts/release-candidate-audit.cjs",
+    "audit:production": "node scripts/production-config-audit.cjs",
     "smoke:backend": "node scripts/neptune-backend-smoke.cjs",
-    "verify:rc": "npm run verify && npm run audit:dependencies && npm run audit:rc && npx expo install --check",
+    "smoke:production": "CONNEXIO_SMOKE_MODE=production node scripts/neptune-backend-smoke.cjs",
+    "verify:rc": "npm run verify && npm run audit:dependencies && npm run audit:rc && npm run audit:production && npx expo install --check",
     "build:preview": "eas build --profile preview --platform all",
-    "build:rc": "eas build --profile release-candidate --platform all",
-    "build:production": "eas build --profile production --platform all"
+    "build:backend-smoke": "eas build --profile backend-smoke --platform all",
+    "build:rc": "npm run smoke:production && eas build --profile release-candidate --platform all",
+    "build:production": "npm run smoke:production && eas build --profile production --platform all"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.0",

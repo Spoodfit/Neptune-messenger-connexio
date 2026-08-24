@@ -1,5 +1,6 @@
 import type { HighlightMedia } from "../../types/experience";
 import type { MessageAttachment } from "../../types/messaging";
+import { requireFutureIsoDate, requireHttpsUrl } from "../../domain/secureUrl";
 import { authenticatedRequest } from "./authenticatedRequest";
 import { ApiError } from "./httpClient";
 
@@ -13,6 +14,7 @@ interface PrepareUploadResponse {
 interface CompleteUploadResponse {
   id: string;
   download_url?: string;
+  download_expires_at?: string;
   mime_type?: string;
   size_bytes?: number;
   width?: number;
@@ -57,6 +59,19 @@ async function uploadAsset(
     },
     fallbackAccessToken
   );
+  if (typeof prepared.id !== "string" || !prepared.id.trim()) {
+    throw new ApiError("Le backend n’a pas identifié l’upload privé.", 502);
+  }
+  let uploadUrl: string;
+  try {
+    uploadUrl = requireHttpsUrl(prepared.upload_url, "URL d’upload privé");
+    requireFutureIsoDate(prepared.expires_at, "Expiration de l’upload privé");
+  } catch (error) {
+    throw new ApiError(
+      error instanceof Error ? error.message : "Préparation d’upload invalide.",
+      502
+    );
+  }
 
   onProgress?.(0.18);
   const localResponse = await fetch(asset.uri);
@@ -72,10 +87,11 @@ async function uploadAsset(
     );
   }
   onProgress?.(0.32);
-  const uploaded = await fetch(prepared.upload_url, {
+  const uploaded = await fetch(uploadUrl, {
     method: "PUT",
     headers,
-    body: blob
+    body: blob,
+    redirect: "error"
   });
   if (!uploaded.ok) {
     throw new ApiError(
@@ -89,6 +105,24 @@ async function uploadAsset(
     { method: "POST" },
     fallbackAccessToken
   );
+  if (typeof completed.id !== "string" || completed.id.trim() !== prepared.id.trim()) {
+    throw new ApiError("Le backend a finalisé un upload inattendu.", 502);
+  }
+  try {
+    completed.download_url = requireHttpsUrl(
+      completed.download_url,
+      "URL privée du fichier"
+    );
+    requireFutureIsoDate(
+      completed.download_expires_at,
+      "Expiration de l’URL privée"
+    );
+  } catch (error) {
+    throw new ApiError(
+      error instanceof Error ? error.message : "URL privée du fichier invalide.",
+      502
+    );
+  }
   onProgress?.(1);
   return completed;
 }
@@ -110,7 +144,8 @@ export async function uploadMessageAttachment(
   return {
     ...attachment,
     id: completed.id,
-    uri: completed.download_url ?? attachment.uri,
+    uri: completed.download_url,
+    downloadUrl: completed.download_url,
     mimeType: completed.mime_type ?? attachment.mimeType,
     sizeBytes: completed.size_bytes ?? attachment.sizeBytes,
     width: completed.width ?? attachment.width,
@@ -137,7 +172,7 @@ export async function uploadHighlightMedia(
   return {
     ...media,
     id: completed.id,
-    uri: completed.download_url ?? media.uri,
+    uri: completed.download_url,
     mimeType: completed.mime_type ?? media.mimeType,
     sizeBytes: completed.size_bytes ?? media.sizeBytes,
     width: completed.width ?? media.width,
@@ -162,11 +197,5 @@ export async function uploadGroupAvatar(
     "group-avatar",
     fallbackAccessToken
   );
-  if (!completed.download_url) {
-    throw new ApiError(
-      "Le backend n’a pas renvoyé l’URL de l’image du groupe.",
-      502
-    );
-  }
-  return completed.download_url;
+  return completed.download_url!;
 }
