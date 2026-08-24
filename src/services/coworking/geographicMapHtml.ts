@@ -125,6 +125,7 @@ ${clientScript}
     const height=group?108:72;
     const marker=L.marker([item.latitude,item.longitude],{
       icon:L.divIcon({className:'',html:markerHtml(item),iconSize:[width,height],iconAnchor:[width/2,height/2]}),
+      zIndexOffset:500,
       title:group?item.members.map(m=>m.name).join(', '):(item.members[0]?.name||'Membre Connexio'),
       keyboard:true
     });
@@ -155,7 +156,7 @@ ${clientScript}
   map.addLayer(eventLayer);
   eventData.forEach(event=>{
     const html='<div class="event-marker '+escapeText(event.proximity)+'" data-event-id="'+escapeText(event.id)+'"><div class="event-hit"></div><div class="event-pulse"></div><div class="event-pole"></div><div class="event-flag"></div></div>';
-    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:120,keyboard:true});
+    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:-250,keyboard:true});
     marker.on('add',()=>{const node=marker.getElement()?.querySelector('.event-marker');if(node)eventNodes.set(event.id,node)});
     marker.on('click',()=>post({type:'event-selected',id:event.id}));
     marker.bindTooltip(escapeText(event.title),{direction:'auto',offset:[0,10],opacity:.96});

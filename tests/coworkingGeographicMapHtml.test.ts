@@ -75,3 +75,9 @@ test("les drapeaux restent ancrés à leurs coordonnées après un déplacement 
   match(html, /L\.markerClusterGroup\(\{/);
   match(html, /event-cluster-core/);
 });
+
+test("les événements restent cliquables sans bloquer les membres superposés", () => {
+  match(html, /zIndexOffset:500/);
+  match(html, /title:event\.title,zIndexOffset:-250,keyboard:true/);
+  match(html, /\.event-hit\{[^}]+pointer-events:auto/);
+});
