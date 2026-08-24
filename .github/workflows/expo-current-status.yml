@@ -1,6 +1,7 @@
 name: Expo current status probe
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - release/connexio-rc1
