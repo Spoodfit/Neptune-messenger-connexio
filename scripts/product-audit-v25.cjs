@@ -66,6 +66,23 @@ async function open(page, route) {
   await page.waitForTimeout(850);
 }
 
+async function auditScheduleCallInitialPosition(page) {
+  await open(page, "/schedule-call?memberId=user-lea&mode=video");
+  const scrollState = await page.evaluate(() => {
+    const scrollers = [...document.querySelectorAll("*")].filter((node) => {
+      const style = getComputedStyle(node);
+      return /(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1;
+    });
+    return {
+      pageY: window.scrollY,
+      nestedMax: Math.max(0, ...scrollers.map((node) => node.scrollTop))
+    };
+  });
+  if (scrollState.pageY > 1 || scrollState.nestedMax > 1) failures.push(`Programmation: écran déplacé automatiquement vers l’objet (${scrollState.pageY}/${scrollState.nestedMax}px)`);
+  await expectVisible(page.getByText("Léa Despoulins", { exact: true }), "Programmation: membre visible à l’ouverture");
+  await expectVisible(page.getByText("Type d’appel", { exact: true }), "Programmation: type visible à l’ouverture");
+}
+
 async function auditCenterMapButton(page, label) {
   await open(page, "/messages");
   const button = page.getByLabel("Ouvrir la Map", { exact: true });
@@ -319,6 +336,7 @@ async function run() {
     }
     const page = await browser.newPage({ viewport: { width: 393, height: 852 }, locale: "fr-FR", colorScheme: "dark", reducedMotion: "reduce" });
     await auditFeedOnly(page);
+    await auditScheduleCallInitialPosition(page);
     await auditMap(page, "393x852 interactif", true);
     await auditPrivateRoom(page);
     await auditScheduleCall(page);

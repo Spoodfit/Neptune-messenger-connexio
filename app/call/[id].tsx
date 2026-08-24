@@ -254,7 +254,7 @@ function CallShell({ icon, title, description, eyebrow, children, member }: { ic
 
 function ReasonEditor({ reason, setReason, onSubmit }: { reason: string; setReason: (value: string) => void; onSubmit: () => void }) {
   const theme = useAppTheme();
-  return <View style={[styles.reasonEditor, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.label, { color: theme.orange }]}>Objet de l’appel</Text><VoicePromptInput value={reason} onChangeText={setReason} onSubmit={onSubmit} placeholder="Ex. Valider le lieu de l’afterwork de vendredi" maxLength={160} /><Text style={[styles.counter, { color: theme.pageTextMuted }]}>{reason.length}/160</Text></View>;
+  return <View style={[styles.reasonEditor, { borderColor: theme.border, backgroundColor: theme.surface }]}><Text style={[styles.label, { color: theme.orange }]}>Objet de l’appel</Text><VoicePromptInput autoFocus value={reason} onChangeText={setReason} onSubmit={onSubmit} placeholder="Ex. Valider le lieu de l’afterwork de vendredi" maxLength={160} /><Text style={[styles.counter, { color: theme.pageTextMuted }]}>{reason.length}/160</Text></View>;
 }
 
 function ReasonCard({ value }: { value: string }) {
