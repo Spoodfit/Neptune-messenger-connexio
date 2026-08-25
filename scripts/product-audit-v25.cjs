@@ -229,7 +229,10 @@ async function auditMap(page, label, interactive = false) {
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
-  const event = frame.locator(".event-marker").first();
+  // The marker keeps its exact geographic anchor while `.event-visual` is
+  // translated to avoid people. Click the translated hit surface, not the
+  // invisible anchor box that may legitimately remain behind a member.
+  const event = frame.locator(".event-marker .event-hit").first();
   if (await event.isVisible().catch(() => false)) {
     await event.click();
     await expectVisible(page.getByLabel("Voir l’évènement", { exact: true }), "Évènement: fiche et CTA");
