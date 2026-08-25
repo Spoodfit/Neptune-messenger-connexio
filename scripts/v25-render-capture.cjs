@@ -76,7 +76,9 @@ async function run() {
       await shot(page, "map-knock-motion-393x852");
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
     }
-    const event = mapFrame.locator(".event-marker").first();
+    // Capture the interaction from the displaced visual hit surface. The
+    // marker's geographic anchor intentionally stays fixed under the map.
+    const event = mapFrame.locator(".event-marker .event-hit").first();
     if (await event.isVisible().catch(() => false)) {
       await event.click();
       await page.mouse.move(20, 180);
