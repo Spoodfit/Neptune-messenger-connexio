@@ -66,6 +66,7 @@ async function run() {
       await page.getByTestId("coworking-action-motion").waitFor({ state:"visible", timeout:2000 }).catch(() => {});
       await shot(page, "map-bonjour-motion-393x852");
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
+      await page.getByTestId("coworking-action-motion").waitFor({ state:"detached", timeout:2600 }).catch(() => {});
     }
     const busy = mapFrame.locator(".cw-marker.busy").first();
     if (await busy.isVisible().catch(() => false)) {
@@ -75,6 +76,7 @@ async function run() {
       await page.getByTestId("coworking-action-motion").waitFor({ state:"visible", timeout:2000 }).catch(() => {});
       await shot(page, "map-knock-motion-393x852");
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
+      await page.getByTestId("coworking-action-motion").waitFor({ state:"detached", timeout:2600 }).catch(() => {});
     }
     // Capture the interaction from the displaced visual hit surface. The
     // marker's geographic anchor intentionally stays fixed under the map.
