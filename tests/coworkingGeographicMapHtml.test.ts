@@ -68,16 +68,20 @@ test("chaque script injecté dans l’iframe reste du JavaScript syntaxiquement 
   for (const script of scripts) doesNotThrow(() => new Function(script));
 });
 
-test("les drapeaux restent ancrés à leurs coordonnées après un déplacement de carte", () => {
-  ok(!html.includes("--event-offset-x"));
-  ok(!html.includes("applyEventOffsets"));
+test("les drapeaux restent géographiquement ancrés et leur séparation visuelle ne change pas pendant un déplacement de carte", () => {
   match(html, /L\.marker\(\[event\.latitude,event\.longitude\]/);
   match(html, /L\.markerClusterGroup\(\{/);
   match(html, /event-cluster-core/);
+  match(html, /function computeEventOffsets\(\)/);
+  match(html, /map\.on\('zoomend'/);
+  ok(!html.includes("map.on('moveend'"));
+  match(html, /event-connector/);
 });
 
-test("les événements et les membres superposés gardent chacun leur cible tactile", () => {
+test("les événements et les membres superposés sont visuellement séparés et gardent chacun leur cible tactile", () => {
   match(html, /zIndexOffset:500/);
   match(html, /title:event\.title,zIndexOffset:750,keyboard:true/);
   match(html, /\.event-hit\{[^}]+left:2px;top:-2px;width:44px;height:44px[^}]+pointer-events:auto/);
+  match(html, /memberClearance>=30&&eventClearance>=22/);
+  match(html, /--event-offset-x/);
 });
