@@ -21,6 +21,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Connexion à la salle": { en: "Connecting to room", es: "Conectando con la sala", de: "Verbindung zum Raum", it: "Connessione alla sala", pt: "A ligar à sala" },
   "Connexion à la salle…": { en: "Connecting to room…", es: "Conectando con la sala…", de: "Verbindung zum Raum…", it: "Connessione alla sala…", pt: "A ligar à sala…" },
   "Connexion média réduite. La présence reste disponible.": { en: "Reduced media connection. Presence remains available.", es: "Conexión multimedia reducida. La presencia sigue disponible.", de: "Eingeschränkte Medienverbindung. Die Präsenz bleibt verfügbar.", it: "Connessione multimediale ridotta. La presenza resta disponibile.", pt: "Ligação multimédia reduzida. A presença continua disponível." },
+  "Flux caméra en attente": { en: "Waiting for live camera", es: "Esperando la cámara en directo", de: "Warten auf Live-Kamera", it: "In attesa della videocamera live", pt: "À espera da câmara em direto" },
   "Dire bonjour": { en: "Say hello", es: "Saludar", de: "Hallo sagen", it: "Saluta", pt: "Dizer olá" },
   "En échange": { en: "Talking", es: "En conversación", de: "Im Gespräch", it: "In conversazione", pt: "Em conversa" },
   "En pause": { en: "On break", es: "En pausa", de: "In Pause", it: "In pausa", pt: "Em pausa" },
@@ -74,6 +75,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "UN SIGNE DU COWORKING": { en: "A COWORKING HELLO", es: "UN SALUDO DEL COWORKING", de: "EIN COWORKING-GRUSS", it: "UN SALUTO DAL COWORKING", pt: "UM OLÁ DO COWORKING" },
   "Voir tout": { en: "See all", es: "Ver todo", de: "Alles anzeigen", it: "Vedi tutto", pt: "Ver tudo" },
   "vous dit bonjour 👋": { en: "says hello 👋", es: "te saluda 👋", de: "sagt Hallo 👋", it: "ti saluta 👋", pt: "diz olá 👋" },
+  "vous dit bonjour": { en: "says hello", es: "te saluda", de: "sagt Hallo", it: "ti saluta", pt: "diz olá" },
   "Afficher la vue d’ensemble": { en: "Show overview", es: "Mostrar vista general", de: "Übersicht anzeigen", it: "Mostra panoramica", pt: "Mostrar vista geral" },
   "Afficher la vue principale": { en: "Show main view", es: "Mostrar vista principal", de: "Hauptansicht anzeigen", it: "Mostra vista principale", pt: "Mostrar vista principal" },
   "Bonjour à l’espace": { en: "Hello to the room", es: "Saludar a la sala", de: "Raum begrüßen", it: "Saluta la stanza", pt: "Cumprimentar a sala" },
@@ -99,7 +101,8 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Vote en cours": { en: "Voting in progress", es: "Votación en curso", de: "Abstimmung läuft", it: "Votazione in corso", pt: "Votação em curso" },
   "Vous êtes maintenant disponible": { en: "You are now available", es: "Ahora estás disponible", de: "Du bist jetzt verfügbar", it: "Ora sei disponibile", pt: "Agora está disponível" },
   "Vous êtes maintenant occupé": { en: "You are now busy", es: "Ahora estás ocupado", de: "Du bist jetzt beschäftigt", it: "Ora sei occupato", pt: "Agora está ocupado" },
-  "Vous ne pouvez pas apparaître disponible tout en restant dans une visio active.": { en: "You cannot appear available while staying in an active video call.", es: "No puedes aparecer disponible mientras sigues en una videollamada activa.", de: "Du kannst nicht als verfügbar erscheinen, während du in einem aktiven Videoanruf bist.", it: "Non puoi risultare disponibile mentre resti in una videochiamata attiva.", pt: "Não pode aparecer disponível enquanto permanece numa videochamada ativa." }
+  "Vous ne pouvez pas apparaître disponible tout en restant dans une visio active.": { en: "You cannot appear available while staying in an active video call.", es: "No puedes aparecer disponible mientras sigues en una videollamada activa.", de: "Du kannst nicht als verfügbar erscheinen, während du in einem aktiven Videoanruf bist.", it: "Non puoi risultare disponibile mentre resti in una videochiamata attiva.", pt: "Não pode aparecer disponível enquanto permanece numa videochamada ativa." },
+  "Vous avez toqué à l’espace": { en: "You knocked on the room", es: "Has llamado a la sala", de: "Du hast am Raum angeklopft", it: "Hai bussato allo spazio", pt: "Bateu à porta do espaço" }
 };
 
 export function translateUiTextV24(value: string, language: SupportedLanguage | string): string {

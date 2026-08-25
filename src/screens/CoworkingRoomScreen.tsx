@@ -7,7 +7,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +23,12 @@ import { useExperience } from "@/providers/ExperienceProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { CoworkingMapApi } from "@/services/api/coworkingMapApi";
+import { ApiError } from "@/services/api/httpClient";
+import { emitCoworkingActionFeedback } from "@/services/coworking/coworkingActionFeedback";
+import {
+  releaseCoworkingInteraction,
+  reserveCoworkingInteraction
+} from "@/services/coworking/coworkingInteractionGuard";
 import { AppAlert } from "@/services/ui/AppAlert";
 import { colors } from "@/theme";
 import type { AppUser } from "@/types/messaging";
@@ -147,6 +152,12 @@ export default function CoworkingRoomScreen() {
 
   const sayHello = async () => {
     if (!selectedMember || !space || busyAction) return;
+    const targetKey = isGeneralRoom ? `user:${selectedMember.id}` : `space:${space.id}`;
+    const reservation = reserveCoworkingInteraction("hello", targetKey);
+    if (!reservation.allowed) {
+      setNotice(`Bonjour déjà envoyé · réessayez dans ${Math.ceil(reservation.remainingMs / 1_000)} s`);
+      return;
+    }
     setBusyAction("hello");
     try {
       if (mapApi) {
@@ -154,11 +165,16 @@ export default function CoworkingRoomScreen() {
           ? { userId: selectedMember.id }
           : { spaceId: space.id });
       }
-      setNotice(isGeneralRoom
-        ? `Bonjour envoyé à ${firstName(selectedMember.name)} 👋`
-        : "Bonjour envoyé à tout l’espace 👋");
+      const message = isGeneralRoom
+        ? `Bonjour envoyé à ${firstName(selectedMember.name)}`
+        : "Bonjour envoyé à tout l’espace";
+      setNotice(message);
+      emitCoworkingActionFeedback({ type: "hello", message });
       setSelectedUserId(null);
     } catch (error) {
+      if (!(error instanceof ApiError && error.status === 429)) {
+        releaseCoworkingInteraction("hello", targetKey);
+      }
       AppAlert.alert("Bonjour non envoyé", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     } finally {
       setBusyAction(null);
@@ -343,13 +359,11 @@ export default function CoworkingRoomScreen() {
                       </View>
                       {!focusedPresence?.cameraOn ? <Ionicons name="videocam-off-outline" size={24} color={theme.pageTextMuted} /> : null}
                     </View>
-                    {focusedPresence?.cameraOn && focusedMember.avatarUrl ? (
-                      <Image
-                        source={{ uri: focusedMember.avatarUrl }}
-                        resizeMode="cover"
-                        accessibilityIgnoresInvertColors
-                        style={styles.focusVideoImage}
-                      />
+                    {focusedPresence?.cameraOn && (!media || media.mock) ? (
+                      <View style={[styles.cameraWaiting, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
+                        <Ionicons name="videocam-outline" size={15} color={theme.violet} />
+                        <Text style={[styles.cameraWaitingText, { color: theme.pageText }]}>Flux caméra en attente</Text>
+                      </View>
                     ) : null}
                     <LinearGradient
                       pointerEvents="none"
@@ -579,7 +593,8 @@ const styles = StyleSheet.create({
   privateBackdrop: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   focusFallback: { ...StyleSheet.absoluteFillObject },
   focusVideoSurface: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
-  focusVideoImage: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, width: "100%", height: "100%" },
+  cameraWaiting: { position: "absolute", left: 14, top: 14, minHeight: 34, borderRadius: 17, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 6 },
+  cameraWaitingText: { fontSize: 10, lineHeight: 13, fontWeight: "900" },
   focusVideoShade: { position: "absolute", left: 0, right: 0, top: "38%", bottom: 0 },
   focusCameraFallback: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 12, paddingBottom: 76 },
   focusAvatarShell: { width: 148, height: 148, borderRadius: 74, borderWidth: 3, alignItems: "center", justifyContent: "center", overflow: "hidden" },

@@ -30,7 +30,10 @@ export function useActionSounds() {
     require("../../../assets/audio/connexio_mention.mp3")
   );
   const knockPlayer = useAudioPlayer(
-    require("../../../assets/audio/connexio_knock.wav")
+    require("../../../assets/audio/connexio_knock.mp3")
+  );
+  const helloPlayer = useAudioPlayer(
+    require("../../../assets/audio/connexio_hello.mp3")
   );
 
   const playCallEnd = useCallback(
@@ -49,6 +52,10 @@ export function useActionSounds() {
     () => replay(knockPlayer, 0.7),
     [knockPlayer]
   );
+  const playHello = useCallback(
+    () => replay(helloPlayer, 0.62),
+    [helloPlayer]
+  );
 
-  return { playCallEnd, playMessageSent, playMention, playKnock };
+  return { playCallEnd, playMessageSent, playMention, playKnock, playHello };
 }

@@ -43,6 +43,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="highlights" options={{ title: "Temps forts" }} />
         <Tabs.Screen name="calls" options={{ title: "Appels" }} />
         <Tabs.Screen name="settings" options={{ title: "Profil" }} />
+        <Tabs.Screen name="coworking" options={{ href: null, title: "Map" }} />
         <Tabs.Screen name="communities" options={{ href: null, title: "Espaces" }} />
         <Tabs.Screen name="contacts" options={{ href: null, title: "Membres" }} />
       </Tabs>
