@@ -216,7 +216,10 @@ async function auditMap(page, label, interactive = false) {
     if (await page.getByLabel(/Toquer/, { exact: false }).count()) failures.push("Disponible: Toquer proposé hors espace actif");
     await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "Disponible: Bonjour");
     await page.getByLabel("Dire bonjour", { exact: true }).click();
-    await expectVisible(page.getByTestId("coworking-action-motion"), "Bonjour: animation de main visible");
+    const helloMotion = page.getByTestId("coworking-action-motion");
+    await expectVisible(helloMotion, "Bonjour: animation de main visible");
+    const helloMotionOpacity = Number(await helloMotion.evaluate((node) => getComputedStyle(node).opacity).catch(() => 0));
+    if (helloMotionOpacity < 0.5) failures.push(`Bonjour: animation montée mais transparente (${helloMotionOpacity})`);
     await expectVisible(page.getByText(/Bonjour · \d+s/), "Bonjour: délai anti-spam visible");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
