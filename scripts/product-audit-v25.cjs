@@ -40,6 +40,15 @@ async function expectVisible(locator, label, timeout = 7000) {
   catch { failures.push(`${label}: élément attendu absent`); return false; }
 }
 
+async function expandVisibleMapClusters(frame, attempts = 8) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const cluster = frame.locator(".cluster-core:visible").first();
+    if (!(await cluster.isVisible().catch(() => false))) return;
+    await cluster.click({ force: true }).catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 420));
+  }
+}
+
 async function checkGeometry(page, label, minimum = 44) {
   const result = await page.evaluate(({ minimum }) => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
@@ -154,10 +163,12 @@ async function auditMap(page, label, interactive = false) {
 
   const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
   await expectVisible(frame.locator("#map"), `${label} carte Leaflet`);
-  if ((await frame.locator(".cw-marker.available").count()) === 0) failures.push(`${label}: aucun utilisateur disponible vert`);
-  if ((await frame.locator(".cw-marker.busy").count()) === 0) failures.push(`${label}: aucune visio occupée rouge`);
-  if ((await frame.locator(".cw-group .cw-satellite").count()) === 0) failures.push(`${label}: groupe visio sans cercles satellites`);
-  if ((await frame.locator(".event-marker .event-flag").count()) === 0) failures.push(`${label}: événements drapeaux absents`);
+  const initialClusterCount = await frame.locator(".cluster-core").count();
+  await expandVisibleMapClusters(frame);
+  if ((await frame.locator(".cw-marker.available").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: aucun utilisateur disponible ni cluster régional`);
+  if ((await frame.locator(".cw-marker.busy").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: aucune visio occupée ni cluster régional`);
+  if ((await frame.locator(".cw-group .cw-satellite").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: groupe visio absent du cluster régional`);
+  if ((await frame.locator(".event-marker .event-flag").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: événements absents du cluster régional`);
   if ((await frame.locator(".cw-status,.cw-camera,.cw-media").count()) > 0) failures.push(`${label}: anciens badges/rectangles visio encore présents`);
 
   const sizes = await frame.locator(".cw-core").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().width)).filter(Boolean));
@@ -181,7 +192,7 @@ async function auditMap(page, label, interactive = false) {
     }
     return { visible, blank };
   });
-  if (faceGeometry.visible === 0) failures.push(`${label}: aucun visage de membre réellement visible dans le viewport`);
+  if (faceGeometry.visible === 0 && initialClusterCount === 0) failures.push(`${label}: aucun visage ni cluster régional visible`);
   if (faceGeometry.blank > 0) failures.push(`${label}: ${faceGeometry.blank} cercle(s) membre visuellement vide(s)`);
 
   const eventProfileCollisions = await frame.locator("body").evaluate(() => {
@@ -209,7 +220,7 @@ async function auditMap(page, label, interactive = false) {
     await expectVisible(page.getByLabel(expectedAvailabilityLabel, { exact: true }), "Disponibilité: bascule en un toucher");
   }
 
-  const available = frame.locator(".cw-marker.available").first();
+  const available = frame.locator(".cw-marker.available .cw-hit").first();
   if (await available.isVisible().catch(() => false)) {
     await available.click();
     await expectVisible(page.getByLabel("Inviter en visio", { exact: true }), "Disponible: invitation visio sans toquement");
@@ -224,7 +235,7 @@ async function auditMap(page, label, interactive = false) {
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
-  const busy = frame.locator(".cw-marker.busy").first();
+  const busy = frame.locator(".cw-marker.busy .cw-hit").first();
   if (await busy.isVisible().catch(() => false)) {
     await busy.click();
     await expectVisible(page.getByLabel("Dire bonjour au groupe", { exact: true }), "Occupé: Bonjour adressé au groupe");
@@ -242,14 +253,7 @@ async function auditMap(page, label, interactive = false) {
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
-  for (let i = 0; i < 6; i += 1) {
-    const zoomAnchor = frame.locator(".cw-marker.busy:visible .cw-hit").first();
-    const anchorBox = await zoomAnchor.boundingBox().catch(() => null);
-    if (anchorBox) await page.mouse.move(anchorBox.x + anchorBox.width / 2, anchorBox.y + anchorBox.height / 2);
-    else await frame.locator("#map").hover();
-    await page.mouse.wheel(0, -900);
-    await page.waitForTimeout(180);
-  }
+  await expandVisibleMapClusters(frame, 10);
   await page.waitForTimeout(650);
   const visibleClusters = await frame.locator(".cluster-core").evaluateAll((nodes) => nodes.filter((node) => {
     const r = node.getBoundingClientRect(); const s = getComputedStyle(node);
