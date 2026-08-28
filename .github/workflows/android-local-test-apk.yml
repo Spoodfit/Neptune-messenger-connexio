@@ -20,6 +20,7 @@ permissions:
   contents: read
 
 env:
+  EXPO_OFFLINE: "1"
   EXPO_PUBLIC_MOCK_MODE: "true"
   EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
   EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
@@ -65,7 +66,7 @@ jobs:
           echo "Building Connexio source: $SOURCE_SHA"
           test "$(git branch --show-current)" = "release/connexio-rc1"
           grep -Fq 'MessagesScreenV22' 'app/(tabs)/messages.tsx'
-          grep -Fq 'HighlightsScreenV22' 'app/(tabs)/highlights.tsx'
+          grep -Fq 'HighlightsFeedScreenV24' 'app/(tabs)/highlights.tsx'
           grep -Fq 'accessibilityLabel="Envoyer le message"' src/screens/ChatConversationScreen.tsx
           grep -Fq 'call-feedback' app/call/'[id].tsx'
           npm run verify

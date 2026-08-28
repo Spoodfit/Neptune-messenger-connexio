@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  EXPO_OFFLINE: "1"
+
 concurrency:
   group: connexio-ci-${{ github.ref }}
   cancel-in-progress: true

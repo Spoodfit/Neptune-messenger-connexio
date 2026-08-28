@@ -31,6 +31,7 @@ permissions:
   contents: read
 
 env:
+  EXPO_OFFLINE: "1"
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
   EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
   EXPO_PUBLIC_MOCK_MODE: "true"
