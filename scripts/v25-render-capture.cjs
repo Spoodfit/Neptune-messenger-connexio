@@ -50,14 +50,8 @@ async function run() {
       await open(page, "/highlights"); await shot(page, `temps-forts-feed-only-${viewport.suffix}`);
       await open(page, "/coworking"); await shot(page, `map-dedicated-${viewport.suffix}`);
       await open(page, "/coworking/visio-business");
-      await page.getByTestId("coworking-focus-video").waitFor({ state:"visible", timeout:10000 }).catch(() => {});
-      await shot(page, `private-video-main-${viewport.suffix}`);
-      const overview = page.getByLabel("Afficher la vue d’ensemble", { exact:true });
-      if (await overview.isVisible().catch(() => false)) {
-        await overview.click();
-        await page.getByTestId("coworking-overview-grid").waitFor({ state:"visible", timeout:3000 }).catch(() => {});
-        await shot(page, `private-video-overview-${viewport.suffix}`);
-      }
+      await page.locator('[data-testid^="coworking-participant-"]').first().waitFor({ state:"visible", timeout:10000 }).catch(() => {});
+      await shot(page, `private-video-grid-${viewport.suffix}`);
       await open(page, "/schedule-call?memberId=user-lea&mode=video");
       await shot(page, `schedule-call-${viewport.suffix}`);
       await page.close();

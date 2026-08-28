@@ -112,8 +112,10 @@ test("les événements et les membres superposés sont visuellement séparés et
   match(html, /--event-offset-x/);
 });
 
-test("le compteur fusionné additionne personnes et évènements dans un seul cercle", () => {
+test("le regroupement régional sépare le nombre de personnes et d’évènements sans double cercle", () => {
   match(html, /getAllChildMarkers\(\)/);
-  match(html, /const total=counts\.people\+counts\.events/);
-  match(html, /iconSize:\[48,48\]/);
+  match(html, /cluster-part/);
+  match(html, /cluster-flag/);
+  match(html, /counts\.people&&counts\.events\?78:48/);
+  ok(!html.includes("const total=counts.people+counts.events"));
 });

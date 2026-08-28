@@ -6,6 +6,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, useWindo
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CoworkingGeographicMap from "../components/CoworkingGeographicMap";
+import { CoworkingActionMotion } from "../components/CoworkingActionMotion";
 import type { CoworkingMapEventMarker, CoworkingMapMarker } from "../components/CoworkingGeographicMap.types";
 import { StatusAvatar } from "../components/StatusAvatar";
 import { env } from "../config/env";
@@ -18,6 +19,7 @@ import {
   type DiscoveryEvent
 } from "../domain/discoveryEvents";
 import { coworkingAvailability, coworkingMapPrimaryAction, coworkingSpaceHostId, participantPresence } from "../domain/coworking";
+import { isFreeRole } from "../domain/accessPolicy";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
 import { useAppLanguage } from "../providers/LanguageProvider";
@@ -26,7 +28,7 @@ import { useAppTheme } from "../providers/ThemeProvider";
 import { CoworkingMapApi } from "../services/api/coworkingMapApi";
 import { ApiError } from "../services/api/httpClient";
 import { NeptuneEventsApi } from "../services/api/neptuneEventsApi";
-import { emitCoworkingActionFeedback } from "../services/coworking/coworkingActionFeedback";
+import { emitCoworkingActionFeedback, type CoworkingActionFeedback } from "../services/coworking/coworkingActionFeedback";
 import {
   interactionCooldownRemaining,
   releaseCoworkingInteraction,
@@ -38,6 +40,31 @@ import type { AppUser } from "../types/messaging";
 
 const AVAILABLE = "#35D58B";
 const BUSY = "#FF5868";
+const OFFLINE = "#8590A8";
+
+const CITY_COORDINATES: Record<string, { latitude: number; longitude: number }> = {
+  carcassonne: { latitude: 43.213, longitude: 2.351 },
+  toulouse: { latitude: 43.6045, longitude: 1.444 },
+  montpellier: { latitude: 43.611, longitude: 3.877 },
+  narbonne: { latitude: 43.1843, longitude: 3.0031 },
+  limoux: { latitude: 43.0549, longitude: 2.218 },
+  limoges: { latitude: 45.8336, longitude: 1.2611 },
+  eaubonne: { latitude: 48.9971, longitude: 2.2825 },
+  cambrai: { latitude: 50.1767, longitude: 3.2356 }
+};
+
+function normalizedCity(value: string): string {
+  return value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr");
+}
+
+function cityLocation(member: AppUser): { latitude: number; longitude: number } | undefined {
+  const base = CITY_COORDINATES[normalizedCity(member.city)];
+  if (!base) return undefined;
+  const seed = [...member.id].reduce((total, character) => (total * 31 + character.charCodeAt(0)) % 997, 17);
+  const angle = (seed / 997) * Math.PI * 2;
+  const radius = 0.006 + (seed % 7) * 0.0012;
+  return { latitude: base.latitude + Math.sin(angle) * radius, longitude: base.longitude + Math.cos(angle) * radius };
+}
 
 type MarkerSelection = {
   marker: CoworkingMapMarker;
@@ -93,6 +120,7 @@ export default function UnifiedMapScreenV24() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<"hello" | "invite" | "knock" | "presence" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [localMotion, setLocalMotion] = useState<CoworkingActionFeedback | null>(null);
   const [interactionClock, setInteractionClock] = useState(() => Date.now());
   const tabBarClearance = 92;
 
@@ -174,11 +202,11 @@ export default function UnifiedMapScreenV24() {
   );
 
   const markers = useMemo<CoworkingMapMarker[]>(() => {
-    const online = allMembers.filter((member) => member.online && momentByUserId.has(member.id));
+    const eligible = allMembers.filter((member) => !isFreeRole(member.role) && (momentByUserId.has(member.id) || cityLocation(member)));
     const grouped = new Map<string, AppUser[]>();
     const singles: AppUser[] = [];
 
-    for (const member of online) {
+    for (const member of eligible) {
       const space = activeSpaceForUser(member.id, snapshot.spaces);
       if (!space) {
         singles.push(member);
@@ -191,14 +219,14 @@ export default function UnifiedMapScreenV24() {
 
     const result: CoworkingMapMarker[] = [];
     for (const member of singles) {
-      const moment = momentByUserId.get(member.id)!;
+      const moment = momentByUserId.get(member.id) ?? cityLocation(member)!;
       const presence = presenceByUserId.get(member.id);
       result.push({
         id: `person:${member.id}`,
         latitude: moment.latitude,
         longitude: moment.longitude,
         city: member.city,
-        availability: coworkingAvailability(presence, undefined),
+        availability: member.online ? coworkingAvailability(presence, undefined) : "offline",
         members: [{
           id: member.id,
           name: member.name,
@@ -218,7 +246,7 @@ export default function UnifiedMapScreenV24() {
         return left.name.localeCompare(right.name);
       });
       const located = orderedMembers
-        .map((member) => ({ member, moment: momentByUserId.get(member.id) }))
+        .map((member) => ({ member, moment: momentByUserId.get(member.id) ?? cityLocation(member) }))
         .filter((item): item is { member: AppUser; moment: NonNullable<ReturnType<typeof momentByUserId.get>> } => Boolean(item.moment));
       if (located.length === 0) continue;
       const host = located.find((item) => item.member.id === space.ownerId) ?? located[0]!;
@@ -310,7 +338,7 @@ export default function UnifiedMapScreenV24() {
         ? firstNameList(selection.marker.members.map((member) => member.name))
         : firstName(selection.member.name);
       const message = selection.space ? "Bonjour envoyé à tout l’espace" : `Bonjour envoyé à ${recipients}`;
-      emitCoworkingActionFeedback({ type: "hello", message });
+      setLocalMotion({ id: Date.now(), type: "hello", message });
       setInteractionClock(Date.now());
     } catch (error) {
       if (!(error instanceof ApiError && error.status === 429)) {
@@ -402,7 +430,8 @@ export default function UnifiedMapScreenV24() {
     await Promise.all([refresh().catch(() => undefined), loadEvents().catch(() => undefined)]);
   };
 
-  const onlineCount = allMembers.filter((member) => member.online && momentByUserId.has(member.id)).length;
+  const eligibleMemberCount = allMembers.filter((member) => !isFreeRole(member.role)).length;
+  const onlineCount = allMembers.filter((member) => !isFreeRole(member.role) && member.online).length;
   const refreshing = loading || eventsLoading;
   const compactHeader = viewportWidth < 340;
   const ownPresence = participantPresence(snapshot, currentUser.id);
@@ -463,6 +492,8 @@ export default function UnifiedMapScreenV24() {
         onLocationUnavailable={() => AppAlert.alert("Localisation indisponible", "Activez la localisation pour recentrer la carte autour de vous.")}
       />
 
+      {localMotion ? <CoworkingActionMotion feedback={localMotion} onFinished={() => setLocalMotion(null)} /> : null}
+
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 10), paddingHorizontal: 10 }]} pointerEvents="box-none">
         <Pressable accessibilityRole="button" accessibilityLabel="Fermer la Map" onPress={() => router.back()} style={[styles.circleButton, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
           <Ionicons name="close" size={21} color={theme.pageText} />
@@ -470,7 +501,7 @@ export default function UnifiedMapScreenV24() {
         <View style={[styles.titlePill, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
           <View style={styles.titleCopy}>
             <Text style={[styles.title, { color: theme.pageText }]}>Map</Text>
-            {!compactHeader ? <Text style={[styles.subtitle, { color: theme.pageTextMuted }]}>{`${onlineCount} en ligne · ${visibleEvents.length} évènement${visibleEvents.length > 1 ? "s" : ""}`}</Text> : null}
+            {!compactHeader ? <Text style={[styles.subtitle, { color: theme.pageTextMuted }]}>{`${eligibleMemberCount} membres · ${onlineCount} en ligne`}</Text> : null}
           </View>
           <Pressable
             accessibilityRole="switch"
@@ -492,9 +523,10 @@ export default function UnifiedMapScreenV24() {
       </View>
 
       <View style={[styles.legend, { top: Math.max(insets.top, 10) + 62, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
-        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: AVAILABLE }]} /><Text style={[styles.legendText, { color: theme.pageText }]}>Disponible</Text></View>
-        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: BUSY }]} /><Text style={[styles.legendText, { color: theme.pageText }]}>Occupé</Text></View>
-        <View style={styles.legendItem}><Ionicons name="flag" size={13} color={theme.accent} /><Text style={[styles.legendText, { color: theme.pageText }]}>Évènement</Text></View>
+        <View accessibilityLabel="Disponible" style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: AVAILABLE }]} />{!compactHeader ? <Text style={[styles.legendText, { color: theme.pageText }]}>Disponible</Text> : null}</View>
+        <View accessibilityLabel="Occupé" style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: BUSY }]} />{!compactHeader ? <Text style={[styles.legendText, { color: theme.pageText }]}>Occupé</Text> : null}</View>
+        <View accessibilityLabel="Hors ligne" style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: OFFLINE }]} />{!compactHeader ? <Text style={[styles.legendText, { color: theme.pageText }]}>Hors ligne</Text> : null}</View>
+        <View accessibilityLabel="Évènement" style={styles.legendItem}><Ionicons name="flag" size={13} color={theme.accent} />{!compactHeader ? <Text style={[styles.legendText, { color: theme.pageText }]}>Évènement</Text> : null}</View>
       </View>
 
       {selection ? (
@@ -505,7 +537,7 @@ export default function UnifiedMapScreenV24() {
               <View style={styles.identityCopy}>
                 <View style={styles.identityLine}>
                   <Text numberOfLines={1} style={[styles.memberName, { color: theme.pageText }]}>{selection.member.name}</Text>
-                  <Text style={[styles.availabilityText, { color: selection.marker.availability === "busy" ? BUSY : AVAILABLE }]}>{selection.marker.availability === "busy" ? "Occupé" : "Disponible"}</Text>
+                  <Text style={[styles.availabilityText, { color: selection.marker.availability === "busy" ? BUSY : selection.marker.availability === "offline" ? OFFLINE : AVAILABLE }]}>{selection.marker.availability === "busy" ? "Occupé" : selection.marker.availability === "offline" ? "Hors ligne" : "Disponible"}</Text>
                 </View>
                 <Text numberOfLines={1} style={[styles.memberMeta, { color: theme.pageTextMuted }]}>{selection.member.company}{selection.member.city ? ` · ${selection.member.city}` : ""}</Text>
               </View>

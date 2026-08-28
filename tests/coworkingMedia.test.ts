@@ -14,20 +14,20 @@ const html = buildCoworkingMediaHtml({
 }, "Moi", {
   cameraOn: true,
   microphoneOn: false,
-  roomViewMode: "stage",
-  focusParticipantId: "host"
+  gridLayout: true,
+  participantLayout: {
+    me: { x: 50, y: 25, width: 320, height: 260 },
+    host: { x: 50, y: 75, width: 320, height: 260 }
+  }
 });
 
-test("la visio privée démarre avec une personne distante en scène et une vue d’ensemble circulaire", () => {
-  match(html, /#remoteGrid\.room-stage \.remote\{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:26px/);
-  match(html, /#remoteGrid\.room-overview \.remote\{[^}]*border-radius:50%/);
-  match(html, /#remoteGrid\.room-stage \.remote \.name\{bottom:92px/);
+test("la visio privée utilise une seule grille où la vidéo remplace l’avatar", () => {
+  match(html, /const freeLayout=\(\)=>Boolean\(cfg\.mapMode\|\|cfg\.spatialAudio\|\|cfg\.gridLayout\)/);
+  match(html, /const positionLocal=\(\)=>\{\s+if\(!freeLayout\(\)\|\|cfg\.mapMode\)return/);
+  match(html, /cfg\.gridLayout\?'22px':'24px'/);
+  match(html, /positionNode\(node,participant\.id\)/);
   match(html, /video\.video-ready[^}]*opacity:1/);
   match(html, /videoTracks\.some\(track=>track\.readyState==='live'&&!track\.muted\)/);
-  match(html, /command\.type==='room-view'/);
-  match(html, /cfg\.focusParticipantId/);
-  match(html, /#local\.room-stage\{bottom:92px\}/);
-  match(html, /remoteNodes\.delete\(participantId\);applyRoomView\(\)/);
 });
 
 test("le document média injecté reste syntaxiquement valide", () => {
@@ -67,6 +67,7 @@ test("le partage d’écran accepte un adaptateur natif ou getDisplayMedia", () 
   match(html, /navigator\.mediaDevices\?\.getDisplayMedia/);
   match(html, /client\.replaceVideoTrack/);
   match(html, /screen-share-state/);
+  match(html, /post\('capabilities',\{screenShare:/);
 });
 
 test("une session mock demande aussi la caméra locale sans exiger le SFU", () => {

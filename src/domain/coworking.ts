@@ -35,7 +35,7 @@ export function coworkingAvailability(
 export type CoworkingMapPrimaryAction = "invite-video" | "knock-space" | "none";
 
 export function coworkingMapPrimaryAction(
-  availability: "available" | "busy",
+  availability: "available" | "busy" | "offline",
   activeSpace: CoworkingSpace | undefined
 ): CoworkingMapPrimaryAction {
   if (activeSpace) return "knock-space";

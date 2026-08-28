@@ -2,7 +2,7 @@ import type {
   AppUser,
   ChatMessage,
   Conversation
-} from "@/types/messaging";
+} from "../types/messaging";
 
 export const currentUser: AppUser = {
   id: "user-johan",
@@ -392,9 +392,31 @@ const baseMessages: ChatMessage[] = [
   }
 ];
 
+// Every conversation preview in the demo must have a corresponding message.
+// Otherwise the list promises content that disappears when the group is opened.
+const previewMessages: ChatMessage[] = conversations
+  .filter((conversation) => conversation.lastMessage && !baseMessages.some((message) => message.conversationId === conversation.id && message.body === conversation.lastMessage))
+  .map((conversation) => {
+    const senderId = conversation.activeMemberIds?.find((id) => id !== currentUser.id) ?? "user-lea";
+    const sender = members.find((member) => member.id === senderId) ?? members[1] ?? currentUser;
+    return {
+      id: `preview-${conversation.id}`,
+      conversationId: conversation.id,
+      senderId: sender.id,
+      senderName: sender.name,
+      senderInitials: sender.initials,
+      senderAvatarUrl: sender.avatarUrl,
+      senderRole: sender.role,
+      body: conversation.lastMessage ?? "",
+      createdAt: conversation.lastMessageAt ?? "2026-07-24T08:00:00.000Z",
+      status: conversation.unreadCount > 0 ? "delivered" : "read",
+      isMine: sender.id === currentUser.id
+    } satisfies ChatMessage;
+  });
+
 export const messagesByConversation: Record<string, ChatMessage[]> =
   conversations.reduce<Record<string, ChatMessage[]>>((accumulator, item) => {
-    accumulator[item.id] = baseMessages
+    accumulator[item.id] = [...baseMessages, ...previewMessages]
       .filter((message) => message.conversationId === item.id)
       .sort(
         (a, b) =>

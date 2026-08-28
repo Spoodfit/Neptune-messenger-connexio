@@ -39,7 +39,7 @@ import {
 } from "@/state/conversationPresentation";
 import { gradients, spacing, typography } from "@/theme";
 import type { ConversationFilter } from "@/types/experience";
-import type { Conversation } from "@/types/messaging";
+import type { ChatMessage, Conversation } from "@/types/messaging";
 
 const MAX_CONTENT_WIDTH = 720;
 
@@ -54,6 +54,16 @@ function matchesMention(conversation: Conversation, aliases: string[]): boolean 
   if ((conversation.mentionCount ?? 0) > 0) return true;
   const text = conversation.lastMessage?.toLocaleLowerCase("fr") ?? "";
   return aliases.some((alias) => alias && text.includes(`@${alias}`));
+}
+
+function latestMessagePreview(message: ChatMessage): string {
+  const body = message.body.trim();
+  if (body) return body;
+  if (message.poll?.question) return `📊 ${message.poll.question}`;
+  const attachment = message.attachments?.[0];
+  if (!attachment) return "Nouveau message";
+  if (attachment.kind === "audio") return "🎙️ Message vocal";
+  return `📎 ${attachment.name || "Pièce jointe"}`;
 }
 
 export default function MessagesScreenV22() {
@@ -115,7 +125,7 @@ export default function MessagesScreenV22() {
         const serverTimestamp = conversation.lastMessageAt ? Date.parse(conversation.lastMessageAt) : 0;
         const localTimestamp = Date.parse(localLatestMessage.createdAt);
         return Number.isFinite(localTimestamp) && localTimestamp > serverTimestamp
-          ? { ...conversation, lastMessage: localLatestMessage.body, lastMessageAt: localLatestMessage.createdAt }
+          ? { ...conversation, lastMessage: latestMessagePreview(localLatestMessage), lastMessageAt: localLatestMessage.createdAt }
           : conversation;
       })
       .filter((conversation) => !isPrivateConversationKind(conversation) || isPrivateConversationPresented(conversation));

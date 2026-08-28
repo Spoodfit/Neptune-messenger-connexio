@@ -59,7 +59,7 @@ jobs:
           cat > web-product-audit-dist/README_TEST.txt <<'EOF'
           CONNEXIO V26 — VERSION WEB DE DEMONSTRATION
 
-          Cette archive contient le build web validé par Product Audit, y compris les évènements ancrés, la disponibilité personnelle et la visio Coworking principale/mosaïque.
+          Cette archive contient le build web validé par Product Audit, y compris les évènements ancrés, la disponibilité personnelle et la grille visio Coworking unique.
           Pour un test immédiat sans backend, utilisez de préférence l'adresse GitHub Pages indiquée dans TESTER_EN_UN_CLIC.md.
           Pour lancer le projet complet depuis le dépôt sous Windows, utilisez TESTER_CONNEXIO.bat à la racine du dépôt.
           EOF

@@ -7,6 +7,7 @@ export interface CoworkingMediaBridgeConfig {
   screenSharing?: boolean;
   mapMode?: boolean;
   spatialAudio?: boolean;
+  gridLayout?: boolean;
   participantLayout?: Record<
     string,
     { x: number; y: number; width: number; height: number }
@@ -116,7 +117,7 @@ export function buildCoworkingMediaHtml(
     let client=null;
 
     const spatial=()=>Boolean(cfg.spatialAudio);
-    const freeLayout=()=>Boolean(cfg.mapMode||cfg.spatialAudio);
+    const freeLayout=()=>Boolean(cfg.mapMode||cfg.spatialAudio||cfg.gridLayout);
     const roomView=()=>cfg.roomViewMode==='stage'||cfg.roomViewMode==='overview';
     if(freeLayout()){
       grid.style.display='block';
@@ -183,7 +184,7 @@ export function buildCoworkingMediaHtml(
       node.style.border='0';
     };
     const positionLocal=()=>{
-      if(!spatial())return;
+      if(!freeLayout()||cfg.mapMode)return;
       const pos=cfg.participantLayout?.[cfg.participantId];
       if(!pos){local.style.display='none';return;}
       local.style.display='block';
@@ -194,7 +195,7 @@ export function buildCoworkingMediaHtml(
       local.style.width=pos.width+'px';
       local.style.height=pos.height+'px';
       local.style.transform='translate(-50%,-50%)';
-      local.style.borderRadius='24px';
+      local.style.borderRadius=cfg.gridLayout?'22px':'24px';
     };
     const spatialGain=(participantId)=>{
       if(!spatial())return 1;
@@ -340,7 +341,7 @@ export function buildCoworkingMediaHtml(
           try{await ensureLocalMedia()}catch(mediaError){localStream=null;post('local-media-unavailable',{message:mediaError?.message||'Caméra ou microphone indisponible.'})}
         }
         if(cfg.mock){
-          applyLayout();applyRoomView();post('connected');post('media-ready');
+          applyLayout();applyRoomView();post('capabilities',{screenShare:Boolean(navigator.mediaDevices?.getDisplayMedia)});post('connected');post('media-ready');
           if(cfg.screenSharing)void setScreenSharing(true);
           return;
         }
@@ -360,6 +361,7 @@ export function buildCoworkingMediaHtml(
           onConnected:()=>post('connected'),
           onError:(error)=>post('error',{message:error?.message||String(error||'Connexion média impossible')})
         });
+        post('capabilities',{screenShare:Boolean(client&&typeof client.startScreenShare==='function'||navigator.mediaDevices?.getDisplayMedia)});
         applyLayout();
         applyRoomView();
         if(cfg.screenSharing)void setScreenSharing(true);

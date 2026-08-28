@@ -16,12 +16,15 @@ export default function CoworkingMediaSurface({
   screenSharing = false,
   mapMode = false,
   spatialAudio = false,
+  gridLayout = false,
   participantLayout,
   roomViewMode,
   focusParticipantId,
   onConnected,
   onLocalMediaReady,
   onScreenShareStateChange,
+  onCapabilities,
+  onAudioLevel,
   onError,
   onLocalMediaUnavailable
 }: CoworkingMediaSurfaceProps) {
@@ -42,6 +45,7 @@ export default function CoworkingMediaSurface({
         screenSharing,
         mapMode,
         spatialAudio,
+        gridLayout,
         participantLayout,
         roomViewMode,
         focusParticipantId
@@ -49,7 +53,7 @@ export default function CoworkingMediaSurface({
     // Les états média, la disposition et le mode de vue sont ensuite injectés
     // dans la WebView. Les ajouter aux dépendances reconnecterait le SFU à
     // chaque bascule de caméra ou de mosaïque.
-    [displayName, mapMode, session, spatialAudio, uiLanguage]
+    [displayName, gridLayout, mapMode, session, spatialAudio, uiLanguage]
   );
   const allowedOrigins = useMemo(() => mediaWebViewOrigins(session.socketUrl, session.clientScriptUrl), [session.clientScriptUrl, session.socketUrl]);
 
@@ -100,6 +104,9 @@ export default function CoworkingMediaSurface({
         type?: string;
         message?: string;
         active?: boolean;
+        screenShare?: boolean;
+        participantId?: string;
+        level?: number;
       };
       if (payload.type === "connected" || payload.type === "media-ready") {
         onConnected?.();
@@ -109,6 +116,12 @@ export default function CoworkingMediaSurface({
       }
       if (payload.type === "screen-share-state") {
         onScreenShareStateChange?.(payload.active === true);
+      }
+      if (payload.type === "capabilities") {
+        onCapabilities?.({ screenShare: payload.screenShare === true });
+      }
+      if (payload.type === "audio-level" && payload.participantId && typeof payload.level === "number") {
+        onAudioLevel?.(payload.participantId, Math.max(0, Math.min(1, payload.level)));
       }
       if (payload.type === "local-media-unavailable") {
         onLocalMediaUnavailable?.(payload.message ?? "Caméra ou microphone indisponible.");
@@ -121,7 +134,7 @@ export default function CoworkingMediaSurface({
     }
   };
 
-  const transparent = mapMode || spatialAudio || Boolean(roomViewMode);
+  const transparent = mapMode || spatialAudio || gridLayout || Boolean(roomViewMode);
 
   return (
     <View

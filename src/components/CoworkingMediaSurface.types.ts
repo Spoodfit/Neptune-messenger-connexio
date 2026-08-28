@@ -17,12 +17,16 @@ export interface CoworkingMediaSurfaceProps {
   screenSharing?: boolean;
   mapMode?: boolean;
   spatialAudio?: boolean;
+  /** Positions every participant video on the single collaborative grid. */
+  gridLayout?: boolean;
   participantLayout?: Record<string, CoworkingMediaLayoutItem>;
   roomViewMode?: CoworkingRoomViewMode;
   focusParticipantId?: string;
   onConnected?: () => void;
   onLocalMediaReady?: () => void;
   onScreenShareStateChange?: (active: boolean) => void;
+  onCapabilities?: (capabilities: { screenShare: boolean }) => void;
+  onAudioLevel?: (participantId: string, level: number) => void;
   onError?: (message: string) => void;
   onLocalMediaUnavailable?: (message: string) => void;
 }

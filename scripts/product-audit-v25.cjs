@@ -303,26 +303,17 @@ async function auditMap(page, label, interactive = false) {
 
 async function auditPrivateRoom(page) {
   await open(page, "/coworking/visio-business");
-  const focusVideo = page.getByTestId("coworking-focus-video");
-  if (await expectVisible(focusVideo, "Visio privée: personne rejointe affichée en vue principale", 10000)) {
-    const stage = page.getByTestId("coworking-room-stage");
-    const [videoBox, stageBox] = await Promise.all([focusVideo.boundingBox(), stage.boundingBox()]);
-    if (!videoBox || !stageBox
-      || videoBox.width < stageBox.width * .9
-      || videoBox.height < stageBox.height * .9
-      || Math.abs(videoBox.x - stageBox.x) > 3
-      || Math.abs(videoBox.y - stageBox.y) > 3) {
-      failures.push("Visio privée: la vue principale ne remplit pas correctement la scène");
-    }
+  const tiles = page.locator('[data-testid^="coworking-participant-"]');
+  await tiles.first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+  const tileCount = await tiles.count();
+  if (tileCount < 2) failures.push(`Visio privée: seulement ${tileCount} participant visible dans la grille`);
+  const stageBox = await page.getByTestId("coworking-room-stage").boundingBox();
+  const tileBoxes = (await Promise.all(Array.from({ length: tileCount }, (_, index) => tiles.nth(index).boundingBox()))).filter(Boolean);
+  if (!stageBox || tileBoxes.some((box) => box.width < stageBox.width * .72 || box.height < stageBox.height * .3)) {
+    failures.push("Visio privée: la grille laisse une zone sombre inutilisée ou contient une tuile trop petite");
   }
-  await expectVisible(page.getByTestId("coworking-self-preview"), "Visio privée: aperçu de soi");
-  await expectVisible(page.getByTestId("coworking-participant-rail"), "Visio privée: rail des participants");
-  const overview = page.getByLabel("Afficher la vue d’ensemble", { exact: true });
-  if (await expectVisible(overview, "Visio privée: réduction en vue d’ensemble")) {
-    await overview.click();
-    await expectVisible(page.getByTestId("coworking-overview-grid"), "Visio privée: participants en cercles");
-    await expectVisible(page.getByLabel("Afficher la vue principale", { exact: true }), "Visio privée: retour à la vue principale");
-  }
+  if (await page.getByText(/^(Principale|Ensemble)$/).count()) failures.push("Visio privée: ancien sélecteur de vues encore visible");
+  if (await page.getByTestId("coworking-participant-rail").count()) failures.push("Visio privée: ancien rail dupliqué encore présent");
   await checkGeometry(page, "Visio privée");
 }
 

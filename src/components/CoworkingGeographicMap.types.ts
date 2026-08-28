@@ -1,7 +1,7 @@
 import type { DiscoveryEventProximity } from "../domain/discoveryEvents";
 import type { CoworkingMediaSession } from "../types/coworking";
 
-export type CoworkingAvailability = "available" | "busy";
+export type CoworkingAvailability = "available" | "busy" | "offline";
 
 export interface CoworkingMapMemberCell {
   id: string;
