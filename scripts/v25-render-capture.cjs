@@ -28,6 +28,14 @@ const server = http.createServer((request, response) => {
 async function settle(page, delay = 650) { await page.waitForTimeout(delay); await page.evaluate(() => document.fonts?.ready).catch(() => {}); await page.waitForTimeout(150); }
 async function open(page, route) { await page.goto(`http://127.0.0.1:${port}${route}`, { waitUntil: "domcontentloaded" }); await settle(page); }
 async function shot(page, name, fullPage = false) { await settle(page, 300); await page.screenshot({ path: path.join(output, `${name}.png`), fullPage }); }
+async function expandVisibleMapClusters(frame, attempts = 10) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const cluster = frame.locator(".cluster-core:visible").first();
+    if (!(await cluster.isVisible().catch(() => false))) return;
+    await cluster.click({ force: true }).catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 420));
+  }
+}
 
 async function run() {
   if (!fs.existsSync(path.join(root, "index.html"))) throw new Error("Build web-product-audit-dist absent");
@@ -58,7 +66,8 @@ async function run() {
     const page = await browser.newPage({ viewport:{ width:393,height:852 }, locale:"fr-FR", colorScheme:"dark", reducedMotion:"reduce" });
     await open(page, "/coworking");
     const mapFrame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
-    const available = mapFrame.locator(".cw-marker.available").first();
+    await expandVisibleMapClusters(mapFrame);
+    const available = mapFrame.locator(".cw-marker.available .cw-hit").first();
     if (await available.isVisible().catch(() => false)) {
       await available.click();
       await shot(page, "map-available-profile-393x852");
@@ -68,7 +77,7 @@ async function run() {
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
       await page.getByTestId("coworking-action-motion").waitFor({ state:"detached", timeout:2600 }).catch(() => {});
     }
-    const busy = mapFrame.locator(".cw-marker.busy").first();
+    const busy = mapFrame.locator(".cw-marker.busy .cw-hit").first();
     if (await busy.isVisible().catch(() => false)) {
       await busy.click();
       await shot(page, "map-video-satellites-393x852");
@@ -87,14 +96,7 @@ async function run() {
       await shot(page, "map-event-flag-sheet-393x852");
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
     }
-    for (let i=0;i<6;i+=1) {
-      const zoomAnchor = mapFrame.locator(".cw-marker.busy:visible .cw-hit").first();
-      const anchorBox = await zoomAnchor.boundingBox().catch(() => null);
-      if (anchorBox) await page.mouse.move(anchorBox.x+anchorBox.width/2,anchorBox.y+anchorBox.height/2);
-      else await mapFrame.locator("#map").hover();
-      await page.mouse.wheel(0,-900);
-      await page.waitForTimeout(160);
-    }
+    await expandVisibleMapClusters(mapFrame);
     const splitGroup = mapFrame.locator(".cw-group.zoom-split:visible").first();
     await splitGroup.waitFor({ state:"visible", timeout:3000 });
     const splitOnScreen = await splitGroup.evaluate((group) => {
