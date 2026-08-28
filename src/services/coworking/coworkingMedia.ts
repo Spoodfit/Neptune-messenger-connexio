@@ -175,11 +175,11 @@ export function buildCoworkingMediaHtml(
       if(!pos){node.style.display='none';return;}
       node.style.display='block';
       node.style.position='absolute';
-      node.style.left=pos.x+'%';
-      node.style.top=pos.y+'%';
-      node.style.width=pos.width+'px';
-      node.style.height=pos.height+'px';
-      node.style.transform='translate(-50%,-50%)';
+      node.style.left=(cfg.gridLayout?pos.x-pos.width/2:pos.x)+'%';
+      node.style.top=(cfg.gridLayout?pos.y-pos.height/2:pos.y)+'%';
+      node.style.width=pos.width+(cfg.gridLayout?'%':'px');
+      node.style.height=pos.height+(cfg.gridLayout?'%':'px');
+      node.style.transform=cfg.gridLayout?'none':'translate(-50%,-50%)';
       node.style.borderRadius=cfg.spatialAudio?'24px':'22px';
       node.style.border='0';
     };
@@ -190,11 +190,11 @@ export function buildCoworkingMediaHtml(
       local.style.display='block';
       local.style.right='auto';
       local.style.bottom='auto';
-      local.style.left=pos.x+'%';
-      local.style.top=pos.y+'%';
-      local.style.width=pos.width+'px';
-      local.style.height=pos.height+'px';
-      local.style.transform='translate(-50%,-50%)';
+      local.style.left=(cfg.gridLayout?pos.x-pos.width/2:pos.x)+'%';
+      local.style.top=(cfg.gridLayout?pos.y-pos.height/2:pos.y)+'%';
+      local.style.width=pos.width+(cfg.gridLayout?'%':'px');
+      local.style.height=pos.height+(cfg.gridLayout?'%':'px');
+      local.style.transform=cfg.gridLayout?'none':'translate(-50%,-50%)';
       local.style.borderRadius=cfg.gridLayout?'22px':'24px';
     };
     const spatialGain=(participantId)=>{

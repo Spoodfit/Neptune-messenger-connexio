@@ -122,29 +122,27 @@ export default function CoworkingRoomScreen() {
   }, [currentUser.id, nodeSize, ownPosition.x, ownPosition.y, participants]);
 
   const privateGridLayout = useMemo(() => {
-    if (stageSize.width < 100 || stageSize.height < 180) return {};
     const count = Math.max(1, participants.length);
     const columns = count <= 2 ? 1 : 2;
     const rows = Math.ceil(count / columns);
-    const gap = 10;
-    const padding = 10;
-    const usableWidth = Math.max(120, stageSize.width - padding * 2 - gap * (columns - 1));
-    const usableHeight = Math.max(180, stageSize.height - padding * 2 - gap * (rows - 1));
-    const tileWidth = usableWidth / columns;
-    const tileHeight = usableHeight / rows;
+    const gap = 2.5;
+    const tileWidth = (94 - gap * (columns - 1)) / columns;
+    const tileHeight = (94 - gap * (rows - 1)) / rows;
+    const left = 3;
+    const top = 3;
     const layout: Record<string, { x: number; y: number; width: number; height: number }> = {};
     participants.forEach((member, index) => {
       const row = Math.floor(index / columns);
       const column = index % columns;
       layout[member.id] = {
-        x: ((padding + column * (tileWidth + gap) + tileWidth / 2) / stageSize.width) * 100,
-        y: ((padding + row * (tileHeight + gap) + tileHeight / 2) / stageSize.height) * 100,
+        x: left + column * (tileWidth + gap) + tileWidth / 2,
+        y: top + row * (tileHeight + gap) + tileHeight / 2,
         width: tileWidth,
         height: tileHeight
       };
     });
     return layout;
-  }, [participants, stageSize.height, stageSize.width]);
+  }, [participants]);
 
   useEffect(() => {
     if (!media) return;
@@ -425,7 +423,9 @@ export default function CoworkingRoomScreen() {
                 const micActive = isMe ? microphoneOn : Boolean(presence?.microphoneOn);
                 const speaking = micActive && (Boolean(presence?.speaking) || (audioLevels[member.id] ?? 0) > 0.08);
                 const cameraActive = isMe ? cameraOn : Boolean(presence?.cameraOn);
-                const avatarSize = Math.max(76, Math.min(132, Math.min(tile.width, tile.height) * 0.48));
+                const tilePixelWidth = stageSize.width * tile.width / 100;
+                const tilePixelHeight = stageSize.height * tile.height / 100;
+                const avatarSize = Math.max(76, Math.min(132, Math.min(tilePixelWidth, tilePixelHeight) * 0.48));
                 return (
                   <View
                     key={`tile-${member.id}`}
@@ -433,12 +433,10 @@ export default function CoworkingRoomScreen() {
                     style={[
                       styles.participantTile,
                       {
-                        left: `${tile.x}%`,
-                        top: `${tile.y}%`,
-                        width: tile.width,
-                        height: tile.height,
-                        marginLeft: -tile.width / 2,
-                        marginTop: -tile.height / 2,
+                        left: `${tile.x - tile.width / 2}%`,
+                        top: `${tile.y - tile.height / 2}%`,
+                        width: `${tile.width}%`,
+                        height: `${tile.height}%`,
                         borderColor: speaking ? theme.success : isMe ? theme.violet : theme.borderSoft,
                         backgroundColor: theme.surface
                       }
@@ -499,8 +497,8 @@ export default function CoworkingRoomScreen() {
                     style={[
                       styles.participantTileAction,
                       {
-                        left: `${tile.x}%`, top: `${tile.y}%`, width: tile.width, height: tile.height,
-                        marginLeft: -tile.width / 2, marginTop: -tile.height / 2
+                        left: `${tile.x - tile.width / 2}%`, top: `${tile.y - tile.height / 2}%`,
+                        width: `${tile.width}%`, height: `${tile.height}%`
                       }
                     ]}
                   >

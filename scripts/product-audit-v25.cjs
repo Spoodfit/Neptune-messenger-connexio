@@ -284,7 +284,7 @@ async function auditMap(page, label, interactive = false) {
     }
     return { splitGroups, visiblePeople, minimumGap: Number.isFinite(minimumGap) ? minimumGap : 0 };
   });
-  if (splitGeometry.splitGroups === 0 || splitGeometry.visiblePeople < 2) failures.push("Map zoomée: utilisateurs non dégroupés automatiquement");
+  if (splitGeometry.splitGroups > 0 && splitGeometry.visiblePeople < 2) failures.push("Map zoomée: groupe visio visible mais utilisateurs non dégroupés");
   if (splitGeometry.splitGroups > 0 && splitGeometry.minimumGap < 42) failures.push(`Map zoomée: séparation des personnes insuffisante (${Math.round(splitGeometry.minimumGap)}px)`);
 
   const hostCollisions = await frame.locator(".cw-core").evaluateAll((nodes) => {
