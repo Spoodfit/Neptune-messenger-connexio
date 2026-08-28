@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AdvantageAdCard } from "../components/AdvantageAdCard";
 import { BrandHeader } from "../components/BrandHeader";
@@ -33,6 +34,7 @@ const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract)
 
 export default function HighlightsFeedScreenV24() {
   const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const compactViewport = width < 320;
   const params = useLocalSearchParams<{ compose?: string; composeNonce?: string }>();
@@ -190,8 +192,14 @@ export default function HighlightsFeedScreenV24() {
   return (
     <LinearGradient colors={theme.pageGradient} style={styles.screen}>
       <BrandHeader title="Temps forts" subtitle="Publications, besoins et offres Neptune." />
-      <ScrollView contentContainerStyle={styles.feed} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={[styles.quickComposer, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}> 
+      <ScrollView
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.feed, { paddingBottom: Math.max(insets.bottom, 8) + 104 }]}
+        scrollIndicatorInsets={{ bottom: 96 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.quickComposer, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>
           <StatusAvatar user={currentUser} size={42} accessible={false} />
           <View style={styles.composerBody}>
             {!composerOpen ? (
@@ -258,7 +266,7 @@ export default function HighlightsFeedScreenV24() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingTop: 8, paddingBottom: 24 },
+  feed: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 10, paddingTop: 8 },
   quickComposer: { minHeight: 70, borderRadius: 22, borderWidth: 1, padding: 10, flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 9 },
   composerBody: { flex: 1, minWidth: 0, gap: 5 },
   composerPromptWrap: { minHeight: 48, justifyContent: "center" },

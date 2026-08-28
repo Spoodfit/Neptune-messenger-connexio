@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Text } from "./LocalizedText";
 import { StatusAvatar } from "./StatusAvatar";
+import { CoworkingActionMotion } from "./CoworkingActionMotion";
 import { env } from "../config/env";
 import { coworkingSpaceHostId } from "../domain/coworking";
 import { useCoworking } from "../providers/CoworkingProvider";
@@ -18,6 +19,11 @@ import {
   subscribeCoworkingInteractions,
   type CoworkingInteractionEvent
 } from "../services/coworking/coworkingInteractionBus";
+import {
+  subscribeCoworkingActionFeedback,
+  type CoworkingActionFeedback
+} from "../services/coworking/coworkingActionFeedback";
+import { acceptIncomingCoworkingInteraction } from "../services/coworking/coworkingInteractionGuard";
 
 type HelloState = { fromUserId: string; nonce: number } | null;
 type KnockState = { requestId: string; fromUserId: string; spaceId: string } | null;
@@ -32,10 +38,11 @@ export function CoworkingInteractionOverlay() {
   const { accessToken, currentUser } = useSession();
   const { members } = useExperience();
   const { joinSpace, snapshot } = useCoworking();
-  const { playKnock } = useActionSounds();
+  const { playHello, playKnock } = useActionSounds();
   const [hello, setHello] = useState<HelloState>(null);
   const [knock, setKnock] = useState<KnockState>(null);
   const [responding, setResponding] = useState(false);
+  const [motion, setMotion] = useState<CoworkingActionFeedback | null>(null);
   const helloTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const mapApi = useMemo(
@@ -47,6 +54,7 @@ export function CoworkingInteractionOverlay() {
     userId === currentUser.id ? currentUser : members.find((member) => member.id === userId);
   const helloMember = memberFor(hello?.fromUserId);
   const knockMember = memberFor(knock?.fromUserId);
+  const finishMotion = useCallback(() => setMotion(null), []);
 
   useEffect(() => () => {
     if (helloTimer.current) clearTimeout(helloTimer.current);
@@ -63,6 +71,13 @@ export function CoworkingInteractionOverlay() {
   }, [hello]);
 
   useEffect(() => {
+    return subscribeCoworkingActionFeedback((feedback) => {
+      setMotion(feedback);
+      void (feedback.type === "hello" ? playHello() : playKnock());
+    });
+  }, [playHello, playKnock]);
+
+  useEffect(() => {
     const onInteraction = (event: CoworkingInteractionEvent) => {
       if (event.type === "hello") {
         if (event.fromUserId === currentUser.id) return;
@@ -72,7 +87,11 @@ export function CoworkingInteractionOverlay() {
             : snapshot.spaces.find((space) => space.id === event.spaceId);
           if (!targetSpace?.participantIds.includes(currentUser.id)) return;
         }
+        const sourceKey = `${event.fromUserId}:${event.spaceId ?? currentUser.id}`;
+        if (!acceptIncomingCoworkingInteraction("hello", sourceKey)) return;
         setHello({ fromUserId: event.fromUserId, nonce: Date.now() });
+        setMotion({ id: Date.now(), type: "hello", message: `${firstName(memberFor(event.fromUserId)?.name ?? "Un membre")} vous dit bonjour` });
+        void playHello();
         return;
       }
       if (event.type === "knock") {
@@ -81,11 +100,13 @@ export function CoworkingInteractionOverlay() {
           ? snapshot.hub
           : snapshot.spaces.find((space) => space.id === event.spaceId);
         if (!targetSpace || coworkingSpaceHostId(targetSpace) !== currentUser.id) return;
+        if (!acceptIncomingCoworkingInteraction("knock", `request:${event.requestId}`)) return;
         setKnock({
           requestId: event.requestId,
           fromUserId: event.fromUserId,
           spaceId: event.spaceId
         });
+        setMotion({ id: Date.now(), type: "knock", message: `${firstName(memberFor(event.fromUserId)?.name ?? "Un membre")} toque à votre espace` });
         void playKnock();
         return;
       }
@@ -96,7 +117,7 @@ export function CoworkingInteractionOverlay() {
       }
     };
     return subscribeCoworkingInteractions(onInteraction);
-  }, [currentUser.id, joinSpace, playKnock, snapshot.hub, snapshot.spaces]);
+  }, [currentUser.id, joinSpace, members, playHello, playKnock, snapshot.hub, snapshot.spaces]);
 
   const answerKnock = async (accepted: boolean) => {
     if (!knock || responding) return;
@@ -109,10 +130,11 @@ export function CoworkingInteractionOverlay() {
     }
   };
 
-  if (!hello && !knock) return null;
+  if (!hello && !knock && !motion) return null;
 
   return (
     <View pointerEvents="box-none" style={styles.layer}>
+      {motion ? <CoworkingActionMotion feedback={motion} onFinished={finishMotion} /> : null}
       {hello && helloMember ? (
         <Pressable
           accessibilityRole="button"
@@ -134,7 +156,7 @@ export function CoworkingInteractionOverlay() {
           <View style={styles.copy}>
             <Text style={[styles.eyebrow, { color: theme.violet }]}>UN SIGNE DU COWORKING</Text>
             <Text numberOfLines={1} style={[styles.helloText, { color: theme.pageText }]}>
-              {firstName(helloMember.name)} vous dit bonjour 👋
+              {firstName(helloMember.name)} vous dit bonjour
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={theme.pageTextMuted} />

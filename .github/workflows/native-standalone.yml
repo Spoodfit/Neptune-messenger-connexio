@@ -28,7 +28,7 @@ on:
       - tsconfig.json
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -97,7 +97,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           cat eas-build-android.stderr || true
           cat eas-build-android.json || true
-      - name: Publier le résultat EAS
+      - name: Préparer le rapport EAS
         if: always()
         shell: bash
         env:
@@ -107,8 +107,6 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const raw = fs.existsSync('eas-build-android.json') ? fs.readFileSync('eas-build-android.json', 'utf8') : '';
-          const stderr = fs.existsSync('eas-build-android.stderr') ? fs.readFileSync('eas-build-android.stderr', 'utf8') : '';
-          const projectInfo = fs.existsSync('eas-project-info.json') ? fs.readFileSync('eas-project-info.json', 'utf8') : '';
           let parsed = null;
           let parseError = null;
           try { parsed = raw.trim() ? JSON.parse(raw) : null; } catch (error) { parseError = String(error); }
@@ -117,7 +115,6 @@ jobs:
           const result = {
             easCode: process.env.EAS_CODE === '' || process.env.EAS_CODE == null ? null : Number(process.env.EAS_CODE),
             projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
-            projectInfo: projectInfo.slice(-4000),
             sourceCommit: process.env.CONNEXIO_SOURCE_SHA || null,
             buildId: build?.id || null,
             status: build?.status || null,
@@ -129,18 +126,27 @@ jobs:
             createdAt: build?.createdAt || null,
             completedAt: build?.completedAt || null,
             artifactUrl,
-            parseError,
-            stderr: stderr.slice(-12000)
+            parseError
           };
           fs.writeFileSync('builds/latest-android-standalone.json', JSON.stringify(result, null, 2) + '\n');
           console.log(JSON.stringify(result, null, 2));
           NODE
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f builds/latest-android-standalone.json
-          git commit -m "build(android): record latest Expo standalone build [skip ci]" || true
-          git push origin HEAD:release/connexio-rc1 || true
-          test "${EAS_CODE:-1}" = "0"
+
+      - name: Conserver le rapport EAS comme artefact immuable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connexio-android-standalone-${{ env.CONNEXIO_SOURCE_SHA }}
+          path: builds/latest-android-standalone.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Échouer si la construction EAS a échoué
+        if: always()
+        shell: bash
+        env:
+          EAS_CODE: ${{ steps.eas.outputs.code }}
+        run: test "${EAS_CODE:-1}" = "0"
 
   standalone-ios:
     name: standalone-ios

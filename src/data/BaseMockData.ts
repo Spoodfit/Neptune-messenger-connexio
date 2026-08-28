@@ -13,7 +13,7 @@ export const currentUser: AppUser = {
   role: "visionary",
   roleLabel: "Visionnaire",
   online: true,
-  avatarUrl: "https://i.pravatar.cc/160?u=neptune-johan"
+  avatarUrl: "https://i.pravatar.cc/160?img=12"
 };
 
 export const members: AppUser[] = [
@@ -27,7 +27,7 @@ export const members: AppUser[] = [
     role: "visionary",
     roleLabel: "Visionnaire",
     online: true,
-    avatarUrl: "https://i.pravatar.cc/160?u=neptune-lea",
+    avatarUrl: "https://i.pravatar.cc/160?img=47",
     webProfileUrl: "https://neptunebusiness.com/profile/user-lea"
   },
   {
@@ -39,7 +39,7 @@ export const members: AppUser[] = [
     role: "captain",
     roleLabel: "Capitaine",
     online: true,
-    avatarUrl: "https://i.pravatar.cc/160?u=neptune-oceane",
+    avatarUrl: "https://i.pravatar.cc/160?img=45",
     webProfileUrl: "https://neptunebusiness.com/profile/user-oceane"
   },
   {
@@ -51,7 +51,7 @@ export const members: AppUser[] = [
     role: "captain",
     roleLabel: "Capitaine",
     online: false,
-    avatarUrl: "https://i.pravatar.cc/160?u=neptune-nabiha",
+    avatarUrl: "https://i.pravatar.cc/160?img=44",
     webProfileUrl: "https://neptunebusiness.com/profile/user-nabiha"
   },
   {
@@ -63,7 +63,7 @@ export const members: AppUser[] = [
     role: "captain",
     roleLabel: "Capitaine",
     online: true,
-    avatarUrl: "https://i.pravatar.cc/160?u=neptune-christelle",
+    avatarUrl: "https://i.pravatar.cc/160?img=49",
     webProfileUrl: "https://neptunebusiness.com/profile/user-christelle"
   }
 ];

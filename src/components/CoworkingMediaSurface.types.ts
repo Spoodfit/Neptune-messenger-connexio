@@ -14,12 +14,15 @@ export interface CoworkingMediaSurfaceProps {
   displayName: string;
   cameraOn: boolean;
   microphoneOn: boolean;
+  screenSharing?: boolean;
   mapMode?: boolean;
   spatialAudio?: boolean;
   participantLayout?: Record<string, CoworkingMediaLayoutItem>;
   roomViewMode?: CoworkingRoomViewMode;
   focusParticipantId?: string;
   onConnected?: () => void;
+  onLocalMediaReady?: () => void;
+  onScreenShareStateChange?: (active: boolean) => void;
   onError?: (message: string) => void;
   onLocalMediaUnavailable?: (message: string) => void;
 }

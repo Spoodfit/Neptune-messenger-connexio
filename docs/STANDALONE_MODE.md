@@ -47,6 +47,7 @@ Les fonctions suivantes ne doivent jamais être présentées comme réelles en m
 - WebSocket temps réel multi-utilisateur ;
 - notifications push serveur ;
 - appels WebRTC entre deux participants distants ;
+- flux caméra distant du Coworking et mosaïque SFU réelle ;
 - TURN de production ;
 - transcription Speech-to-Text réelle ;
 - traduction arbitraire de nouveaux messages ou paroles ;

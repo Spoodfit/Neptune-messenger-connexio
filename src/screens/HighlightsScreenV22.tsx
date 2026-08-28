@@ -204,7 +204,7 @@ export default function HighlightsScreenV22() {
 
       {mode === "feed" ? (
         <ScrollView contentContainerStyle={styles.feed} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <View style={[styles.quickComposer, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}> 
+          <View style={[styles.quickComposer, { backgroundColor: theme.surface, borderColor: theme.borderSoft }]}>
             <StatusAvatar user={currentUser} size={42} accessible={false} />
             <View style={styles.composerBody}>
               {!composerOpen ? <Pressable accessibilityRole="button" accessibilityLabel="Écrire une publication rapide" onPress={openComposer} style={styles.composerPromptWrap}><Text style={[styles.composerPrompt, { color: theme.pageTextMuted }]}>Quoi de neuf pour le réseau ?</Text></Pressable> : <TextInput autoFocus multiline value={body} onChangeText={setBody} placeholder="Partagez simplement ce que vous voulez…" placeholderTextColor={theme.pageTextMuted} style={[styles.composerInput, { color: theme.pageText }]} />}

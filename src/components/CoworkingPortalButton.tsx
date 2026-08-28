@@ -46,7 +46,7 @@ export function CoworkingPortalButton() {
           accessibilityRole="button"
           accessibilityLabel="Ouvrir la Map"
           accessibilityHint="Afficher les membres connectés et les événements sur la carte"
-          onPress={() => router.push("/coworking")}
+          onPress={() => router.push("/(tabs)/coworking")}
           style={({ pressed }) => [styles.pressable, compactBar && styles.compactPressable, pressed && styles.pressed]}
         >
           <LinearGradient colors={gradients.primary} style={[styles.gradient, compactBar && styles.compactGradient]}>

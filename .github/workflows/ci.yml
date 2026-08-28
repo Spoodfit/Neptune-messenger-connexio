@@ -17,7 +17,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,12 +42,23 @@ jobs:
         run: npx expo install --check
       - name: Expo public configuration audit
         run: npx expo config --type public >/dev/null
+      - name: Generate Android project from the managed configuration
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
+        run: |
+          npx expo prebuild --platform android --clean --no-install
+          test -x android/gradlew
+          test -f android/app/build.gradle
       - name: Production configuration gate
         env:
           EAS_BUILD_PROFILE: production
           EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
           EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
           EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_MEDIA_CLIENT_ORIGINS: https://media.example.invalid
           EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
           EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
           EXPO_PUBLIC_PRIVACY_POLICY_URL: https://spoodfit.github.io/Neptune-messenger-connexio/privacy-policy.html

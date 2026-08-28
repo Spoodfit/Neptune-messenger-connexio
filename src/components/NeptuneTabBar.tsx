@@ -91,7 +91,7 @@ export function NeptuneTabBar({ state, descriptors, navigation }: NeptuneTabBarP
 }
 
 const styles = StyleSheet.create({
-  outer: { paddingHorizontal: 8, paddingTop: 4, position: "relative", zIndex: 1000, elevation: 40 },
+  outer: { width: "100%", maxWidth: 720, alignSelf: "center", paddingHorizontal: 8, paddingTop: 4, position: "relative", zIndex: 1000, elevation: 40 },
   bar: { height: 72, padding: 5, overflow: "hidden", position: "relative", borderRadius: radii.xl, borderWidth: 1, flexDirection: "row", alignItems: "stretch", elevation: 42, zIndex: 1002, shadowOpacity: 0.14, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } },
   sideGroup: { flex: 1, minWidth: 0, height: "100%", flexDirection: "row", alignItems: "stretch" },
   centerSlot: { width: 60, flexShrink: 0 },

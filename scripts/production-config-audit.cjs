@@ -99,6 +99,9 @@ if (productionConfig.extra?.releaseStage !== "production") {
 if (productionConfig.extra?.eas?.projectId !== canonicalProjectId) {
   throw new Error("Le binaire production cible un projet EAS inattendu.");
 }
+if (!Array.isArray(productionConfig.extra?.mediaClientOrigins)) {
+  throw new Error("La liste d’origines du client SFU n’est pas normalisée.");
+}
 if (productionConfig.android?.package !== "com.neptunebusiness.connexio") {
   throw new Error("Package Android production inattendu.");
 }
@@ -124,6 +127,12 @@ requireRejectedConfig(
   "production",
   { EXPO_PUBLIC_MOCK_MODE: "true" },
   "EXPO_PUBLIC_MOCK_MODE doit être false"
+);
+requireRejectedConfig(
+  "Origine client SFU non chiffrée",
+  "production",
+  { EXPO_PUBLIC_MEDIA_CLIENT_ORIGINS: "http://cdn.example.com" },
+  "origines HTTPS"
 );
 
 console.log(

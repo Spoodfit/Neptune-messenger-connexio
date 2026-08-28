@@ -9,6 +9,38 @@ interface MediaTransportInput {
   expiresAt?: string;
 }
 
+function secureUrl(value: string): URL | null {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "wss:") return null;
+    if (url.username || url.password) return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function sameNetworkAuthority(left: URL, right: URL): boolean {
+  return left.hostname.toLocaleLowerCase() === right.hostname.toLocaleLowerCase() &&
+    (left.port || (left.protocol === "https:" || left.protocol === "wss:" ? "443" : "")) ===
+      (right.port || (right.protocol === "https:" || right.protocol === "wss:" ? "443" : ""));
+}
+
+export function isTrustedMediaClientScript(
+  signalingUrl: string,
+  clientScriptUrl: string,
+  allowedClientOrigins: readonly string[] = []
+): boolean {
+  const signaling = secureUrl(signalingUrl);
+  const client = secureUrl(clientScriptUrl);
+  if (!signaling || !client || client.protocol !== "https:") return false;
+  if (sameNetworkAuthority(signaling, client)) return true;
+  return allowedClientOrigins.some((candidate) => {
+    const allowed = secureUrl(candidate);
+    return Boolean(allowed && allowed.protocol === "https:" && allowed.origin === client.origin);
+  });
+}
+
 function urlsFor(server: IceServerLike): readonly string[] {
   return typeof server.urls === "string" ? [server.urls] : server.urls;
 }
@@ -20,25 +52,21 @@ export function hasTurnServer(iceServers: readonly IceServerLike[]): boolean {
 }
 
 export function isSecureMediaUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "wss:";
-  } catch {
-    return false;
-  }
+  return secureUrl(value) !== null;
 }
 
 export function assertCandidateMediaTransport(
   input: MediaTransportInput,
   required: boolean,
-  now = Date.now()
+  now = Date.now(),
+  allowedClientOrigins: readonly string[] = []
 ): void {
   if (!required) return;
   if (!isSecureMediaUrl(input.signalingUrl)) {
     throw new Error("Transport média refusé : signalisation HTTPS/WSS requise.");
   }
-  if (input.clientScriptUrl && !isSecureMediaUrl(input.clientScriptUrl)) {
-    throw new Error("Transport média refusé : client SFU HTTPS requis.");
+  if (input.clientScriptUrl && !isTrustedMediaClientScript(input.signalingUrl, input.clientScriptUrl, allowedClientOrigins)) {
+    throw new Error("Transport média refusé : origine du client SFU non autorisée.");
   }
   if (!hasTurnServer(input.iceServers)) {
     throw new Error("Transport média refusé : serveur TURN manquant.");

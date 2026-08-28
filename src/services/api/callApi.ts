@@ -89,7 +89,9 @@ function normalizeSession(
     typeof payload.expires_at === "string" ? payload.expires_at : undefined;
   assertCandidateMediaTransport(
     { signalingUrl: socketUrl, clientScriptUrl, iceServers, expiresAt },
-    env.releaseStage === "release-candidate" || env.releaseStage === "production"
+    env.releaseStage === "release-candidate" || env.releaseStage === "production",
+    Date.now(),
+    env.mediaClientOrigins
   );
   const requestedLanguage = getTranslationRequestLanguage();
   return {

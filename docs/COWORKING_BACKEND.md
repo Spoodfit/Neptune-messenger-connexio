@@ -106,6 +106,8 @@ pour un bonjour individuel, ou :
 
 pour un bonjour collectif. Dans ce second cas, le serveur émet `coworking.hello` à tous les `participant_ids` de l'espace sauf l'émetteur, avec `from_user_id` et `space_id`. Il ne doit ni choisir le membre actuellement sélectionné dans l'interface, ni envoyer le signal à des personnes extérieures à l'espace.
 
+Le serveur applique également une limite d'un bonjour par paire `émetteur + cible` toutes les **30 secondes**. Une répétition renvoie `429` avec `Retry-After` et ne réémet aucun évènement temps réel. Le verrou côté application améliore l'expérience, mais ne remplace jamais ce contrôle serveur.
+
 ### `POST /v1/coworking/knock`
 
 Pour rejoindre une visio existante, la requête contient uniquement :
@@ -119,6 +121,8 @@ Le serveur résout l'hôte depuis `owner_id`. Si ce champ est momentanément abs
 `POST /v1/coworking/knock/:requestId/respond`
 
 Une acceptation ajoute le demandeur au même espace/SFU et émet `coworking.knock.resolved` **uniquement au demandeur**. Un refus ne modifie pas les participants. Le départ de l'hôte transfère atomiquement `owner_id` au participant restant le plus ancien ; si l'espace devient vide, il est fermé.
+
+Un seul toquement non résolu est autorisé par paire `demandeur + espace`. Après résolution, un nouveau toquement reste bloqué pendant **60 secondes**. Les répétitions renvoient le même `request_id` tant que la demande est en attente, puis `429` avec `Retry-After` pendant le délai de repos ; elles ne doivent jamais déclencher plusieurs sons ou notifications chez l'hôte.
 
 ### `POST /v1/coworking/spaces`
 

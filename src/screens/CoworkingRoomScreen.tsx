@@ -7,15 +7,23 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
+  useWindowDimensions,
   type GestureResponderEvent,
   type LayoutChangeEvent
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Reanimated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming
+} from "react-native-reanimated";
 
 import { env } from "@/config/env";
 import { participantPresence } from "@/domain/coworking";
@@ -24,6 +32,12 @@ import { useExperience } from "@/providers/ExperienceProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { useAppTheme } from "@/providers/ThemeProvider";
 import { CoworkingMapApi } from "@/services/api/coworkingMapApi";
+import { ApiError } from "@/services/api/httpClient";
+import { emitCoworkingActionFeedback } from "@/services/coworking/coworkingActionFeedback";
+import {
+  releaseCoworkingInteraction,
+  reserveCoworkingInteraction
+} from "@/services/coworking/coworkingInteractionGuard";
 import { AppAlert } from "@/services/ui/AppAlert";
 import { colors } from "@/theme";
 import type { AppUser } from "@/types/messaging";
@@ -51,6 +65,8 @@ export default function CoworkingRoomScreen() {
   const params = useLocalSearchParams<{ spaceId?: string | string[] }>();
   const spaceId = first(params.spaceId);
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const compactViewport = width < 330;
   const theme = useAppTheme();
   const { currentUser, accessToken } = useSession();
   const { members } = useExperience();
@@ -67,6 +83,8 @@ export default function CoworkingRoomScreen() {
   const savedMediaState = mediaStateForSpace(spaceId);
   const [cameraOn, setCameraOn] = useState(savedMediaState?.cameraOn ?? true);
   const [microphoneOn, setMicrophoneOn] = useState(savedMediaState?.microphoneOn ?? false);
+  const [screenSharing, setScreenSharing] = useState(false);
+  const [localMediaReady, setLocalMediaReady] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [pinnedUserId, setPinnedUserId] = useState<string | null>(null);
   const [roomViewMode, setRoomViewMode] = useState<"stage" | "overview">("stage");
@@ -117,6 +135,11 @@ export default function CoworkingRoomScreen() {
   }, [cameraOn, media, microphoneOn, spaceId, updateMediaState]);
 
   useEffect(() => {
+    setLocalMediaReady(false);
+    setScreenSharing(false);
+  }, [media?.spaceId]);
+
+  useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(null), 2600);
     return () => clearTimeout(timer);
@@ -147,6 +170,12 @@ export default function CoworkingRoomScreen() {
 
   const sayHello = async () => {
     if (!selectedMember || !space || busyAction) return;
+    const targetKey = isGeneralRoom ? `user:${selectedMember.id}` : `space:${space.id}`;
+    const reservation = reserveCoworkingInteraction("hello", targetKey);
+    if (!reservation.allowed) {
+      setNotice(`Bonjour déjà envoyé · réessayez dans ${Math.ceil(reservation.remainingMs / 1_000)} s`);
+      return;
+    }
     setBusyAction("hello");
     try {
       if (mapApi) {
@@ -154,11 +183,15 @@ export default function CoworkingRoomScreen() {
           ? { userId: selectedMember.id }
           : { spaceId: space.id });
       }
-      setNotice(isGeneralRoom
-        ? `Bonjour envoyé à ${firstName(selectedMember.name)} 👋`
-        : "Bonjour envoyé à tout l’espace 👋");
+      const message = isGeneralRoom
+        ? `Bonjour envoyé à ${firstName(selectedMember.name)}`
+        : "Bonjour envoyé à tout l’espace";
+      emitCoworkingActionFeedback({ type: "hello", message });
       setSelectedUserId(null);
     } catch (error) {
+      if (!(error instanceof ApiError && error.status === 429)) {
+        releaseCoworkingInteraction("hello", targetKey);
+      }
       AppAlert.alert("Bonjour non envoyé", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     } finally {
       setBusyAction(null);
@@ -201,7 +234,7 @@ export default function CoworkingRoomScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: theme.pageBackground }]}> 
+    <View style={[styles.screen, { backgroundColor: theme.pageBackground }]}>
       <LinearGradient colors={theme.pageGradient} style={StyleSheet.absoluteFill} />
 
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 9), borderBottomColor: theme.borderSoft, backgroundColor: theme.shellBackground }]}>
@@ -276,19 +309,26 @@ export default function CoworkingRoomScreen() {
               })}
             </View>
 
-            {media && !media.mock ? (
+            {media ? (
               <View pointerEvents="none" style={StyleSheet.absoluteFill}>
                 <CoworkingMediaSurface
                   session={media}
                   displayName={currentUser.name}
                   cameraOn={cameraOn}
                   microphoneOn={microphoneOn}
+                  screenSharing={screenSharing}
                   spatialAudio
                   participantLayout={participantLayout}
+                  onLocalMediaReady={() => {
+                    setLocalMediaReady(true);
+                    setMediaError(null);
+                  }}
+                  onScreenShareStateChange={setScreenSharing}
                   onError={setMediaError}
                   onLocalMediaUnavailable={(message) => {
                     setCameraOn(false);
                     setMicrophoneOn(false);
+                    setLocalMediaReady(false);
                     setMediaError(message);
                   }}
                 />
@@ -338,18 +378,19 @@ export default function CoworkingRoomScreen() {
                 <View testID="coworking-focus-remote" style={styles.focusFallback}>
                   <View testID="coworking-focus-video" style={[styles.focusVideoSurface, { backgroundColor: theme.surface }]}>
                     <View style={styles.focusCameraFallback}>
-                      <View testID="coworking-focus-avatar" style={[styles.focusAvatarShell, { borderColor: focusedPresence?.speaking ? theme.success : theme.borderSoft, backgroundColor: theme.surfaceStrong }]}>
-                        <StatusAvatar user={focusedMember} size={116} accessible={false} />
+                      <View style={styles.focusAvatarStage}>
+                        <AudioHalo active={Boolean(focusedPresence?.speaking && focusedPresence.microphoneOn)} size={148} color={theme.success} />
+                        <View testID="coworking-focus-avatar" style={[styles.focusAvatarShell, { borderColor: focusedPresence?.speaking ? theme.success : theme.borderSoft, backgroundColor: theme.surfaceStrong }]}>
+                          <StatusAvatar user={focusedMember} size={116} accessible={false} />
+                        </View>
                       </View>
                       {!focusedPresence?.cameraOn ? <Ionicons name="videocam-off-outline" size={24} color={theme.pageTextMuted} /> : null}
                     </View>
-                    {focusedPresence?.cameraOn && focusedMember.avatarUrl ? (
-                      <Image
-                        source={{ uri: focusedMember.avatarUrl }}
-                        resizeMode="cover"
-                        accessibilityIgnoresInvertColors
-                        style={styles.focusVideoImage}
-                      />
+                    {focusedPresence?.cameraOn && (!media || media.mock) ? (
+                      <View style={[styles.cameraWaiting, compactViewport && styles.cameraWaitingCompact, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
+                        <Ionicons name="videocam-outline" size={15} color={theme.violet} />
+                        <Text numberOfLines={1} style={[styles.cameraWaitingText, { color: theme.pageText }]}>{compactViewport ? "Caméra en attente" : "Flux caméra en attente"}</Text>
+                      </View>
                     ) : null}
                     <LinearGradient
                       pointerEvents="none"
@@ -403,19 +444,26 @@ export default function CoworkingRoomScreen() {
               ) : null}
             </View>
 
-            {media && !media.mock ? (
+            {media ? (
               <View pointerEvents="none" style={StyleSheet.absoluteFill}>
                 <CoworkingMediaSurface
                   session={media}
                   displayName={currentUser.name}
                   cameraOn={cameraOn}
                   microphoneOn={microphoneOn}
+                  screenSharing={screenSharing}
                   roomViewMode={roomViewMode}
                   focusParticipantId={focusedMember?.id}
+                  onLocalMediaReady={() => {
+                    setLocalMediaReady(true);
+                    setMediaError(null);
+                  }}
+                  onScreenShareStateChange={setScreenSharing}
                   onError={setMediaError}
                   onLocalMediaUnavailable={(message) => {
                     setCameraOn(false);
                     setMicrophoneOn(false);
+                    setLocalMediaReady(false);
                     setMediaError(message);
                   }}
                 />
@@ -433,7 +481,7 @@ export default function CoworkingRoomScreen() {
                 <Text style={[styles.viewToggleText, { color: theme.pageText }]}>{roomViewMode === "stage" ? "Ensemble" : "Principale"}</Text>
               </Pressable>
 
-              {roomViewMode === "stage" && (!media || media.mock) ? (
+              {roomViewMode === "stage" && !localMediaReady ? (
                 <View testID="coworking-self-preview" pointerEvents="none" style={[styles.selfPreview, { backgroundColor: theme.surface, borderColor: theme.violet }]}>
                   <StatusAvatar user={currentUser} size={48} accessible={false} />
                   <Text style={[styles.selfPreviewText, { color: theme.pageText }]}>Moi</Text>
@@ -479,7 +527,7 @@ export default function CoworkingRoomScreen() {
         {mediaError ? (
           <View pointerEvents="none" style={[styles.mediaWarning, { bottom: isGeneralRoom ? 12 : 92, backgroundColor: theme.dangerSoft, borderColor: theme.danger }]}>
             <Ionicons name="alert-circle-outline" size={16} color={theme.danger} />
-            <Text numberOfLines={2} style={[styles.mediaWarningText, { color: theme.pageText }]}>Connexion média réduite. La présence reste disponible.</Text>
+            <Text numberOfLines={2} style={[styles.mediaWarningText, { color: theme.pageText }]}>{mediaError}</Text>
           </View>
         ) : null}
       </View>
@@ -517,6 +565,13 @@ export default function CoworkingRoomScreen() {
       <View style={[styles.controls, { paddingBottom: Math.max(insets.bottom, 10), backgroundColor: theme.shellBackground, borderTopColor: theme.borderSoft }]}>
         <Control icon={microphoneOn ? "mic" : "mic-off"} label={microphoneOn ? "Couper le micro" : "Activer le micro"} active={microphoneOn} onPress={() => setMicrophoneOn((value) => !value)} />
         <Control icon={cameraOn ? "videocam" : "videocam-off"} label={cameraOn ? "Couper la caméra" : "Activer la caméra"} active={cameraOn} onPress={() => setCameraOn((value) => !value)} />
+        <Control icon={screenSharing ? "stop-circle" : "desktop-outline"} label={screenSharing ? "Arrêter le partage d’écran" : "Partager mon écran"} active={screenSharing} onPress={() => {
+          if (!media) {
+            setMediaError("Le partage d’écran nécessite une session média active.");
+            return;
+          }
+          setScreenSharing((value) => !value);
+        }} />
         <Pressable accessibilityRole="button" accessibilityLabel="Quitter la salle" onPress={() => void leave()} style={({ pressed }) => [styles.leaveControl, { backgroundColor: theme.danger }, pressed && styles.pressed]}>
           <Ionicons name="exit" size={24} color={colors.white} />
         </Pressable>
@@ -528,6 +583,40 @@ export default function CoworkingRoomScreen() {
         </View>
       ) : null}
     </View>
+  );
+}
+
+function AudioHalo({ active, size, color }: { active: boolean; size: number; color: string }) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    cancelAnimation(progress);
+    if (!active) {
+      progress.value = 0;
+      return;
+    }
+    progress.value = withRepeat(
+      withTiming(1, { duration: 1_350, easing: Easing.out(Easing.quad) }),
+      -1,
+      false
+    );
+    return () => cancelAnimation(progress);
+  }, [active, progress]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: active ? 0.42 * (1 - progress.value) : 0,
+    transform: [{ scale: 0.88 + progress.value * 0.34 }]
+  }), [active]);
+
+  return (
+    <Reanimated.View
+      pointerEvents="none"
+      style={[
+        styles.audioHalo,
+        { width: size, height: size, borderRadius: size / 2, borderColor: color },
+        animatedStyle
+      ]}
+    />
   );
 }
 
@@ -579,9 +668,13 @@ const styles = StyleSheet.create({
   privateBackdrop: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   focusFallback: { ...StyleSheet.absoluteFillObject },
   focusVideoSurface: { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
-  focusVideoImage: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, width: "100%", height: "100%" },
+  cameraWaiting: { position: "absolute", left: 14, top: 14, minHeight: 34, borderRadius: 17, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 6 },
+  cameraWaitingCompact: { right: 124, paddingHorizontal: 8, gap: 4 },
+  cameraWaitingText: { flexShrink: 1, fontSize: 10, lineHeight: 13, fontWeight: "900" },
   focusVideoShade: { position: "absolute", left: 0, right: 0, top: "38%", bottom: 0 },
   focusCameraFallback: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", gap: 12, paddingBottom: 76 },
+  focusAvatarStage: { width: 168, height: 168, alignItems: "center", justifyContent: "center" },
+  audioHalo: { position: "absolute", borderWidth: 3 },
   focusAvatarShell: { width: 148, height: 148, borderRadius: 74, borderWidth: 3, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   focusName: { position: "absolute", left: 14, right: 104, bottom: 94, minHeight: 38, borderRadius: 19, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   focusNameText: { flexShrink: 1, fontSize: 13, lineHeight: 17, fontWeight: "900" },

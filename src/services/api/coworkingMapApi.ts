@@ -36,7 +36,9 @@ function normalizeMedia(value: unknown, observerByDefault: boolean): CoworkingMe
   const expiresAt = stringValue(item.expires_at) || undefined;
   assertCandidateMediaTransport(
     { signalingUrl: socketUrl, clientScriptUrl, iceServers, expiresAt },
-    env.releaseStage === "release-candidate" || env.releaseStage === "production"
+    env.releaseStage === "release-candidate" || env.releaseStage === "production",
+    Date.now(),
+    env.mediaClientOrigins
   );
   const explicitObserver = item.observer === true || item.listen_only === true || item.listenOnly === true;
   const explicitPublisher = item.observer === false || item.publish === true || item.publisher === true;

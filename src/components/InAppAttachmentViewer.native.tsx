@@ -12,6 +12,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
 import { colors, spacing, typography } from "../theme";
+import {
+  allowsAttachmentNavigation,
+  attachmentWebViewPolicy
+} from "../domain/webViewSecurity";
 import type { InAppAttachmentViewerProps } from "./InAppAttachmentViewer.types";
 import { HighlightMediaView } from "./HighlightMediaView";
 
@@ -25,6 +29,7 @@ export default function InAppAttachmentViewer({
   const styles = useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const uri = attachment.downloadUrl ?? attachment.uri ?? "";
+  const webViewPolicy = useMemo(() => attachmentWebViewPolicy(uri), [uri]);
   const isImage = attachment.kind === "photo";
   const isVideo = attachment.kind === "video";
 
@@ -75,7 +80,7 @@ export default function InAppAttachmentViewer({
             }
           ]}
         >
-          {!uri ? (
+          {!uri || !webViewPolicy ? (
             <Text style={styles.empty}>Ce fichier n’est plus accessible.</Text>
           ) : isImage ? (
             <Image source={{ uri }} resizeMode="contain" style={styles.image} />
@@ -100,9 +105,23 @@ export default function InAppAttachmentViewer({
           ) : (
             <WebView
               source={{ uri }}
-              originWhitelist={["https://*", "file://*", "data:*", "blob:*"]}
-              allowsInlineMediaPlayback
-              allowingReadAccessToURL={uri}
+              originWhitelist={webViewPolicy.originWhitelist}
+              javaScriptEnabled={false}
+              domStorageEnabled={false}
+              cacheEnabled={false}
+              incognito
+              allowFileAccess={webViewPolicy.allowFileAccess}
+              allowFileAccessFromFileURLs={false}
+              allowUniversalAccessFromFileURLs={false}
+              allowingReadAccessToURL={webViewPolicy.allowFileAccess ? uri : undefined}
+              sharedCookiesEnabled={false}
+              thirdPartyCookiesEnabled={false}
+              javaScriptCanOpenWindowsAutomatically={false}
+              setSupportMultipleWindows={false}
+              mixedContentMode="never"
+              onShouldStartLoadWithRequest={(request) =>
+                allowsAttachmentNavigation(uri, request.url)
+              }
               style={styles.webView}
               startInLoadingState
             />

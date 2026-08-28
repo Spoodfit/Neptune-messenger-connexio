@@ -12,6 +12,7 @@ import {
 } from "../src/i18n/translationLocale";
 import { normalizeMessageTranslation } from "../src/services/api/translationWire";
 import { capabilitiesForBackendContract } from "../src/config/backendCapabilities";
+import { translationSourceAttribution } from "../src/i18n/contentTranslation";
 
 test("normalise les locales système vers une langue supportée", () => {
   strictEqual(normalizeLanguageCode("fr-FR"), "fr");
@@ -60,4 +61,14 @@ test("la traduction appartient au contrat Connexio uniquement", () => {
     capabilitiesForBackendContract("neptune-web-v1").messageTranslation,
     false
   );
+});
+
+test("l’attribution de traduction reste grammaticale dans la langue de l’interface", () => {
+  const translation = {
+    sourceLanguage: "en",
+    targetLanguage: "fr",
+    status: "ready" as const
+  };
+  strictEqual(translationSourceAttribution(translation, "fr"), "Traduit de l’anglais");
+  strictEqual(translationSourceAttribution(translation, "en"), "Translated from English");
 });

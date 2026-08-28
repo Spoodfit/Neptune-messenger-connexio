@@ -11,7 +11,7 @@ import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { buildIntegratedCallHtml } from "../services/calls/callRoom";
 import { buildLiveCaptionBootstrapScript } from "../services/calls/liveCaptions";
-import { colors } from "../theme";
+import { allowsWebViewNavigation, mediaWebViewOrigins } from "../domain/webViewSecurity";
 import type { CallSurfaceProps } from "./CallSurface.types";
 
 const NATIVE_CALL_BRIDGE = `
@@ -46,10 +46,13 @@ true;
 `;
 
 import { useAppTheme } from "@/providers/ThemeProvider";
+import { useAppLanguage } from "@/providers/LanguageProvider";
 export default function CallSurface({ session, displayName, onClose, onUnanswered }: CallSurfaceProps) {
   const theme = useAppTheme();
+  const { uiLanguage } = useAppLanguage();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const html = useMemo(() => buildIntegratedCallHtml(session, displayName), [displayName, session]);
+  const html = useMemo(() => buildIntegratedCallHtml(session, displayName, uiLanguage), [displayName, session, uiLanguage]);
+  const allowedOrigins = useMemo(() => mediaWebViewOrigins(session.socketUrl, session.clientScriptUrl), [session.clientScriptUrl, session.socketUrl]);
   const captionBootstrap = useMemo(() => buildLiveCaptionBootstrapScript(session, displayName), [displayName, session]);
   const injectedBootstrap = useMemo(() => `${captionBootstrap}\n${NATIVE_CALL_BRIDGE}`, [captionBootstrap]);
   const ringbackPlayer = useAudioPlayer(require("../../assets/audio/connexio-ringtone.mp3"));
@@ -85,6 +88,7 @@ export default function CallSurface({ session, displayName, onClose, onUnanswere
   };
 
   const handleMessage = (event: WebViewMessageEvent) => {
+    if (!allowsWebViewNavigation(event.nativeEvent.url, allowedOrigins)) return;
     try {
       const payload = JSON.parse(event.nativeEvent.data) as { type?: string; callId?: string; conversationId?: string; reason?: string };
       if (payload.type === "connected") {
@@ -108,15 +112,25 @@ export default function CallSurface({ session, displayName, onClose, onUnanswere
   return (
     <View style={styles.screen}>
       <WebView
-        source={{ html, baseUrl: new URL(session.socketUrl).origin }}
+        source={{ html, baseUrl: allowedOrigins[0] }}
         injectedJavaScriptBeforeContentLoaded={injectedBootstrap}
         javaScriptEnabled
-        domStorageEnabled
+        domStorageEnabled={false}
+        cacheEnabled={false}
+        incognito
         mediaPlaybackRequiresUserAction={false}
-        allowFileAccess
+        allowFileAccess={false}
+        allowFileAccessFromFileURLs={false}
+        allowUniversalAccessFromFileURLs={false}
         allowsInlineMediaPlayback
         allowsFullscreenVideo
-        originWhitelist={["https://*", "http://localhost*"]}
+        mixedContentMode="never"
+        sharedCookiesEnabled={false}
+        thirdPartyCookiesEnabled={false}
+        javaScriptCanOpenWindowsAutomatically={false}
+        setSupportMultipleWindows={false}
+        originWhitelist={["about:blank", ...allowedOrigins]}
+        onShouldStartLoadWithRequest={(request) => allowsWebViewNavigation(request.url, allowedOrigins)}
         onMessage={handleMessage}
         style={styles.webView}
       />

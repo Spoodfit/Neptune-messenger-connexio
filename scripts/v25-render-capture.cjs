@@ -59,10 +59,28 @@ async function run() {
     await open(page, "/coworking");
     const mapFrame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
     const available = mapFrame.locator(".cw-marker.available").first();
-    if (await available.isVisible().catch(() => false)) { await available.click(); await shot(page, "map-available-profile-393x852"); await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {}); }
+    if (await available.isVisible().catch(() => false)) {
+      await available.click();
+      await shot(page, "map-available-profile-393x852");
+      await page.getByLabel("Dire bonjour", { exact:true }).click().catch(() => {});
+      await page.getByTestId("coworking-action-motion").waitFor({ state:"visible", timeout:2000 }).catch(() => {});
+      await shot(page, "map-bonjour-motion-393x852");
+      await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
+      await page.getByTestId("coworking-action-motion").waitFor({ state:"detached", timeout:2600 }).catch(() => {});
+    }
     const busy = mapFrame.locator(".cw-marker.busy").first();
-    if (await busy.isVisible().catch(() => false)) { await busy.click(); await shot(page, "map-video-satellites-393x852"); await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {}); }
-    const event = mapFrame.locator(".event-marker").first();
+    if (await busy.isVisible().catch(() => false)) {
+      await busy.click();
+      await shot(page, "map-video-satellites-393x852");
+      await page.getByLabel("Toquer à l’espace et demander l’autorisation d’entrer", { exact:true }).click().catch(() => {});
+      await page.getByTestId("coworking-action-motion").waitFor({ state:"visible", timeout:2000 }).catch(() => {});
+      await shot(page, "map-knock-motion-393x852");
+      await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
+      await page.getByTestId("coworking-action-motion").waitFor({ state:"detached", timeout:2600 }).catch(() => {});
+    }
+    // Capture the interaction from the displaced visual hit surface. The
+    // marker's geographic anchor intentionally stays fixed under the map.
+    const event = mapFrame.locator(".event-marker .event-hit").first();
     if (await event.isVisible().catch(() => false)) {
       await event.click();
       await page.mouse.move(20, 180);

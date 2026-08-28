@@ -8,12 +8,17 @@ import {
   useAudioRecorderState
 } from "expo-audio";
 import * as Crypto from "expo-crypto";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent
+} from "expo-speech-recognition";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from "react-native";
 import { AppAlert } from "@/services/ui/AppAlert";
 import { useAppTheme } from "@/providers/ThemeProvider";
 
+import { getCurrentUiLocaleTag } from "../i18n/uiLocale";
 import { colors, gradients } from "../theme";
 import type { MessageAttachment } from "../types/messaging";
 
@@ -28,6 +33,11 @@ const RECORDING_OPTIONS = {
   isMeteringEnabled: true
 };
 
+const SPEECH_RECORDING_SUPPORTED = (
+  Platform.OS === "ios" ||
+  (Platform.OS === "android" && Number(Platform.Version) >= 33)
+) && ExpoSpeechRecognitionModule.supportsRecording();
+
 function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
@@ -40,24 +50,77 @@ export function InlineVoiceRecorder({ onCancel, onRecorded, maxDurationSeconds =
   const recorderState = useAudioRecorderState(recorder, 100);
   const [preparing, setPreparing] = useState(true);
   const [finishing, setFinishing] = useState(false);
+  const [speechElapsedMillis, setSpeechElapsedMillis] = useState(0);
+  const [speechMetering, setSpeechMetering] = useState<number | null>(null);
   const mountedRef = useRef(true);
   const startedRef = useRef(false);
   const finalizedRef = useRef(false);
   const restoringAudioRef = useRef<Promise<void> | null>(null);
+  const transcriptionRef = useRef("");
+  const finalTranscriptionSegmentsRef = useRef<string[]>([]);
+  const speechRecordingUriRef = useRef<string | null>(null);
+  const speechAudioEndResolverRef = useRef<(() => void) | null>(null);
+  const speechStartedAtRef = useRef(0);
+  const speechElapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speechLimitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackRecorderActiveRef = useRef(false);
+  const recognitionActiveRef = useRef(false);
   const onCancelRef = useRef(onCancel);
   const onRecordedRef = useRef(onRecorded);
-  const elapsedSeconds = recorderState.durationMillis / 1000;
-  const meteringLevel = Math.max(0, Math.min(1, ((recorderState.metering ?? -60) + 60) / 60));
+  const elapsedSeconds = SPEECH_RECORDING_SUPPORTED
+    ? speechElapsedMillis / 1000
+    : recorderState.durationMillis / 1000;
+  const meteringLevel = SPEECH_RECORDING_SUPPORTED
+    ? speechMetering ?? 0
+    : Math.max(0, Math.min(1, ((recorderState.metering ?? -60) + 60) / 60));
   const waveform = useMemo(
     () => Array.from({ length: 32 }, (_, index) => {
       const phase = elapsedSeconds * 7 + index * 0.9;
       const fallbackLevel = 0.18 + Math.abs(Math.sin(phase)) * 0.42;
-      const liveLevel = recorderState.metering == null ? fallbackLevel : meteringLevel;
+      const meterAvailable = SPEECH_RECORDING_SUPPORTED ? speechMetering != null : recorderState.metering != null;
+      const liveLevel = meterAvailable ? meteringLevel : fallbackLevel;
       const barVariation = 0.58 + Math.abs(Math.sin(index * 1.17)) * 0.42;
       return 6 + Math.round(liveLevel * barVariation * 25);
     }),
-    [elapsedSeconds, meteringLevel, recorderState.metering]
+    [elapsedSeconds, meteringLevel, recorderState.metering, speechMetering]
   );
+
+  const stopSpeechTimers = () => {
+    if (speechElapsedTimerRef.current) clearInterval(speechElapsedTimerRef.current);
+    if (speechLimitTimerRef.current) clearTimeout(speechLimitTimerRef.current);
+    speechElapsedTimerRef.current = null;
+    speechLimitTimerRef.current = null;
+  };
+
+  useSpeechRecognitionEvent("result", (event) => {
+    const transcript = event.results[0]?.transcript?.trim();
+    if (!transcript) return;
+    if (event.isFinal && finalTranscriptionSegmentsRef.current.at(-1) !== transcript) {
+      finalTranscriptionSegmentsRef.current.push(transcript);
+    }
+    const segments = event.isFinal
+      ? finalTranscriptionSegmentsRef.current
+      : [...finalTranscriptionSegmentsRef.current, transcript];
+    transcriptionRef.current = segments.join(" ").trim();
+  });
+  useSpeechRecognitionEvent("volumechange", (event) => {
+    setSpeechMetering(Math.max(0, Math.min(1, (event.value + 2) / 12)));
+  });
+  useSpeechRecognitionEvent("audioend", (event) => {
+    if (event.uri) speechRecordingUriRef.current = event.uri;
+    recognitionActiveRef.current = false;
+    stopSpeechTimers();
+    speechAudioEndResolverRef.current?.();
+    speechAudioEndResolverRef.current = null;
+  });
+  useSpeechRecognitionEvent("end", () => {
+    recognitionActiveRef.current = false;
+    stopSpeechTimers();
+    if (speechRecordingUriRef.current) {
+      speechAudioEndResolverRef.current?.();
+      speechAudioEndResolverRef.current = null;
+    }
+  });
 
   useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
   useEffect(() => { onRecordedRef.current = onRecorded; }, [onRecorded]);
@@ -75,7 +138,21 @@ export function InlineVoiceRecorder({ onCancel, onRecorded, maxDurationSeconds =
   const stopOnce = async () => {
     if (finalizedRef.current) return;
     finalizedRef.current = true;
-    if (recorderState.isRecording) await recorder.stop().catch(() => undefined);
+    if (SPEECH_RECORDING_SUPPORTED) {
+      stopSpeechTimers();
+      if (!recognitionActiveRef.current) return;
+      const audioEnded = new Promise<void>((resolve) => { speechAudioEndResolverRef.current = resolve; });
+      ExpoSpeechRecognitionModule.stop();
+      await Promise.race([
+        audioEnded,
+        new Promise<void>((resolve) => setTimeout(resolve, 5_000))
+      ]);
+      return;
+    }
+    if (fallbackRecorderActiveRef.current || recorderState.isRecording) {
+      await recorder.stop().catch(() => undefined);
+      fallbackRecorderActiveRef.current = false;
+    }
   };
 
   useEffect(() => {
@@ -86,7 +163,9 @@ export function InlineVoiceRecorder({ onCancel, onRecorded, maxDurationSeconds =
 
     void (async () => {
       try {
-        const permission = await requestRecordingPermissionsAsync();
+        const permission = SPEECH_RECORDING_SUPPORTED
+          ? await ExpoSpeechRecognitionModule.requestPermissionsAsync()
+          : await requestRecordingPermissionsAsync();
         if (cancelled) return;
         if (!permission.granted) throw new Error("Autorisez le microphone pour enregistrer un vocal.");
         await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
@@ -94,12 +173,41 @@ export function InlineVoiceRecorder({ onCancel, onRecorded, maxDurationSeconds =
           await restorePlaybackMode();
           return;
         }
-        await recorder.prepareToRecordAsync();
-        if (cancelled) {
-          await restorePlaybackMode();
-          return;
+        if (SPEECH_RECORDING_SUPPORTED) {
+          transcriptionRef.current = "";
+          finalTranscriptionSegmentsRef.current = [];
+          speechRecordingUriRef.current = null;
+          speechStartedAtRef.current = Date.now();
+          recognitionActiveRef.current = true;
+          ExpoSpeechRecognitionModule.start({
+            lang: getCurrentUiLocaleTag(),
+            interimResults: true,
+            continuous: true,
+            maxAlternatives: 1,
+            addsPunctuation: true,
+            recordingOptions: {
+              persist: true,
+              outputFileName: `connexio-vocal-${Date.now()}.wav`,
+              outputSampleRate: 16_000,
+              outputEncoding: "pcmFormatInt16"
+            },
+            volumeChangeEventOptions: { enabled: true, intervalMillis: 100 }
+          });
+          speechElapsedTimerRef.current = setInterval(() => {
+            if (mountedRef.current) setSpeechElapsedMillis(Date.now() - speechStartedAtRef.current);
+          }, 100);
+          speechLimitTimerRef.current = setTimeout(() => {
+            if (recognitionActiveRef.current) ExpoSpeechRecognitionModule.stop();
+          }, maxDurationSeconds * 1_000);
+        } else {
+          await recorder.prepareToRecordAsync();
+          if (cancelled) {
+            await restorePlaybackMode();
+            return;
+          }
+          recorder.record({ forDuration: maxDurationSeconds });
+          fallbackRecorderActiveRef.current = true;
         }
-        recorder.record({ forDuration: maxDurationSeconds });
         if (mountedRef.current) setPreparing(false);
       } catch (error) {
         await restorePlaybackMode();
@@ -115,7 +223,11 @@ export function InlineVoiceRecorder({ onCancel, onRecorded, maxDurationSeconds =
     return () => {
       cancelled = true;
       mountedRef.current = false;
-      if (!finalizedRef.current) {
+      stopSpeechTimers();
+      if (SPEECH_RECORDING_SUPPORTED && recognitionActiveRef.current) {
+        recognitionActiveRef.current = false;
+        ExpoSpeechRecognitionModule.abort();
+      } else if (!finalizedRef.current && fallbackRecorderActiveRef.current) {
         finalizedRef.current = true;
         void recorder.stop().catch(() => undefined).finally(() => { void restorePlaybackMode(); });
       } else {
@@ -141,18 +253,21 @@ export function InlineVoiceRecorder({ onCancel, onRecorded, maxDurationSeconds =
     try {
       await stopOnce();
       await restorePlaybackMode();
-      const uri = recorder.uri;
+      const uri = SPEECH_RECORDING_SUPPORTED ? speechRecordingUriRef.current : recorder.uri;
       if (!uri) throw new Error("Le fichier vocal n’a pas été créé.");
+      const transcript = transcriptionRef.current.trim() || undefined;
+      const speechRecording = SPEECH_RECORDING_SUPPORTED;
       await onRecordedRef.current({
         id: `local-voice-${Crypto.randomUUID()}`,
         kind: "audio",
-        name: `vocal-${Date.now()}.m4a`,
+        name: `vocal-${Date.now()}.${speechRecording ? "wav" : "m4a"}`,
         uri,
-        mimeType: "audio/mp4",
+        mimeType: speechRecording ? "audio/wav" : "audio/mp4",
         durationSeconds: Math.max(1, Math.round(elapsedSeconds)),
         status: "local",
         uploadProgress: 0,
-        transcriptStatus: "pending"
+        transcript,
+        transcriptStatus: transcript ? "ready" : "pending"
       });
     } catch (error) {
       finalizedRef.current = false;

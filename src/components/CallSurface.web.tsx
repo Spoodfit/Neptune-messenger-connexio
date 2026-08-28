@@ -1,4 +1,4 @@
-import { createElement, useEffect, useMemo } from "react";
+import { createElement, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { buildIntegratedCallHtml } from "../services/calls/callRoom";
@@ -7,6 +7,7 @@ import { colors } from "../theme";
 import type { CallSurfaceProps } from "./CallSurface.types";
 
 import { useAppTheme } from "@/providers/ThemeProvider";
+import { useAppLanguage } from "@/providers/LanguageProvider";
 export default function CallSurface({
   session,
   displayName,
@@ -14,19 +15,23 @@ export default function CallSurface({
   onUnanswered
 }: CallSurfaceProps) {
   const theme = useAppTheme();
+  const { uiLanguage } = useAppLanguage();
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const styles = useMemo(() => createStyles(theme), [theme]);
   const html = useMemo(
     () =>
       injectLiveCaptionRuntime(
-        buildIntegratedCallHtml(session, displayName),
+        buildIntegratedCallHtml(session, displayName, uiLanguage),
         session,
         displayName
       ),
-    [displayName, session]
+    [displayName, session, uiLanguage]
   );
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
+      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
+      if (globalThis.location?.origin && event.origin !== globalThis.location.origin) return;
       if (!event.data) return;
       try {
         const payload =
@@ -56,11 +61,14 @@ export default function CallSurface({
   return (
     <View style={styles.screen}>
       {createElement("iframe", {
+        ref: (node: HTMLIFrameElement | null) => { iframeRef.current = node; },
         title:
           session.mode === "audio"
             ? "Appel audio Connexio"
             : "Appel vidéo Connexio",
         srcDoc: html,
+        sandbox: "allow-scripts allow-same-origin",
+        referrerPolicy: "no-referrer",
         allow:
           "camera; microphone; fullscreen; autoplay; speaker-selection; display-capture",
         style: {

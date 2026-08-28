@@ -13,8 +13,11 @@ import { ActivityIndicator,
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { getRoleAppearance } from "../domain/roleAppearance";
+import { allowsWebViewNavigation } from "../domain/webViewSecurity";
+import { useAppLanguage } from "../providers/LanguageProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { AppAlert } from "../services/ui/AppAlert";
+import { LEAFLET_SCRIPTS, LEAFLET_STYLESHEETS, MAP_DOCUMENT_ORIGIN, leafletSecurityMeta } from "../services/maps/leafletAssets";
 import { radii } from "../theme";
 import type { NeptuneMapProps } from "./NeptuneMap.types";
 
@@ -30,6 +33,7 @@ function escapeForInlineJson(value: unknown): string {
 
 export default function NeptuneMap({ moments, selectedMemberId, onSelectMember }: NeptuneMapProps) {
   const theme = useAppTheme();
+  const { uiLanguage } = useAppLanguage();
   const webViewRef = useRef<WebView>(null);
   const [locating, setLocating] = useState(false);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
@@ -73,13 +77,12 @@ export default function NeptuneMap({ moments, selectedMemberId, onSelectMember }
     };
     const vars = escapeForInlineJson(css);
     return `<!doctype html>
-<html lang="fr">
+<html lang="${uiLanguage}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+${leafletSecurityMeta()}
+${LEAFLET_STYLESHEETS}
 <style>
 :root{--bg:${css.background};--surface:${css.surface};--surface-strong:${css.surfaceStrong};--text:${css.text};--muted:${css.muted};--border:${css.border};--accent:${css.accent};--violet:${css.violet};--orange:${css.orange};--shell:${css.shell}}
 html,body,#map{height:100%;margin:0;background:var(--bg);font-family:Arial,sans-serif}
@@ -89,8 +92,7 @@ html,body,#map{height:100%;margin:0;background:var(--bg);font-family:Arial,sans-
 </style>
 </head>
 <body><div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+${LEAFLET_SCRIPTS}
 <script>
 const members=${serialized};const palette=${vars};
 const markerNodes=new Map();
@@ -104,9 +106,10 @@ map.addLayer(cluster);if(bounds.length){map.fitBounds(bounds,{padding:[54,54],ma
 let userCircle=null,userMarker=null;function showUserLocation(location){if(!location)return;const point=[location.latitude,location.longitude];if(userCircle)map.removeLayer(userCircle);if(userMarker)map.removeLayer(userMarker);userCircle=L.circle(point,{radius:Math.max(100,location.accuracy||100),color:palette.orange,fillColor:palette.accent,fillOpacity:.13,weight:2}).addTo(map);userMarker=L.circleMarker(point,{radius:7,color:palette.surface,weight:3,fillColor:palette.accent,fillOpacity:1}).addTo(map);map.flyTo(point,13,{duration:.8});}
 function updateSelection(memberId){markerNodes.forEach((node,id)=>node.classList.toggle('selected',Boolean(memberId)&&id===memberId));}function handleParentMessage(raw){try{const data=typeof raw==='string'?JSON.parse(raw):raw;if(data.type==='user-location')showUserLocation(data.location);if(data.type==='selected-member')updateSelection(data.memberId||null);}catch{}}window.addEventListener('message',event=>handleParentMessage(event.data));document.addEventListener('message',event=>handleParentMessage(event.data));
 </script></body></html>`;
-  }, [moments, theme.accent, theme.border, theme.isLight, theme.orange, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, theme.violet]);
+  }, [moments, theme.accent, theme.border, theme.isLight, theme.orange, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, theme.violet, uiLanguage]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
+    if (!allowsWebViewNavigation(event.nativeEvent.url, [MAP_DOCUMENT_ORIGIN])) return;
     try {
       const payload = JSON.parse(event.nativeEvent.data) as { type?: string; memberId?: string };
       if (payload.type === "member-selected" && payload.memberId) onSelectMember(payload.memberId);
@@ -133,7 +136,7 @@ function updateSelection(memberId){markerNodes.forEach((node,id)=>node.classList
 
   return (
     <View style={[styles.wrap, { borderColor: theme.border, backgroundColor: theme.pageBackground }]}>
-      <WebView ref={webViewRef} source={{ html }} onMessage={handleMessage} onLoadEnd={() => postMapState()} javaScriptEnabled domStorageEnabled originWhitelist={["*"]} mixedContentMode="never" style={[styles.webView, { backgroundColor: theme.pageBackground }]} />
+      <WebView ref={webViewRef} source={{ html, baseUrl: MAP_DOCUMENT_ORIGIN }} onMessage={handleMessage} onLoadEnd={() => postMapState()} javaScriptEnabled domStorageEnabled={false} cacheEnabled={false} incognito allowFileAccess={false} allowFileAccessFromFileURLs={false} allowUniversalAccessFromFileURLs={false} sharedCookiesEnabled={false} thirdPartyCookiesEnabled={false} javaScriptCanOpenWindowsAutomatically={false} setSupportMultipleWindows={false} originWhitelist={["about:blank", MAP_DOCUMENT_ORIGIN]} onShouldStartLoadWithRequest={(request) => allowsWebViewNavigation(request.url, [MAP_DOCUMENT_ORIGIN])} mixedContentMode="never" style={[styles.webView, { backgroundColor: theme.pageBackground }]} />
       <Pressable accessibilityRole="button" accessibilityLabel="Me localiser" onPress={() => void locateUser()} style={({ pressed }) => [styles.locationButton, { borderColor: theme.border, backgroundColor: theme.surface, shadowColor: theme.shadow }, pressed && styles.pressed]}>
         {locating ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="locate" size={21} color={theme.pageText} />}
       </Pressable>

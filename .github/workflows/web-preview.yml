@@ -2,28 +2,24 @@ name: Web Preview
 
 on:
   pull_request:
-    branches:
-      - main
   push:
     branches:
-      - feat/production-hardening
-      - feat/mvp-mobile-messenger
       - main
+      - release/connexio-rc1
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pages: write
-  issues: write
+permissions: {}
 
 concurrency:
-  group: connexio-web-preview
+  group: connexio-web-preview-${{ github.event_name == 'pull_request' && github.ref || 'public' }}
   cancel-in-progress: true
 
 jobs:
-  preview:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,62 +35,52 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Verify source before publication
+        run: npm run verify --silent
+
       - name: Build web preview
         env:
           EXPO_PUBLIC_GITHUB_PAGES: "true"
           EXPO_PUBLIC_MOCK_MODE: "true"
         run: npm run web:build
 
-      - name: Publish static build to gh-pages
-        if: github.event_name != 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify public policy documents
         run: |
-          touch dist/.nojekyll
-          cd dist
-          git init
-          git checkout -b gh-pages
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Deploy Connexio preview ${GITHUB_SHA}"
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push --force origin gh-pages
+          test -f dist/privacy-policy.html
+          test -f dist/connexio-terms.html
+          test -f dist/account-deletion.html
 
-      - name: Configure gh-pages as Pages source
-        if: github.event_name != 'pull_request'
-        uses: actions/github-script@v7
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.ref_name == 'main' || github.ref_name == 'release/connexio-rc1'))
+        uses: actions/upload-pages-artifact@v3
         with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const source = { branch: 'gh-pages', path: '/' };
-            try {
-              await github.request('GET /repos/{owner}/{repo}/pages', { owner, repo });
-              await github.request('PUT /repos/{owner}/{repo}/pages', {
-                owner,
-                repo,
-                build_type: 'legacy',
-                source
-              });
-            } catch (error) {
-              if (error.status !== 404) throw error;
-              await github.request('POST /repos/{owner}/{repo}/pages', {
-                owner,
-                repo,
-                build_type: 'legacy',
-                source
-              });
-            }
+          path: dist
 
-      - name: Wait for public preview
-        if: github.event_name != 'pull_request'
+  deploy:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.ref_name == 'main' || github.ref_name == 'release/connexio-rc1'))
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy immutable Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify public preview
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         run: |
-          URL="https://spoodfit.github.io/Neptune-messenger-connexio/"
+          set -euo pipefail
           for attempt in $(seq 1 30); do
-            code=$(curl --location --silent --output /tmp/connexio-page --write-out "%{http_code}" "$URL" || true)
-            if [ "$code" = "200" ] && grep -qi "connexio\|expo" /tmp/connexio-page; then
-              echo "Preview available: $URL"
+            code=$(curl --location --silent --output /tmp/connexio-page --write-out "%{http_code}" "$PAGE_URL" || true)
+            if [ "$code" = "200" ] && grep -Eqi "connexio|expo" /tmp/connexio-page; then
+              echo "Preview available: $PAGE_URL"
               exit 0
             fi
             echo "Attempt $attempt/30: HTTP $code"
@@ -102,37 +88,3 @@ jobs:
           done
           echo "GitHub Pages did not become available in time."
           exit 1
-
-      - name: Publish preview status on PR 3
-        if: always() && github.event_name == 'push' && github.ref_name == 'feat/production-hardening'
-        uses: actions/github-script@v7
-        env:
-          JOB_STATUS: ${{ job.status }}
-        with:
-          script: |
-            const marker = '<!-- connexio-web-preview -->';
-            const pageUrl = 'https://spoodfit.github.io/Neptune-messenger-connexio/';
-            const ok = process.env.JOB_STATUS === 'success';
-            const body = `${marker}\n## Prévisualisation Connexio\n\n- Publication : **${process.env.JOB_STATUS}**\n- Commit : \`${context.sha}\`\n- Exécution : ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n${ok ? `✅ [Ouvrir la démonstration](${pageUrl})` : '❌ Le site n’est pas encore accessible. L’exécution ci-dessus contient la cause exacte.'}`;
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: 3,
-              per_page: 100
-            });
-            const existing = comments.find((comment) => comment.body?.includes(marker));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: 3,
-                body
-              });
-            }

@@ -6,6 +6,14 @@ on:
       - release/connexio-rc1
     paths:
       - .github/workflows/android-local-test-apk.yml
+      - app/**
+      - src/**
+      - assets/**
+      - app.config.*
+      - app.json
+      - package.json
+      - package-lock.json
+      - tsconfig.json
   workflow_dispatch:
 
 permissions:
@@ -30,6 +38,7 @@ jobs:
       - name: Checkout exact release commit
         uses: actions/checkout@v4
         with:
+          ref: release/connexio-rc1
           fetch-depth: 0
 
       - name: Setup Node
@@ -54,6 +63,7 @@ jobs:
           SOURCE_SHA="$(git rev-parse HEAD)"
           echo "CONNEXIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           echo "Building Connexio source: $SOURCE_SHA"
+          test "$(git branch --show-current)" = "release/connexio-rc1"
           grep -Fq 'MessagesScreenV22' 'app/(tabs)/messages.tsx'
           grep -Fq 'HighlightsScreenV22' 'app/(tabs)/highlights.tsx'
           grep -Fq 'accessibilityLabel="Envoyer le message"' src/screens/ChatConversationScreen.tsx

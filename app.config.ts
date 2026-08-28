@@ -22,6 +22,18 @@ function rejectLegacyStoreUrl(name: string, value: string): void {
   if (LEGACY_STORE_URLS.has(value.replace(/\/$/, ""))) throw new Error(`${name} pointe vers une ancienne page non dédiée à Connexio. Utilisez les documents Connexio validés.`);
 }
 
+function parseHttpsOrigins(name: string, value: string): string[] {
+  if (!value.trim()) return [];
+  return value.split(",").map((entry) => {
+    const raw = entry.trim();
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.username || url.password || url.origin !== raw.replace(/\/$/, "")) {
+      throw new Error(`${name} doit contenir uniquement des origines HTTPS séparées par des virgules.`);
+    }
+    return url.origin;
+  });
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
   const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? EAS_PROJECT_ID;
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
@@ -32,6 +44,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const accountDeletionUrl = process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ?? `${PUBLIC_POLICY_BASE_URL}/account-deletion.html`;
   const supportUrl = process.env.EXPO_PUBLIC_SUPPORT_URL ?? "mailto:contact@neptunebusiness.com";
   const backendContract = process.env.EXPO_PUBLIC_BACKEND_CONTRACT ?? "neptune-web-v1";
+  const mediaClientOrigins = parseHttpsOrigins("EXPO_PUBLIC_MEDIA_CLIENT_ORIGINS", process.env.EXPO_PUBLIC_MEDIA_CLIENT_ORIGINS ?? "");
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
   const coworkingEnabled = process.env.EXPO_PUBLIC_COWORKING_ENABLED === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
@@ -88,7 +101,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ITSAppUsesNonExemptEncryption: false,
         NSCameraUsageDescription: "Connexio utilise la caméra lorsque vous choisissez de prendre une photo, publier une vidéo, participer à un appel vidéo ou ouvrir la Map Coworking.",
         NSMicrophoneUsageDescription: MICROPHONE_PERMISSION,
-        NSSpeechRecognitionUsageDescription: "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.",
+        NSSpeechRecognitionUsageDescription: "Connexio transcrit uniquement les messages vocaux et objets d’appel que vous choisissez explicitement d’enregistrer ou de dicter.",
         NSPhotoLibraryUsageDescription: "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.",
         NSLocationWhenInUseUsageDescription: "Connexio utilise votre position uniquement à votre demande pour la carte ou le partage d’un lieu.",
         NSContactsUsageDescription: "Connexio ouvre vos contacts uniquement lorsque vous choisissez explicitement une personne à inviter ou recommander."
@@ -116,7 +129,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "expo-audio",
       "expo-font",
       "expo-asset",
-      ["expo-speech-recognition", { microphonePermission: MICROPHONE_PERMISSION, speechRecognitionPermission: "Connexio transcrit uniquement l’objet d’appel que vous choisissez explicitement de dicter.", androidSpeechServicePackages: ["com.google.android.googlequicksearchbox", "com.google.android.as"] }],
+      ["expo-speech-recognition", { microphonePermission: MICROPHONE_PERMISSION, speechRecognitionPermission: "Connexio transcrit uniquement les messages vocaux et objets d’appel que vous choisissez explicitement d’enregistrer ou de dicter.", androidSpeechServicePackages: ["com.google.android.googlequicksearchbox", "com.google.android.as"] }],
       ["expo-contacts", { contactsPermission: "Connexio ouvre vos contacts uniquement lorsque vous choisissez explicitement une personne à inviter ou recommander." }],
       "expo-secure-store",
       "expo-system-ui",
@@ -135,6 +148,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       accountDeletionUrl,
       supportUrl,
       backendContract,
+      mediaClientOrigins,
       mockMode,
       coworkingEnabled,
       standaloneMode: buildProfile === "standalone",

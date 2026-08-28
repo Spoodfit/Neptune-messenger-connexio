@@ -4,6 +4,17 @@ import { normalizeUiLanguageCode, type SupportedUiLanguage } from "./uiTranslati
 type TranslationSet = Partial<Record<Exclude<SupportedUiLanguage, "fr">, string>>;
 
 export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
+  "Arrêter le partage d’écran": { en: "Stop screen sharing", es: "Dejar de compartir pantalla", de: "Bildschirmfreigabe beenden", it: "Interrompi condivisione schermo", pt: "Parar partilha de ecrã" },
+  "BONJOUR ENVOYÉ": { en: "HELLO SENT", es: "SALUDO ENVIADO", de: "GRUSS GESENDET", it: "SALUTO INVIATO", pt: "SAUDAÇÃO ENVIADA" },
+  "Caméra en attente": { en: "Waiting for camera", es: "Esperando la cámara", de: "Warten auf Kamera", it: "In attesa della videocamera", pt: "À espera da câmara" },
+  "Catégorie de la publication": { en: "Post category", es: "Categoría de la publicación", de: "Beitragskategorie", it: "Categoria della pubblicazione", pt: "Categoria da publicação" },
+  "Catégorie détectée": { en: "Detected category", es: "Categoría detectada", de: "Erkannte Kategorie", it: "Categoria rilevata", pt: "Categoria detetada" },
+  "DEMANDE ENVOYÉE": { en: "REQUEST SENT", es: "SOLICITUD ENVIADA", de: "ANFRAGE GESENDET", it: "RICHIESTA INVIATA", pt: "PEDIDO ENVIADO" },
+  "Heure du rendez-vous": { en: "Meeting time", es: "Hora de la cita", de: "Uhrzeit des Termins", it: "Ora dell’appuntamento", pt: "Hora da reunião" },
+  "Jour du rendez-vous": { en: "Meeting day", es: "Día de la cita", de: "Tag des Termins", it: "Giorno dell’appuntamento", pt: "Dia da reunião" },
+  "Masquer les catégories": { en: "Hide categories", es: "Ocultar categorías", de: "Kategorien ausblenden", it: "Nascondi categorie", pt: "Ocultar categorias" },
+  "Modifier la catégorie": { en: "Change category", es: "Cambiar categoría", de: "Kategorie ändern", it: "Modifica categoria", pt: "Alterar categoria" },
+  "Ouvrez les actions d’accessibilité pour sélectionner une personne, un groupe ou un évènement.": { en: "Open the accessibility actions to select a person, group, or event.", es: "Abre las acciones de accesibilidad para seleccionar una persona, un grupo o un evento.", de: "Öffne die Bedienungshilfen-Aktionen, um eine Person, Gruppe oder Veranstaltung auszuwählen.", it: "Apri le azioni di accessibilità per selezionare una persona, un gruppo o un evento.", pt: "Abra as ações de acessibilidade para selecionar uma pessoa, um grupo ou um evento." },
   "· en visio": { en: "· on video", es: "· en videollamada", de: "· per Video", it: "· in video", pt: "· em vídeo" },
   "Accepter": { en: "Accept", es: "Aceptar", de: "Annehmen", it: "Accetta", pt: "Aceitar" },
   "Accepter le toquement": { en: "Accept knock", es: "Aceptar llamada", de: "Anklopfen annehmen", it: "Accetta la richiesta", pt: "Aceitar pedido" },
@@ -21,6 +32,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Connexion à la salle": { en: "Connecting to room", es: "Conectando con la sala", de: "Verbindung zum Raum", it: "Connessione alla sala", pt: "A ligar à sala" },
   "Connexion à la salle…": { en: "Connecting to room…", es: "Conectando con la sala…", de: "Verbindung zum Raum…", it: "Connessione alla sala…", pt: "A ligar à sala…" },
   "Connexion média réduite. La présence reste disponible.": { en: "Reduced media connection. Presence remains available.", es: "Conexión multimedia reducida. La presencia sigue disponible.", de: "Eingeschränkte Medienverbindung. Die Präsenz bleibt verfügbar.", it: "Connessione multimediale ridotta. La presenza resta disponibile.", pt: "Ligação multimédia reduzida. A presença continua disponível." },
+  "Flux caméra en attente": { en: "Waiting for live camera", es: "Esperando la cámara en directo", de: "Warten auf Live-Kamera", it: "In attesa della videocamera live", pt: "À espera da câmara em direto" },
   "Dire bonjour": { en: "Say hello", es: "Saludar", de: "Hallo sagen", it: "Saluta", pt: "Dizer olá" },
   "En échange": { en: "Talking", es: "En conversación", de: "Im Gespräch", it: "In conversazione", pt: "Em conversa" },
   "En pause": { en: "On break", es: "En pausa", de: "In Pause", it: "In pausa", pt: "Em pausa" },
@@ -40,6 +52,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "L’espace réapparaîtra dès que le service temps réel sera activé.": { en: "The space will reappear as soon as the realtime service is enabled.", es: "El espacio reaparecerá en cuanto se active el servicio en tiempo real.", de: "Der Bereich erscheint wieder, sobald der Echtzeitdienst aktiviert ist.", it: "Lo spazio riapparirà non appena il servizio in tempo reale sarà attivato.", pt: "O espaço reaparecerá assim que o serviço em tempo real estiver ativado." },
   "La présence en ligne réapparaîtra dès que le service temps réel sera actif.": { en: "Online presence will reappear as soon as the realtime service is active.", es: "La presencia en línea reaparecerá en cuanto se active el servicio en tiempo real.", de: "Die Online-Präsenz erscheint wieder, sobald der Echtzeitdienst aktiv ist.", it: "La presenza online riapparirà non appena il servizio in tempo reale sarà attivo.", pt: "A presença online reaparecerá assim que o serviço em tempo real estiver ativo." },
   "Le bureau est ouvert": { en: "The office is open", es: "La oficina está abierta", de: "Das Büro ist geöffnet", it: "L'ufficio è aperto", pt: "O escritório está aberto" },
+  "Le partage d’écran nécessite une session média active.": { en: "Screen sharing requires an active media session.", es: "Compartir pantalla requiere una sesión multimedia activa.", de: "Die Bildschirmfreigabe erfordert eine aktive Mediensitzung.", it: "La condivisione dello schermo richiede una sessione multimediale attiva.", pt: "A partilha de ecrã requer uma sessão multimédia ativa." },
   "Les rejoindre": { en: "Join them", es: "Unirse a ellos", de: "Beitreten", it: "Unisciti a loro", pt: "Juntar-se a eles" },
   "Marquer l'annonce comme lue": { en: "Mark announcement as read", es: "Marcar el anuncio como leído", de: "Ankündigung als gelesen markieren", it: "Segna l'annuncio come letto", pt: "Marcar anúncio como lido" },
   "NOUVEAU": { en: "NEW", es: "NUEVO", de: "NEU", it: "NUOVO", pt: "NOVO" },
@@ -50,6 +63,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Ouvrir le groupe": { en: "Open group", es: "Abrir grupo", de: "Gruppe öffnen", it: "Apri gruppo", pt: "Abrir grupo" },
   "PAUSE": { en: "BREAK", es: "PAUSA", de: "PAUSE", it: "PAUSA", pt: "PAUSA" },
   "Pas maintenant": { en: "Not now", es: "Ahora no", de: "Jetzt nicht", it: "Non ora", pt: "Agora não" },
+  "Partager mon écran": { en: "Share my screen", es: "Compartir mi pantalla", de: "Meinen Bildschirm teilen", it: "Condividi il mio schermo", pt: "Partilhar o meu ecrã" },
   "Progression du message vocal": { en: "Voice message progress", es: "Progreso del mensaje de voz", de: "Fortschritt der Sprachnachricht", it: "Avanzamento del messaggio vocale", pt: "Progresso da mensagem de voz" },
   "Proposer un rendez-vous": { en: "Suggest a meeting", es: "Proponer una cita", de: "Termin vorschlagen", it: "Proponi un appuntamento", pt: "Propor uma reunião" },
   "Publications, besoins et offres Neptune.": { en: "Neptune posts, needs and offers.", es: "Publicaciones, necesidades y ofertas de Neptune.", de: "Neptune-Beiträge, Bedarfe und Angebote.", it: "Pubblicazioni, esigenze e offerte Neptune.", pt: "Publicações, necessidades e ofertas Neptune." },
@@ -74,6 +88,7 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "UN SIGNE DU COWORKING": { en: "A COWORKING HELLO", es: "UN SALUDO DEL COWORKING", de: "EIN COWORKING-GRUSS", it: "UN SALUTO DAL COWORKING", pt: "UM OLÁ DO COWORKING" },
   "Voir tout": { en: "See all", es: "Ver todo", de: "Alles anzeigen", it: "Vedi tutto", pt: "Ver tudo" },
   "vous dit bonjour 👋": { en: "says hello 👋", es: "te saluda 👋", de: "sagt Hallo 👋", it: "ti saluta 👋", pt: "diz olá 👋" },
+  "vous dit bonjour": { en: "says hello", es: "te saluda", de: "sagt Hallo", it: "ti saluta", pt: "diz olá" },
   "Afficher la vue d’ensemble": { en: "Show overview", es: "Mostrar vista general", de: "Übersicht anzeigen", it: "Mostra panoramica", pt: "Mostrar vista geral" },
   "Afficher la vue principale": { en: "Show main view", es: "Mostrar vista principal", de: "Hauptansicht anzeigen", it: "Mostra vista principale", pt: "Mostrar vista principal" },
   "Bonjour à l’espace": { en: "Hello to the room", es: "Saludar a la sala", de: "Raum begrüßen", it: "Saluta la stanza", pt: "Cumprimentar a sala" },
@@ -99,7 +114,8 @@ export const UI_TRANSLATIONS_V24: Record<string, TranslationSet> = {
   "Vote en cours": { en: "Voting in progress", es: "Votación en curso", de: "Abstimmung läuft", it: "Votazione in corso", pt: "Votação em curso" },
   "Vous êtes maintenant disponible": { en: "You are now available", es: "Ahora estás disponible", de: "Du bist jetzt verfügbar", it: "Ora sei disponibile", pt: "Agora está disponível" },
   "Vous êtes maintenant occupé": { en: "You are now busy", es: "Ahora estás ocupado", de: "Du bist jetzt beschäftigt", it: "Ora sei occupato", pt: "Agora está ocupado" },
-  "Vous ne pouvez pas apparaître disponible tout en restant dans une visio active.": { en: "You cannot appear available while staying in an active video call.", es: "No puedes aparecer disponible mientras sigues en una videollamada activa.", de: "Du kannst nicht als verfügbar erscheinen, während du in einem aktiven Videoanruf bist.", it: "Non puoi risultare disponibile mentre resti in una videochiamata attiva.", pt: "Não pode aparecer disponível enquanto permanece numa videochamada ativa." }
+  "Vous ne pouvez pas apparaître disponible tout en restant dans une visio active.": { en: "You cannot appear available while staying in an active video call.", es: "No puedes aparecer disponible mientras sigues en una videollamada activa.", de: "Du kannst nicht als verfügbar erscheinen, während du in einem aktiven Videoanruf bist.", it: "Non puoi risultare disponibile mentre resti in una videochiamata attiva.", pt: "Não pode aparecer disponível enquanto permanece numa videochamada ativa." },
+  "Vous avez toqué à l’espace": { en: "You knocked on the room", es: "Has llamado a la sala", de: "Du hast am Raum angeklopft", it: "Hai bussato allo spazio", pt: "Bateu à porta do espaço" }
 };
 
 export function translateUiTextV24(value: string, language: SupportedLanguage | string): string {

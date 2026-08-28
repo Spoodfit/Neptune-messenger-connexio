@@ -4,7 +4,8 @@ import test from "node:test";
 import {
   assertCandidateMediaTransport,
   hasTurnServer,
-  isSecureMediaUrl
+  isSecureMediaUrl,
+  isTrustedMediaClientScript
 } from "../src/domain/mediaTransport";
 
 const now = Date.parse("2026-08-24T20:00:00.000Z");
@@ -56,4 +57,38 @@ test("les helpers détectent TURN et les transports chiffrés", () => {
   strictEqual(hasTurnServer([{ urls: "stun:stun.example.com:3478" }]), false);
   strictEqual(isSecureMediaUrl("wss://api.example.com/socket.io"), true);
   strictEqual(isSecureMediaUrl("ws://api.example.com/socket.io"), false);
+});
+
+test("le client SFU reste sur l’autorité de signalisation ou une origine explicitement autorisée", () => {
+  strictEqual(
+    isTrustedMediaClientScript("wss://api.example.com/realtime", "https://api.example.com/sfu/client.js"),
+    true
+  );
+  strictEqual(
+    isTrustedMediaClientScript("wss://api.example.com/realtime", "https://cdn.example.com/sfu/client.js"),
+    false
+  );
+  strictEqual(
+    isTrustedMediaClientScript(
+      "wss://api.example.com/realtime",
+      "https://cdn.example.com/sfu/client.js",
+      ["https://cdn.example.com"]
+    ),
+    true
+  );
+});
+
+test("la candidate production refuse un script cross-origin non déclaré", () => {
+  throws(() =>
+    assertCandidateMediaTransport(
+      {
+        signalingUrl: "wss://api.example.com/realtime",
+        clientScriptUrl: "https://evil.example/client.js",
+        iceServers: [{ urls: "turns:turn.example.com:5349" }],
+        expiresAt: "2026-08-24T20:05:00.000Z"
+      },
+      true,
+      now
+    )
+  );
 });

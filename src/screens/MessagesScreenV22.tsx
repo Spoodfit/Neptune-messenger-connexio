@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, FlatList, Modal, Pressable, SectionList, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Animated, FlatList, Modal, Pressable, SectionList, StyleSheet, View, useWindowDimensions } from "react-native";
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
@@ -58,6 +58,8 @@ function matchesMention(conversation: Conversation, aliases: string[]): boolean 
 
 export default function MessagesScreenV22() {
   const theme = useAppTheme();
+  const { width } = useWindowDimensions();
+  const compactSearch = width < 320;
   const reducedMotion = useReducedMotion();
   const {
     serviceAvailable,
@@ -397,7 +399,8 @@ export default function MessagesScreenV22() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder={filter === "groups" ? "Rechercher un club ou un groupe…" : "Rechercher une conversation…"}
+            accessibilityLabel={filter === "groups" ? "Rechercher un club ou un groupe" : "Rechercher une conversation privée"}
+            placeholder={compactSearch ? "Rechercher…" : filter === "groups" ? "Rechercher un club ou un groupe…" : "Rechercher une conversation…"}
             placeholderTextColor={theme.pageTextMuted}
             style={[styles.searchInput, { color: theme.pageText }]}
           />

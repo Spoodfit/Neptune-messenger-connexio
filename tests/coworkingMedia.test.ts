@@ -36,3 +36,50 @@ test("le document média injecté reste syntaxiquement valide", () => {
   ok(scripts.length > 0);
   for (const script of scripts) doesNotThrow(() => new Function(script));
 });
+
+test("le document média applique une CSP et la langue active", () => {
+  const localizedHtml = buildCoworkingMediaHtml({
+    spaceId: "space-test",
+    socketUrl: "wss://media.example.com/realtime",
+    socketPath: "/socket.io",
+    token: "short-lived-test-token",
+    participantId: "me",
+    clientScriptUrl: "https://media.example.com/client.js",
+    iceServers: [],
+    mock: false
+  }, "Moi", { cameraOn: true, microphoneOn: false }, "en");
+  match(localizedHtml, /<html lang="en">/);
+  match(localizedHtml, /Content-Security-Policy/);
+  match(localizedHtml, /connect-src https:\/\/media\.example\.com wss:\/\/media\.example\.com/);
+  match(localizedHtml, /client\.js" crossorigin="anonymous"/);
+});
+
+test("les niveaux audio pilotent un halo discret autour des participants", () => {
+  match(html, /@keyframes audioHalo/);
+  match(html, /monitorAudio=\(stream,node,key\)=>/);
+  match(html, /node\.classList\.toggle\('speaking',level>/);
+  match(html, /post\('audio-level'/);
+});
+
+test("le partage d’écran accepte un adaptateur natif ou getDisplayMedia", () => {
+  match(html, /command\.type==='screen-share'/);
+  match(html, /client\.startScreenShare/);
+  match(html, /navigator\.mediaDevices\?\.getDisplayMedia/);
+  match(html, /client\.replaceVideoTrack/);
+  match(html, /screen-share-state/);
+});
+
+test("une session mock demande aussi la caméra locale sans exiger le SFU", () => {
+  const mockHtml = buildCoworkingMediaHtml({
+    spaceId: "space-test",
+    socketUrl: "https://mock.connexio.local",
+    socketPath: "/socket.io",
+    token: "mock-token",
+    participantId: "me",
+    iceServers: [],
+    mock: true
+  }, "Moi", { cameraOn: true, microphoneOn: false });
+  match(mockHtml, /await ensureLocalMedia\(\)/);
+  match(mockHtml, /if\(cfg\.mock\)\{/);
+  match(mockHtml, /post\('local-media-ready'\)/);
+});

@@ -9,7 +9,7 @@ on:
       - .github/workflows/expo-current-status.yml
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -28,6 +28,7 @@ jobs:
           node-version: "22.13"
       - name: Verify account and project
         run: |
+          test -n "$EXPO_TOKEN"
           npx --yes eas-cli@21.7.1 whoami
           npx --yes eas-cli@21.7.1 project:info --json
       - name: Read current Android builds
@@ -35,10 +36,10 @@ jobs:
           mkdir -p builds
           npx --yes eas-cli@21.7.1 build:list --platform android --limit 10 --json --non-interactive > builds/eas-current-new-account.json
           cat builds/eas-current-new-account.json
-      - name: Persist status snapshot
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -f builds/eas-current-new-account.json
-          git commit -m "chore(expo): snapshot new-account Android builds [skip ci]" || true
-          git push origin HEAD:release/connexio-rc1 || true
+      - name: Upload immutable status snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: connexio-eas-android-status-${{ github.sha }}
+          path: builds/eas-current-new-account.json
+          if-no-files-found: error
+          retention-days: 14

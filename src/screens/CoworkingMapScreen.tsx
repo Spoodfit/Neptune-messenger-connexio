@@ -314,7 +314,7 @@ export default function CoworkingMapScreen() {
       </View>
 
       {selection ? (
-        <View style={[styles.sheet, { bottom: Math.max(insets.bottom, 10) + 74, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}> 
+        <View style={[styles.sheet, { bottom: Math.max(insets.bottom, 10) + 74, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
           <View style={styles.sheetTop}>
             <Pressable
               accessibilityRole="button"

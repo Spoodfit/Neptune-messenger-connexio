@@ -4,11 +4,13 @@ import { Modal, StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { useAppTheme, type ConnexioTheme } from "../providers/ThemeProvider";
+import { useAppLanguage } from "../providers/LanguageProvider";
+import { allowsWebViewNavigation } from "../domain/webViewSecurity";
 import { AppAlert } from "../services/ui/AppAlert";
 import { colors } from "../theme";
 import type { RecordedVoicePayload, VoiceRecorderModalProps } from "./VoiceRecorderModal.types";
 
-function recorderHtml(maxDurationSeconds: number, maxSizeBytes: number, theme: ConnexioTheme): string {
+function recorderHtml(maxDurationSeconds: number, maxSizeBytes: number, theme: ConnexioTheme, language: string): string {
   const background = theme.pageBackground;
   const surface = theme.surface;
   const surfaceStrong = theme.surfaceStrong;
@@ -24,11 +26,13 @@ function recorderHtml(maxDurationSeconds: number, maxSizeBytes: number, theme: C
   const handle = theme.isLight ? "#6B7E96" : "#687694";
   const shadow = theme.isLight ? "rgba(34,61,90,.22)" : "rgba(0,0,0,.45)";
   return `<!doctype html>
-<html lang="fr">
+<html lang="${language}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
 <meta name="color-scheme" content="${theme.isLight ? "light" : "dark"}" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; media-src blob: data:; img-src data: blob:;" />
+<meta name="referrer" content="no-referrer" />
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:${background};color:${text};font-family:Inter,system-ui,-apple-system,sans-serif}body{display:flex;align-items:flex-end;justify-content:center;background:${overlay}}
 .sheet{width:100%;max-width:680px;padding:18px 18px max(24px,env(safe-area-inset-bottom));border-radius:28px 28px 0 0;border:1px solid ${border};border-bottom:0;background:linear-gradient(155deg,${surface},${surfaceStrong});box-shadow:0 -22px 60px ${shadow}}
@@ -105,9 +109,11 @@ function recorderHtml(maxDurationSeconds: number, maxSizeBytes: number, theme: C
 
 export default function VoiceRecorderModal({ visible, onClose, onRecorded, maxDurationSeconds = 300, maxSizeBytes = 12 * 1024 * 1024 }: VoiceRecorderModalProps) {
   const theme = useAppTheme();
-  const html = useMemo(() => recorderHtml(maxDurationSeconds, maxSizeBytes, theme), [maxDurationSeconds, maxSizeBytes, theme]);
+  const { uiLanguage } = useAppLanguage();
+  const html = useMemo(() => recorderHtml(maxDurationSeconds, maxSizeBytes, theme, uiLanguage), [maxDurationSeconds, maxSizeBytes, theme, uiLanguage]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
+    if (!allowsWebViewNavigation(event.nativeEvent.url, ["https://localhost"])) return;
     try {
       const message = JSON.parse(event.nativeEvent.data) as { type?: string; payload?: RecordedVoicePayload };
       if (message.type === "close") { onClose(); return; }
@@ -123,7 +129,7 @@ export default function VoiceRecorderModal({ visible, onClose, onRecorded, maxDu
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={[styles.screen, { backgroundColor: theme.overlay }]}>
-        <WebView source={{ html, baseUrl: "https://localhost" }} javaScriptEnabled domStorageEnabled allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} originWhitelist={["https://localhost", "about:blank"]} onMessage={handleMessage} style={[styles.webView, { backgroundColor: colors.transparent }]} />
+        <WebView source={{ html, baseUrl: "https://localhost" }} javaScriptEnabled domStorageEnabled={false} cacheEnabled={false} incognito allowFileAccess={false} allowFileAccessFromFileURLs={false} allowUniversalAccessFromFileURLs={false} sharedCookiesEnabled={false} thirdPartyCookiesEnabled={false} javaScriptCanOpenWindowsAutomatically={false} setSupportMultipleWindows={false} allowsInlineMediaPlayback mediaPlaybackRequiresUserAction={false} originWhitelist={["https://localhost", "about:blank"]} onShouldStartLoadWithRequest={(request) => allowsWebViewNavigation(request.url, ["https://localhost"])} onMessage={handleMessage} style={[styles.webView, { backgroundColor: colors.transparent }]} />
       </View>
     </Modal>
   );

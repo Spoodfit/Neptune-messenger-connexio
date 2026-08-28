@@ -17,6 +17,11 @@ const html = buildCoworkingGeographicMapHtml({
       initials: "AB",
       avatarUrl: "https://example.com/avatar.jpg",
       cameraOn: true
+    }, {
+      id: "member:guest",
+      name: "Noé Réseau",
+      initials: "NR",
+      cameraOn: false
     }]
   }],
   events: [{
@@ -68,16 +73,47 @@ test("chaque script injecté dans l’iframe reste du JavaScript syntaxiquement 
   for (const script of scripts) doesNotThrow(() => new Function(script));
 });
 
-test("les drapeaux restent ancrés à leurs coordonnées après un déplacement de carte", () => {
-  ok(!html.includes("--event-offset-x"));
-  ok(!html.includes("applyEventOffsets"));
-  match(html, /L\.marker\(\[event\.latitude,event\.longitude\]/);
-  match(html, /L\.markerClusterGroup\(\{/);
-  match(html, /event-cluster-core/);
+test("les dépendances cartographiques distantes sont verrouillées et le document est cloisonné", () => {
+  match(html, /Content-Security-Policy/);
+  match(html, /leaflet@1\.9\.4[^>]+integrity="sha384-/);
+  match(html, /leaflet\.markercluster@1\.5\.3[^>]+integrity="sha384-/);
+  match(html, /crossorigin="anonymous"/);
+  ok(!html.includes("postMessage({source:'connexio-coworking-map',...payload},'*')"));
 });
 
-test("les événements et les membres superposés gardent chacun leur cible tactile", () => {
+test("le fond cartographique ne dépend plus de CARTO ni d’une clé API", () => {
+  match(html, /https:\/\/tile\.openstreetmap\.org\/\{z\}\/\{x\}\/\{y\}\.png/);
+  ok(!html.includes("basemaps.cartocdn.com"));
+  ok(!html.includes("API KEY REQUIRED"));
+});
+
+test("les personnes réunies en visio partagent une zone discrète identifiable", () => {
+  match(html, /cw-room-zone/);
+  match(html, /cw-room-label.*item\.members\.length/);
+  match(html, /cw-marker\.busy \.cw-room-zone/);
+});
+
+test("les drapeaux restent géographiquement ancrés et leur séparation visuelle ne change pas pendant un déplacement de carte", () => {
+  match(html, /L\.marker\(\[event\.latitude,event\.longitude\]/);
+  match(html, /L\.markerClusterGroup\(\{/);
+  match(html, /connexioEventCount:1/);
+  ok(!html.includes("eventLayer=L.markerClusterGroup"));
+  match(html, /function computeEventOffsets\(\)/);
+  match(html, /map\.on\('zoomend moveend'/);
+  match(html, /event-connector/);
+});
+
+test("les événements et les membres superposés sont visuellement séparés et gardent chacun leur cible tactile", () => {
   match(html, /zIndexOffset:500/);
-  match(html, /title:event\.title,zIndexOffset:750,keyboard:true/);
+  match(html, /title:event\.title,zIndexOffset:750,keyboard:true,connexioPeopleCount:0,connexioEventCount:1/);
   match(html, /\.event-hit\{[^}]+left:2px;top:-2px;width:44px;height:44px[^}]+pointer-events:auto/);
+  match(html, /memberClearance>=38&&eventClearance>=28/);
+  match(html, /nearMember\?candidates:\[\{x:0,y:0\},\.\.\.candidates\]/);
+  match(html, /--event-offset-x/);
+});
+
+test("le compteur fusionné additionne personnes et évènements dans un seul cercle", () => {
+  match(html, /getAllChildMarkers\(\)/);
+  match(html, /const total=counts\.people\+counts\.events/);
+  match(html, /iconSize:\[48,48\]/);
 });

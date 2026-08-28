@@ -13,6 +13,7 @@ interface AppExtra {
   standaloneMode?: boolean;
   buildProfile?: string;
   backendContract?: "neptune-web-v1" | "connexio-v1";
+  mediaClientOrigins?: string[];
   releaseStage?: "development" | "preview" | "standalone" | "release-candidate" | "production";
   eas?: {
     projectId?: string;
@@ -44,6 +45,7 @@ export const env = {
     process.env.EXPO_PUBLIC_COWORKING_ENABLED === "true",
   buildProfile: extra.buildProfile ?? "development",
   backendContract: extra.backendContract ?? "neptune-web-v1",
+  mediaClientOrigins: Array.isArray(extra.mediaClientOrigins) ? extra.mediaClientOrigins : [],
   releaseStage: extra.releaseStage ?? "development",
   easProjectId: extra.eas?.projectId ?? Constants.easConfig?.projectId ?? ""
 } as const;

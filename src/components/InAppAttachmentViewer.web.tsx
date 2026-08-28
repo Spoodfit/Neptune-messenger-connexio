@@ -13,6 +13,7 @@ import { Image,
 import { colors, spacing, typography } from "../theme";
 import type { InAppAttachmentViewerProps } from "./InAppAttachmentViewer.types";
 import { HighlightMediaView } from "./HighlightMediaView";
+import { attachmentWebViewPolicy } from "../domain/webViewSecurity";
 
 function sourceUri({ attachment }: Pick<InAppAttachmentViewerProps, "attachment">): string {
   return attachment.downloadUrl ?? attachment.uri ?? "";
@@ -27,6 +28,7 @@ export default function InAppAttachmentViewer({
   const theme = useAppTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const uri = sourceUri({ attachment });
+  const trustedUri = attachmentWebViewPolicy(uri) ? uri : "";
   const isImage = attachment.kind === "photo";
   const isVideo = attachment.kind === "video";
 
@@ -59,17 +61,17 @@ export default function InAppAttachmentViewer({
         </View>
 
         <View style={styles.content}>
-          {!uri ? (
+          {!trustedUri ? (
             <Text style={styles.empty}>Ce fichier n’est plus accessible.</Text>
           ) : isImage ? (
-            <Image source={{ uri }} resizeMode="contain" style={styles.image} />
+            <Image source={{ uri: trustedUri }} resizeMode="contain" style={styles.image} />
           ) : isVideo ? (
             <View style={styles.videoWrap}>
               <HighlightMediaView
                 media={{
                   id: attachment.id,
                   kind: "video",
-                  uri,
+                  uri: trustedUri,
                   name: attachment.name,
                   mimeType: attachment.mimeType,
                   sizeBytes: attachment.sizeBytes,
@@ -84,14 +86,16 @@ export default function InAppAttachmentViewer({
           ) : (
             createElement("iframe", {
               title: attachment.name,
-              src: uri,
+              src: trustedUri,
               style: {
                 width: "100%",
                 height: "100%",
                 border: 0,
                 background: "#FFFFFF"
               },
-              sandbox: "allow-same-origin allow-scripts allow-forms allow-downloads"
+              sandbox: "",
+              referrerPolicy: "no-referrer",
+              loading: "lazy"
             })
           )}
         </View>

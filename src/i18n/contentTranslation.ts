@@ -118,3 +118,75 @@ export function translationSourceLabel(translation?: ContentTranslation): string
   const base = source.trim().toLocaleLowerCase().replace("_", "-").split("-")[0];
   return SUPPORTED_LANGUAGES.find((language) => language.code === base)?.nativeName ?? source.trim();
 }
+
+const FRENCH_SOURCE_FORMS: Partial<Record<(typeof SUPPORTED_LANGUAGES)[number]["code"], string>> = {
+  fr: "du français",
+  en: "de l’anglais",
+  es: "de l’espagnol",
+  de: "de l’allemand",
+  it: "de l’italien",
+  pt: "du portugais",
+  nl: "du néerlandais",
+  pl: "du polonais",
+  ro: "du roumain",
+  sv: "du suédois",
+  da: "du danois",
+  no: "du norvégien",
+  tr: "du turc",
+  ru: "du russe",
+  ar: "de l’arabe",
+  hi: "de l’hindi",
+  zh: "du chinois",
+  ja: "du japonais",
+  ko: "du coréen"
+};
+
+const UI_LANGUAGE_TAGS: Record<string, string> = {
+  fr: "fr-FR",
+  en: "en-US",
+  es: "es-ES",
+  de: "de-DE",
+  it: "it-IT",
+  pt: "pt-PT"
+};
+
+/** Returns a complete, grammatical source-language attribution for the viewer. */
+export function translationSourceAttribution(
+  translation?: ContentTranslation,
+  viewerLanguage = getTranslationRequestLanguage()
+): string {
+  const runtime = translation as RuntimeTranslation | undefined;
+  const rawSource = runtime?.sourceLanguage ?? runtime?.source_language;
+  const locale = viewerLanguage.trim().toLocaleLowerCase().replace("_", "-").split("-")[0] || "fr";
+  if (!rawSource) {
+    if (locale === "en") return "Translated from the original language";
+    if (locale === "es") return "Traducido del idioma original";
+    if (locale === "de") return "Aus der Originalsprache übersetzt";
+    if (locale === "it") return "Tradotto dalla lingua originale";
+    if (locale === "pt") return "Traduzido do idioma original";
+    return "Traduit de la langue d’origine";
+  }
+
+  const sourceCode = rawSource.trim().toLocaleLowerCase().replace("_", "-").split("-")[0] ?? "";
+  const source = SUPPORTED_LANGUAGES.find((language) => language.code === sourceCode);
+  if (locale === "fr") {
+    const frenchForm = source ? FRENCH_SOURCE_FORMS[source.code] : undefined;
+    return frenchForm ? `Traduit ${frenchForm}` : `Traduit depuis ${rawSource.trim()}`;
+  }
+
+  let displayName = source?.nativeName ?? rawSource.trim();
+  try {
+    if (sourceCode && typeof Intl.DisplayNames === "function") {
+      displayName = new Intl.DisplayNames([UI_LANGUAGE_TAGS[locale] ?? locale], { type: "language" }).of(sourceCode) ?? displayName;
+    }
+  } catch {
+    // Older Hermes builds may omit Intl.DisplayNames; native names remain clear.
+  }
+
+  if (locale === "en") return `Translated from ${displayName}`;
+  if (locale === "es") return `Traducido de: ${displayName}`;
+  if (locale === "de") return `Übersetzt aus: ${displayName}`;
+  if (locale === "it") return `Tradotto da: ${displayName}`;
+  if (locale === "pt") return `Traduzido de: ${displayName}`;
+  return `Translated from ${displayName}`;
+}

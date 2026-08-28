@@ -24,7 +24,14 @@ import { useAppLanguage } from "../providers/LanguageProvider";
 import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { CoworkingMapApi } from "../services/api/coworkingMapApi";
+import { ApiError } from "../services/api/httpClient";
 import { NeptuneEventsApi } from "../services/api/neptuneEventsApi";
+import { emitCoworkingActionFeedback } from "../services/coworking/coworkingActionFeedback";
+import {
+  interactionCooldownRemaining,
+  releaseCoworkingInteraction,
+  reserveCoworkingInteraction
+} from "../services/coworking/coworkingInteractionGuard";
 import { AppAlert } from "../services/ui/AppAlert";
 import type { CoworkingMediaSession, CoworkingSpace } from "../types/coworking";
 import type { AppUser } from "../types/messaging";
@@ -86,6 +93,8 @@ export default function UnifiedMapScreenV24() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState<"hello" | "invite" | "knock" | "presence" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [interactionClock, setInteractionClock] = useState(() => Date.now());
+  const tabBarClearance = 92;
 
   const loadEvents = async () => {
     if (!eventsApi) return;
@@ -141,6 +150,12 @@ export default function UnifiedMapScreenV24() {
     const timer = setTimeout(() => setNotice(null), 2600);
     return () => clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    if (!selectedMarkerId) return;
+    const timer = setInterval(() => setInteractionClock(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [selectedMarkerId]);
 
   const allMembers = useMemo(() => {
     const byId = new Map<string, AppUser>();
@@ -251,6 +266,11 @@ export default function UnifiedMapScreenV24() {
   const selection: MarkerSelection | null = selectedMarker && selectedMember
     ? { marker: selectedMarker, member: selectedMember, space: selectedSpace }
     : null;
+  const interactionTargetKey = selection?.space
+    ? `space:${selection.space.id}`
+    : selection ? `user:${selection.member.id}` : "none";
+  const helloCooldownSeconds = Math.ceil(interactionCooldownRemaining("hello", interactionTargetKey, interactionClock) / 1_000);
+  const knockCooldownSeconds = Math.ceil(interactionCooldownRemaining("knock", interactionTargetKey, interactionClock) / 1_000);
   const selectedEvent = selectedEventId ? visibleEvents.find((event) => event.id === selectedEventId) : undefined;
 
   const selectMarker = (markerId: string) => {
@@ -274,6 +294,11 @@ export default function UnifiedMapScreenV24() {
 
   const sayHello = async () => {
     if (!selection || actionBusy || selection.member.id === currentUser.id) return;
+    const reservation = reserveCoworkingInteraction("hello", interactionTargetKey);
+    if (!reservation.allowed) {
+      setNotice(`Bonjour déjà envoyé · réessayez dans ${Math.ceil(reservation.remainingMs / 1_000)} s`);
+      return;
+    }
     setActionBusy("hello");
     try {
       if (mapApi) {
@@ -284,8 +309,13 @@ export default function UnifiedMapScreenV24() {
       const recipients = selection.space
         ? firstNameList(selection.marker.members.map((member) => member.name))
         : firstName(selection.member.name);
-      setNotice(`Bonjour envoyé à ${recipients} 👋`);
+      const message = selection.space ? "Bonjour envoyé à tout l’espace" : `Bonjour envoyé à ${recipients}`;
+      emitCoworkingActionFeedback({ type: "hello", message });
+      setInteractionClock(Date.now());
     } catch (error) {
+      if (!(error instanceof ApiError && error.status === 429)) {
+        releaseCoworkingInteraction("hello", interactionTargetKey);
+      }
       AppAlert.alert("Bonjour non envoyé", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     } finally {
       setActionBusy(null);
@@ -314,6 +344,13 @@ export default function UnifiedMapScreenV24() {
     if (!selection || actionBusy || selection.member.id === currentUser.id) return;
     const primaryAction = coworkingMapPrimaryAction(selection.marker.availability, selection.space);
     if (primaryAction === "none") return;
+    if (primaryAction === "knock-space") {
+      const reservation = reserveCoworkingInteraction("knock", interactionTargetKey);
+      if (!reservation.allowed) {
+        setNotice(`Toquement déjà envoyé · réessayez dans ${Math.ceil(reservation.remainingMs / 1_000)} s`);
+        return;
+      }
+    }
     setActionBusy(primaryAction === "invite-video" ? "invite" : "knock");
     try {
       if (primaryAction === "invite-video") {
@@ -326,11 +363,16 @@ export default function UnifiedMapScreenV24() {
       if (!mapApi) {
         const hostId = coworkingSpaceHostId(targetSpace);
         const host = hostId ? allMembers.find((member) => member.id === hostId) : undefined;
-        setNotice(`Demande envoyée à ${host ? firstName(host.name) : "l’hôte"} · en attente d’autorisation…`);
+        emitCoworkingActionFeedback({ type: "knock", message: `Demande envoyée à ${host ? firstName(host.name) : "l’hôte"}` });
+        setInteractionClock(Date.now());
         return;
       }
 
       const result = await mapApi.knock({ spaceId: targetSpace.id });
+      emitCoworkingActionFeedback({
+        type: "knock",
+        message: "Vous avez toqué à l’espace"
+      });
 
       if (result.status === "declined") {
         setNotice(`${firstName(selection.member.name)} n’est pas disponible maintenant.`);
@@ -345,8 +387,11 @@ export default function UnifiedMapScreenV24() {
         }
       }
 
-      setNotice("Tu as toqué à l’espace · autorisation de l’hôte demandée.");
+      setInteractionClock(Date.now());
     } catch (error) {
+      if (primaryAction === "knock-space" && !(error instanceof ApiError && error.status === 429)) {
+        releaseCoworkingInteraction("knock", interactionTargetKey);
+      }
       AppAlert.alert("Impossible de toquer", error instanceof Error ? error.message : "Réessayez dans quelques instants.");
     } finally {
       setActionBusy(null);
@@ -453,7 +498,7 @@ export default function UnifiedMapScreenV24() {
       </View>
 
       {selection ? (
-        <View style={[styles.sheet, { bottom: Math.max(insets.bottom, 10), backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}> 
+        <View style={[styles.sheet, { bottom: tabBarClearance, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
           <View style={styles.sheetTop}>
             <Pressable accessibilityRole="button" accessibilityLabel={`Ouvrir le profil de ${selection.member.name}`} onPress={() => router.push(`/profile/${encodeURIComponent(selection.member.id)}`)} style={styles.identity}>
               <StatusAvatar user={selection.member} size={52} accessible={false} />
@@ -488,7 +533,7 @@ export default function UnifiedMapScreenV24() {
             <View style={styles.actions}>
               <Pressable accessibilityRole="button" accessibilityLabel={selection.space ? "Dire bonjour au groupe" : "Dire bonjour"} disabled={Boolean(actionBusy)} onPress={() => void sayHello()} style={[styles.action, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
                 <Ionicons name="hand-left-outline" size={19} color={theme.violet} />
-                <Text style={[styles.actionText, { color: theme.pageText }]}>{selection.space ? "Bonjour au groupe" : "Bonjour"}</Text>
+                <Text style={[styles.actionText, { color: theme.pageText }]}>{helloCooldownSeconds > 0 ? `Bonjour · ${helloCooldownSeconds}s` : selection.space ? "Bonjour au groupe" : "Bonjour"}</Text>
               </Pressable>
               {selectionPrimaryAction !== "none" ? (
                 <Pressable
@@ -499,7 +544,7 @@ export default function UnifiedMapScreenV24() {
                   style={[styles.action, styles.primaryAction, { backgroundColor: selectionPrimaryAction === "knock-space" ? BUSY : AVAILABLE }]}
                 >
                   {actionBusy === "knock" || actionBusy === "invite" ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Ionicons name={selectionPrimaryAction === "knock-space" ? "notifications-outline" : "videocam-outline"} size={19} color="#FFFFFF" />}
-                  <Text style={styles.primaryActionText}>{selectionPrimaryAction === "knock-space" ? "Toquer à l’espace" : "Inviter en visio"}</Text>
+                  <Text style={styles.primaryActionText}>{selectionPrimaryAction === "knock-space" && knockCooldownSeconds > 0 ? `Patientez ${knockCooldownSeconds}s` : selectionPrimaryAction === "knock-space" ? "Toquer à l’espace" : "Inviter en visio"}</Text>
                 </Pressable>
               ) : null}
               <Pressable accessibilityRole="button" accessibilityLabel="Proposer un rendez-vous" onPress={() => router.push({ pathname: "/schedule-call", params: { memberId: selection.member.id, mode: "video" } })} style={[styles.iconAction, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
@@ -511,7 +556,7 @@ export default function UnifiedMapScreenV24() {
       ) : null}
 
       {selectedEvent ? (
-        <View style={[styles.sheet, { bottom: Math.max(insets.bottom, 10), backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}> 
+        <View style={[styles.sheet, { bottom: tabBarClearance, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
           <View style={styles.sheetTop}>
             <View style={[styles.eventIcon, { backgroundColor: theme.accentSoft }]}><Ionicons name="flag" size={22} color={theme.accent} /></View>
             <View style={styles.identityCopy}>
@@ -538,7 +583,7 @@ export default function UnifiedMapScreenV24() {
       ) : null}
 
       {notice ? (
-        <View pointerEvents="none" style={[styles.notice, { bottom: Math.max(insets.bottom, 10) + 76, backgroundColor: theme.pageText }]}>
+        <View pointerEvents="none" style={[styles.notice, { bottom: tabBarClearance + 76, backgroundColor: theme.pageText }]}>
           <Text style={[styles.noticeText, { color: theme.pageBackground }]}>{notice}</Text>
         </View>
       ) : null}

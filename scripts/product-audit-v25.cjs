@@ -142,6 +142,7 @@ async function auditFeedOnly(page) {
 async function auditMap(page, label, interactive = false) {
   await open(page, "/coworking");
   await expectVisible(page.getByText("Map", { exact: true }).first(), `${label} Map`);
+  await expectVisible(page.getByRole("tab", { name: /Messages/ }), `${label} navigation principale conservée`);
   const availability = page.getByLabel(/^Ma disponibilité : (Disponible|Occupé)$/);
   if (await expectVisible(availability, `${label} disponibilité personnelle`)) {
     const box = await availability.boundingBox();
@@ -183,6 +184,20 @@ async function auditMap(page, label, interactive = false) {
   if (faceGeometry.visible === 0) failures.push(`${label}: aucun visage de membre réellement visible dans le viewport`);
   if (faceGeometry.blank > 0) failures.push(`${label}: ${faceGeometry.blank} cercle(s) membre visuellement vide(s)`);
 
+  const eventProfileCollisions = await frame.locator("body").evaluate(() => {
+    const visibleRects = (selector) => [...document.querySelectorAll(selector)]
+      .map((node) => node.getBoundingClientRect())
+      .filter((rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight);
+    const events = visibleRects(".event-visual");
+    const people = visibleRects(".cw-core,.cw-satellite");
+    return events.reduce((total, eventRect) => total + people.filter((personRect) => {
+      const width = Math.max(0, Math.min(eventRect.right, personRect.right) - Math.max(eventRect.left, personRect.left));
+      const height = Math.max(0, Math.min(eventRect.bottom, personRect.bottom) - Math.max(eventRect.top, personRect.top));
+      return width > 2 && height > 2;
+    }).length, 0);
+  });
+  if (eventProfileCollisions > 0) failures.push(`${label}: ${eventProfileCollisions} superposition(s) visible(s) entre drapeau et profil`);
+
   if (!interactive) return;
 
   const initialAvailabilityLabel = await availability.getAttribute("aria-label").catch(() => null);
@@ -200,6 +215,12 @@ async function auditMap(page, label, interactive = false) {
     await expectVisible(page.getByLabel("Inviter en visio", { exact: true }), "Disponible: invitation visio sans toquement");
     if (await page.getByLabel(/Toquer/, { exact: false }).count()) failures.push("Disponible: Toquer proposé hors espace actif");
     await expectVisible(page.getByLabel("Dire bonjour", { exact: true }), "Disponible: Bonjour");
+    await page.getByLabel("Dire bonjour", { exact: true }).click();
+    const helloMotion = page.getByTestId("coworking-action-motion");
+    await expectVisible(helloMotion, "Bonjour: animation de main visible");
+    const helloMotionOpacity = Number(await helloMotion.evaluate((node) => getComputedStyle(node).opacity).catch(() => 0));
+    if (helloMotionOpacity < 0.5) failures.push(`Bonjour: animation montée mais transparente (${helloMotionOpacity})`);
+    await expectVisible(page.getByText(/Bonjour · \d+s/), "Bonjour: délai anti-spam visible");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
@@ -211,7 +232,10 @@ async function auditMap(page, label, interactive = false) {
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
   }
 
-  const event = frame.locator(".event-marker").first();
+  // The marker keeps its exact geographic anchor while `.event-visual` is
+  // translated to avoid people. Click the translated hit surface, not the
+  // invisible anchor box that may legitimately remain behind a member.
+  const event = frame.locator(".event-marker .event-hit").first();
   if (await event.isVisible().catch(() => false)) {
     await event.click();
     await expectVisible(page.getByLabel("Voir l’évènement", { exact: true }), "Évènement: fiche et CTA");

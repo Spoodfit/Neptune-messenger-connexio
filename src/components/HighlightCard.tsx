@@ -13,9 +13,10 @@ import {
   contentTranslationTargetsViewer,
   hasTranslatedContentField,
   translatedContentField,
-  translationSourceLabel
+  translationSourceAttribution
 } from "../i18n/contentTranslation";
 import { mockContentTranslation } from "../i18n/mockContentLookup";
+import { getTranslationRequestLanguage } from "../i18n/translationLocale";
 import { useSession } from "../providers/SessionProvider";
 import { useAppTheme } from "../providers/ThemeProvider";
 import { NeptuneExperienceApi } from "../services/api/experienceApi";
@@ -38,6 +39,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
   const [menuOpen, setMenuOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
+  const viewerLanguage = getTranslationRequestLanguage();
   const totalReactions = post.reactions.reduce((total, reaction) => total + reaction.count, 0);
   const locationLabel = post.location?.label ?? post.locationLabel;
   const synchronized = post.kind === "offre" ? post.syncedWithAdvantagesCommittee || post.syncedWithBusinessApp : post.syncedWithBusinessApp;
@@ -48,7 +50,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
       : post.translation;
   const translationReady = hasTranslatedContentField(post.body, effectiveTranslation, "body");
   const renderedBody = translatedContentField(post.body, effectiveTranslation, "body", undefined, showOriginal) ?? post.body;
-  const sourceLabel = translationSourceLabel(effectiveTranslation);
+  const sourceAttribution = translationSourceAttribution(effectiveTranslation, viewerLanguage);
 
   const sharePost = async () => {
     if (sharing) return;
@@ -92,7 +94,7 @@ export function HighlightCard({ post, compact = false, onReact }: HighlightCardP
 
       {post.media ? <View style={styles.mediaWrap}><HighlightMediaView media={post.media} compact={compact} />{post.media.durationSeconds ? <View style={styles.duration}><Text style={styles.durationText}>{Math.floor(post.media.durationSeconds / 60)}:{String(Math.floor(post.media.durationSeconds % 60)).padStart(2, "0")}</Text></View> : null}</View> : null}
       <Text style={[styles.body, { color: theme.pageTextSecondary }, compact && styles.compactBody]} numberOfLines={compact ? 5 : undefined}>{renderedBody}</Text>
-      {translationReady ? <View style={styles.translationMeta}><Text style={[styles.translationLabel, { color: theme.pageTextMuted }]}>{showOriginal ? "Contenu original" : `Traduit de ${sourceLabel}`}</Text><Text style={[styles.translationLabel, { color: theme.pageTextMuted }]}>·</Text><Pressable accessibilityRole="button" accessibilityLabel={showOriginal ? "Afficher la traduction" : "Afficher le contenu original"} onPress={() => setShowOriginal((value) => !value)} style={styles.translationToggle}><Text style={[styles.translationToggleText, { color: theme.violet }]}>{showOriginal ? "Voir la traduction" : "Voir l’original"}</Text></Pressable></View> : null}
+      {translationReady ? <View style={styles.translationMeta}><Text style={[styles.translationLabel, { color: theme.pageTextMuted }]}>{showOriginal ? "Contenu original" : sourceAttribution}</Text><Text style={[styles.translationLabel, { color: theme.pageTextMuted }]}>·</Text><Pressable accessibilityRole="button" accessibilityLabel={showOriginal ? "Afficher la traduction" : "Afficher le contenu original"} onPress={() => setShowOriginal((value) => !value)} style={styles.translationToggle}><Text style={[styles.translationToggleText, { color: theme.violet }]}>{showOriginal ? "Voir la traduction" : "Voir l’original"}</Text></Pressable></View> : null}
       {locationLabel || post.coordinates ? <View style={styles.locationLine}><Ionicons name="location-outline" size={13} color={theme.pageTextMuted} /><Text style={[styles.locationText, { color: theme.pageTextMuted }]} numberOfLines={1}>{locationLabel ?? "Position approximative"}</Text></View> : null}
       <View style={styles.metrics}><Text style={[styles.metricText, { color: theme.pageTextMuted }]}>{totalReactions} réactions</Text><Text style={[styles.metricText, { color: theme.pageTextMuted }]}>{post.comments.length} commentaires</Text>{!compact ? <Text style={[styles.metricText, { color: theme.pageTextMuted }]}>{post.shareCount} partages</Text> : null}</View>
 

@@ -3,6 +3,8 @@ import { StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { useAppTheme } from "../providers/ThemeProvider";
+import { useAppLanguage } from "../providers/LanguageProvider";
+import { allowsWebViewNavigation, mediaWebViewOrigins } from "../domain/webViewSecurity";
 import { buildCoworkingMediaHtml } from "../services/coworking/coworkingMedia";
 import type { CoworkingMediaSurfaceProps } from "./CoworkingMediaSurface.types";
 
@@ -11,21 +13,25 @@ export default function CoworkingMediaSurface({
   displayName,
   cameraOn,
   microphoneOn,
+  screenSharing = false,
   mapMode = false,
   spatialAudio = false,
   participantLayout,
   roomViewMode,
   focusParticipantId,
   onConnected,
+  onLocalMediaReady,
+  onScreenShareStateChange,
   onError,
   onLocalMediaUnavailable
 }: CoworkingMediaSurfaceProps) {
   const theme = useAppTheme();
+  const { uiLanguage } = useAppLanguage();
   const webViewRef = useRef<WebView>(null);
-  const latestMediaRef = useRef({ cameraOn, microphoneOn });
+  const latestMediaRef = useRef({ cameraOn, microphoneOn, screenSharing });
   const latestLayoutRef = useRef(participantLayout);
   const latestRoomViewRef = useRef({ roomViewMode, focusParticipantId });
-  latestMediaRef.current = { cameraOn, microphoneOn };
+  latestMediaRef.current = { cameraOn, microphoneOn, screenSharing };
   latestLayoutRef.current = participantLayout;
   latestRoomViewRef.current = { roomViewMode, focusParticipantId };
   const html = useMemo(
@@ -33,17 +39,19 @@ export default function CoworkingMediaSurface({
       buildCoworkingMediaHtml(session, displayName, {
         cameraOn,
         microphoneOn,
+        screenSharing,
         mapMode,
         spatialAudio,
         participantLayout,
         roomViewMode,
         focusParticipantId
-      }),
+      }, uiLanguage),
     // Les états média, la disposition et le mode de vue sont ensuite injectés
     // dans la WebView. Les ajouter aux dépendances reconnecterait le SFU à
     // chaque bascule de caméra ou de mosaïque.
-    [displayName, mapMode, session, spatialAudio]
+    [displayName, mapMode, session, spatialAudio, uiLanguage]
   );
+  const allowedOrigins = useMemo(() => mediaWebViewOrigins(session.socketUrl, session.clientScriptUrl), [session.clientScriptUrl, session.socketUrl]);
 
   useEffect(() => {
     webViewRef.current?.injectJavaScript(
@@ -54,6 +62,15 @@ export default function CoworkingMediaSurface({
       })});true;`
     );
   }, [cameraOn, microphoneOn]);
+
+  useEffect(() => {
+    webViewRef.current?.injectJavaScript(
+      `window.__connexioCoworkingControl?.(${JSON.stringify({
+        type: "screen-share",
+        active: screenSharing
+      })});true;`
+    );
+  }, [screenSharing]);
 
   useEffect(() => {
     if (!participantLayout) return;
@@ -77,13 +94,21 @@ export default function CoworkingMediaSurface({
   }, [focusParticipantId, roomViewMode]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
+    if (!allowsWebViewNavigation(event.nativeEvent.url, allowedOrigins)) return;
     try {
       const payload = JSON.parse(event.nativeEvent.data) as {
         type?: string;
         message?: string;
+        active?: boolean;
       };
       if (payload.type === "connected" || payload.type === "media-ready") {
         onConnected?.();
+      }
+      if (payload.type === "local-media-ready") {
+        onLocalMediaReady?.();
+      }
+      if (payload.type === "screen-share-state") {
+        onScreenShareStateChange?.(payload.active === true);
       }
       if (payload.type === "local-media-unavailable") {
         onLocalMediaUnavailable?.(payload.message ?? "Caméra ou microphone indisponible.");
@@ -96,8 +121,6 @@ export default function CoworkingMediaSurface({
     }
   };
 
-  if (session.mock) return null;
-
   const transparent = mapMode || spatialAudio || Boolean(roomViewMode);
 
   return (
@@ -109,13 +132,23 @@ export default function CoworkingMediaSurface({
     >
       <WebView
         ref={webViewRef}
-        source={{ html, baseUrl: new URL(session.socketUrl).origin }}
+        source={{ html, baseUrl: allowedOrigins[0] }}
         javaScriptEnabled
-        domStorageEnabled
+        domStorageEnabled={false}
+        cacheEnabled={false}
+        incognito
         mediaPlaybackRequiresUserAction={false}
-        allowFileAccess
+        allowFileAccess={false}
+        allowFileAccessFromFileURLs={false}
+        allowUniversalAccessFromFileURLs={false}
         allowsInlineMediaPlayback
-        originWhitelist={["https://*", "http://localhost*"]}
+        mixedContentMode="never"
+        sharedCookiesEnabled={false}
+        thirdPartyCookiesEnabled={false}
+        javaScriptCanOpenWindowsAutomatically={false}
+        setSupportMultipleWindows={false}
+        originWhitelist={["about:blank", ...allowedOrigins]}
+        onShouldStartLoadWithRequest={(request) => allowsWebViewNavigation(request.url, allowedOrigins)}
         onLoadEnd={() => {
           webViewRef.current?.injectJavaScript(
             `window.__connexioCoworkingControl?.(${JSON.stringify({ type: "media", ...latestMediaRef.current })});true;`

@@ -141,6 +141,7 @@ export default function ChatScreen() {
   const lastMarkedReadMessageId = useRef<string | null>(null);
   const messageListRef = useRef<FlatList<ChatMessage>>(null);
   const lastLatestMessageIdRef = useRef<string | null>(null);
+  const transcriptPollingStartedAtRef = useRef(0);
   const spotlightProgress = useRef(new Animated.Value(0)).current;
   const [spotlightMessageId, setSpotlightMessageId] = useState<string | null>(null);
 
@@ -204,6 +205,30 @@ export default function ChatScreen() {
     lastMarkedReadMessageId.current = null;
     void loadMessages(conversationId);
   }, [conversationId, loadMessages, localOnly]);
+
+  useEffect(() => {
+    if (env.mockMode || localOnly || !conversationId) return;
+    const hasPendingTranscript = messages.some((message) =>
+      message.attachments?.some((attachment) =>
+        attachment.kind === "audio" &&
+        attachment.transcriptStatus === "pending" &&
+        !attachment.transcript?.trim()
+      )
+    );
+    if (!hasPendingTranscript) {
+      transcriptPollingStartedAtRef.current = 0;
+      return;
+    }
+    if (!transcriptPollingStartedAtRef.current) transcriptPollingStartedAtRef.current = Date.now();
+    const timer = setInterval(() => {
+      if (Date.now() - transcriptPollingStartedAtRef.current > 120_000) {
+        clearInterval(timer);
+        return;
+      }
+      void loadMessages(conversationId);
+    }, 4_000);
+    return () => clearInterval(timer);
+  }, [conversationId, loadMessages, localOnly, messages]);
 
   useEffect(() => {
     if (!conversationId || !latestMessageId || localOnly) return;
@@ -284,7 +309,14 @@ export default function ChatScreen() {
     setSubmitting(true);
     const originalReply = replyingTo;
     try {
-      const readyAttachment = env.mockMode || localOnly ? { ...attachment, status: "ready" as const, uploadProgress: 1 } : await uploadMessageAttachment(attachment);
+      const readyAttachment = env.mockMode || localOnly
+        ? {
+            ...attachment,
+            status: "ready" as const,
+            uploadProgress: 1,
+            transcriptStatus: attachment.transcript ? "ready" as const : "failed" as const
+          }
+        : await uploadMessageAttachment(attachment);
       const accepted = source === "admin"
         ? await sendCreatedGroupMessage(conversation.id, "🎙️ Message vocal", originalReply ?? undefined, [readyAttachment], [])
         : source === "private"

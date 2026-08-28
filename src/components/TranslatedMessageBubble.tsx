@@ -19,7 +19,7 @@ import {
   translatedContentField,
   translatedPollOption,
   translatedPollQuestion,
-  translationSourceLabel
+  translationSourceAttribution
 } from "../i18n/contentTranslation";
 import { mockContentTranslation, mockPollTranslation } from "../i18n/mockContentLookup";
 import { getTranslationRequestLanguage } from "../i18n/translationLocale";
@@ -178,7 +178,7 @@ export function MessageBubble(props: MessageBubbleProps) {
     [message, translatedAttachments, translatedBody, translatedPoll, translatedReplyPreview]
   );
 
-  const sourceLabel = translationSourceLabel(sourceTranslation);
+  const sourceAttribution = translationSourceAttribution(sourceTranslation, viewerLanguage);
 
   return (
     <View style={styles.container}>
@@ -193,7 +193,7 @@ export function MessageBubble(props: MessageBubbleProps) {
       {translationReady ? (
         <View style={[styles.translationMeta, centered ? styles.centeredMeta : styles.otherMeta]}>
           <Text style={styles.translationLabel}>
-            {showOriginal ? "Contenu original" : `Traduit de ${sourceLabel}`}
+            {showOriginal ? "Contenu original" : sourceAttribution}
           </Text>
           <Text style={styles.separator}>·</Text>
           <Pressable

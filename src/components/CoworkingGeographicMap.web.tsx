@@ -2,6 +2,7 @@ import { createElement, useEffect, useMemo, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
+import { useAppLanguage } from "../providers/LanguageProvider";
 import { buildCoworkingGeographicMapHtml } from "../services/coworking/geographicMapHtml";
 import type { CoworkingGeographicMapProps } from "./CoworkingGeographicMap.types";
 
@@ -15,6 +16,7 @@ export default function CoworkingGeographicMap({
   onSelectEvent
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
+  const { uiLanguage } = useAppLanguage();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const onSelectMarkerRef = useRef(onSelectMarker);
   const onSelectEventRef = useRef(onSelectEvent);
@@ -26,6 +28,8 @@ export default function CoworkingGeographicMap({
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
+      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
+      if (event.origin !== window.location.origin) return;
       if (event.data?.source !== "connexio-coworking-map") return;
       if (event.data?.type === "marker-selected" && typeof event.data.id === "string") {
         onSelectMarkerRef.current(event.data.id);
@@ -41,7 +45,7 @@ export default function CoworkingGeographicMap({
   const postSelection = () => {
     iframeRef.current?.contentWindow?.postMessage(
       { type: "selection", markerId: selectedMarkerId ?? null, eventId: selectedEventId ?? null },
-      "*"
+      window.location.origin
     );
   };
 
@@ -56,6 +60,7 @@ export default function CoworkingGeographicMap({
         events,
         mediaSession,
         bridge: "web",
+        language: uiLanguage,
         theme: {
           pageBackground: theme.pageBackground,
           surface: theme.surface,
@@ -67,11 +72,11 @@ export default function CoworkingGeographicMap({
           isLight: theme.isLight
         }
       }),
-    [events, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
+    [events, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, uiLanguage]
   );
 
   return (
-    <View style={[styles.wrap, { backgroundColor: theme.pageBackground }]}> 
+    <View style={[styles.wrap, { backgroundColor: theme.pageBackground }]}>
       {createElement("iframe", {
         ref: (node: HTMLIFrameElement | null) => {
           iframeRef.current = node;
@@ -79,6 +84,8 @@ export default function CoworkingGeographicMap({
         title: "Carte géographique du Coworking Connexio",
         srcDoc: html,
         onLoad: postSelection,
+        sandbox: "allow-scripts allow-same-origin",
+        referrerPolicy: "no-referrer",
         style: {
           width: "100%",
           height: "100%",

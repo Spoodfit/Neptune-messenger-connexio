@@ -16,6 +16,11 @@ test("V17 traduit les libellés dynamiques sans altérer les noms", () => {
   assert.equal(translateConnexioUiText("Programmer avec Johan Zambelli", "de"), "Planen mit Johan Zambelli");
   assert.equal(translateConnexioUiText("Recommander un contact à Aurore Martin", "es"), "Recomendar un contacto a Aurore Martin");
   assert.equal(translateConnexioUiText("7 appels", "it"), "7 chiamate");
+  assert.equal(translateConnexioUiText("Sélectionner Johan Zambelli", "en"), "Select Johan Zambelli");
+  assert.equal(
+    translateConnexioUiText("Carte du Coworking, 3 groupes ou personnes et 2 évènements", "de"),
+    "Coworking-Karte, 3 Gruppen oder Personen und 2 Veranstaltungen"
+  );
 });
 
 test("V17 ne traduit jamais une donnée utilisateur inconnue", () => {

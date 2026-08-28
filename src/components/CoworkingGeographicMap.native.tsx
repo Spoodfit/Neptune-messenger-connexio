@@ -5,7 +5,10 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { useAppTheme } from "../providers/ThemeProvider";
+import { useAppLanguage } from "../providers/LanguageProvider";
+import { allowsWebViewNavigation } from "../domain/webViewSecurity";
 import { buildCoworkingGeographicMapHtml } from "../services/coworking/geographicMapHtml";
+import { MAP_DOCUMENT_ORIGIN } from "../services/maps/leafletAssets";
 import type { CoworkingGeographicMapProps } from "./CoworkingGeographicMap.types";
 
 export default function CoworkingGeographicMap({
@@ -19,6 +22,7 @@ export default function CoworkingGeographicMap({
   onLocationUnavailable
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
+  const { uiLanguage, t } = useAppLanguage();
   const webViewRef = useRef<WebView>(null);
   const [locating, setLocating] = useState(false);
   const html = useMemo(
@@ -28,6 +32,7 @@ export default function CoworkingGeographicMap({
         events,
         mediaSession,
         bridge: "native",
+        language: uiLanguage,
         theme: {
           pageBackground: theme.pageBackground,
           surface: theme.surface,
@@ -39,8 +44,22 @@ export default function CoworkingGeographicMap({
           isLight: theme.isLight
         }
       }),
-    [events, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong]
+    [events, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, uiLanguage]
   );
+  const accessibilityTargets = useMemo(() => [
+    ...markers.map((marker, index) => ({
+      name: `marker-${index}`,
+      label: t(`Sélectionner ${marker.members.map((member) => member.name).join(", ")}`),
+      id: marker.id,
+      kind: "marker" as const
+    })),
+    ...events.map((event, index) => ({
+      name: `event-${index}`,
+      label: t(`Sélectionner l’évènement ${event.title}`),
+      id: event.id,
+      kind: "event" as const
+    }))
+  ], [events, markers, t]);
 
   const postSelection = () => {
     webViewRef.current?.postMessage(
@@ -57,6 +76,7 @@ export default function CoworkingGeographicMap({
   }, [selectedEventId, selectedMarkerId]);
 
   const handleMessage = (event: WebViewMessageEvent) => {
+    if (!allowsWebViewNavigation(event.nativeEvent.url, [MAP_DOCUMENT_ORIGIN])) return;
     try {
       const payload = JSON.parse(event.nativeEvent.data) as { type?: string; id?: string };
       if (!payload.id) return;
@@ -93,19 +113,46 @@ export default function CoworkingGeographicMap({
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.pageBackground }]}>
-      <WebView
-        ref={webViewRef}
-        source={{ html }}
-        onMessage={handleMessage}
-        onLoadEnd={postSelection}
-        javaScriptEnabled
-        domStorageEnabled
-        mediaPlaybackRequiresUserAction={false}
-        allowsInlineMediaPlayback
-        originWhitelist={["*"]}
-        mixedContentMode="never"
-        style={[styles.webView, { backgroundColor: theme.pageBackground }]}
-      />
+      <View
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={t(`Carte du Coworking, ${markers.length} groupes ou personnes et ${events.length} évènements`)}
+        accessibilityHint={t("Ouvrez les actions d’accessibilité pour sélectionner une personne, un groupe ou un évènement.")}
+        accessibilityActions={accessibilityTargets.map(({ name, label }) => ({ name, label }))}
+        onAccessibilityAction={(event) => {
+          const target = accessibilityTargets.find((item) => item.name === event.nativeEvent.actionName);
+          if (!target) return;
+          if (target.kind === "marker") onSelectMarker(target.id);
+          else onSelectEvent?.(target.id);
+        }}
+        style={styles.mapFrame}
+      >
+        <WebView
+          ref={webViewRef}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          source={{ html, baseUrl: MAP_DOCUMENT_ORIGIN }}
+          onMessage={handleMessage}
+          onLoadEnd={postSelection}
+          javaScriptEnabled
+          domStorageEnabled={false}
+          cacheEnabled={false}
+          incognito
+          mediaPlaybackRequiresUserAction={false}
+          allowsInlineMediaPlayback
+          allowFileAccess={false}
+          allowFileAccessFromFileURLs={false}
+          allowUniversalAccessFromFileURLs={false}
+          sharedCookiesEnabled={false}
+          thirdPartyCookiesEnabled={false}
+          javaScriptCanOpenWindowsAutomatically={false}
+          setSupportMultipleWindows={false}
+          originWhitelist={["about:blank", MAP_DOCUMENT_ORIGIN]}
+          onShouldStartLoadWithRequest={(request) => allowsWebViewNavigation(request.url, [MAP_DOCUMENT_ORIGIN])}
+          mixedContentMode="never"
+          style={[styles.webView, { backgroundColor: theme.pageBackground }]}
+        />
+      </View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Me localiser"
@@ -128,6 +175,7 @@ export default function CoworkingGeographicMap({
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, minHeight: 420, position: "relative", overflow: "hidden" },
+  mapFrame: { flex: 1, minHeight: 0 },
   webView: { flex: 1 },
   locate: {
     position: "absolute",

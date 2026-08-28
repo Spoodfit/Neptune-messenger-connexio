@@ -37,6 +37,7 @@ export function VoiceMessagePlayer({ attachment, isMine }: VoiceMessagePlayerPro
   const theme = useAppTheme();
   const [transcriptExpanded, setTranscriptExpanded] = useState(false);
   const [waveWidth, setWaveWidth] = useState(1);
+  const [playbackRate, setPlaybackRate] = useState<1 | 1.5 | 2>(1);
   const source = attachment.downloadUrl ?? attachment.uri ?? null;
   const player = useAudioPlayer(source, { updateInterval: 120 });
   const status = useAudioPlayerStatus(player);
@@ -64,7 +65,14 @@ export function VoiceMessagePlayer({ attachment, isMine }: VoiceMessagePlayerPro
     if (duration > 0 && status.currentTime >= duration - 0.15) {
       void player.seekTo(0);
     }
+    player.setPlaybackRate(playbackRate);
     player.play();
+  };
+
+  const cyclePlaybackRate = () => {
+    const next = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+    setPlaybackRate(next);
+    player.setPlaybackRate(next);
   };
 
   const onWaveLayout = (event: LayoutChangeEvent) => {
@@ -132,6 +140,18 @@ export function VoiceMessagePlayer({ attachment, isMine }: VoiceMessagePlayerPro
           </Pressable>
           <View style={styles.timeRow}>
             <Text style={[styles.time, { color: muted }]}>{formatSeconds(status.currentTime)}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Vitesse de lecture ${String(playbackRate).replace(".", ",")} fois`}
+              hitSlop={9}
+              onPress={cyclePlaybackRate}
+              style={[
+                styles.speedButton,
+                { borderColor: isMine ? "rgba(255,255,255,0.22)" : theme.borderSoft }
+              ]}
+            >
+              <Text style={[styles.speedText, { color: foreground }]}>{String(playbackRate).replace(".", ",")}×</Text>
+            </Pressable>
             <View style={styles.voiceMeta}>
               <Ionicons name="mic-outline" size={12} color={muted} />
               <Text style={[styles.time, { color: muted }]}>{formatSeconds(duration)}</Text>
@@ -222,6 +242,16 @@ const styles = StyleSheet.create({
   } satisfies ViewStyle,
   voiceMeta: { flexDirection: "row", alignItems: "center", gap: 3 } satisfies ViewStyle,
   time: { fontSize: 10, lineHeight: 13, fontWeight: "800" } satisfies TextStyle,
+  speedButton: {
+    minWidth: 38,
+    height: 30,
+    borderRadius: 999,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6
+  } satisfies ViewStyle,
+  speedText: { fontSize: 10, lineHeight: 13, fontWeight: "900" } satisfies TextStyle,
   transcript: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 4 } satisfies ViewStyle,
   transcriptHeading: { flexDirection: "row", alignItems: "center", gap: 5 } satisfies ViewStyle,
   transcriptLabel: {

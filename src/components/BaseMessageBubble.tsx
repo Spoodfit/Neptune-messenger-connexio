@@ -84,6 +84,10 @@ export function MessageBubble({
   )?.emoji;
   const canReactWithLongPress = Boolean(onReact) && !message.isMine;
   const senderRoleAppearance = getRoleAppearance(message.senderRole ?? "triton", theme.isLight);
+  const voiceOnlyPlaceholder = message.attachments?.length === 1 &&
+    message.attachments[0]?.kind === "audio" &&
+    /^(?:🎙️\s*)?(?:message\s+)?vocal(?:\s+neptune)?$/iu.test(message.body.trim());
+  const visibleBody = voiceOnlyPlaceholder ? "" : message.body;
 
   useEffect(() => {
     Animated.spring(reactionProgress, {
@@ -184,7 +188,7 @@ export function MessageBubble({
         />
       ) : null}
 
-      {message.body ? (
+      {visibleBody ? (
         <Text
           selectable
           style={[
@@ -192,7 +196,7 @@ export function MessageBubble({
             message.isMine ? styles.mineBody : styles.otherBody
           ]}
         >
-          {message.body}
+          {visibleBody}
         </Text>
       ) : null}
 
@@ -226,7 +230,7 @@ export function MessageBubble({
 
       <Animated.View
         {...panResponder.panHandlers}
-        accessibilityLabel={`${message.senderName}. ${message.body}. ${formatMessageTime(
+        accessibilityLabel={`${message.senderName}. ${voiceOnlyPlaceholder ? "Message vocal" : message.body}. ${formatMessageTime(
           message.createdAt
         )}${message.isMine ? `. ${statusLabel}` : ""}. Glisser vers la droite pour répondre.`}
         style={[
