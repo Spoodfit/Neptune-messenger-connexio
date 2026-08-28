@@ -309,9 +309,13 @@ async function auditPrivateRoom(page) {
   if (tileCount < 2) failures.push(`Visio privée: seulement ${tileCount} participant visible dans la grille`);
   const stageBox = await page.getByTestId("coworking-room-stage").boundingBox();
   const tileBoxes = (await Promise.all(Array.from({ length: tileCount }, (_, index) => tiles.nth(index).boundingBox()))).filter(Boolean);
-  if (!stageBox || tileBoxes.some((box) => box.width < stageBox.width * .72 || box.height < stageBox.height * .3)) {
+  const coverage = stageBox
+    ? tileBoxes.reduce((total, box) => total + box.width * box.height, 0) / Math.max(1, stageBox.width * stageBox.height)
+    : 0;
+  if (!stageBox || coverage < .7 || tileBoxes.some((box) => box.width < stageBox.width * .38 || box.height < stageBox.height * .22)) {
     const geometry = {
       stage: stageBox && [Math.round(stageBox.width), Math.round(stageBox.height)],
+      coverage: Number(coverage.toFixed(3)),
       tiles: tileBoxes.map((box) => [Math.round(box.width), Math.round(box.height), Math.round(box.x), Math.round(box.y)])
     };
     failures.push(`Visio privée: la grille laisse une zone sombre inutilisée ou contient une tuile trop petite (${JSON.stringify(geometry)})`);

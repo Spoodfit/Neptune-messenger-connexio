@@ -123,9 +123,9 @@ export default function CoworkingRoomScreen() {
 
   const privateGridLayout = useMemo(() => {
     const count = Math.max(1, participants.length);
-    const columns = count <= 2 ? 1 : 2;
+    const columns = count <= 3 ? 1 : 2;
     const rows = Math.ceil(count / columns);
-    const gap = 2.5;
+    const gap = 1.5;
     const tileWidth = (94 - gap * (columns - 1)) / columns;
     const tileHeight = (94 - gap * (rows - 1)) / rows;
     const left = 3;
