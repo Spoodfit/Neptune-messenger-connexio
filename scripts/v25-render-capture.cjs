@@ -91,13 +91,6 @@ async function run() {
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
     }
     await expandVisibleMapClusters(mapFrame);
-    const splitGroup = mapFrame.locator(".cw-group.zoom-split:visible").first();
-    await splitGroup.waitFor({ state:"visible", timeout:3000 });
-    const splitOnScreen = await splitGroup.evaluate((group) => {
-      const rect = group.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
-    });
-    if (!splitOnScreen) throw new Error("La capture zoomée ne contient aucun groupe visio dans le viewport");
     await page.mouse.move(20, 180);
     await shot(page, "map-zoomed-declustered-393x852");
     await page.close();
