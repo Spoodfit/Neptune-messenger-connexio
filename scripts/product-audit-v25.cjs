@@ -310,7 +310,11 @@ async function auditPrivateRoom(page) {
   const stageBox = await page.getByTestId("coworking-room-stage").boundingBox();
   const tileBoxes = (await Promise.all(Array.from({ length: tileCount }, (_, index) => tiles.nth(index).boundingBox()))).filter(Boolean);
   if (!stageBox || tileBoxes.some((box) => box.width < stageBox.width * .72 || box.height < stageBox.height * .3)) {
-    failures.push("Visio privée: la grille laisse une zone sombre inutilisée ou contient une tuile trop petite");
+    const geometry = {
+      stage: stageBox && [Math.round(stageBox.width), Math.round(stageBox.height)],
+      tiles: tileBoxes.map((box) => [Math.round(box.width), Math.round(box.height), Math.round(box.x), Math.round(box.y)])
+    };
+    failures.push(`Visio privée: la grille laisse une zone sombre inutilisée ou contient une tuile trop petite (${JSON.stringify(geometry)})`);
   }
   if (await page.getByText(/^(Principale|Ensemble)$/).count()) failures.push("Visio privée: ancien sélecteur de vues encore visible");
   if (await page.getByTestId("coworking-participant-rail").count()) failures.push("Visio privée: ancien rail dupliqué encore présent");
