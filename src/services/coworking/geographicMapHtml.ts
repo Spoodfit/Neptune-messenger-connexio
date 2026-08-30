@@ -138,7 +138,7 @@ ${clientScript}
     const markerIds=[...new Set(children.map(marker=>marker.options.connexioMarkerId).filter(Boolean))];
     const eventIds=[...new Set(children.map(marker=>marker.options.connexioEventId).filter(Boolean))];
     post({type:'cluster-selected',markerIds,eventIds});
-    map.fitBounds(event.layer.getBounds(),{padding:[72,72],maxZoom:Math.min(12,map.getZoom()+3)});
+    map.fitBounds(event.layer.getBounds(),{padding:[72,72],maxZoom:Math.min(13.5,map.getZoom()+3)});
   });
   const bounds=[];
   const faceHtml=member=>{

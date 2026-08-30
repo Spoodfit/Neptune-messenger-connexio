@@ -795,8 +795,8 @@ export default function UnifiedMapScreenV24() {
             <View style={styles.dockTitleLine}><View style={[styles.liveDot, { backgroundColor: theme.success }]} /><Text style={[styles.dockTitle, { color: theme.pageText }]}>À saisir maintenant</Text></View>
             <Text style={[styles.dockMeta, { color: theme.pageTextMuted }]}>{`${availableMembers.length + visibleEvents.length} opportunités`}</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.opportunityRail}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Afficher les membres disponibles" onPress={() => changeRadarMode("available")} style={[styles.opportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+          <View style={styles.opportunityRail}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t("Voir les personnes disponibles maintenant")} onPress={() => changeRadarMode("available")} style={[styles.opportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
               <View style={styles.avatarPreview}>
                 {availableMembers.slice(0, 3).map((member, index) => <View key={member.id} style={index > 0 ? styles.stackedAvatar : undefined}><StatusAvatar user={member} size={32} accessible={false} /></View>)}
                 {availableMembers.length === 0 ? <View style={[styles.emptyPreview, { backgroundColor: theme.successSoft }]}><Ionicons name="people-outline" size={19} color={theme.success} /></View> : null}
@@ -820,7 +820,7 @@ export default function UnifiedMapScreenV24() {
                 <Ionicons name="chevron-forward" size={17} color={theme.pageTextMuted} />
               </Pressable>
             ) : null}
-          </ScrollView>
+          </View>
         </View>
       ) : null}
 
@@ -841,7 +841,7 @@ const styles = StyleSheet.create({
   titleCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 15, lineHeight: 18, fontWeight: "900" },
   subtitle: { marginTop: 1, fontSize: 9, lineHeight: 12, fontWeight: "700" },
-  ownStatus: { minWidth: 70, minHeight: 46, borderRadius: 17, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  ownStatus: { minWidth: 70, minHeight: 48, borderRadius: 17, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   ownStatusDot: { width: 8, height: 8, borderRadius: 4 },
   ownStatusText: { maxWidth: 62, fontSize: 8, lineHeight: 11, fontWeight: "900" },
   modeRail: { position: "absolute", left: 12, right: 12, minHeight: 56, borderRadius: 20, borderWidth: 1, padding: 3, flexDirection: "row", alignItems: "center", gap: 3 },
@@ -897,9 +897,9 @@ const styles = StyleSheet.create({
   liveDot: { width: 8, height: 8, borderRadius: 4 },
   dockTitle: { fontSize: 11, lineHeight: 14, fontWeight: "900" },
   dockMeta: { fontSize: 9, lineHeight: 12, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  opportunityRail: { gap: 8, paddingRight: 4 },
-  opportunityCard: { width: 214, minHeight: 66, borderRadius: 18, borderWidth: 1, padding: 8, flexDirection: "row", alignItems: "center", gap: 8 },
-  eventOpportunityCard: { width: 258 },
+  opportunityRail: { gap: 6 },
+  opportunityCard: { minHeight: 58, borderRadius: 18, borderWidth: 1, padding: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  eventOpportunityCard: { minHeight: 58 },
   avatarPreview: { minWidth: 48, flexDirection: "row", alignItems: "center" },
   stackedAvatar: { marginLeft: -14 },
   emptyPreview: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },

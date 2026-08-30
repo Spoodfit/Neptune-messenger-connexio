@@ -24,6 +24,7 @@ export const UI_TRANSLATIONS_V27: Record<string, TranslationSet> = {
   "S’inscrire à l’évènement": { en: "Register for the event", es: "Inscribirse en el evento", de: "Für die Veranstaltung anmelden", it: "Iscriviti all’evento", pt: "Inscrever-se no evento" },
   "Visio en cours": { en: "Video call in progress", es: "Videollamada en curso", de: "Videoanruf läuft", it: "Videochiamata in corso", pt: "Videochamada em curso" },
   "Voir les membres disponibles": { en: "See available members", es: "Ver miembros disponibles", de: "Verfügbare Mitglieder anzeigen", it: "Vedi membri disponibili", pt: "Ver membros disponíveis" },
+  "Voir les personnes disponibles maintenant": { en: "See people available now", es: "Ver personas disponibles ahora", de: "Jetzt verfügbare Personen anzeigen", it: "Vedi le persone disponibili ora", pt: "Ver pessoas disponíveis agora" },
   "Voir toute la communauté": { en: "View the whole community", es: "Ver toda la comunidad", de: "Gesamte Community anzeigen", it: "Vedi tutta la community", pt: "Ver toda a comunidade" },
   "Voter pour cet évènement": { en: "Vote for this event", es: "Votar por este evento", de: "Für diese Veranstaltung abstimmen", it: "Vota per questo evento", pt: "Votar neste evento" }
 };

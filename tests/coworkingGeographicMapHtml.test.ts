@@ -129,6 +129,8 @@ test("le regroupement régional nomme les contenus et ouvre la sélection de zon
   match(html, /clusterCopy\.eventShort/);
   match(html, /zoomToBoundsOnClick:false/);
   match(html, /type:'cluster-selected',markerIds,eventIds/);
+  match(html, /disableClusteringAtZoom:13/);
+  match(html, /Math\.min\(13\.5,map\.getZoom\(\)\+3\)/);
   match(html, /connexioMarkerId:item\.id/);
   ok(!html.includes("const total=counts.people+counts.events"));
 });
