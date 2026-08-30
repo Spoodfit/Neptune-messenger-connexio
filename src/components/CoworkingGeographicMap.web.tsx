@@ -1,5 +1,6 @@
-import { createElement, useEffect, useMemo, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 import { useAppTheme } from "../providers/ThemeProvider";
 import { useAppLanguage } from "../providers/LanguageProvider";
@@ -10,21 +11,28 @@ export default function CoworkingGeographicMap({
   markers,
   events = [],
   mediaSession,
+  focusLocation,
+  controlsTop = 136,
   selectedMarkerId,
   selectedEventId,
   onSelectMarker,
-  onSelectEvent
+  onSelectEvent,
+  onSelectCluster,
+  onLocationUnavailable
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
-  const { uiLanguage } = useAppLanguage();
+  const { uiLanguage, t } = useAppLanguage();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [locating, setLocating] = useState(false);
   const onSelectMarkerRef = useRef(onSelectMarker);
   const onSelectEventRef = useRef(onSelectEvent);
+  const onSelectClusterRef = useRef(onSelectCluster);
 
   useEffect(() => {
     onSelectMarkerRef.current = onSelectMarker;
     onSelectEventRef.current = onSelectEvent;
-  }, [onSelectEvent, onSelectMarker]);
+    onSelectClusterRef.current = onSelectCluster;
+  }, [onSelectCluster, onSelectEvent, onSelectMarker]);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
@@ -36,6 +44,15 @@ export default function CoworkingGeographicMap({
       }
       if (event.data?.type === "event-selected" && typeof event.data.id === "string") {
         onSelectEventRef.current?.(event.data.id);
+      }
+      if (event.data?.type === "cluster-selected") {
+        const markerIds = Array.isArray(event.data.markerIds)
+          ? event.data.markerIds.filter((id: unknown): id is string => typeof id === "string")
+          : [];
+        const eventIds = Array.isArray(event.data.eventIds)
+          ? event.data.eventIds.filter((id: unknown): id is string => typeof id === "string")
+          : [];
+        if (markerIds.length || eventIds.length) onSelectClusterRef.current?.({ markerIds, eventIds });
       }
     };
     window.addEventListener("message", listener);
@@ -59,6 +76,7 @@ export default function CoworkingGeographicMap({
         markers,
         events,
         mediaSession,
+        focusLocation,
         bridge: "web",
         language: uiLanguage,
         theme: {
@@ -72,8 +90,38 @@ export default function CoworkingGeographicMap({
           isLight: theme.isLight
         }
       }),
-    [events, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, uiLanguage]
+    [events, focusLocation, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, uiLanguage]
   );
+
+  const post = (payload: object) => {
+    iframeRef.current?.contentWindow?.postMessage(payload, window.location.origin);
+  };
+
+  const locate = () => {
+    if (locating) return;
+    if (!navigator.geolocation) {
+      onLocationUnavailable?.();
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        post({
+          type: "locate",
+          location: {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          }
+        });
+        setLocating(false);
+      },
+      () => {
+        setLocating(false);
+        onLocationUnavailable?.();
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 }
+    );
+  };
 
   return (
     <View style={[styles.wrap, { backgroundColor: theme.pageBackground }]}>
@@ -95,10 +143,32 @@ export default function CoworkingGeographicMap({
         },
         allow: "camera; autoplay"
       })}
+      <View style={[styles.controls, { top: controlsTop }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("Voir toute la communauté")}
+          accessibilityHint={t("Affiche tous les membres et évènements visibles")}
+          onPress={() => post({ type: "fit-all" })}
+          style={({ pressed }) => [styles.control, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }, pressed && styles.pressed]}
+        >
+          <Ionicons name="globe-outline" size={20} color={theme.pageText} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("Me localiser")}
+          onPress={locate}
+          style={({ pressed }) => [styles.control, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }, pressed && styles.pressed]}
+        >
+          {locating ? <ActivityIndicator size="small" color={theme.pageText} /> : <Ionicons name="locate" size={20} color={theme.pageText} />}
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, minHeight: 420, overflow: "hidden" }
+  wrap: { flex: 1, minHeight: 420, overflow: "hidden", position: "relative" },
+  controls: { position: "absolute", right: 12, gap: 8 },
+  control: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  pressed: { opacity: 0.82, transform: [{ scale: 0.96 }] }
 });

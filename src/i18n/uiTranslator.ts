@@ -13,6 +13,7 @@ import { translateUiTextV20 } from "./uiTranslationsV20";
 import { translateUiTextV22 } from "./uiTranslationsV22";
 import { translateUiTextV23 } from "./uiTranslationsV23";
 import { translateUiTextV24 } from "./uiTranslationsV24";
+import { translateUiTextV27 } from "./uiTranslationsV27";
 
 export function translateConnexioUiText(value: string, language: SupportedLanguage | string): string {
   if (!value || language === "fr") return value;
@@ -20,6 +21,8 @@ export function translateConnexioUiText(value: string, language: SupportedLangua
   if (dynamic !== value) return dynamic;
   const coworkingDynamic = translateCoworkingUiPattern(value, language);
   if (coworkingDynamic !== value) return coworkingDynamic;
+  const v27 = translateUiTextV27(value, language);
+  if (v27 !== value) return v27;
   const v24 = translateUiTextV24(value, language);
   if (v24 !== value) return v24;
   const v23 = translateUiTextV23(value, language);

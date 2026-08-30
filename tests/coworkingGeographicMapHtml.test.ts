@@ -29,8 +29,11 @@ const html = buildCoworkingGeographicMapHtml({
     title: "Rencontre test",
     latitude: 43.22,
     longitude: 2.36,
-    proximity: "within48h"
+    proximity: "within48h",
+    startsAt: "2026-09-03T18:00:00.000Z",
+    city: "Carcassonne"
   }],
+  focusLocation: { latitude: 43.213, longitude: 2.351 },
   mediaSession: {
     spaceId: "test",
     socketUrl: "wss://example.com",
@@ -93,11 +96,15 @@ test("les personnes réunies en visio partagent une zone discrète identifiable"
   match(html, /cw-marker\.busy \.cw-room-zone/);
 });
 
-test("les drapeaux restent géographiquement ancrés et leur séparation visuelle ne change pas pendant un déplacement de carte", () => {
+test("les dates d’évènement restent géographiquement ancrées et explicites", () => {
   match(html, /L\.marker\(\[event\.latitude,event\.longitude\]/);
   match(html, /L\.markerClusterGroup\(\{/);
   match(html, /connexioEventCount:1/);
-  ok(!html.includes("eventLayer=L.markerClusterGroup"));
+  match(html, /event-calendar/);
+  match(html, /event-day/);
+  match(html, /event-month/);
+  ok(!html.includes("event-flag"));
+  ok(!html.includes("event-pole"));
   match(html, /function computeEventOffsets\(\)/);
   match(html, /map\.on\('zoomend moveend'/);
   match(html, /event-connector/);
@@ -105,17 +112,30 @@ test("les drapeaux restent géographiquement ancrés et leur séparation visuell
 
 test("les événements et les membres superposés sont visuellement séparés et gardent chacun leur cible tactile", () => {
   match(html, /zIndexOffset:500/);
-  match(html, /title:event\.title,zIndexOffset:750,keyboard:true,connexioPeopleCount:0,connexioEventCount:1/);
-  match(html, /\.event-hit\{[^}]+left:2px;top:-2px;width:44px;height:44px[^}]+pointer-events:auto/);
+  match(html, /title:event\.title,zIndexOffset:750,keyboard:true,connexioPeopleCount:0,connexioEventCount:1,connexioEventId:event\.id/);
+  match(html, /\.event-hit\{[^}]+left:3px;top:0;width:50px;height:52px[^}]+pointer-events:auto/);
   match(html, /memberClearance>=38&&eventClearance>=28/);
   match(html, /nearMember\?candidates:\[\{x:0,y:0\},\.\.\.candidates\]/);
   match(html, /--event-offset-x/);
+  match(html, /if\(map\.getZoom\(\)<13\)/);
+  ok(!html.includes("{x:104,y:-38}"));
 });
 
-test("le regroupement régional sépare le nombre de personnes et d’évènements sans double cercle", () => {
+test("le regroupement régional nomme les contenus et ouvre la sélection de zone", () => {
   match(html, /getAllChildMarkers\(\)/);
   match(html, /cluster-part/);
-  match(html, /cluster-flag/);
-  match(html, /counts\.people&&counts\.events\?78:48/);
+  match(html, /cluster-events/);
+  match(html, /clusterCopy\.members/);
+  match(html, /clusterCopy\.eventShort/);
+  match(html, /zoomToBoundsOnClick:false/);
+  match(html, /type:'cluster-selected',markerIds,eventIds/);
+  match(html, /connexioMarkerId:item\.id/);
   ok(!html.includes("const total=counts.people+counts.events"));
+});
+
+test("le Radar s’ouvre sur le bassin local avant de proposer toute la communauté", () => {
+  match(html, /const focusLocation=/);
+  match(html, /map\.distance\(focus,point\)<=230000/);
+  match(html, /function fitInitial\(\)/);
+  match(html, /if\(data\?\.type==='fit-all'\)fitAll\(\)/);
 });

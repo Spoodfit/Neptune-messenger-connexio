@@ -119,10 +119,10 @@ async function auditMap(page) {
   await portal.click();
   await waitRoute(page, "/coworking", "Map : ouverture en un tap");
 
-  check(await page.getByText("Map", { exact: true }).first().isVisible().catch(() => false), "Map : titre visible");
-  check(await page.getByText("Disponible", { exact: true }).first().isVisible().catch(() => false), "Map : légende Disponible visible");
-  check(await page.getByText("Occupé", { exact: true }).first().isVisible().catch(() => false), "Map : légende Occupé visible");
-  check(await page.getByText("Évènement", { exact: true }).first().isVisible().catch(() => false), "Map : légende Évènement visible");
+  check(await page.getByText("Radar Connexio", { exact: true }).first().isVisible().catch(() => false), "Map : titre orienté usage visible");
+  check(await page.getByLabel("Afficher tous les membres et évènements", { exact: true }).isVisible().catch(() => false), "Map : filtre Tout visible");
+  check(await page.getByLabel("Afficher les membres disponibles", { exact: true }).isVisible().catch(() => false), "Map : filtre Disponibles visible");
+  check(await page.getByLabel("Afficher les évènements", { exact: true }).isVisible().catch(() => false), "Map : filtre Évènements visible");
   check((await page.getByText("Salle générale", { exact: true }).count()) === 0, "Map V25 : aucune Salle générale");
   check((await page.getByLabel("Rejoindre la salle générale", { exact: true }).count()) === 0, "Map V25 : aucune action Salle générale");
   await checkTarget(page.getByLabel("Fermer la Map", { exact: true }), "Map : fermeture tactile");
@@ -143,19 +143,19 @@ async function auditMap(page) {
   const availableMarkers = frame.locator(".cw-marker.available");
   const busyMarkers = frame.locator(".cw-marker.busy");
   const groupSatellites = frame.locator(".cw-group .cw-satellite");
-  const eventFlags = frame.locator(".event-marker .event-flag");
+  const eventCalendars = frame.locator(".event-marker .event-calendar");
   const initialClusterCount = await waitForFrameCount(frame.locator(".cluster-core"));
   await expandVisibleMapClusters(frame);
-  const [availableCount, busyCount, satelliteCount, eventFlagCount] = await Promise.all([
+  const [availableCount, busyCount, satelliteCount, eventCalendarCount] = await Promise.all([
     waitForFrameCount(availableMarkers),
     waitForFrameCount(busyMarkers),
     waitForFrameCount(groupSatellites),
-    waitForFrameCount(eventFlags)
+    waitForFrameCount(eventCalendars)
   ]);
   check(availableCount > 0 || initialClusterCount > 0, "Map : personnes disponibles présentes ou regroupées");
   check(busyCount > 0 || initialClusterCount > 0, "Map : visios occupées présentes ou regroupées");
   check(satelliteCount > 0 || initialClusterCount > 0, "Map : groupe visio présent ou regroupé");
-  check(eventFlagCount > 0 || initialClusterCount > 0, "Map : événements présents ou regroupés");
+  check(eventCalendarCount > 0 || initialClusterCount > 0, "Map : événements datés présents ou regroupés");
 
   const faceGeometry = await frame.locator(".cw-face").evaluateAll((faces) => {
     const inViewport = (rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;

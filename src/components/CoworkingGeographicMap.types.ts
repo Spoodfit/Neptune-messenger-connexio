@@ -9,6 +9,7 @@ export interface CoworkingMapMemberCell {
   initials: string;
   avatarUrl?: string;
   cameraOn: boolean;
+  isCurrentUser?: boolean;
 }
 
 export interface CoworkingMapMarker {
@@ -27,15 +28,32 @@ export interface CoworkingMapEventMarker {
   latitude: number;
   longitude: number;
   proximity: DiscoveryEventProximity;
+  startsAt: string;
+  endsAt?: string;
+  city?: string;
+  publicationState?: "voting" | "published" | "cancelled";
+}
+
+export interface CoworkingMapClusterSelection {
+  markerIds: string[];
+  eventIds: string[];
+}
+
+export interface CoworkingMapFocusLocation {
+  latitude: number;
+  longitude: number;
 }
 
 export interface CoworkingGeographicMapProps {
   markers: CoworkingMapMarker[];
   events?: CoworkingMapEventMarker[];
   mediaSession?: CoworkingMediaSession;
+  focusLocation?: CoworkingMapFocusLocation;
+  controlsTop?: number;
   selectedMarkerId?: string | null;
   selectedEventId?: string | null;
   onSelectMarker: (markerId: string) => void;
   onSelectEvent?: (eventId: string) => void;
+  onSelectCluster?: (selection: CoworkingMapClusterSelection) => void;
   onLocationUnavailable?: () => void;
 }

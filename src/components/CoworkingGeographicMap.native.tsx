@@ -15,10 +15,13 @@ export default function CoworkingGeographicMap({
   markers,
   events = [],
   mediaSession,
+  focusLocation,
+  controlsTop = 136,
   selectedMarkerId,
   selectedEventId,
   onSelectMarker,
   onSelectEvent,
+  onSelectCluster,
   onLocationUnavailable
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
@@ -31,6 +34,7 @@ export default function CoworkingGeographicMap({
         markers,
         events,
         mediaSession,
+        focusLocation,
         bridge: "native",
         language: uiLanguage,
         theme: {
@@ -44,7 +48,7 @@ export default function CoworkingGeographicMap({
           isLight: theme.isLight
         }
       }),
-    [events, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, uiLanguage]
+    [events, focusLocation, markers, mediaSession, theme.border, theme.isLight, theme.pageBackground, theme.pageText, theme.pageTextMuted, theme.shellBackground, theme.surface, theme.surfaceStrong, uiLanguage]
   );
   const accessibilityTargets = useMemo(() => [
     ...markers.map((marker, index) => ({
@@ -78,11 +82,28 @@ export default function CoworkingGeographicMap({
   const handleMessage = (event: WebViewMessageEvent) => {
     if (!allowsWebViewNavigation(event.nativeEvent.url, [MAP_DOCUMENT_ORIGIN])) return;
     try {
-      const payload = JSON.parse(event.nativeEvent.data) as { type?: string; id?: string };
-      if (!payload.id) return;
-      if (payload.type === "marker-selected") onSelectMarker(payload.id);
-      if (payload.type === "event-selected") onSelectEvent?.(payload.id);
+      const payload = JSON.parse(event.nativeEvent.data) as {
+        type?: string;
+        id?: string;
+        markerIds?: unknown;
+        eventIds?: unknown;
+      };
+      if (payload.type === "marker-selected" && payload.id) onSelectMarker(payload.id);
+      if (payload.type === "event-selected" && payload.id) onSelectEvent?.(payload.id);
+      if (payload.type === "cluster-selected") {
+        const markerIds = Array.isArray(payload.markerIds)
+          ? payload.markerIds.filter((id): id is string => typeof id === "string")
+          : [];
+        const eventIds = Array.isArray(payload.eventIds)
+          ? payload.eventIds.filter((id): id is string => typeof id === "string")
+          : [];
+        if (markerIds.length || eventIds.length) onSelectCluster?.({ markerIds, eventIds });
+      }
     } catch {}
+  };
+
+  const showCommunity = () => {
+    webViewRef.current?.postMessage(JSON.stringify({ type: "fit-all" }));
   };
 
   const locate = async () => {
@@ -153,22 +174,37 @@ export default function CoworkingGeographicMap({
           style={[styles.webView, { backgroundColor: theme.pageBackground }]}
         />
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Me localiser"
-        onPress={() => void locate()}
-        style={({ pressed }) => [
-          styles.locate,
-          { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft },
-          pressed && styles.pressed
-        ]}
-      >
-        {locating ? (
-          <ActivityIndicator size="small" color={theme.pageText} />
-        ) : (
-          <Ionicons name="locate" size={20} color={theme.pageText} />
-        )}
-      </Pressable>
+      <View style={[styles.controls, { top: controlsTop }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("Voir toute la communauté")}
+          accessibilityHint={t("Affiche tous les membres et évènements visibles")}
+          onPress={showCommunity}
+          style={({ pressed }) => [
+            styles.control,
+            { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft },
+            pressed && styles.pressed
+          ]}
+        >
+          <Ionicons name="globe-outline" size={20} color={theme.pageText} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("Me localiser")}
+          onPress={() => void locate()}
+          style={({ pressed }) => [
+            styles.control,
+            { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft },
+            pressed && styles.pressed
+          ]}
+        >
+          {locating ? (
+            <ActivityIndicator size="small" color={theme.pageText} />
+          ) : (
+            <Ionicons name="locate" size={20} color={theme.pageText} />
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -177,10 +213,12 @@ const styles = StyleSheet.create({
   wrap: { flex: 1, minHeight: 420, position: "relative", overflow: "hidden" },
   mapFrame: { flex: 1, minHeight: 0 },
   webView: { flex: 1 },
-  locate: {
+  controls: {
     position: "absolute",
     right: 12,
-    top: 82,
+    gap: 8
+  },
+  control: {
     width: 48,
     height: 48,
     borderRadius: 24,

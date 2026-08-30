@@ -87,7 +87,7 @@ async function run() {
     if (await event.isVisible().catch(() => false)) {
       await event.click();
       await page.mouse.move(20, 180);
-      await shot(page, "map-event-flag-sheet-393x852");
+      await shot(page, "map-event-date-sheet-393x852");
       await page.getByLabel("Fermer la fiche", { exact:true }).click().catch(() => {});
     }
     await expandVisibleMapClusters(mapFrame);

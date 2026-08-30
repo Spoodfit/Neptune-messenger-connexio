@@ -150,7 +150,7 @@ async function auditFeedOnly(page) {
 
 async function auditMap(page, label, interactive = false) {
   await open(page, "/coworking");
-  await expectVisible(page.getByText("Map", { exact: true }).first(), `${label} Map`);
+  await expectVisible(page.getByText("Radar Connexio", { exact: true }).first(), `${label} Radar Connexio`);
   await expectVisible(page.getByRole("tab", { name: /Messages/ }), `${label} navigation principale conservée`);
   const availability = page.getByLabel(/^Ma disponibilité : (Disponible|Occupé)$/);
   if (await expectVisible(availability, `${label} disponibilité personnelle`)) {
@@ -168,7 +168,7 @@ async function auditMap(page, label, interactive = false) {
   if ((await frame.locator(".cw-marker.available").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: aucun utilisateur disponible ni cluster régional`);
   if ((await frame.locator(".cw-marker.busy").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: aucune visio occupée ni cluster régional`);
   if ((await frame.locator(".cw-group .cw-satellite").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: groupe visio absent du cluster régional`);
-  if ((await frame.locator(".event-marker .event-flag").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: événements absents du cluster régional`);
+  if ((await frame.locator(".event-marker .event-calendar").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: événements datés absents du cluster régional`);
   if ((await frame.locator(".cw-status,.cw-camera,.cw-media").count()) > 0) failures.push(`${label}: anciens badges/rectangles visio encore présents`);
 
   const sizes = await frame.locator(".cw-core").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().width)).filter(Boolean));
@@ -207,7 +207,7 @@ async function auditMap(page, label, interactive = false) {
       return width > 2 && height > 2;
     }).length, 0);
   });
-  if (eventProfileCollisions > 0) failures.push(`${label}: ${eventProfileCollisions} superposition(s) visible(s) entre drapeau et profil`);
+  if (eventProfileCollisions > 0) failures.push(`${label}: ${eventProfileCollisions} superposition(s) visible(s) entre date d’évènement et profil`);
 
   if (!interactive) return;
 

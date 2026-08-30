@@ -1,5 +1,6 @@
 import type {
   CoworkingMapEventMarker,
+  CoworkingMapFocusLocation,
   CoworkingMapMarker
 } from "../../components/CoworkingGeographicMap.types";
 import type { CoworkingMediaSession } from "../../types/coworking";
@@ -21,6 +22,7 @@ interface GeographicMapHtmlOptions {
   markers: CoworkingMapMarker[];
   events?: CoworkingMapEventMarker[];
   mediaSession?: CoworkingMediaSession;
+  focusLocation?: CoworkingMapFocusLocation;
   theme: GeographicMapTheme;
   bridge: "native" | "web";
   language?: string;
@@ -38,6 +40,7 @@ export function buildCoworkingGeographicMapHtml({
   markers,
   events = [],
   mediaSession,
+  focusLocation,
   theme,
   bridge,
   language = "fr"
@@ -65,6 +68,16 @@ export function buildCoworkingGeographicMapHtml({
     ...(mediaSession?.clientScriptUrl ? [mediaSession.clientScriptUrl] : [])
   ]);
   const documentLanguage = normalizeLanguageCode(language, "fr");
+  const clusterCopy = ({
+    fr: { member: "membre", members: "membres", event: "évènement", events: "évènements", eventShort: "év." },
+    en: { member: "member", members: "members", event: "event", events: "events", eventShort: "event" },
+    es: { member: "miembro", members: "miembros", event: "evento", events: "eventos", eventShort: "evento" },
+    de: { member: "Mitglied", members: "Mitglieder", event: "Veranstaltung", events: "Veranstaltungen", eventShort: "Event" },
+    it: { member: "membro", members: "membri", event: "evento", events: "eventi", eventShort: "evento" },
+    pt: { member: "membro", members: "membros", event: "evento", events: "eventos", eventShort: "evento" }
+  } as const)[documentLanguage as "fr" | "en" | "es" | "de" | "it" | "pt"] ?? {
+    member: "member", members: "members", event: "event", events: "events", eventShort: "event"
+  };
 
   return `<!doctype html>
 <html lang="${documentLanguage}">
@@ -77,8 +90,8 @@ ${LEAFLET_STYLESHEETS}
 :root{--bg:${theme.pageBackground};--surface:${theme.surface};--surfaceStrong:${theme.surfaceStrong};--text:${theme.pageText};--muted:${theme.pageTextMuted};--border:${theme.border};--shell:${theme.shellBackground};--available:#35D58B;--busy:#FF5868;--offline:#8590A8}
 *{box-sizing:border-box}html,body,#map{height:100%;width:100%;margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow:hidden}.leaflet-tile-pane{${theme.isLight ? "" : "filter:brightness(.56) invert(1) contrast(1.58) hue-rotate(180deg) saturate(.28);"}}.leaflet-control-attribution{background:rgba(0,0,0,.12)!important;color:var(--muted)!important;font-size:7px!important}.leaflet-control-attribution a{color:var(--muted)!important}.leaflet-pane.leaflet-marker-pane{z-index:620}.leaflet-tooltip{max-width:min(240px,calc(100vw - 24px));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--shell)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:11px!important;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.16)!important;padding:6px 9px!important}
 .cw-marker{--offset-x:0px;--offset-y:0px;--core-size:42px;--sat-size:23px;position:relative;width:100%;height:100%;transform:translate(var(--offset-x),var(--offset-y)) scale(1);transform-origin:center;transition:transform .2s ease,filter .2s ease;filter:drop-shadow(0 7px 15px rgba(0,0,0,.25));pointer-events:none}.cw-marker.selected{transform:translate(var(--offset-x),var(--offset-y)) scale(1.08);filter:drop-shadow(0 10px 21px rgba(0,0,0,.36))}.cw-hit{position:absolute;left:50%;top:50%;width:52px;height:52px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:auto;cursor:pointer}.cw-group .cw-hit{width:108px;height:96px}.cw-room-zone{position:absolute;left:50%;top:38%;width:100px;height:70px;transform:translate(-50%,-50%);border:1.5px solid color-mix(in srgb,var(--status) 76%,white);border-radius:999px;background:color-mix(in srgb,var(--status) 10%,rgba(2,7,19,.82));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--status) 16%,transparent),0 8px 22px rgba(0,0,0,.2);z-index:1;transition:width .22s ease,height .22s ease,top .22s ease}.cw-room-label{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);padding:2px 6px;border-radius:999px;background:color-mix(in srgb,var(--status) 22%,var(--shell));color:var(--text);font-size:6px;line-height:8px;font-weight:950;letter-spacing:.55px;white-space:nowrap}.cw-core,.cw-satellite{position:absolute;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:var(--surfaceStrong);color:var(--text);font-weight:900;border:3px solid var(--status);box-shadow:0 6px 15px rgba(0,0,0,.26);transition:left .22s ease,top .22s ease,width .22s ease,height .22s ease,border-width .22s ease}.cw-core{left:50%;top:50%;width:var(--core-size);height:var(--core-size);transform:translate(-50%,-50%);z-index:4;font-size:10px}.cw-group .cw-core{top:38%}.cw-satellite{width:var(--sat-size);height:var(--sat-size);transform:translate(-50%,-50%);z-index:5;border-width:2px;font-size:7px}.cw-group.zoom-split .cw-core{top:50%}.cw-group.zoom-split .cw-hit{width:166px;height:166px}.cw-group.zoom-split .cw-room-zone{top:50%;width:164px;height:164px}.cw-group.zoom-split .cw-room-label{bottom:9px;font-size:7px;line-height:9px}.cw-group.zoom-split .cw-satellite{z-index:8;border-width:3px}.cw-face{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,var(--surfaceStrong),var(--surface));overflow:hidden}.cw-fallback{position:relative;z-index:1;opacity:1;transition:opacity .16s ease}.cw-face img,.cw-face video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .16s ease}.cw-face img{z-index:2}.cw-face.avatar-ready img{opacity:1}.cw-face.avatar-ready .cw-fallback{opacity:0}.cw-face video{z-index:3;background:transparent}.cw-face video.video-ready{opacity:1;background:var(--surfaceStrong)}.cw-extra{position:absolute;display:grid;place-items:center;border-radius:50%;width:var(--sat-size);height:var(--sat-size);background:var(--shell);border:2px solid var(--status);color:var(--text);font-size:8px;font-weight:900;z-index:7;transform:translate(-50%,-50%);transition:left .22s ease,top .22s ease,width .22s ease,height .22s ease}.cw-marker.available .cw-core{animation:cwPulse 3.4s ease-out infinite}.cw-marker.busy .cw-room-zone{animation:roomGlow 3.8s ease-in-out infinite}
-.event-leaflet-icon{background:transparent!important;border:none!important;pointer-events:none!important;overflow:visible!important}.event-marker{width:46px;height:50px;position:relative;--event:#3479aa;--wave:5.2s;--pulse:.12;--event-offset-x:0px;--event-offset-y:0px;pointer-events:none}.event-visual{position:absolute;inset:0;transform:translate(var(--event-offset-x),var(--event-offset-y));transform-origin:14px 42px;transition:transform .18s ease,filter .18s ease}.event-connector{position:absolute;left:12px;top:44px;height:2px;width:0;border-radius:2px;background:color-mix(in srgb,var(--event) 72%,white);opacity:.74;transform-origin:0 50%;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.24))}.event-marker.recent{--event:#6f9dbe;--wave:5.8s;--pulse:.1}.event-marker.voting{--event:#7657d6;--wave:4.8s;--pulse:.24}.event-marker.later{--event:#3479aa}.event-marker.within7d{--event:#248fc0;--wave:4.2s;--pulse:.2}.event-marker.within48h{--event:#12b9cc;--wave:2.9s;--pulse:.36}.event-marker.live{--event:#19e0c8;--wave:2s;--pulse:.55}.event-marker.selected .event-visual{transform:translate(var(--event-offset-x),calc(var(--event-offset-y) - 2px)) scale(1.12);filter:drop-shadow(0 7px 12px color-mix(in srgb,var(--event) 45%,transparent))}.event-hit{position:absolute;left:2px;top:-2px;width:44px;height:44px;border-radius:16px;pointer-events:auto;cursor:pointer;z-index:6}.event-pole{position:absolute;left:11px;top:7px;width:3px;height:38px;border-radius:3px;background:linear-gradient(180deg,#f8fbff,#8da9bb);box-shadow:0 2px 8px rgba(0,0,0,.24);z-index:2}.event-flag{position:absolute;left:14px;top:7px;width:28px;height:20px;background:linear-gradient(115deg,var(--event),color-mix(in srgb,var(--event) 70%,white));clip-path:polygon(0 0,100% 10%,86% 50%,100% 90%,0 100%);border-radius:2px 6px 6px 2px;transform-origin:0 50%;animation:flagWave var(--wave) ease-in-out infinite;box-shadow:0 4px 11px color-mix(in srgb,var(--event) 40%,transparent);z-index:3;pointer-events:none}.event-pulse{position:absolute;left:1px;bottom:0;width:28px;height:12px;border-radius:50%;border:2px solid var(--event);opacity:var(--pulse);animation:eventPulse calc(var(--wave) * .92) ease-out infinite}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{height:44px;display:flex;align-items:center;justify-content:center;gap:5px;padding:5px 7px;border-radius:22px;border:2px solid #54d8dc;background:#0b2438;color:#fff;font-size:12px;font-weight:950;box-shadow:0 8px 20px rgba(0,0,0,.3);outline:0;white-space:nowrap}.cluster-part{min-width:28px;height:28px;padding:0 6px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:3px;background:rgba(255,255,255,.09)}.cluster-flag{color:#54d8dc}
-@keyframes cwPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--available) 30%,transparent),0 6px 15px rgba(0,0,0,.26)}72%,100%{box-shadow:0 0 0 9px transparent,0 6px 15px rgba(0,0,0,.26)}}@keyframes roomGlow{0%,100%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--status) 16%,transparent),0 8px 22px rgba(0,0,0,.2)}50%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--status) 22%,transparent),0 0 20px color-mix(in srgb,var(--status) 22%,transparent)}}@keyframes flagWave{0%,100%{transform:perspective(70px) rotateY(0deg) skewY(-1deg)}50%{transform:perspective(70px) rotateY(-18deg) skewY(2deg)}}@keyframes eventPulse{0%{transform:scale(.72);opacity:var(--pulse)}78%,100%{transform:scale(1.7);opacity:0}}@media(prefers-reduced-motion:reduce){.cw-marker.available .cw-core,.cw-marker.busy .cw-room-zone,.event-flag,.event-pulse{animation:none!important}.cw-core,.cw-satellite,.cw-extra,.cw-room-zone{transition:none!important}}
+.event-leaflet-icon{background:transparent!important;border:none!important;pointer-events:none!important;overflow:visible!important}.event-marker{width:56px;height:62px;position:relative;--event:#3479aa;--pulse:.12;--event-offset-x:0px;--event-offset-y:0px;pointer-events:none}.event-visual{position:absolute;inset:0;transform:translate(var(--event-offset-x),var(--event-offset-y));transform-origin:26px 54px;transition:transform .18s ease,filter .18s ease}.event-connector{position:absolute;left:27px;top:54px;height:2px;width:0;border-radius:2px;background:color-mix(in srgb,var(--event) 72%,white);opacity:0;transform-origin:0 50%;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}.event-anchor{position:absolute;left:23px;top:50px;width:8px;height:8px;border-radius:50%;background:var(--event);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:1}.event-marker.recent{--event:#6f9dbe;--pulse:.1}.event-marker.voting{--event:#7657d6;--pulse:.24}.event-marker.later{--event:#3479aa}.event-marker.within7d{--event:#248fc0;--pulse:.2}.event-marker.within48h{--event:#12b9cc;--pulse:.36}.event-marker.live{--event:#19c99d;--pulse:.58}.event-marker.selected .event-visual{transform:translate(var(--event-offset-x),calc(var(--event-offset-y) - 3px)) scale(1.1);filter:drop-shadow(0 8px 14px color-mix(in srgb,var(--event) 44%,transparent))}.event-hit{position:absolute;left:3px;top:0;width:50px;height:52px;border-radius:16px;pointer-events:auto;cursor:pointer;z-index:8}.event-calendar{position:absolute;left:3px;top:0;width:50px;height:50px;border-radius:15px;background:var(--shell);border:2px solid var(--event);box-shadow:0 8px 18px rgba(0,0,0,.28);overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text);z-index:4}.event-calendar:before{content:"";position:absolute;left:0;right:0;top:0;height:7px;background:var(--event)}.event-day{font-size:17px;line-height:18px;font-weight:950;margin-top:5px;font-variant-numeric:tabular-nums}.event-month{font-size:8px;line-height:9px;font-weight:950;text-transform:uppercase;letter-spacing:.65px;color:var(--muted)}.event-live-label{position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);height:17px;padding:0 6px;border-radius:9px;background:var(--event);color:#fff;font-size:7px;line-height:17px;font-weight:950;letter-spacing:.6px;white-space:nowrap;z-index:7}.event-pulse{position:absolute;left:14px;top:40px;width:28px;height:15px;border-radius:50%;border:2px solid var(--event);opacity:var(--pulse);animation:eventPulse 2.6s ease-out infinite}.custom-cluster{background:transparent!important;border:none!important}.cluster-core{height:44px;display:flex;align-items:center;justify-content:center;gap:4px;padding:5px;border-radius:22px;border:2px solid #54d8dc;background:#0b2438;color:#fff;font-size:10px;font-weight:950;box-shadow:0 8px 20px rgba(0,0,0,.3);outline:0;white-space:nowrap}.cluster-part{height:30px;padding:0 8px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.09)}.cluster-events{color:#7ce6dc}
+@keyframes cwPulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--available) 30%,transparent),0 6px 15px rgba(0,0,0,.26)}72%,100%{box-shadow:0 0 0 9px transparent,0 6px 15px rgba(0,0,0,.26)}}@keyframes roomGlow{0%,100%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--status) 16%,transparent),0 8px 22px rgba(0,0,0,.2)}50%{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--status) 22%,transparent),0 0 20px color-mix(in srgb,var(--status) 22%,transparent)}}@keyframes eventPulse{0%{transform:scale(.72);opacity:var(--pulse)}78%,100%{transform:scale(1.7);opacity:0}}@media(prefers-reduced-motion:reduce){.cw-marker.available .cw-core,.cw-marker.busy .cw-room-zone,.event-pulse{animation:none!important}.cw-core,.cw-satellite,.cw-extra,.cw-room-zone{transition:none!important}}
 </style>
 </head>
 <body>
@@ -89,6 +102,8 @@ ${clientScript}
 (() => {
   const markerData=${escapeJson(markers)};
   const eventData=${escapeJson(events)};
+  const focusLocation=${escapeJson(focusLocation ?? null)};
+  const clusterCopy=${escapeJson(clusterCopy)};
   const session=${escapeJson(session)};
   const nativeBridge=${bridge === "native" ? "true" : "false"};
   const markerNodes=new Map();
@@ -96,6 +111,7 @@ ${clientScript}
   const eventOffsets=new Map();
   const videoNodes=new Map();
   const markerEntries=[];
+  const eventEntries=[];
   const escapeText=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
   const parentOrigin=(()=>{try{const value=window.parent?.location?.origin;return value&&value!=='null'?value:null}catch{return null}})();
   const post=payload=>{try{${postExpression}}catch{}};
@@ -103,18 +119,26 @@ ${clientScript}
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
   const cluster=L.markerClusterGroup({
     maxClusterRadius:zoom=>zoom<7?58:zoom<10?46:32,
-    disableClusteringAtZoom:12,
+    disableClusteringAtZoom:13,
+    zoomToBoundsOnClick:false,
     spiderfyOnMaxZoom:false,
     showCoverageOnHover:false,
     removeOutsideVisibleBounds:true,
     iconCreateFunction:c=>{
       const counts=c.getAllChildMarkers().reduce((result,marker)=>({people:result.people+Number(marker.options.connexioPeopleCount||0),events:result.events+Number(marker.options.connexioEventCount||0)}),{people:0,events:0});
-      const label=[counts.people?counts.people+' personne'+(counts.people>1?'s':''):'',counts.events?counts.events+' évènement'+(counts.events>1?'s':''):''].filter(Boolean).join(' et ');
-      const people=counts.people?'<span class="cluster-part" aria-hidden="true">● '+counts.people+'</span>':'';
-      const events=counts.events?'<span class="cluster-part cluster-flag" aria-hidden="true">⚑ '+counts.events+'</span>':'';
-      const width=counts.people&&counts.events?78:48;
+      const label=[counts.people?counts.people+' '+(counts.people>1?clusterCopy.members:clusterCopy.member):'',counts.events?counts.events+' '+(counts.events>1?clusterCopy.events:clusterCopy.event):''].filter(Boolean).join(' · ');
+      const people=counts.people?'<span class="cluster-part" aria-hidden="true">'+counts.people+' '+(counts.people>1?clusterCopy.members:clusterCopy.member)+'</span>':'';
+      const events=counts.events?'<span class="cluster-part cluster-events" aria-hidden="true">'+counts.events+' '+clusterCopy.eventShort+'</span>':'';
+      const width=counts.people&&counts.events?126:counts.people?Math.min(104,58+String(counts.people).length*8):66;
       return L.divIcon({className:'custom-cluster',html:'<div class="cluster-core" role="button" aria-label="'+escapeText(label)+'">'+people+events+'</div>',iconSize:[width,44],iconAnchor:[width/2,22]});
     }
+  });
+  cluster.on('clusterclick',event=>{
+    const children=event.layer.getAllChildMarkers();
+    const markerIds=[...new Set(children.map(marker=>marker.options.connexioMarkerId).filter(Boolean))];
+    const eventIds=[...new Set(children.map(marker=>marker.options.connexioEventId).filter(Boolean))];
+    post({type:'cluster-selected',markerIds,eventIds});
+    map.fitBounds(event.layer.getBounds(),{padding:[72,72],maxZoom:Math.min(12,map.getZoom()+3)});
   });
   const bounds=[];
   const faceHtml=member=>{
@@ -149,6 +173,7 @@ ${clientScript}
       zIndexOffset:500,
       connexioPeopleCount:item.members.length,
       connexioEventCount:0,
+      connexioMarkerId:item.id,
       title:group?item.members.map(m=>m.name).join(', '):(item.members[0]?.name||'Membre Connexio'),
       keyboard:true
     });
@@ -168,17 +193,36 @@ ${clientScript}
   });
   map.addLayer(cluster);
 
+  const eventMonthFormatter=new Intl.DateTimeFormat('${documentLanguage}',{month:'short'});
+  const eventTooltipFormatter=new Intl.DateTimeFormat('${documentLanguage}',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const eventBadge=event=>event.proximity==='live'?'LIVE':event.proximity==='voting'?'VOTE':'';
   eventData.forEach(event=>{
-    const html='<div class="event-marker '+escapeText(event.proximity)+'" data-event-id="'+escapeText(event.id)+'"><div class="event-connector"></div><div class="event-visual"><div class="event-hit"></div><div class="event-pulse"></div><div class="event-pole"></div><div class="event-flag"></div></div></div>';
-    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[46,50],iconAnchor:[12,44]}),title:event.title,zIndexOffset:750,keyboard:true,connexioPeopleCount:0,connexioEventCount:1});
+    const startsAt=new Date(event.startsAt);
+    const day=Number.isFinite(startsAt.getTime())?String(startsAt.getDate()).padStart(2,'0'):'--';
+    const month=Number.isFinite(startsAt.getTime())?eventMonthFormatter.format(startsAt).replace('.',''):'';
+    const badge=eventBadge(event);
+    const badgeHtml=badge?'<span class="event-live-label">'+escapeText(badge)+'</span>':'';
+    const html='<div class="event-marker '+escapeText(event.proximity)+'" data-event-id="'+escapeText(event.id)+'"><div class="event-anchor"></div><div class="event-connector"></div><div class="event-visual"><div class="event-hit"></div><div class="event-pulse"></div><div class="event-calendar"><span class="event-day">'+escapeText(day)+'</span><span class="event-month">'+escapeText(month)+'</span></div>'+badgeHtml+'</div></div>';
+    const marker=L.marker([event.latitude,event.longitude],{icon:L.divIcon({className:'event-leaflet-icon',html,iconSize:[56,62],iconAnchor:[27,54]}),title:event.title,zIndexOffset:750,keyboard:true,connexioPeopleCount:0,connexioEventCount:1,connexioEventId:event.id});
     marker.on('add',()=>{const node=marker.getElement()?.querySelector('.event-marker');if(node){eventNodes.set(event.id,node);applyEventOffset(node,eventOffsets.get(event.id)||{x:0,y:0})}});
     marker.on('click',()=>post({type:'event-selected',id:event.id}));
-    marker.bindTooltip(escapeText(event.title),{direction:'auto',offset:[0,10],opacity:.96});
+    const tooltipDate=Number.isFinite(startsAt.getTime())?eventTooltipFormatter.format(startsAt):'';
+    marker.bindTooltip(escapeText(event.title+(tooltipDate?' · '+tooltipDate:'')),{direction:'auto',offset:[0,12],opacity:.96});
+    eventEntries.push({id:event.id,marker});
     cluster.addLayer(marker);
     bounds.push([event.latitude,event.longitude]);
   });
 
-  if(bounds.length){map.fitBounds(bounds,{padding:[48,48],maxZoom:9})}else{map.setView([46.5,2.2],5.6)}
+  const allBounds=bounds.length?L.latLngBounds(bounds):null;
+  function fitAll(){if(allBounds?.isValid())map.fitBounds(allBounds,{padding:[64,64],maxZoom:8.5});else map.setView([46.5,2.2],5.6)}
+  function fitInitial(){
+    if(!focusLocation||!Number.isFinite(focusLocation.latitude)||!Number.isFinite(focusLocation.longitude)){fitAll();return}
+    const focus=[focusLocation.latitude,focusLocation.longitude];
+    const nearby=bounds.filter(point=>map.distance(focus,point)<=230000);
+    if(nearby.length>=2){map.fitBounds(nearby,{padding:[70,70],maxZoom:9.5});return}
+    map.setView(focus,9.25);
+  }
+  fitInitial();
 
   function visualCoreSize(){
     const count=markerData.length;
@@ -220,7 +264,7 @@ ${clientScript}
   }
   function applyCollisionOffsets(){
     markerNodes.forEach(node=>{setOffset(node,0,0);updateMarkerVisual(node)});
-    if(map.getZoom()>=10){
+    if(map.getZoom()>=13){
       const visible=markerEntries.map(entry=>({entry,node:entry.marker.getElement()?.querySelector('.cw-marker'),point:map.latLngToLayerPoint(entry.marker.getLatLng())})).filter(item=>item.node);
       const visited=new Set();
       for(let i=0;i<visible.length;i+=1){
@@ -257,23 +301,27 @@ ${clientScript}
     const connector=node.querySelector('.event-connector');
     if(!connector)return;
     const distance=Math.hypot(x,y);
-    connector.style.width=Math.max(0,distance-7)+'px';
-    connector.style.opacity=distance>8?'.74':'0';
+    connector.style.width=Math.min(56,Math.max(0,distance-8))+'px';
+    connector.style.opacity=distance>10?'.66':'0';
     connector.style.transform='rotate('+Math.atan2(y,x)+'rad)';
   }
   function computeEventOffsets(){
-    const memberPoints=markerData.map(item=>({
-      point:map.latLngToLayerPoint([item.latitude,item.longitude]),
-      radius:item.members.length>1?58:42
-    }));
+    if(map.getZoom()<13){eventNodes.forEach(node=>applyEventOffset(node,{x:0,y:0}));return}
+    const memberPoints=markerEntries.map(entry=>({
+      node:entry.marker.getElement()?.querySelector('.cw-marker'),
+      point:map.latLngToLayerPoint(entry.marker.getLatLng()),
+      radius:entry.marker.options.connexioPeopleCount>1?62:42
+    })).filter(item=>item.node);
     const placed=[];
     const candidates=[
-      {x:74,y:-72},{x:-74,y:-72},{x:82,y:6},{x:-82,y:6},
-      {x:68,y:76},{x:-68,y:76},{x:0,y:-88},{x:0,y:88},{x:104,y:-38},{x:-104,y:-38}
+      {x:54,y:-46},{x:-54,y:-46},{x:58,y:8},{x:-58,y:8},
+      {x:48,y:52},{x:-48,y:52},{x:0,y:-58},{x:0,y:58}
     ];
-    eventData.forEach((event,eventIndex)=>{
-      const anchor=map.latLngToLayerPoint([event.latitude,event.longitude]);
-      const nearMember=memberPoints.some(item=>Math.hypot(anchor.x-item.point.x,anchor.y-item.point.y)<112);
+    eventEntries.forEach((entry,eventIndex)=>{
+      const node=entry.marker.getElement()?.querySelector('.event-marker');
+      if(!node)return;
+      const anchor=map.latLngToLayerPoint(entry.marker.getLatLng());
+      const nearMember=memberPoints.some(item=>Math.hypot(anchor.x-item.point.x,anchor.y-item.point.y)<78);
       const baseCandidates=nearMember?candidates:[{x:0,y:0},...candidates];
       const ordered=baseCandidates.map((candidate,index,array)=>array[(index+eventIndex)%array.length]);
       let best=ordered[0],bestScore=-Infinity;
@@ -285,16 +333,16 @@ ${clientScript}
         if(score>bestScore){bestScore=score;best=candidate}
         if(memberClearance>=38&&eventClearance>=28){best=candidate;break}
       }
-      eventOffsets.set(event.id,best);
+      eventOffsets.set(entry.id,best);
       placed.push({x:anchor.x+best.x,y:anchor.y+best.y});
-      const node=eventNodes.get(event.id);if(node)applyEventOffset(node,best);
+      applyEventOffset(node,best);
     });
   }
   const updateSelection=(markerId,eventId)=>{
     markerNodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(markerId)&&key===markerId));
     eventNodes.forEach((node,key)=>node.classList.toggle('selected',Boolean(eventId)&&key===eventId));
   };
-  const handle=raw=>{try{const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.type==='selection')updateSelection(data.markerId||null,data.eventId||null);if(data?.type==='locate'&&data.location){const point=[data.location.latitude,data.location.longitude];map.flyTo(point,12.5,{duration:.65});}}catch{}};
+  const handle=raw=>{try{const data=typeof raw==='string'?JSON.parse(raw):raw;if(data?.type==='selection')updateSelection(data.markerId||null,data.eventId||null);if(data?.type==='locate'&&data.location){const point=[data.location.latitude,data.location.longitude];map.flyTo(point,12.5,{duration:.65});}if(data?.type==='fit-all')fitAll();}catch{}};
   window.addEventListener('message',event=>{if(nativeBridge||event.origin===parentOrigin)handle(event.data)});
   if(nativeBridge)document.addEventListener('message',event=>handle(event.data));
   map.on('zoomend moveend',()=>requestAnimationFrame(()=>{applyCollisionOffsets();computeEventOffsets()}));
