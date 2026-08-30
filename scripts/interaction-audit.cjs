@@ -199,8 +199,8 @@ async function auditMap(page) {
     await page.getByLabel("Fermer la fiche", { exact: true }).waitFor({ state: "detached", timeout: 2500 }).catch(() => {});
   }
 
-  // The visible flag can be offset from its immutable geographic anchor to
-  // prevent overlap. Exercise the translated surface the user actually taps.
+  // The visible event date can be offset from its immutable geographic anchor
+  // to prevent overlap. Exercise the translated surface the user actually taps.
   const event = frame.locator(".event-marker .event-hit").first();
   if (await event.isVisible().catch(() => false)) {
     await event.click();

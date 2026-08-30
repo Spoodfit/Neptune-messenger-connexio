@@ -525,7 +525,7 @@ export default function UnifiedMapScreenV24() {
     : radarMode === "events"
       ? `${visibleEvents.length} évènements à découvrir`
       : `${eligibleMemberCount} membres · ${visibleEvents.length} évènements`;
-  const controlsTop = Math.max(insets.top, 10) + 120;
+  const controlsTop = Math.max(insets.top, 10) + 126;
 
   const applyAvailability = async (next: "available" | "busy") => {
     if (actionBusy) return;
@@ -844,8 +844,8 @@ const styles = StyleSheet.create({
   ownStatus: { minWidth: 70, minHeight: 46, borderRadius: 17, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   ownStatusDot: { width: 8, height: 8, borderRadius: 4 },
   ownStatusText: { maxWidth: 62, fontSize: 8, lineHeight: 11, fontWeight: "900" },
-  modeRail: { position: "absolute", left: 12, right: 12, minHeight: 48, borderRadius: 20, borderWidth: 1, padding: 3, flexDirection: "row", alignItems: "center", gap: 3 },
-  modeButton: { flex: 1, minWidth: 0, minHeight: 42, borderRadius: 16, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  modeRail: { position: "absolute", left: 12, right: 12, minHeight: 56, borderRadius: 20, borderWidth: 1, padding: 3, flexDirection: "row", alignItems: "center", gap: 3 },
+  modeButton: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 16, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   modeLabel: { flexShrink: 1, fontSize: 10, lineHeight: 13, fontWeight: "900" },
   modeCount: { fontSize: 9, lineHeight: 12, fontWeight: "900", fontVariant: ["tabular-nums"] },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
