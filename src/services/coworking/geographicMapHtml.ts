@@ -116,6 +116,7 @@ ${clientScript}
   const parentOrigin=(()=>{try{const value=window.parent?.location?.origin;return value&&value!=='null'?value:null}catch{return null}})();
   const post=payload=>{try{${postExpression}}catch{}};
   const map=L.map('map',{zoomControl:false,minZoom:4,maxZoom:18,zoomSnap:.25,attributionControl:true});
+  map.on('movestart zoomstart dragstart',()=>post({type:'map-interaction'}));
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
   const cluster=L.markerClusterGroup({
     maxClusterRadius:zoom=>zoom<7?58:zoom<10?46:32,

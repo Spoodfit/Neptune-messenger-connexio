@@ -155,6 +155,7 @@ export default function UnifiedMapScreenV24() {
   const [notice, setNotice] = useState<string | null>(null);
   const [localMotion, setLocalMotion] = useState<CoworkingActionFeedback | null>(null);
   const [interactionClock, setInteractionClock] = useState(() => Date.now());
+  const [opportunityExpanded, setOpportunityExpanded] = useState(false);
   const tabBarClearance = 92;
 
   const loadEvents = async () => {
@@ -343,7 +344,13 @@ export default function UnifiedMapScreenV24() {
     }
     return [...ids].map((id) => allMembers.find((member) => member.id === id)).filter((member): member is AppUser => Boolean(member));
   }, [allMembers, currentUser.id, markers]);
-  const nextEvent = visibleEvents.find((event) => getDiscoveryEventState(event, eventClock) !== "recent");
+  const liveEvents = visibleEvents.filter((event) => getDiscoveryEventState(event, eventClock) === "live");
+  const upcomingEvents = visibleEvents.filter((event) => {
+    const state = getDiscoveryEventState(event, eventClock);
+    return state !== "recent" && state !== "live";
+  });
+  const nextEvent = upcomingEvents[0] ?? liveEvents[0];
+  const priorityEvent = liveEvents[0] ?? nextEvent;
   const clusterMarkers = selectedCluster
     ? markers.filter((marker) => selectedCluster.markerIds.includes(marker.id))
     : [];
@@ -369,6 +376,7 @@ export default function UnifiedMapScreenV24() {
   const selectedEvent = selectedEventId ? visibleEvents.find((event) => event.id === selectedEventId) : undefined;
 
   const selectMarker = (markerId: string) => {
+    setOpportunityExpanded(false);
     const marker = markers.find((item) => item.id === markerId);
     setSelectedCluster(null);
     setSelectedEventId(null);
@@ -377,6 +385,7 @@ export default function UnifiedMapScreenV24() {
   };
 
   const selectEvent = (eventId: string) => {
+    setOpportunityExpanded(false);
     setSelectedCluster(null);
     setSelectedMarkerId(null);
     setSelectedMemberId(null);
@@ -384,6 +393,7 @@ export default function UnifiedMapScreenV24() {
   };
 
   const closeSelection = () => {
+    setOpportunityExpanded(false);
     setSelectedCluster(null);
     setSelectedMarkerId(null);
     setSelectedMemberId(null);
@@ -391,6 +401,7 @@ export default function UnifiedMapScreenV24() {
   };
 
   const selectCluster = (clusterSelection: CoworkingMapClusterSelection) => {
+    setOpportunityExpanded(false);
     setSelectedMarkerId(null);
     setSelectedMemberId(null);
     setSelectedEventId(null);
@@ -525,7 +536,19 @@ export default function UnifiedMapScreenV24() {
     : radarMode === "events"
       ? `${visibleEvents.length} évènements à découvrir`
       : `${eligibleMemberCount} membres · ${visibleEvents.length} évènements`;
-  const controlsTop = Math.max(insets.top, 10) + 126;
+  const availableLabel = t(availableMembers.length === 1 ? "personne disponible maintenant" : "personnes disponibles maintenant");
+  const liveEventLabel = t(liveEvents.length === 1 ? "évènement en cours" : "évènements en cours");
+  const upcomingLabel = t(upcomingEvents.length === 1 ? "évènement à venir" : "évènements à venir");
+  const compactOpportunitySummary = availableMembers.length > 0 && liveEvents.length > 0
+    ? availableMembers.length + " " + availableLabel + " · " + liveEvents.length + " " + liveEventLabel
+    : availableMembers.length > 0
+      ? availableMembers.length + " " + availableLabel
+      : liveEvents.length > 0
+        ? liveEvents.length + " " + liveEventLabel
+        : upcomingEvents.length > 0
+          ? upcomingEvents.length + " " + upcomingLabel
+          : t("Rien d’urgent maintenant");
+  const controlsTop = Math.max(insets.top, 10) + 118;
 
   const applyAvailability = async (next: "available" | "busy") => {
     if (actionBusy) return;
@@ -579,6 +602,7 @@ export default function UnifiedMapScreenV24() {
         onSelectMarker={selectMarker}
         onSelectEvent={selectEvent}
         onSelectCluster={selectCluster}
+        onInteraction={() => setOpportunityExpanded(false)}
         onLocationUnavailable={() => AppAlert.alert("Localisation indisponible", "Activez la localisation pour recentrer la carte autour de vous.")}
       />
 
@@ -789,43 +813,83 @@ export default function UnifiedMapScreenV24() {
         </View>
       ) : null}
 
-      {!selection && !selectedEvent && !selectedCluster ? (
-        <View style={[styles.opportunityDock, { bottom: tabBarClearance, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
-          <View style={styles.dockHeader}>
-            <View style={styles.dockTitleLine}><View style={[styles.liveDot, { backgroundColor: theme.success }]} /><Text style={[styles.dockTitle, { color: theme.pageText }]}>À saisir maintenant</Text></View>
-            <Text style={[styles.dockMeta, { color: theme.pageTextMuted }]}>{`${availableMembers.length + visibleEvents.length} opportunités`}</Text>
-          </View>
-          <View style={styles.opportunityRail}>
-            <Pressable accessibilityRole="button" accessibilityLabel={t("Voir les personnes disponibles maintenant")} onPress={() => changeRadarMode("available")} style={[styles.opportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
-              <View style={styles.avatarPreview}>
-                {availableMembers.slice(0, 3).map((member, index) => <View key={member.id} style={index > 0 ? styles.stackedAvatar : undefined}><StatusAvatar user={member} size={32} accessible={false} /></View>)}
-                {availableMembers.length === 0 ? <View style={[styles.emptyPreview, { backgroundColor: theme.successSoft }]}><Ionicons name="people-outline" size={19} color={theme.success} /></View> : null}
-              </View>
-              <View style={styles.opportunityCopy}>
-                <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{`${availableMembers.length} disponibles`}</Text>
-                <Text numberOfLines={1} style={[styles.opportunityMeta, { color: theme.success }]}>Échanger maintenant</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={17} color={theme.pageTextMuted} />
-            </Pressable>
-            {nextEvent ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={`Sélectionner l’évènement ${nextEvent.title}`} onPress={() => selectEvent(nextEvent.id)} style={[styles.opportunityCard, styles.eventOpportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
-                <View style={[styles.dateTile, { backgroundColor: theme.accentSoft, borderColor: theme.accent }]}>
-                  <Text style={[styles.dateDay, { color: theme.pageText }]}>{new Date(nextEvent.startsAt).getDate().toString().padStart(2, "0")}</Text>
-                  <Text style={[styles.dateMonth, { color: theme.pageTextMuted }]}>{new Date(nextEvent.startsAt).toLocaleString(localeTag, { month: "short" }).replace(".", "")}</Text>
+      {!selection && !selectedEvent && !selectedCluster && radarMode === "all" ? (
+        <View
+          style={[
+            styles.smartDock,
+            opportunityExpanded ? styles.smartDockExpanded : styles.smartDockCompact,
+            { bottom: tabBarClearance, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t(opportunityExpanded ? "Réduire ce panneau" : "Ouvrir ce panneau")}
+            onPress={() => setOpportunityExpanded((value) => !value)}
+            style={({ pressed }) => [styles.smartDockToggle, pressed && styles.pressed]}
+          >
+            <View style={styles.smartDockSignal}>
+              <View style={[styles.liveDot, { backgroundColor: availableMembers.length > 0 || liveEvents.length > 0 ? theme.success : theme.pageTextMuted }]} />
+              <Text numberOfLines={1} style={[styles.smartDockTitle, { color: theme.pageText }]}>
+                {opportunityExpanded ? t("Maintenant autour de vous") : compactOpportunitySummary}
+              </Text>
+            </View>
+            <Ionicons name={opportunityExpanded ? "chevron-down" : "chevron-up"} size={18} color={theme.pageTextMuted} />
+          </Pressable>
+
+          {opportunityExpanded ? (
+            <View style={styles.opportunityRail}>
+              {availableMembers.length > 0 ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={t("Voir les personnes disponibles maintenant")} onPress={() => changeRadarMode("available")} style={[styles.opportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+                  <View style={styles.avatarPreview}>
+                    {availableMembers.slice(0, 3).map((member, index) => <View key={member.id} style={index > 0 ? styles.stackedAvatar : undefined}><StatusAvatar user={member} size={32} accessible={false} /></View>)}
+                  </View>
+                  <View style={styles.opportunityCopy}>
+                    <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{availableMembers.length + " " + availableLabel}</Text>
+                    <Text numberOfLines={1} style={[styles.opportunityMeta, { color: theme.success }]}>{t("Échanger maintenant")}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={17} color={theme.pageTextMuted} />
+                </Pressable>
+              ) : null}
+
+              {priorityEvent ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={t("Sélectionner l’évènement") + " " + priorityEvent.title} onPress={() => selectEvent(priorityEvent.id)} style={[styles.opportunityCard, styles.eventOpportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+                  <View style={[styles.dateTile, { backgroundColor: theme.accentSoft, borderColor: getDiscoveryEventState(priorityEvent, eventClock) === "live" ? theme.success : theme.accent }]}>
+                    <Text style={[styles.dateDay, { color: theme.pageText }]}>{new Date(priorityEvent.startsAt).getDate().toString().padStart(2, "0")}</Text>
+                    <Text style={[styles.dateMonth, { color: theme.pageTextMuted }]}>{new Date(priorityEvent.startsAt).toLocaleString(localeTag, { month: "short" }).replace(".", "")}</Text>
+                  </View>
+                  <View style={styles.opportunityCopy}>
+                    <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{priorityEvent.title}</Text>
+                    <Text numberOfLines={1} style={[styles.opportunityMeta, { color: getDiscoveryEventState(priorityEvent, eventClock) === "live" ? theme.success : theme.pageTextMuted }]}>{eventStatusLabel(priorityEvent, eventClock)}{priorityEvent.city ? " · " + priorityEvent.city : ""}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={17} color={theme.pageTextMuted} />
+                </Pressable>
+              ) : null}
+
+              {visibleEvents.length > 0 ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={t("Voir tous les évènements")} onPress={() => changeRadarMode("events")} style={[styles.allEventsButton, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+                  <View style={styles.allEventsCopy}>
+                    <Ionicons name="calendar-outline" size={17} color={theme.pageText} />
+                    <Text numberOfLines={1} style={[styles.allEventsText, { color: theme.pageText }]}>{t("Voir tous les évènements")}</Text>
+                  </View>
+                  <View style={[styles.countBadge, { backgroundColor: theme.violetSoft }]}>
+                    <Text style={[styles.countBadgeText, { color: theme.violet }]}>{visibleEvents.length}</Text>
+                  </View>
+                </Pressable>
+              ) : null}
+
+              {availableMembers.length === 0 && !priorityEvent && visibleEvents.length === 0 ? (
+                <View style={styles.emptyDockRow}>
+                  <Ionicons name="checkmark-circle-outline" size={18} color={theme.pageTextMuted} />
+                  <Text style={[styles.emptyDockText, { color: theme.pageTextMuted }]}>{t("Rien d’urgent maintenant")}</Text>
                 </View>
-                <View style={styles.opportunityCopy}>
-                  <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{nextEvent.title}</Text>
-                  <Text numberOfLines={1} style={[styles.opportunityMeta, { color: theme.pageTextMuted }]}>{eventStatusLabel(nextEvent, eventClock)}{nextEvent.city ? ` · ${nextEvent.city}` : ""}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={17} color={theme.pageTextMuted} />
-              </Pressable>
-            ) : null}
-          </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
       {notice ? (
-        <View pointerEvents="none" style={[styles.notice, { bottom: tabBarClearance + 76, backgroundColor: theme.pageText }]}>
+        <View pointerEvents="none" style={[styles.notice, { bottom: tabBarClearance + (opportunityExpanded && radarMode === "all" ? 224 : 66), backgroundColor: theme.pageText }]}>
           <Text style={[styles.noticeText, { color: theme.pageBackground }]}>{notice}</Text>
         </View>
       ) : null}
@@ -836,16 +900,16 @@ export default function UnifiedMapScreenV24() {
 const styles = StyleSheet.create({
   screen: { flex: 1, position: "relative", overflow: "hidden" },
   topBar: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
-  circleButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  titlePill: { flex: 1, minHeight: 52, maxWidth: 264, paddingLeft: 12, paddingRight: 4, borderRadius: 20, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 5 },
+  circleButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  titlePill: { flex: 1, minHeight: 48, maxWidth: 260, paddingLeft: 11, paddingRight: 4, borderRadius: 19, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 5 },
   titleCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 15, lineHeight: 18, fontWeight: "900" },
   subtitle: { marginTop: 1, fontSize: 9, lineHeight: 12, fontWeight: "700" },
-  ownStatus: { minWidth: 70, minHeight: 48, borderRadius: 17, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  ownStatus: { minWidth: 70, minHeight: 42, borderRadius: 16, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   ownStatusDot: { width: 8, height: 8, borderRadius: 4 },
   ownStatusText: { maxWidth: 62, fontSize: 8, lineHeight: 11, fontWeight: "900" },
-  modeRail: { position: "absolute", left: 12, right: 12, minHeight: 56, borderRadius: 20, borderWidth: 1, padding: 3, flexDirection: "row", alignItems: "center", gap: 3 },
-  modeButton: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 16, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
+  modeRail: { position: "absolute", left: 12, right: 12, minHeight: 52, borderRadius: 19, borderWidth: 1, padding: 3, flexDirection: "row", alignItems: "center", gap: 3 },
+  modeButton: { flex: 1, minWidth: 0, minHeight: 44, borderRadius: 15, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
   modeLabel: { flexShrink: 1, fontSize: 10, lineHeight: 13, fontWeight: "900" },
   modeCount: { fontSize: 9, lineHeight: 12, fontWeight: "900", fontVariant: ["tabular-nums"] },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
@@ -891,14 +955,15 @@ const styles = StyleSheet.create({
   eventSecondaryText: { flexShrink: 1, fontSize: 9, lineHeight: 12, fontWeight: "900", textAlign: "center" },
   eventCta: { flex: 1.1, minWidth: 0, minHeight: 52, borderRadius: 17, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
   eventCtaText: { flexShrink: 1, color: "#FFFFFF", fontSize: 10, lineHeight: 13, fontWeight: "900", textAlign: "center" },
-  opportunityDock: { position: "absolute", left: 10, right: 10, borderRadius: 23, borderWidth: 1, padding: 10, gap: 8, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 14 },
-  dockHeader: { minHeight: 20, paddingHorizontal: 2, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  dockTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  smartDock: { position: "absolute", left: 10, right: 10, borderRadius: 21, borderWidth: 1, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 14 },
+  smartDockCompact: { paddingHorizontal: 12, paddingVertical: 7 },
+  smartDockExpanded: { padding: 10, gap: 8 },
+  smartDockToggle: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  smartDockSignal: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 7 },
+  smartDockTitle: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 14, fontWeight: "900" },
   liveDot: { width: 8, height: 8, borderRadius: 4 },
-  dockTitle: { fontSize: 11, lineHeight: 14, fontWeight: "900" },
-  dockMeta: { fontSize: 9, lineHeight: 12, fontWeight: "800", fontVariant: ["tabular-nums"] },
   opportunityRail: { gap: 6 },
-  opportunityCard: { minHeight: 58, borderRadius: 18, borderWidth: 1, padding: 8, flexDirection: "row", alignItems: "center", gap: 8 },
+  opportunityCard: { minHeight: 56, borderRadius: 17, borderWidth: 1, padding: 8, flexDirection: "row", alignItems: "center", gap: 8 },
   eventOpportunityCard: { minHeight: 58 },
   avatarPreview: { minWidth: 48, flexDirection: "row", alignItems: "center" },
   stackedAvatar: { marginLeft: -14 },
@@ -906,6 +971,13 @@ const styles = StyleSheet.create({
   opportunityCopy: { flex: 1, minWidth: 0 },
   opportunityTitle: { fontSize: 11, lineHeight: 14, fontWeight: "900" },
   opportunityMeta: { marginTop: 3, fontSize: 9, lineHeight: 12, fontWeight: "800" },
+  allEventsButton: { minHeight: 42, borderRadius: 15, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  allEventsCopy: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 7 },
+  allEventsText: { flex: 1, minWidth: 0, fontSize: 10, lineHeight: 13, fontWeight: "900" },
+  countBadge: { minWidth: 26, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  countBadgeText: { fontSize: 9, lineHeight: 12, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  emptyDockRow: { minHeight: 42, borderRadius: 15, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 8 },
+  emptyDockText: { flex: 1, minWidth: 0, fontSize: 10, lineHeight: 13, fontWeight: "800" },
   dateTile: { width: 44, height: 48, borderRadius: 14, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   dateDay: { fontSize: 16, lineHeight: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
   dateMonth: { fontSize: 8, lineHeight: 10, fontWeight: "900", textTransform: "uppercase" },

@@ -4,6 +4,18 @@ import { normalizeUiLanguageCode, type SupportedUiLanguage } from "./uiTranslati
 type TranslationSet = Partial<Record<Exclude<SupportedUiLanguage, "fr">, string>>;
 
 export const UI_TRANSLATIONS_V27: Record<string, TranslationSet> = {
+  "Maintenant autour de vous": { en: "Now around you", es: "Ahora a tu alrededor", de: "Jetzt in deiner Nähe", it: "Ora intorno a te", pt: "Agora à sua volta" },
+  "Rien d’urgent maintenant": { en: "Nothing urgent right now", es: "Nada urgente ahora", de: "Gerade nichts Dringendes", it: "Niente di urgente ora", pt: "Nada urgente agora" },
+  "Voir tous les évènements": { en: "See all events", es: "Ver todos los eventos", de: "Alle Veranstaltungen ansehen", it: "Vedi tutti gli eventi", pt: "Ver todos os eventos" },
+  "Réduire ce panneau": { en: "Collapse this panel", es: "Reducir este panel", de: "Dieses Panel einklappen", it: "Riduci questo pannello", pt: "Recolher este painel" },
+  "Ouvrir ce panneau": { en: "Open this panel", es: "Abrir este panel", de: "Dieses Panel öffnen", it: "Apri questo pannello", pt: "Abrir este painel" },
+  "Sélectionner l’évènement": { en: "Select event", es: "Seleccionar evento", de: "Veranstaltung auswählen", it: "Seleziona evento", pt: "Selecionar evento" },
+  "personne disponible maintenant": { en: "person available now", es: "persona disponible ahora", de: "Person jetzt verfügbar", it: "persona disponibile ora", pt: "pessoa disponível agora" },
+  "personnes disponibles maintenant": { en: "people available now", es: "personas disponibles ahora", de: "Personen jetzt verfügbar", it: "persone disponibili ora", pt: "pessoas disponíveis agora" },
+  "évènement en cours": { en: "event happening now", es: "evento en curso", de: "laufende Veranstaltung", it: "evento in corso", pt: "evento a decorrer" },
+  "évènements en cours": { en: "events happening now", es: "eventos en curso", de: "laufende Veranstaltungen", it: "eventi in corso", pt: "eventos a decorrer" },
+  "évènement à venir": { en: "upcoming event", es: "evento próximo", de: "bevorstehende Veranstaltung", it: "evento in arrivo", pt: "próximo evento" },
+  "évènements à venir": { en: "upcoming events", es: "eventos próximos", de: "bevorstehende Veranstaltungen", it: "eventi in arrivo", pt: "próximos eventos" },
   "À saisir maintenant": { en: "Worth acting on now", es: "Para aprovechar ahora", de: "Jetzt interessant", it: "Da cogliere ora", pt: "Para aproveitar agora" },
   "À venir": { en: "Upcoming", es: "Próximamente", de: "Demnächst", it: "In arrivo", pt: "Em breve" },
   "Affiche tous les membres et évènements visibles": { en: "Shows all visible members and events", es: "Muestra todos los miembros y eventos visibles", de: "Zeigt alle sichtbaren Mitglieder und Veranstaltungen", it: "Mostra tutti i membri e gli eventi visibili", pt: "Mostra todos os membros e eventos visíveis" },
