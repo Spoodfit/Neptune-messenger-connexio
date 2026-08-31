@@ -1,154 +1,167 @@
 import type { ConfigContext, ExpoConfig } from "expo/config";
 
+const APP_VERSION = "1.0.1";
+const EAS_PROJECT_ID = "1e85dc3a-4114-4387-8e15-2463a82e68fd";
+const NOTIFICATION_SOUND = "./assets/audio/connexio_notification.mp3";
+const MENTION_SOUND = "./assets/audio/connexio_mention.mp3";
+const PUBLIC_POLICY_BASE_URL = "https://spoodfit.github.io/Neptune-messenger-connexio";
+const MICROPHONE_PERMISSION = "Connexio utilise le microphone uniquement lorsque vous choisissez d’envoyer un message vocal, d’enregistrer une vidéo, de dicter l’objet d’un appel ou de participer à un appel ou au Coworking.";
+const LEGACY_STORE_URLS = new Set([
+  "https://neptunebusiness.com/confidentialite",
+  "https://www.neptunebusiness.com/confidentialite",
+  "https://neptunebusiness.com/suppression-compte",
+  "https://www.neptunebusiness.com/suppression-compte",
+  "https://www.neptunebusiness.com/condition-generale-utilisation",
+  "https://neptunebusiness.com/condition-generale-utilisation"
+]);
+
+function requireHttps(name: string, value: string): void {
+  if (!value.startsWith("https://")) throw new Error(`${name} doit utiliser HTTPS en production.`);
+}
+function rejectLegacyStoreUrl(name: string, value: string): void {
+  if (LEGACY_STORE_URLS.has(value.replace(/\/$/, ""))) throw new Error(`${name} pointe vers une ancienne page non dédiée à Connexio. Utilisez les documents Connexio validés.`);
+}
+
+function parseHttpsOrigins(name: string, value: string): string[] {
+  if (!value.trim()) return [];
+  return value.split(",").map((entry) => {
+    const raw = entry.trim();
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.username || url.password || url.origin !== raw.replace(/\/$/, "")) {
+      throw new Error(`${name} doit contenir uniquement des origines HTTPS séparées par des virgules.`);
+    }
+    return url.origin;
+  });
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
+  const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? EAS_PROJECT_ID;
   const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
   const realtimeUrl = process.env.EXPO_PUBLIC_REALTIME_URL ?? "";
-  const businessWebBaseUrl =
-    process.env.EXPO_PUBLIC_BUSINESS_WEB_BASE_URL ??
-    "https://neptunebusiness.com";
+  const businessWebBaseUrl = process.env.EXPO_PUBLIC_BUSINESS_WEB_BASE_URL ?? "https://neptunebusiness.com";
+  const privacyPolicyUrl = process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? `${PUBLIC_POLICY_BASE_URL}/privacy-policy.html`;
+  const termsUrl = process.env.EXPO_PUBLIC_TERMS_URL ?? `${PUBLIC_POLICY_BASE_URL}/connexio-terms.html`;
+  const accountDeletionUrl = process.env.EXPO_PUBLIC_ACCOUNT_DELETION_URL ?? `${PUBLIC_POLICY_BASE_URL}/account-deletion.html`;
+  const supportUrl = process.env.EXPO_PUBLIC_SUPPORT_URL ?? "mailto:contact@neptunebusiness.com";
+  const backendContract = process.env.EXPO_PUBLIC_BACKEND_CONTRACT ?? "neptune-web-v1";
+  const mediaClientOrigins = parseHttpsOrigins("EXPO_PUBLIC_MEDIA_CLIENT_ORIGINS", process.env.EXPO_PUBLIC_MEDIA_CLIENT_ORIGINS ?? "");
   const mockMode = process.env.EXPO_PUBLIC_MOCK_MODE === "true";
+  const coworkingEnabled = process.env.EXPO_PUBLIC_COWORKING_ENABLED === "true";
   const buildProfile = process.env.EAS_BUILD_PROFILE ?? "development";
+  const buildRef = process.env.EAS_BUILD_GIT_COMMIT_HASH ?? process.env.GITHUB_SHA ?? "local";
+  const isProduction = buildProfile === "production";
+  const isReleaseCandidate = buildProfile === "release-candidate";
+  const isStoreBuild = isProduction || isReleaseCandidate;
   const isGithubPages = process.env.EXPO_PUBLIC_GITHUB_PAGES === "true";
 
-  if (buildProfile === "production") {
+  if (isStoreBuild) {
     const missing = [
       !apiBaseUrl && "EXPO_PUBLIC_API_BASE_URL",
-      !realtimeUrl && "EXPO_PUBLIC_REALTIME_URL",
-      !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID"
+      backendContract === "connexio-v1" && !realtimeUrl && "EXPO_PUBLIC_REALTIME_URL",
+      !easProjectId && "EXPO_PUBLIC_EAS_PROJECT_ID",
+      !privacyPolicyUrl && "EXPO_PUBLIC_PRIVACY_POLICY_URL",
+      !termsUrl && "EXPO_PUBLIC_TERMS_URL",
+      !accountDeletionUrl && "EXPO_PUBLIC_ACCOUNT_DELETION_URL",
+      !supportUrl && "EXPO_PUBLIC_SUPPORT_URL"
     ].filter(Boolean);
-    if (mockMode) {
-      throw new Error("EXPO_PUBLIC_MOCK_MODE doit être false en production.");
-    }
-    if (missing.length > 0) {
-      throw new Error(
-        `Configuration Connexio production incomplète : ${missing.join(", ")}`
-      );
-    }
-    if (!apiBaseUrl.startsWith("https://")) {
-      throw new Error("EXPO_PUBLIC_API_BASE_URL doit utiliser HTTPS en production.");
-    }
-    if (!realtimeUrl.startsWith("wss://") && !realtimeUrl.startsWith("https://")) {
-      throw new Error(
-        "EXPO_PUBLIC_REALTIME_URL doit utiliser WSS ou HTTPS en production."
-      );
-    }
-    if (!businessWebBaseUrl.startsWith("https://")) {
-      throw new Error(
-        "EXPO_PUBLIC_BUSINESS_WEB_BASE_URL doit utiliser HTTPS en production."
-      );
-    }
+    if (mockMode) throw new Error("EXPO_PUBLIC_MOCK_MODE doit être false pour une build store.");
+    if (missing.length > 0) throw new Error(`Configuration Connexio store incomplète : ${missing.join(", ")}`);
+    if (backendContract !== "neptune-web-v1" && backendContract !== "connexio-v1") throw new Error("EXPO_PUBLIC_BACKEND_CONTRACT doit valoir neptune-web-v1 ou connexio-v1.");
+    if (backendContract !== "connexio-v1") throw new Error("Build candidate/Store bloquée : le backend ne déclare pas encore le contrat sécurisé connexio-v1.");
+    requireHttps("EXPO_PUBLIC_API_BASE_URL", apiBaseUrl);
+    if (backendContract === "connexio-v1" && !realtimeUrl.startsWith("wss://") && !realtimeUrl.startsWith("https://")) throw new Error("EXPO_PUBLIC_REALTIME_URL doit utiliser WSS ou HTTPS pour une build store.");
+    requireHttps("EXPO_PUBLIC_BUSINESS_WEB_BASE_URL", businessWebBaseUrl);
+    requireHttps("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);
+    requireHttps("EXPO_PUBLIC_TERMS_URL", termsUrl);
+    requireHttps("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);
+    rejectLegacyStoreUrl("EXPO_PUBLIC_PRIVACY_POLICY_URL", privacyPolicyUrl);
+    rejectLegacyStoreUrl("EXPO_PUBLIC_TERMS_URL", termsUrl);
+    rejectLegacyStoreUrl("EXPO_PUBLIC_ACCOUNT_DELETION_URL", accountDeletionUrl);
+    if (!supportUrl.startsWith("https://") && !supportUrl.startsWith("mailto:")) throw new Error("EXPO_PUBLIC_SUPPORT_URL doit utiliser HTTPS ou mailto: pour une build store.");
   }
 
   return {
     ...config,
     name: "Connexio by Neptune",
-    slug: "neptune-messenger-connexio",
-    version: "0.4.0",
-    orientation: "portrait",
+    owner: "johanzambellis-team",
+    slug: "connexio",
+    version: APP_VERSION,
+    orientation: "default",
     scheme: "neptuneconnexio",
-    userInterfaceStyle: "dark",
+    userInterfaceStyle: "automatic",
     backgroundColor: "#020713",
-    web: {
-      bundler: "metro",
-      output: "single"
-    },
-    experiments: isGithubPages
-      ? {
-          baseUrl: "/Neptune-messenger-connexio"
-        }
-      : undefined,
+    icon: "./assets/icon.png",
+    web: { bundler: "metro", output: "single", favicon: "./assets/favicon.png" },
+    experiments: isGithubPages ? { baseUrl: "/Neptune-messenger-connexio" } : undefined,
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.neptunebusiness.connexio",
+      icon: "./assets/icon.png",
       infoPlist: {
-        NSCameraUsageDescription:
-          "Connexio utilise la caméra pour envoyer des photos, publier des vidéos et participer aux appels vidéo.",
-        NSMicrophoneUsageDescription:
-          "Connexio utilise le microphone pour les messages audio et les appels.",
-        NSSpeechRecognitionUsageDescription:
-          "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
-        NSPhotoLibraryUsageDescription:
-          "Connexio accède à vos médias uniquement lorsque vous choisissez un contenu à partager.",
-        NSLocationWhenInUseUsageDescription:
-          "Connexio utilise votre position pour vous localiser sur la carte et partager un lieu à votre demande."
+        ITSAppUsesNonExemptEncryption: false,
+        NSCameraUsageDescription: "Connexio utilise la caméra lorsque vous choisissez de prendre une photo, publier une vidéo, participer à un appel vidéo ou ouvrir la Map Coworking.",
+        NSMicrophoneUsageDescription: MICROPHONE_PERMISSION,
+        NSSpeechRecognitionUsageDescription: "Connexio transcrit uniquement les messages vocaux et objets d’appel que vous choisissez explicitement d’enregistrer ou de dicter.",
+        NSPhotoLibraryUsageDescription: "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.",
+        NSLocationWhenInUseUsageDescription: "Connexio utilise votre position uniquement à votre demande pour la carte ou le partage d’un lieu.",
+        NSContactsUsageDescription: "Connexio ouvre vos contacts uniquement lorsque vous choisissez explicitement une personne à inviter ou recommander."
+      },
+      privacyManifests: {
+        NSPrivacyAccessedAPITypes: [
+          { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryUserDefaults", NSPrivacyAccessedAPITypeReasons: ["CA92.1"] },
+          { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategorySystemBootTime", NSPrivacyAccessedAPITypeReasons: ["35F9.1"] },
+          { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryFileTimestamp", NSPrivacyAccessedAPITypeReasons: ["C617.1"] },
+          { NSPrivacyAccessedAPIType: "NSPrivacyAccessedAPICategoryDiskSpace", NSPrivacyAccessedAPITypeReasons: ["E174.1"] }
+        ]
       }
     },
     android: {
       package: "com.neptunebusiness.connexio",
-      adaptiveIcon: {
-        backgroundColor: "#020713"
-      },
-      permissions: [
-        "POST_NOTIFICATIONS",
-        "CAMERA",
-        "RECORD_AUDIO",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ]
+      icon: "./assets/icon.png",
+      blockedPermissions: ["android.permission.ACCESS_FINE_LOCATION", "android.permission.WRITE_CONTACTS"],
+      adaptiveIcon: { foregroundImage: "./assets/adaptive-icon.png", backgroundColor: "#FFFFFF" },
+      softwareKeyboardLayoutMode: "resize",
+      permissions: ["POST_NOTIFICATIONS", "CAMERA", "RECORD_AUDIO", "ACCESS_COARSE_LOCATION", "READ_CONTACTS"]
     },
     plugins: [
       "expo-router",
+      ["expo-splash-screen", { image: "./assets/splash-icon.png", imageWidth: 220, resizeMode: "contain", backgroundColor: "#FFFFFF" }],
       "expo-audio",
-      [
-        "expo-speech-recognition",
-        {
-          microphonePermission:
-            "Connexio utilise le microphone pour dicter l’objet d’un appel.",
-          speechRecognitionPermission:
-            "Connexio transcrit uniquement l’objet de l’appel que vous choisissez de dicter.",
-          androidSpeechServicePackages: [
-            "com.google.android.googlequicksearchbox",
-            "com.google.android.as"
-          ]
-        }
-      ],
+      "expo-font",
+      "expo-asset",
+      ["expo-speech-recognition", { microphonePermission: MICROPHONE_PERMISSION, speechRecognitionPermission: "Connexio transcrit uniquement les messages vocaux et objets d’appel que vous choisissez explicitement d’enregistrer ou de dicter.", androidSpeechServicePackages: ["com.google.android.googlequicksearchbox", "com.google.android.as"] }],
+      ["expo-contacts", { contactsPermission: "Connexio ouvre vos contacts uniquement lorsque vous choisissez explicitement une personne à inviter ou recommander." }],
       "expo-secure-store",
-      [
-        "expo-sqlite",
-        {
-          useSQLCipher: true
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          defaultChannel: "messages"
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          photosPermission:
-            "Connexio accède aux photos et vidéos que vous choisissez de partager.",
-          cameraPermission:
-            "Connexio utilise la caméra pour créer un contenu à partager.",
-          microphonePermission:
-            "Connexio utilise le microphone lors de l’enregistrement vidéo."
-        }
-      ],
-      [
-        "expo-location",
-        {
-          locationWhenInUsePermission:
-            "Connexio utilise votre position uniquement à votre demande."
-        }
-      ],
+      "expo-system-ui",
+      ["expo-sqlite", { useSQLCipher: true }],
+      ["expo-notifications", { defaultChannel: "messages", icon: "./assets/notification-icon.png", color: "#0048BA", sounds: [NOTIFICATION_SOUND, MENTION_SOUND] }],
+      ["expo-image-picker", { photosPermission: "Connexio accède uniquement aux photos et vidéos que vous choisissez de partager.", cameraPermission: "Connexio utilise la caméra lorsque vous choisissez de créer un contenu.", microphonePermission: MICROPHONE_PERMISSION }],
+      ["expo-location", { locationWhenInUsePermission: "Connexio utilise votre position uniquement à votre demande." }],
       "expo-document-picker"
     ],
     extra: {
       apiBaseUrl,
       realtimeUrl,
       businessWebBaseUrl,
+      privacyPolicyUrl,
+      termsUrl,
+      accountDeletionUrl,
+      supportUrl,
+      backendContract,
+      mediaClientOrigins,
       mockMode,
+      coworkingEnabled,
+      standaloneMode: buildProfile === "standalone",
       buildProfile,
-      ...(easProjectId
-        ? {
-            eas: {
-              projectId: easProjectId
-            }
-          }
-        : {})
+      buildRef,
+      releaseStage:
+        buildProfile === "preview" ||
+        buildProfile === "standalone" ||
+        buildProfile === "release-candidate" ||
+        buildProfile === "production"
+          ? buildProfile
+          : "development",
+      eas: { projectId: easProjectId }
     }
   };
 };

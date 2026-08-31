@@ -1,6 +1,7 @@
 import type {
   AppUser,
   AttachmentKind,
+  ContentTranslation,
   Conversation,
   UserRole
 } from "./messaging";
@@ -16,6 +17,9 @@ export interface GroupDraft {
   iconName?: string;
   allowedRoles: UserRole[];
   canMembersPost: boolean;
+  adminIds?: string[];
+  announcementPublisherIds?: string[];
+  allowFreeDiscovery?: boolean;
 }
 
 export interface PrivateConversationDraft {
@@ -49,6 +53,7 @@ export interface HighlightMedia {
   status?: "local" | "uploading" | "ready" | "failed";
   transcript?: string;
   transcriptStatus?: "pending" | "ready" | "failed";
+  transcriptTranslation?: ContentTranslation;
 }
 
 export interface HighlightReactionSummary {
@@ -63,9 +68,12 @@ export interface HighlightComment {
   author: AppUser;
   body: string;
   createdAt: string;
+  updatedAt?: string;
   parentCommentId?: string;
   mentionedUserIds?: string[];
   reactions: HighlightReactionSummary[];
+  sourceLanguage?: string;
+  translation?: ContentTranslation;
 }
 
 export interface HighlightLocation {
@@ -83,6 +91,7 @@ export interface HighlightPost {
   kind: HighlightKind;
   body: string;
   createdAt: string;
+  updatedAt?: string;
   media?: HighlightMedia;
   mentionedUserIds?: string[];
   reactions: HighlightReactionSummary[];
@@ -98,6 +107,8 @@ export interface HighlightPost {
   syncedWithBusinessApp?: boolean;
   syncedWithAdvantagesCommittee?: boolean;
   syncState?: "local" | "queued" | "synced" | "failed";
+  sourceLanguage?: string;
+  translation?: ContentTranslation;
 }
 
 export interface PlaceSuggestion {

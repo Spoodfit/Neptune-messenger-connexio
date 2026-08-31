@@ -1,0 +1,75 @@
+name: Build native release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Plateforme à construire
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connexio-native-release-candidate
+  cancel-in-progress: true
+
+jobs:
+  eas-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
+      EXPO_PUBLIC_MOCK_MODE: "false"
+      EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+      EXPO_PUBLIC_API_BASE_URL: https://api.neptunebusiness.com/api
+      EXPO_PUBLIC_REALTIME_URL: https://api.neptunebusiness.com
+      EXPO_PUBLIC_COWORKING_ENABLED: "true"
+      EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+    steps:
+      - name: Vérifier les accès EAS
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "Secret EXPO_TOKEN manquant"; exit 1; }
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+      - name: Verrouiller la provenance de la release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "release/connexio-rc1"
+          echo "CONNEXIO_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Installer les dépendances verrouillées
+        run: npm ci --no-audit --no-fund
+      - name: Vérifier la release candidate
+        run: npm run verify:rc
+      - name: Certifier le backend Connexio avant de consommer un build EAS
+        run: npm run smoke:production
+      - name: Vérifier la configuration embarquée
+        env:
+          EAS_BUILD_PROFILE: release-candidate
+        run: npx expo config --type public >/dev/null
+      - name: Vérifier le projet Expo cible
+        run: |
+          npx eas-cli@21.7.1 whoami
+          npx eas-cli@21.7.1 project:info --json > eas-project-info.json
+          node -e 'const p=require("./eas-project-info.json"); const id=p.id ?? p.projectId; if(id!==process.env.EXPO_PUBLIC_EAS_PROJECT_ID) throw new Error(`Projet EAS inattendu: ${id}`)'
+      - name: Construire avec EAS
+        run: npx eas-cli@21.7.1 build --profile release-candidate --platform "${{ inputs.platform }}" --non-interactive --wait
+      - name: Résumer la provenance
+        if: always()
+        run: echo "Source release candidate ${CONNEXIO_SOURCE_SHA:-indisponible}"

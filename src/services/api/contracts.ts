@@ -25,6 +25,7 @@ export interface SendMessageInput {
 export interface SessionApi {
   loginWithCredentials(email: string, password: string): Promise<AppUser>;
   getCurrentUser(): Promise<AppUser>;
+  refreshCookieSession(): Promise<AppUser>;
   logoutCookieSession(): Promise<void>;
   exchangeOneTimeCode(code: string, deviceId: string): Promise<SessionPayload>;
   refreshSession(refreshToken: string): Promise<SessionPayload>;

@@ -2,6 +2,8 @@ import {
   normalizeRealtimeEvent,
   type RealtimeEvent
 } from "./realtimeEvents";
+import { buildSocketIoWebSocketUrl } from "../../domain/realtimeTransport";
+import { emitCoworkingInteraction } from "../coworking/coworkingInteractionBus";
 
 export type { RealtimeEvent } from "./realtimeEvents";
 
@@ -14,24 +16,43 @@ interface RealtimeClientOptions {
   connectionTimeoutMs?: number;
 }
 
-function buildSocketIoWebSocketUrl(baseUrl: string, ticket: string): string {
-  const url = new URL(baseUrl);
-  url.protocol = url.protocol === "https:" ? "wss:" : url.protocol === "http:" ? "ws:" : url.protocol;
-  if (!url.pathname.includes("socket.io")) {
-    url.pathname = `${url.pathname.replace(/\/$/, "")}/socket.io/`;
-  }
-  url.searchParams.set("EIO", "4");
-  url.searchParams.set("transport", "websocket");
-  url.searchParams.set("ticket", ticket);
-  return url.toString();
-}
-
 function asSocketEventPayload(eventName: string, payload: unknown): unknown {
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
     const record = payload as Record<string, unknown>;
     return "type" in record ? record : { type: eventName, ...record };
   }
   return { type: eventName, payload };
+}
+
+function broadcastCoworkingInteraction(event: RealtimeEvent): void {
+  if (event.type === "coworking.hello") {
+    emitCoworkingInteraction({
+      type: "hello",
+      fromUserId: event.payload.fromUserId,
+      spaceId: event.payload.spaceId,
+      receivedAt: new Date().toISOString()
+    });
+    return;
+  }
+  if (event.type === "coworking.knock") {
+    emitCoworkingInteraction({
+      type: "knock",
+      requestId: event.payload.requestId,
+      fromUserId: event.payload.fromUserId,
+      spaceId: event.payload.spaceId,
+      receivedAt: new Date().toISOString()
+    });
+    return;
+  }
+  if (event.type === "coworking.knock.resolved") {
+    emitCoworkingInteraction({
+      type: "knock-resolved",
+      requestId: event.payload.requestId,
+      status: event.payload.status,
+      spaceId: event.payload.spaceId,
+      receivedAt: new Date().toISOString()
+    });
+  }
 }
 
 export class RealtimeClient {
@@ -98,7 +119,9 @@ export class RealtimeClient {
 
   private dispatchPayload(payload: unknown): void {
     const normalized = normalizeRealtimeEvent(payload);
-    if (normalized) this.options.onEvent(normalized);
+    if (!normalized) return;
+    broadcastCoworkingInteraction(normalized);
+    this.options.onEvent(normalized);
   }
 
   private handleFrame(socket: WebSocket, rawData: unknown): void {
@@ -153,7 +176,10 @@ export class RealtimeClient {
       const ticket = await this.options.ticketProvider();
       if (this.closedByClient || generation !== this.generation) return;
       this.activeTicket = ticket;
-      const socket = new WebSocket(buildSocketIoWebSocketUrl(this.options.url, ticket));
+      // Le ticket éphémère ne doit jamais apparaître dans l'URL : les reverse
+      // proxies, CDN et outils d'observabilité journalisent fréquemment les
+      // query strings. Il est transmis uniquement dans la trame d'auth Socket.IO.
+      const socket = new WebSocket(buildSocketIoWebSocketUrl(this.options.url));
       this.socket = socket;
       this.connectionTimer = setTimeout(() => {
         if (socket !== this.socket) return;

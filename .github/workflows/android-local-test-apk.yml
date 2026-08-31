@@ -1,0 +1,111 @@
+name: Build quota-free Android test APK
+
+on:
+  push:
+    branches:
+      - release/connexio-rc1
+    paths:
+      - .github/workflows/android-local-test-apk.yml
+      - app/**
+      - src/**
+      - assets/**
+      - app.config.*
+      - app.json
+      - package.json
+      - package-lock.json
+      - tsconfig.json
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPO_OFFLINE: "1"
+  EXPO_PUBLIC_MOCK_MODE: "true"
+  EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+  EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+  EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
+
+concurrency:
+  group: connexio-local-android-test-apk
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: build-standalone-test-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify exact Connexio source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git rev-parse HEAD)"
+          echo "CONNEXIO_SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "Building Connexio source: $SOURCE_SHA"
+          test "$(git branch --show-current)" = "release/connexio-rc1"
+          grep -Fq 'MessagesScreenV22' 'app/(tabs)/messages.tsx'
+          grep -Fq 'HighlightsFeedScreenV24' 'app/(tabs)/highlights.tsx'
+          grep -Fq 'accessibilityLabel="Envoyer le message"' src/screens/ChatConversationScreen.tsx
+          grep -Fq 'call-feedback' app/call/'[id].tsx'
+          npm run verify
+          npm run audit:rc
+          npx expo install --check
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build installable standalone release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Package APK with source metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          mkdir -p artifacts
+          SHORT_SHA="${CONNEXIO_SOURCE_SHA:0:8}"
+          cp "$APK" "artifacts/connexio-${SHORT_SHA}-standalone-test.apk"
+          sha256sum "artifacts/connexio-${SHORT_SHA}-standalone-test.apk" > "artifacts/connexio-${SHORT_SHA}-standalone-test.apk.sha256"
+          cat > artifacts/build-info.txt <<EOF
+          Connexio Android standalone test APK
+          Source SHA: ${CONNEXIO_SOURCE_SHA}
+          Project: @johanzambellis-team/connexio
+          Package: com.neptunebusiness.connexio
+          Built by: GitHub Actions (quota-free local Gradle build)
+          Purpose: internal device validation only; not a Play Store artifact
+          EOF
+          cat artifacts/build-info.txt
+
+      - name: Upload standalone APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: connexio-android-standalone-test-${{ github.sha }}
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 14

@@ -210,6 +210,19 @@ function optionalStringArray(
   return normalized.length ? [...new Set(normalized)] : undefined;
 }
 
+function participantIds(record: Record<string, unknown>): string[] | undefined {
+  const explicit = optionalStringArray(record, 10_000, 256, "memberIds", "member_ids");
+  if (explicit?.length) return explicit;
+  const raw = readUnknown(record, "members", "participants", "participantUsers", "participant_users");
+  if (!Array.isArray(raw)) return undefined;
+  const ids = raw.map((item) => {
+    if (typeof item === "string") return item.trim();
+    if (!isRecord(item)) return "";
+    return optionalBoundedString(item, 256, "id", "user_id", "member_id") ?? "";
+  }).filter(Boolean);
+  return ids.length ? [...new Set(ids)] : undefined;
+}
+
 function initialsFromName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return (
@@ -220,10 +233,45 @@ function initialsFromName(name: string): string {
   );
 }
 
+function normalizedRoleText(value: unknown): string {
+  return typeof value === "string"
+    ? value
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase("fr")
+    : "";
+}
+
 function normalizeRole(value: unknown): UserRole {
-  return typeof value === "string" && USER_ROLES.has(value as UserRole)
-    ? (value as UserRole)
-    : "triton";
+  const role = normalizedRoleText(value);
+  if (role === "legende") return "moussaillon";
+  return USER_ROLES.has(role as UserRole) ? (role as UserRole) : "triton";
+}
+
+function normalizeNeptuneRole(record: Record<string, unknown>): UserRole {
+  if (readUnknown(record, "is_amiral") === true) return "amiral";
+  if (readUnknown(record, "is_ambassadeur") === true) return "capitaine";
+  if (readUnknown(record, "is_allie") === true) return "allie";
+
+  for (const key of [
+    "special_role",
+    "role",
+    "neptune_role",
+    "Role",
+    "plan",
+    "statut"
+  ]) {
+    const value = readUnknown(record, key);
+    const normalized = normalizedRoleText(value);
+    if (!normalized) continue;
+    if (normalized === "ambassadeur") return "capitaine";
+    if (normalized === "legende") return "moussaillon";
+    if (USER_ROLES.has(normalized as UserRole)) {
+      return normalized as UserRole;
+    }
+  }
+  return "triton";
 }
 
 function requireConversationType(value: unknown): ConversationType {
@@ -334,14 +382,23 @@ function normalizeReplyPreview(value: unknown): ReplyPreview | undefined {
 
 export function normalizeAppUser(value: unknown): AppUser {
   if (!isRecord(value)) throw new WireValidationError("Utilisateur invalide.");
-  const name = requireBoundedString(
+  const explicitName = optionalBoundedString(
     value,
-    "Nom utilisateur",
     160,
     "name",
-    "full_name"
+    "full_name",
+    "Name"
   );
-  const role = normalizeRole(readUnknown(value, "role", "neptune_role"));
+  const composedName = [
+    optionalBoundedString(value, 100, "prenom"),
+    optionalBoundedString(value, 100, "nom")
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const name = explicitName ?? composedName;
+  if (!name) throw new WireValidationError("Nom utilisateur manquant ou invalide.");
+  const role = normalizeNeptuneRole(value);
   return {
     id: requireBoundedString(
       value,
@@ -354,13 +411,30 @@ export function normalizeAppUser(value: unknown): AppUser {
     initials:
       optionalBoundedString(value, 8, "initials") ?? initialsFromName(name),
     company:
-      optionalBoundedString(value, 160, "company", "company_name") ?? "",
-    city: optionalBoundedString(value, 160, "city") ?? "",
+      optionalBoundedString(
+        value,
+        200,
+        "company",
+        "company_name",
+        "entreprise"
+      ) ?? "",
+    city: optionalBoundedString(value, 160, "city", "ville") ?? "",
     role,
     roleLabel: ROLE_LABELS[normalizeUserRole(role)],
     online: booleanOrDefault(value, false, "online", "is_online"),
-    avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url"),
-    phone: optionalBoundedString(value, 32, "phone", "phone_number"),
+    avatarUrl: optionalHttpsUrl(
+      value,
+      "avatarUrl",
+      "avatar_url",
+      "photo_profil"
+    ),
+    phone: optionalBoundedString(
+      value,
+      32,
+      "phone",
+      "phone_number",
+      "telephone"
+    ),
     videoCallEnabled: booleanOrDefault(
       value,
       false,
@@ -443,7 +517,8 @@ export function normalizeConversation(value: unknown): Conversation {
     canManage: booleanOrDefault(value, false, "canManage", "can_manage"),
     avatarUrl: optionalHttpsUrl(value, "avatarUrl", "avatar_url"),
     iconName: optionalBoundedString(value, 80, "iconName", "icon_name"),
-    memberIds: optionalStringArray(value, 10_000, 256, "memberIds", "member_ids"),
+    memberIds: participantIds(value),
+    activeMemberIds: optionalStringArray(value, 500, 256, "activeMemberIds", "active_member_ids"),
     ownerId: optionalBoundedString(value, 256, "ownerId", "owner_id"),
     adminIds: optionalStringArray(value, 500, 256, "adminIds", "admin_ids"),
     muted: booleanOrDefault(value, false, "muted", "is_muted"),

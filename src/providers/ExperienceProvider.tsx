@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { env } from "../config/env";
+import { capabilitiesForBackendContract } from "../config/backendCapabilities";
 import { members as initialMembers } from "../data/mockData";
 import {
   callHistory as initialCallHistory,
@@ -69,6 +70,7 @@ interface ExperienceContextValue {
   ) => Promise<boolean>;
   toggleConversationMuted: (conversationId: string) => void;
   leaveConversation: (conversationId: string) => void;
+  joinConversation: (conversationId: string) => Promise<void>;
   updateGroup: (conversationId: string, draft: GroupDraft) => void;
   getMessageReactions: (message: ChatMessage) => MessageReactionSummary[];
   toggleMessageReaction: (message: ChatMessage, emoji: string) => void;
@@ -90,6 +92,7 @@ interface ExperienceContextValue {
 }
 
 const ExperienceContext = createContext<ExperienceContextValue | null>(null);
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
 
 function toggleReaction(
   reactions: readonly MessageReactionSummary[],
@@ -182,7 +185,9 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
     const [memberResult, highlightResult, mapResult] = await Promise.allSettled([
       api.listMembers(),
       api.listHighlights(),
-      api.listMapMoments()
+      BACKEND_CAPABILITIES.highlightsCommunity
+        ? api.listMapMoments()
+        : Promise.resolve([])
     ]);
     if (memberResult.status === "fulfilled") {
       setMembers(memberResult.value);
@@ -210,7 +215,10 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
   );
 
   const isConversationVisible = useCallback(
-    (conversation: Conversation) => !leftConversationIds.has(conversation.id),
+    (conversation: Conversation) => {
+      if (!leftConversationIds.has(conversation.id)) return true;
+      return conversation.type !== "direct" && conversation.type !== "small_group";
+    },
     [leftConversationIds]
   );
 
@@ -386,6 +394,26 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       }
     },
     [api]
+  );
+
+  const joinConversation = useCallback(
+    async (conversationId: string) => {
+      const wasLeft = leftConversationIds.has(conversationId);
+      setLeftConversationIds((previous) => {
+        const next = new Set(previous);
+        next.delete(conversationId);
+        return next;
+      });
+      if (api && !isLocalId(conversationId)) {
+        try {
+          await api.joinGroup(conversationId);
+        } catch (error) {
+          if (wasLeft) setLeftConversationIds((previous) => new Set(previous).add(conversationId));
+          throw error;
+        }
+      }
+    },
+    [api, leftConversationIds]
   );
 
   const updateGroup = useCallback(
@@ -619,6 +647,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       sendLocalMessage,
       toggleConversationMuted,
       leaveConversation,
+      joinConversation,
       updateGroup,
       getMessageReactions,
       toggleMessageReaction,
@@ -639,6 +668,7 @@ export function ExperienceProvider({ children }: PropsWithChildren) {
       getConversationMessages,
       getMessageReactions,
       isConversationVisible,
+      joinConversation,
       localConversations,
       localMessagesByConversation,
       mapMoments,

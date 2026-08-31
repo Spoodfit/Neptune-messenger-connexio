@@ -1,20 +1,26 @@
-const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
-  hour: "2-digit",
-  minute: "2-digit"
-});
-
-const dayFormatter = new Intl.DateTimeFormat("fr-FR", {
-  weekday: "short"
-});
+import { getCurrentUiLocaleTag } from "../i18n/uiLocale";
 
 function parseDate(value: string): Date | null {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date : null;
 }
 
+function timeFormatter() {
+  return new Intl.DateTimeFormat(getCurrentUiLocaleTag(), {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function dayFormatter() {
+  return new Intl.DateTimeFormat(getCurrentUiLocaleTag(), {
+    weekday: "short"
+  });
+}
+
 export function formatMessageTime(value: string): string {
   const date = parseDate(value);
-  return date ? timeFormatter.format(date) : "Heure inconnue";
+  return date ? timeFormatter().format(date) : "Heure inconnue";
 }
 
 export function formatConversationTime(value?: string): string {
@@ -28,9 +34,6 @@ export function formatConversationTime(value?: string): string {
     date.getMonth() === now.getMonth() &&
     date.getDate() === now.getDate();
 
-  if (sameDay) {
-    return timeFormatter.format(date);
-  }
-
-  return dayFormatter.format(date).replace(".", "");
+  if (sameDay) return timeFormatter().format(date);
+  return dayFormatter().format(date).replace(".", "");
 }

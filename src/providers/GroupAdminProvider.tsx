@@ -8,13 +8,14 @@ import {
   useState
 } from "react";
 
-import { useSession } from "./SessionProvider";
+import { canPublishInConversation } from "../domain/accessPolicy";
 import type { GroupDraft } from "../types/experience";
 import type {
   ChatMessage,
   Conversation,
   MessageAttachment
 } from "../types/messaging";
+import { useSession } from "./SessionProvider";
 
 interface GroupAdminContextValue {
   createdGroups: Conversation[];
@@ -49,7 +50,7 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
         name: draft.name.trim(),
         description: draft.description.trim(),
         categoryLabel: "Groupe administré",
-        type: "topic",
+        type: draft.iconName === "megaphone" ? "announcement" : "topic",
         memberCount: 1,
         unreadCount: 0,
         restricted: true,
@@ -59,7 +60,9 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
         avatarUrl: draft.avatarUrl,
         iconName: draft.iconName,
         ownerId: currentUser.id,
-        adminIds: [currentUser.id],
+        adminIds: draft.adminIds ?? [],
+        announcementPublisherIds: draft.announcementPublisherIds ?? [],
+        allowFreeDiscovery: draft.allowFreeDiscovery ?? false,
         memberIds: [currentUser.id],
         lastMessage: "Groupe créé.",
         lastMessageAt: new Date().toISOString()
@@ -86,7 +89,12 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
                 avatarUrl: draft.avatarUrl,
                 iconName: draft.iconName,
                 allowedRoles: draft.allowedRoles,
-                canPost: draft.canMembersPost
+                canPost: draft.canMembersPost,
+                adminIds: draft.adminIds ?? group.adminIds,
+                announcementPublisherIds:
+                  draft.announcementPublisherIds ?? group.announcementPublisherIds,
+                allowFreeDiscovery:
+                  draft.allowFreeDiscovery ?? group.allowFreeDiscovery
               }
             : group
         )
@@ -117,7 +125,8 @@ export function GroupAdminProvider({ children }: PropsWithChildren) {
       const cleanBody = body.trim();
       const group = createdGroups.find((item) => item.id === conversationId);
       if (
-        !group?.canPost ||
+        !group ||
+        !canPublishInConversation(currentUser, group) ||
         (!cleanBody && attachments.length === 0) ||
         cleanBody.length > 4_000
       ) {

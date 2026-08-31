@@ -1,5 +1,8 @@
 import { Asset } from "expo-asset";
 
+import { normalizeLanguageCode } from "../../i18n/languages";
+import { browserOriginForTransport } from "../../domain/webViewSecurity";
+
 export type CallMode = "audio" | "video";
 
 const CONNEXIO_RINGTONE_URI = Asset.fromModule(
@@ -34,16 +37,21 @@ function escapeJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
+function escapeAttribute(value: string): string {
+  return value.replace(/[&<>\"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" })[character] ?? character);
+}
+
 function socketClientScriptUrl(session: IntegratedCallSession): string {
   if (session.clientScriptUrl) return session.clientScriptUrl;
-  const origin = new URL(session.socketUrl).origin;
+  const origin = browserOriginForTransport(session.socketUrl);
   const path = session.socketPath.replace(/\/$/, "");
   return `${origin}${path}/socket.io.js`;
 }
 
 export function buildIntegratedCallHtml(
   session: IntegratedCallSession,
-  displayName: string
+  displayName: string,
+  language = "fr"
 ): string {
   const config = {
     callId: session.id,
@@ -61,13 +69,21 @@ export function buildIntegratedCallHtml(
     ringtoneUrl: CONNEXIO_RINGTONE_URI
   };
   const scriptUrl = socketClientScriptUrl(session);
+  const scriptOrigin = new URL(scriptUrl).origin;
+  const signalingUrl = new URL(session.socketUrl);
+  const signalingAuthority = `${signalingUrl.hostname}${signalingUrl.port ? `:${signalingUrl.port}` : ""}`;
+  const signalingOrigins = `https://${signalingAuthority} wss://${signalingAuthority}`;
+  const documentLanguage = normalizeLanguageCode(language, "fr");
+  const contentSecurityPolicy = `default-src 'none'; script-src 'unsafe-inline' ${scriptOrigin}; style-src 'unsafe-inline'; connect-src ${signalingOrigins} ${scriptOrigin}; media-src 'self' blob: data: https:; img-src data: blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none';`;
 
   return `<!doctype html>
-<html lang="fr">
+<html lang="${documentLanguage}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
   <meta name="color-scheme" content="dark" />
+  <meta http-equiv="Content-Security-Policy" content="${escapeAttribute(contentSecurityPolicy)}" />
+  <meta name="referrer" content="no-referrer" />
   <title>Appel Connexio</title>
   <style>
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#020713;color:#f4f7ff;font-family:Inter,system-ui,-apple-system,sans-serif}
@@ -104,7 +120,7 @@ export function buildIntegratedCallHtml(
       <button id="end" class="end" aria-label="Raccrocher"></button>
     </div>
   </div>
-  ${session.mock ? "" : `<script src="${scriptUrl}"></script>`}
+  ${session.mock ? "" : `<script src="${escapeAttribute(scriptUrl)}" crossorigin="anonymous"></script>`}
   <script>
   (() => {
     const cfg = ${escapeJson(config)};
@@ -146,7 +162,12 @@ export function buildIntegratedCallHtml(
     const post = (type, payload = {}) => {
       const message = JSON.stringify({ type, ...payload });
       if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(message);
-      if (window.parent && window.parent !== window) window.parent.postMessage(message, '*');
+      if (window.parent && window.parent !== window) {
+        try {
+          const parentOrigin = window.parent.location.origin;
+          if (parentOrigin && parentOrigin !== 'null') window.parent.postMessage(message, parentOrigin);
+        } catch {}
+      }
     };
     const setNetwork = (label, state = '') => {
       network.className = state;

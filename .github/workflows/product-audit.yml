@@ -3,7 +3,8 @@ name: Product Audit
 on:
   push:
     branches:
-      - feat/production-hardening
+      - main
+      - release/connexio-rc1
   pull_request:
   workflow_dispatch:
 
@@ -13,6 +14,7 @@ permissions:
 jobs:
   product-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +26,7 @@ jobs:
           node-version: 22.13.1
           cache: npm
       - name: Install locked dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
       - name: Install audit browser
         run: |
           npm install --no-save --package-lock=false playwright-core@1.58.2
@@ -38,22 +40,33 @@ jobs:
           EXPO_PUBLIC_EAS_PROJECT_ID: ""
           EXPO_PUBLIC_GITHUB_PAGES: "false"
         run: npx expo export --platform web --output-dir web-product-audit-dist
-      - name: Run product audit
-        run: node scripts/product-audit.cjs
+      - name: Run dedicated Map product audit
+        run: node scripts/product-audit-v25.cjs
+      - name: Run full multilingual audit
+        run: node scripts/i18n-product-audit.cjs
+      - name: Capture dedicated Map render review
+        run: node scripts/v25-render-capture.cjs
+      - name: Upload V26 render review
+        uses: actions/upload-artifact@v4
+        with:
+          name: connexio-v26-render-review
+          path: v26-render-review
+          if-no-files-found: error
+          retention-days: 14
       - name: Package downloadable web preview
         run: |
           cp TESTER_CONNEXIO.bat web-product-audit-dist/TESTER_CONNEXIO.bat
           cat > web-product-audit-dist/README_TEST.txt <<'EOF'
-          CONNEXIO V13 — VERSION WEB DE DEMONSTRATION
+          CONNEXIO V26 — VERSION WEB DE DEMONSTRATION
 
-          Cette archive contient le build web validé par Product Audit.
+          Cette archive contient le build web validé par Product Audit, y compris les évènements ancrés, la disponibilité personnelle et la grille visio Coworking unique.
           Pour un test immédiat sans backend, utilisez de préférence l'adresse GitHub Pages indiquée dans TESTER_EN_UN_CLIC.md.
           Pour lancer le projet complet depuis le dépôt sous Windows, utilisez TESTER_CONNEXIO.bat à la racine du dépôt.
           EOF
       - name: Upload downloadable web preview
         uses: actions/upload-artifact@v4
         with:
-          name: connexio-v13-web-preview
+          name: connexio-v26-web-preview
           path: web-product-audit-dist
           if-no-files-found: error
           retention-days: 14
