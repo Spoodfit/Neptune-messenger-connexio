@@ -1,0 +1,65 @@
+name: Audit status avatars and action sounds
+
+on:
+  push:
+    branches:
+      - release/connexio-rc1
+    paths:
+      - .github/workflows/rc1-avatar-sound-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/connexio-rc1
+      - name: Inventory member visuals and sound hooks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          roots = [Path('app'), Path('src')]
+          print('=== AVATAR AND MEMBER VISUAL OCCURRENCES ===')
+          for root in roots:
+              for path in sorted(root.rglob('*.tsx')):
+                  text = path.read_text(encoding='utf-8')
+                  lines = text.splitlines()
+                  hits = []
+                  for i, line in enumerate(lines, 1):
+                      if re.search(r'avatar|initials|profileImage|memberImage|authorImage|senderAvatar|<Image', line, re.I):
+                          hits.append(i)
+                  if not hits:
+                      continue
+                  print(f'\n--- {path} ---')
+                  shown = set()
+                  for hit in hits:
+                      for n in range(max(1, hit-3), min(len(lines), hit+4)+1):
+                          if n not in shown:
+                              print(f'{n:04d}: {lines[n-1]}')
+                              shown.add(n)
+          print('\n=== STATUS AVATAR ADOPTION ===')
+          for root in roots:
+              for path in sorted(root.rglob('*.tsx')):
+                  text = path.read_text(encoding='utf-8')
+                  if 'StatusAvatar' in text or 'MemberAvatarStack' in text or 'MemberStatusBadge' in text:
+                      print(path, 'StatusAvatar=', text.count('StatusAvatar'), 'Stack=', text.count('MemberAvatarStack'), 'Badge=', text.count('MemberStatusBadge'))
+          print('\n=== AUDIO / CALL / SEND / MENTION OCCURRENCES ===')
+          for root in roots:
+              for path in sorted(root.rglob('*')):
+                  if path.suffix not in {'.ts', '.tsx'}:
+                      continue
+                  text = path.read_text(encoding='utf-8')
+                  if re.search(r'useAudioPlayer|Audio\(|sound|ringtone|mention|sendMessage|endCall|hangup|terminate|leaveRoom', text, re.I):
+                      lines = text.splitlines()
+                      print(f'\n--- {path} ---')
+                      for i, line in enumerate(lines, 1):
+                          if re.search(r'useAudioPlayer|Audio\(|sound|ringtone|mention|sendMessage|endCall|hangup|terminate|leaveRoom', line, re.I):
+                              print(f'{i:04d}: {line}')
+          PY

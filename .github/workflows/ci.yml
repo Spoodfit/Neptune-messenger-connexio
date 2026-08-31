@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - release/connexio-rc1
+
+permissions:
+  contents: read
+
+env:
+  EXPO_OFFLINE: "1"
+
+concurrency:
+  group: connexio-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Production dependency vulnerability audit
+        run: npm run audit:dependencies --silent
+      - name: TypeScript and domain tests
+        run: npm run verify --silent
+      - name: Store release policy audit
+        run: npm run audit:rc --silent
+      - name: Production profile audit
+        run: npm run audit:production --silent
+      - name: Expo dependency compatibility
+        run: npx expo install --check
+      - name: Expo public configuration audit
+        run: npx expo config --type public >/dev/null
+      - name: Generate Android project from the managed configuration
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 1e85dc3a-4114-4387-8e15-2463a82e68fd
+        run: |
+          npx expo prebuild --platform android --clean --no-install
+          test -x android/gradlew
+          test -f android/app/build.gradle
+      - name: Production configuration gate
+        env:
+          EAS_BUILD_PROFILE: production
+          EXPO_PUBLIC_BACKEND_CONTRACT: connexio-v1
+          EXPO_PUBLIC_API_BASE_URL: https://api.example.invalid
+          EXPO_PUBLIC_REALTIME_URL: wss://api.example.invalid/v1/realtime
+          EXPO_PUBLIC_MEDIA_CLIENT_ORIGINS: https://media.example.invalid
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_PRIVACY_POLICY_URL: https://spoodfit.github.io/Neptune-messenger-connexio/privacy-policy.html
+          EXPO_PUBLIC_TERMS_URL: https://spoodfit.github.io/Neptune-messenger-connexio/connexio-terms.html
+          EXPO_PUBLIC_ACCOUNT_DELETION_URL: https://spoodfit.github.io/Neptune-messenger-connexio/account-deletion.html
+          EXPO_PUBLIC_SUPPORT_URL: mailto:contact@neptunebusiness.com
+          EXPO_PUBLIC_MOCK_MODE: "false"
+        run: npx expo config --type public >/dev/null
+      - name: Current Neptune backend must stay blocked from Store builds
+        env:
+          EAS_BUILD_PROFILE: production
+          EXPO_PUBLIC_BACKEND_CONTRACT: neptune-web-v1
+          EXPO_PUBLIC_API_BASE_URL: https://api.neptunebusiness.com/api
+          EXPO_PUBLIC_BUSINESS_WEB_BASE_URL: https://neptunebusiness.com
+          EXPO_PUBLIC_EAS_PROJECT_ID: 00000000-0000-0000-0000-000000000000
+          EXPO_PUBLIC_MOCK_MODE: "false"
+        run: |
+          if npx expo config --type public >/tmp/connexio-production-gate.log 2>&1; then
+            echo "Le backend Neptune actuel ne doit pas produire une build Store."
+            exit 1
+          fi
+          grep -q "backend ne déclare pas encore le contrat sécurisé connexio-v1" /tmp/connexio-production-gate.log
+
+  responsive-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install pinned browser audit tools
+        run: |
+          npm install --no-save --no-package-lock playwright@1.55.0 serve@14.2.4
+          npx playwright install --with-deps chromium
+      - name: Build mock web application
+        env:
+          EXPO_PUBLIC_MOCK_MODE: "true"
+          EXPO_PUBLIC_GITHUB_PAGES: "false"
+        run: npm run web:build
+      - name: Audit responsive layout and interactions
+        run: |
+          npx serve -s dist -l 4173 > /tmp/connexio-serve.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          node scripts/visual-audit-fr.cjs
+          node scripts/interaction-audit.cjs

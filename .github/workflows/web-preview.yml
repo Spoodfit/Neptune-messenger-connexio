@@ -1,0 +1,90 @@
+name: Web Preview
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - release/connexio-rc1
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: connexio-web-preview-${{ github.event_name == 'pull_request' && github.ref || 'public' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          show-progress: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify source before publication
+        run: npm run verify --silent
+
+      - name: Build web preview
+        env:
+          EXPO_PUBLIC_GITHUB_PAGES: "true"
+          EXPO_PUBLIC_MOCK_MODE: "true"
+        run: npm run web:build
+
+      - name: Verify public policy documents
+        run: |
+          test -f dist/privacy-policy.html
+          test -f dist/connexio-terms.html
+          test -f dist/account-deletion.html
+
+      - name: Upload GitHub Pages artifact
+        if: (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    if: (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy immutable Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Verify public preview
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            code=$(curl --location --silent --output /tmp/connexio-page --write-out "%{http_code}" "$PAGE_URL" || true)
+            if [ "$code" = "200" ] && grep -Eqi "connexio|expo" /tmp/connexio-page; then
+              echo "Preview available: $PAGE_URL"
+              exit 0
+            fi
+            echo "Attempt $attempt/30: HTTP $code"
+            sleep 5
+          done
+          echo "GitHub Pages did not become available in time."
+          exit 1

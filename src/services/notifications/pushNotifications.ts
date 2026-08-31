@@ -1,0 +1,183 @@
+import Constants from "expo-constants";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+
+import { env } from "../../config/env";
+import type { PushTokenRegistration } from "../../types/messaging";
+import {
+  buildNotificationCopy,
+  type NotificationEvent,
+  type NotificationChannelId
+} from "./notificationCatalog";
+
+const REGISTERED_PUSH_TOKEN_KEY = "connexio.push.registered-token";
+const NOTIFICATION_SOUND = "connexio_notification.mp3";
+const MENTION_SOUND = "connexio_mention.mp3";
+
+function getProjectId(): string | undefined {
+  return env.easProjectId || Constants.easConfig?.projectId || undefined;
+}
+
+function createRegistration(token: string): PushTokenRegistration {
+  return {
+    token,
+    provider: "expo",
+    platform: Platform.OS === "ios" ? "ios" : "android",
+    appVersion: Constants.expoConfig?.version ?? "0.0.0",
+    deviceName: Device.deviceName ?? undefined
+  };
+}
+
+export function configureNotificationPresentation(): void {
+  if (Platform.OS === "web") return;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true
+    })
+  });
+}
+
+export async function rememberRegisteredPushToken(token: string): Promise<void> {
+  if (Platform.OS === "web") return;
+  await SecureStore.setItemAsync(REGISTERED_PUSH_TOKEN_KEY, token, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY
+  });
+}
+
+export async function getRegisteredPushToken(): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+  return SecureStore.getItemAsync(REGISTERED_PUSH_TOKEN_KEY);
+}
+
+export async function forgetRegisteredPushToken(): Promise<void> {
+  if (Platform.OS === "web") return;
+  await SecureStore.deleteItemAsync(REGISTERED_PUSH_TOKEN_KEY);
+}
+
+export async function unregisterDeviceFromPushNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
+  try {
+    await Notifications.unregisterForNotificationsAsync();
+  } finally {
+    await forgetRegisteredPushToken();
+  }
+}
+
+async function ensureAndroidChannels(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  const channels: Array<{
+    id: NotificationChannelId;
+    name: string;
+    description: string;
+    importance: Notifications.AndroidImportance;
+    vibrationPattern: number[];
+    sound: string;
+  }> = [
+    { id: "messages", name: "Messages", description: "Messages privés et de groupe", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180], sound: NOTIFICATION_SOUND },
+    { id: "mentions", name: "Mentions", description: "Mentions qui demandent votre attention", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 180], sound: MENTION_SOUND },
+    { id: "replies", name: "Réponses", description: "Réponses directes à vos messages", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 100, 160], sound: NOTIFICATION_SOUND },
+    { id: "calls", name: "Appels et rappels", description: "Appels entrants, appels manqués et rappels", importance: Notifications.AndroidImportance.MAX, vibrationPattern: [0, 240, 90, 240], sound: NOTIFICATION_SOUND },
+    { id: "groups", name: "Groupes et annonces", description: "Invitations, annonces, sondages et automatisations", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180], sound: NOTIFICATION_SOUND },
+    { id: "events", name: "Évènements", description: "Votes, rappels et modifications d’évènements", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 180, 120, 180], sound: NOTIFICATION_SOUND },
+    { id: "community", name: "Communauté", description: "Réactions, commentaires et Temps forts", importance: Notifications.AndroidImportance.DEFAULT, vibrationPattern: [0, 140], sound: NOTIFICATION_SOUND },
+    { id: "account", name: "Compte et sécurité", description: "Sécurité du compte et informations importantes", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 220, 100, 220], sound: NOTIFICATION_SOUND }
+  ];
+
+  await Promise.all(
+    channels.map((channel) =>
+      Notifications.setNotificationChannelAsync(channel.id, {
+        name: channel.name,
+        description: channel.description,
+        importance: channel.importance,
+        vibrationPattern: channel.vibrationPattern,
+        sound: channel.sound,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE
+      })
+    )
+  );
+}
+
+export function buildRemotePushPayload(event: NotificationEvent) {
+  const copy = buildNotificationCopy(event);
+  return {
+    title: copy.title,
+    body: copy.body,
+    sound: event.type === "mention" ? MENTION_SOUND : NOTIFICATION_SOUND,
+    channelId: copy.channelId,
+    data: copy.data
+  };
+}
+
+export async function scheduleCallBackReminder(
+  conversationId: string,
+  callerName: string,
+  delaySeconds = 10 * 60
+): Promise<boolean> {
+  if (Platform.OS === "web") return false;
+  const current = await Notifications.getPermissionsAsync();
+  const status =
+    current.status === "granted"
+      ? current.status
+      : (await Notifications.requestPermissionsAsync()).status;
+  if (status !== "granted") return false;
+
+  await ensureAndroidChannels();
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      ...buildRemotePushPayload({
+        type: "call_back_reminder",
+        actorName: callerName,
+        conversationId
+      }),
+      data: {
+        type: "call_back_reminder",
+        conversationId
+      }
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.round(delaySeconds)),
+      repeats: false,
+      channelId: Platform.OS === "android" ? "calls" : undefined
+    }
+  });
+  return true;
+}
+
+export async function registrationFromDevicePushToken(
+  devicePushToken: Notifications.DevicePushToken
+): Promise<PushTokenRegistration | null> {
+  if (Platform.OS === "web" || !Device.isDevice) return null;
+  const projectId = getProjectId();
+  if (!projectId) return null;
+  const expoToken = await Notifications.getExpoPushTokenAsync({
+    projectId,
+    devicePushToken
+  });
+  return createRegistration(expoToken.data);
+}
+
+export async function registerForPushNotifications(): Promise<PushTokenRegistration | null> {
+  if (Platform.OS === "web" || !Device.isDevice) return null;
+
+  await ensureAndroidChannels();
+
+  const existing = await Notifications.getPermissionsAsync();
+  let status = existing.status;
+  if (status !== "granted") {
+    status = (await Notifications.requestPermissionsAsync()).status;
+  }
+  if (status !== "granted") return null;
+
+  const projectId = getProjectId();
+  if (!projectId) return null;
+
+  const token = await Notifications.getExpoPushTokenAsync({ projectId });
+  return createRegistration(token.data);
+}

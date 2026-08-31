@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "rootDir": ".",
+    "outDir": ".test-dist",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [
+    "src/domain/**/*.ts",
+    "src/i18n/languages.ts",
+    "src/i18n/translationLocale.ts",
+    "src/services/auth/**/*.ts",
+    "src/services/api/contracts.ts",
+    "src/services/api/realtimeTicketWire.ts",
+    "src/services/api/wire.ts",
+    "src/services/api/neptuneWebFeed.ts",
+    "src/config/backendCapabilities.ts",
+    "src/services/realtime/realtimeEvents.ts",
+    "src/services/calls/liveCaptions.ts",
+    "src/services/coworking/geographicMapHtml.ts",
+    "src/services/coworking/coworkingMedia.ts",
+    "src/storage/outboxStore.memory.ts",
+    "src/storage/outboxStore.types.ts",
+    "src/theme/**/*.ts",
+    "src/types/messaging.ts",
+    "src/utils/date.ts",
+    "src/utils/redact.ts",
+    "tests/**/*.ts"
+  ]
+}
