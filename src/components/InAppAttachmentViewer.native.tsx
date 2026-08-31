@@ -1,0 +1,155 @@
+import { Text } from "@/components/LocalizedText";
+import {
+  useMemo } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
+
+import { colors, spacing, typography } from "../theme";
+import {
+  allowsAttachmentNavigation,
+  attachmentWebViewPolicy
+} from "../domain/webViewSecurity";
+import type { InAppAttachmentViewerProps } from "./InAppAttachmentViewer.types";
+import { HighlightMediaView } from "./HighlightMediaView";
+
+import { useAppTheme } from "@/providers/ThemeProvider";
+export default function InAppAttachmentViewer({
+  attachment,
+  visible,
+  onClose
+}: InAppAttachmentViewerProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
+  const uri = attachment.downloadUrl ?? attachment.uri ?? "";
+  const webViewPolicy = useMemo(() => attachmentWebViewPolicy(uri), [uri]);
+  const isImage = attachment.kind === "photo";
+  const isVideo = attachment.kind === "video";
+
+  return (
+    <Modal
+      animationType="slide"
+      presentationStyle="fullScreen"
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.screen}>
+        <View
+          style={[
+            styles.header,
+            {
+              paddingTop: Math.max(insets.top, spacing.sm),
+              paddingLeft: spacing.sm + insets.left,
+              paddingRight: spacing.sm + insets.right
+            }
+          ]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Fermer l’aperçu"
+            onPress={onClose}
+            style={styles.closeButton}
+          >
+            <Ionicons name="close" size={25} color={theme.pageText} />
+          </Pressable>
+          <View style={styles.headerText}>
+            <Text numberOfLines={1} style={styles.title}>
+              {attachment.name}
+            </Text>
+            <Text numberOfLines={1} style={styles.subtitle}>
+              Aperçu sécurisé dans Connexio
+            </Text>
+          </View>
+          <View style={styles.closeButton} />
+        </View>
+
+        <View
+          style={[
+            styles.content,
+            {
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+              paddingBottom: insets.bottom
+            }
+          ]}
+        >
+          {!uri || !webViewPolicy ? (
+            <Text style={styles.empty}>Ce fichier n’est plus accessible.</Text>
+          ) : isImage ? (
+            <Image source={{ uri }} resizeMode="contain" style={styles.image} />
+          ) : isVideo ? (
+            <View style={styles.videoWrap}>
+              <HighlightMediaView
+                media={{
+                  id: attachment.id,
+                  kind: "video",
+                  uri,
+                  name: attachment.name,
+                  mimeType: attachment.mimeType,
+                  sizeBytes: attachment.sizeBytes,
+                  durationSeconds: attachment.durationSeconds,
+                  width: attachment.width,
+                  height: attachment.height,
+                  status: attachment.status,
+                  uploadProgress: attachment.uploadProgress
+                }}
+              />
+            </View>
+          ) : (
+            <WebView
+              source={{ uri }}
+              originWhitelist={webViewPolicy.originWhitelist}
+              javaScriptEnabled={false}
+              domStorageEnabled={false}
+              cacheEnabled={false}
+              incognito
+              allowFileAccess={webViewPolicy.allowFileAccess}
+              allowFileAccessFromFileURLs={false}
+              allowUniversalAccessFromFileURLs={false}
+              allowingReadAccessToURL={webViewPolicy.allowFileAccess ? uri : undefined}
+              sharedCookiesEnabled={false}
+              thirdPartyCookiesEnabled={false}
+              javaScriptCanOpenWindowsAutomatically={false}
+              setSupportMultipleWindows={false}
+              mixedContentMode="never"
+              onShouldStartLoadWithRequest={(request) =>
+                allowsAttachmentNavigation(uri, request.url)
+              }
+              style={styles.webView}
+              startInLoadingState
+            />
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: theme.pageBackground },
+  header: {
+    minHeight: 68,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.borderSoft,
+    backgroundColor: theme.border,
+    flexDirection: "row",
+    alignItems: "center"
+  },
+  closeButton: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  headerText: { flex: 1, minWidth: 0, alignItems: "center" },
+  title: { ...typography.heading3, color: theme.pageText, maxWidth: "100%" },
+  subtitle: { ...typography.caption, color: theme.pageTextMuted, marginTop: 2 },
+  content: { flex: 1, minHeight: 0 },
+  image: { width: "100%", height: "100%" },
+  videoWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
+  webView: { flex: 1, backgroundColor: colors.white },
+  empty: { ...typography.body, color: theme.pageTextMuted, textAlign: "center", marginTop: spacing.xl }
+});

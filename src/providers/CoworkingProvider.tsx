@@ -1,0 +1,391 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren
+} from "react";
+
+import { capabilitiesForBackendContract } from "../config/backendCapabilities";
+import { env } from "../config/env";
+import { coworkingPresentCount, removeCoworkingParticipant, spaceForUser } from "../domain/coworking";
+import { useExperience } from "./ExperienceProvider";
+import { useSession } from "./SessionProvider";
+import { NeptuneCoworkingApi } from "../services/api/coworkingApi";
+import type {
+  CoworkingMediaSession,
+  CoworkingParticipantPresence,
+  CoworkingPresenceMode,
+  CoworkingSnapshot,
+  CoworkingSpace,
+  CreateCoworkingSpaceInput
+} from "../types/coworking";
+
+const BACKEND_CAPABILITIES = capabilitiesForBackendContract(env.backendContract);
+const COWORKING_AVAILABLE =
+  env.mockMode ||
+  (env.coworkingEnabled && BACKEND_CAPABILITIES.calls && BACKEND_CAPABILITIES.realtime);
+
+interface CoworkingContextValue {
+  serviceAvailable: boolean;
+  snapshot: CoworkingSnapshot;
+  activeCount: number;
+  currentSpace?: CoworkingSpace;
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  joinSpace: (spaceId: string) => Promise<CoworkingMediaSession | undefined>;
+  leaveCurrentSpace: () => Promise<void>;
+  updatePresence: (mode: CoworkingPresenceMode, statusText?: string) => Promise<void>;
+  createSpace: (input: CreateCoworkingSpaceInput) => Promise<{ spaceId: string; media?: CoworkingMediaSession }>;
+  mediaForSpace: (spaceId: string) => CoworkingMediaSession | undefined;
+  mediaStateForSpace: (spaceId: string) => { cameraOn: boolean; microphoneOn: boolean } | undefined;
+  updateMediaState: (spaceId: string, patch: Partial<{ cameraOn: boolean; microphoneOn: boolean }>) => void;
+}
+
+const EMPTY_SNAPSHOT: CoworkingSnapshot = {
+  hub: {
+    id: "hub",
+    name: "Hub Neptune",
+    kind: "hub",
+    access: "open",
+    participantIds: [],
+    mediaEnabled: true
+  },
+  spaces: [],
+  participants: [],
+  updatedAt: new Date(0).toISOString()
+};
+
+function removeUserFromSpaces(snapshot: CoworkingSnapshot, userId: string): CoworkingSnapshot {
+  return {
+    ...snapshot,
+    hub: { ...snapshot.hub, participantIds: snapshot.hub.participantIds.filter((id) => id !== userId) },
+    spaces: snapshot.spaces.map((space) => removeCoworkingParticipant(space, userId))
+  };
+}
+
+function ensurePresence(
+  participants: CoworkingParticipantPresence[],
+  userId: string,
+  patch: Partial<CoworkingParticipantPresence> = {}
+): CoworkingParticipantPresence[] {
+  const existing = participants.find((participant) => participant.userId === userId);
+  const next: CoworkingParticipantPresence = {
+    userId,
+    mode: patch.mode ?? existing?.mode ?? "available",
+    statusText: patch.statusText ?? existing?.statusText,
+    cameraOn: patch.cameraOn ?? existing?.cameraOn ?? true,
+    microphoneOn: patch.microphoneOn ?? existing?.microphoneOn ?? false,
+    speaking: patch.speaking ?? false,
+    joinedAt: existing?.joinedAt ?? new Date().toISOString()
+  };
+  return [...participants.filter((participant) => participant.userId !== userId), next];
+}
+
+function mockMediaSession(spaceId: string, userId: string): CoworkingMediaSession {
+  return {
+    spaceId,
+    socketUrl: "https://mock.connexio.local",
+    socketPath: "/socket.io",
+    token: `mock-${spaceId}-${userId}`,
+    participantId: userId,
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    mock: true
+  };
+}
+
+function buildMockSnapshot(memberIds: string[]): CoworkingSnapshot {
+  const ids = memberIds.slice(0, 9);
+  const hubParticipantIds = ids.slice(2, 3);
+  const now = new Date();
+  const joinedAt = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
+  const participants = ids.map<CoworkingParticipantPresence>((userId, index) => ({
+    userId,
+    mode: "available",
+    statusText: index < 2 ? "En visio" : "Disponible",
+    cameraOn: index < 2 || index === 3,
+    microphoneOn: index === 0,
+    speaking: index === 0,
+    joinedAt: joinedAt(8 + index * 7)
+  }));
+
+  return {
+    hub: {
+      id: "hub",
+      name: "Salle générale",
+      kind: "hub",
+      access: "open",
+      participantIds: [],
+      activity: "Rencontres spontanées",
+      mediaEnabled: true
+    },
+    spaces: ids.length >= 2
+      ? [
+          {
+            id: "visio-business",
+            name: "Échange en cours",
+            kind: "open",
+            access: "open",
+            ownerId: ids[0],
+            participantIds: ids.slice(0, 2),
+            maxParticipants: 6,
+            activity: "Visio en cours",
+            mediaEnabled: true
+          }
+        ]
+      : [],
+    participants,
+    updatedAt: now.toISOString()
+  };
+}
+
+const CoworkingContext = createContext<CoworkingContextValue | null>(null);
+
+export function CoworkingProvider({ children }: PropsWithChildren) {
+  const { accessToken, currentUser } = useSession();
+  const { members } = useExperience();
+  const api = useMemo(() => env.mockMode ? null : new NeptuneCoworkingApi(accessToken), [accessToken]);
+  const mockInitializedRef = useRef(false);
+  const [snapshot, setSnapshot] = useState<CoworkingSnapshot>(EMPTY_SNAPSHOT);
+  const [mediaSessions, setMediaSessions] = useState<Record<string, CoworkingMediaSession>>({});
+  const [mediaStates, setMediaStates] = useState<Record<string, { cameraOn: boolean; microphoneOn: boolean }>>({});
+  const [loading, setLoading] = useState(!env.mockMode && COWORKING_AVAILABLE);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!env.mockMode || mockInitializedRef.current || members.length === 0) return;
+    mockInitializedRef.current = true;
+    const candidates = members.filter((member) => member.id !== currentUser.id);
+    const online = candidates.filter((member) => member.online);
+    setSnapshot(buildMockSnapshot((online.length >= 5 ? online : candidates).map((member) => member.id)));
+    setLoading(false);
+  }, [currentUser.id, members]);
+
+  const refresh = useCallback(async () => {
+    if (!COWORKING_AVAILABLE || env.mockMode || !api) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setSnapshot(await api.getSnapshot());
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : "Le Coworking est momentanément indisponible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [api]);
+
+  useEffect(() => {
+    if (env.mockMode || !COWORKING_AVAILABLE) return;
+    void refresh();
+    const interval = setInterval(() => void refresh(), 15_000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  const joinSpace = useCallback(async (spaceId: string) => {
+    setError(null);
+    if (env.mockMode) {
+      let nextMedia: CoworkingMediaSession | undefined;
+      setSnapshot((previous) => {
+        const stripped = removeUserFromSpaces(previous, currentUser.id);
+        const targetIsHub = spaceId === stripped.hub.id;
+        const target = targetIsHub ? stripped.hub : stripped.spaces.find((space) => space.id === spaceId);
+        if (!target) return previous;
+        const nextParticipants = ensurePresence(stripped.participants, currentUser.id, {
+          cameraOn: true,
+          microphoneOn: false,
+          mode: "available"
+        });
+        nextMedia = mockMediaSession(spaceId, currentUser.id);
+        return {
+          ...stripped,
+          hub: targetIsHub ? { ...stripped.hub, participantIds: [...stripped.hub.participantIds, currentUser.id] } : stripped.hub,
+          spaces: targetIsHub ? stripped.spaces : stripped.spaces.map((space) => space.id === spaceId ? { ...space, participantIds: [...space.participantIds, currentUser.id] } : space),
+          participants: nextParticipants,
+          currentUserSpaceId: spaceId,
+          updatedAt: new Date().toISOString()
+        };
+      });
+      const media = nextMedia ?? mockMediaSession(spaceId, currentUser.id);
+      setMediaSessions((previous) => ({ ...previous, [spaceId]: media }));
+      setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
+      return media;
+    }
+    if (!COWORKING_AVAILABLE || !api) return undefined;
+    try {
+      const result = await api.joinSpace(spaceId);
+      setSnapshot(result.snapshot);
+      if (result.media) {
+        setMediaSessions((previous) => ({ ...previous, [spaceId]: result.media! }));
+        setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
+      }
+      return result.media;
+    } catch (joinError) {
+      setError(joinError instanceof Error ? joinError.message : "Impossible de rejoindre cet espace.");
+      throw joinError;
+    }
+  }, [api, currentUser.id]);
+
+  const leaveCurrentSpace = useCallback(async () => {
+    // Some backend snapshots expose membership without the optional
+    // `current_user_space_id`; derive the active room as a safe fallback so
+    // leaving never becomes a local-only navigation with a stale presence.
+    const activeSpaceId = snapshot.currentUserSpaceId ?? spaceForUser(snapshot, currentUser.id)?.id;
+    if (!activeSpaceId) return;
+    setError(null);
+    if (env.mockMode) {
+      setSnapshot((previous) => {
+        const stripped = removeUserFromSpaces(previous, currentUser.id);
+        return {
+          ...stripped,
+          participants: stripped.participants.filter((participant) => participant.userId !== currentUser.id),
+          currentUserSpaceId: undefined,
+          updatedAt: new Date().toISOString()
+        };
+      });
+      setMediaSessions((previous) => {
+        const next = { ...previous };
+        delete next[activeSpaceId];
+        return next;
+      });
+      setMediaStates((previous) => {
+        const next = { ...previous };
+        delete next[activeSpaceId];
+        return next;
+      });
+      return;
+    }
+    if (!COWORKING_AVAILABLE || !api) return;
+    try {
+      setSnapshot(await api.leaveSpace(activeSpaceId));
+      setMediaSessions((previous) => {
+        const next = { ...previous };
+        delete next[activeSpaceId];
+        return next;
+      });
+      setMediaStates((previous) => {
+        const next = { ...previous };
+        delete next[activeSpaceId];
+        return next;
+      });
+    } catch (leaveError) {
+      setError(leaveError instanceof Error ? leaveError.message : "Impossible de quitter le Coworking.");
+      throw leaveError;
+    }
+  }, [api, currentUser.id, snapshot]);
+
+  const updatePresence = useCallback(async (mode: CoworkingPresenceMode, statusText?: string) => {
+    setError(null);
+    if (env.mockMode) {
+      setSnapshot((previous) => ({
+        ...previous,
+        participants: ensurePresence(previous.participants, currentUser.id, { mode, statusText }),
+        updatedAt: new Date().toISOString()
+      }));
+      return;
+    }
+    if (!COWORKING_AVAILABLE || !api) return;
+    try {
+      setSnapshot(await api.updatePresence(mode, statusText));
+    } catch (presenceError) {
+      setError(presenceError instanceof Error ? presenceError.message : "Votre disponibilité n’a pas pu être mise à jour.");
+      throw presenceError;
+    }
+  }, [api, currentUser.id]);
+
+  const createSpace = useCallback(async (input: CreateCoworkingSpaceInput) => {
+    setError(null);
+    if (env.mockMode) {
+      const spaceId = `local-coworking-${Date.now()}`;
+      const focusEndsAt = input.kind === "focus" && input.focusMinutes
+        ? new Date(Date.now() + input.focusMinutes * 60_000).toISOString()
+        : undefined;
+      const space: CoworkingSpace = {
+        id: spaceId,
+        name: input.name.trim() || "Mon espace",
+        kind: input.kind,
+        access: input.access,
+        ownerId: currentUser.id,
+        participantIds: [
+          currentUser.id,
+          ...(input.kind === "private" ? (input.invitedUserIds ?? []).filter((id) => id !== currentUser.id) : [])
+        ],
+        invitedUserIds: input.invitedUserIds ?? [],
+        maxParticipants: input.kind === "focus" ? 6 : 5,
+        activity: input.activity?.trim() || undefined,
+        focusEndsAt,
+        mediaEnabled: true
+      };
+      const media = mockMediaSession(spaceId, currentUser.id);
+      setSnapshot((previous) => {
+        const stripped = removeUserFromSpaces(previous, currentUser.id);
+        return {
+          ...stripped,
+          spaces: [...stripped.spaces, space],
+          participants: ensurePresence(stripped.participants, currentUser.id, {
+            mode: "available",
+            cameraOn: true,
+            microphoneOn: false
+          }),
+          currentUserSpaceId: spaceId,
+          updatedAt: new Date().toISOString()
+        };
+      });
+      setMediaSessions((previous) => ({ ...previous, [spaceId]: media }));
+      setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
+      return { spaceId, media };
+    }
+    if (!COWORKING_AVAILABLE || !api) throw new Error("Le Coworking n’est pas disponible.");
+    const result = await api.createSpace(input);
+    setSnapshot(result.snapshot);
+    const spaceId = result.snapshot.currentUserSpaceId;
+    if (!spaceId) throw new Error("L’espace a été créé mais n’a pas pu être rejoint.");
+    if (result.media) {
+      setMediaSessions((previous) => ({ ...previous, [spaceId]: result.media! }));
+      setMediaStates((previous) => ({ ...previous, [spaceId]: { cameraOn: true, microphoneOn: false } }));
+    }
+    return { spaceId, media: result.media };
+  }, [api, currentUser.id]);
+
+  const currentSpace = useMemo(() => spaceForUser(snapshot, currentUser.id), [currentUser.id, snapshot]);
+  const activeCount = useMemo(() => coworkingPresentCount(snapshot), [snapshot]);
+  const mediaForSpace = useCallback((spaceId: string) => mediaSessions[spaceId], [mediaSessions]);
+  const mediaStateForSpace = useCallback((spaceId: string) => mediaStates[spaceId], [mediaStates]);
+  const updateMediaState = useCallback((spaceId: string, patch: Partial<{ cameraOn: boolean; microphoneOn: boolean }>) => {
+    setMediaStates((previous) => ({
+      ...previous,
+      [spaceId]: {
+        cameraOn: patch.cameraOn ?? previous[spaceId]?.cameraOn ?? true,
+        microphoneOn: patch.microphoneOn ?? previous[spaceId]?.microphoneOn ?? false
+      }
+    }));
+  }, []);
+
+  const value = useMemo<CoworkingContextValue>(() => ({
+    serviceAvailable: COWORKING_AVAILABLE,
+    snapshot,
+    activeCount,
+    currentSpace,
+    loading,
+    error,
+    refresh,
+    joinSpace,
+    leaveCurrentSpace,
+    updatePresence,
+    createSpace,
+    mediaForSpace,
+    mediaStateForSpace,
+    updateMediaState
+  }), [activeCount, createSpace, currentSpace, error, joinSpace, leaveCurrentSpace, loading, mediaForSpace, mediaStateForSpace, refresh, snapshot, updateMediaState]);
+
+  return <CoworkingContext.Provider value={value}>{children}</CoworkingContext.Provider>;
+}
+
+export function useCoworking(): CoworkingContextValue {
+  const value = useContext(CoworkingContext);
+  if (!value) throw new Error("useCoworking doit être utilisé dans CoworkingProvider.");
+  return value;
+}

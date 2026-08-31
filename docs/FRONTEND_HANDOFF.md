@@ -1,14 +1,30 @@
-# Connexio V14 — contrat de remise backend
+# Connexio V26 — contrat de remise backend
 
-## Architecture cible
+## État réel du backend Neptune (11 août 2026)
+
+Connexio utilise le même compte et la même base métier que Neptune Business via :
+
+```text
+EXPO_PUBLIC_API_BASE_URL=https://api.neptunebusiness.com/api
+EXPO_PUBLIC_BACKEND_CONTRACT=neptune-web-v1
+EXPO_PUBLIC_BUSINESS_WEB_BASE_URL=https://neptunebusiness.com
+EXPO_PUBLIC_MOCK_MODE=false
+```
+
+Ce mode connecte `/v1/auth`, `/v1/users`, `/v1/needs`, `/v1/benefits` et la suppression de compte. Il désactive volontairement messagerie, appels, push et fonctions communautaires non protégées. Les routes historiques `/message-threads` et `/messages` ne doivent pas être utilisées : elles ne garantissent pas actuellement l’appartenance du demandeur au thread.
+
+Le profil EAS `production` refuse ce contrat. Il ne devient constructible qu’après déploiement et déclaration explicite du contrat `connexio-v1` décrit ci-dessous.
+
+## Architecture cible `connexio-v1`
 
 Connexio est le client de messagerie de Neptune Business. Le frontend Expo/React Native consomme le backend existant : **Node.js / Express 5**, **Prisma 7**, **PostgreSQL 16**, **Redis**, authentification Neptune et **Socket.IO**.
 
 `EXPO_PUBLIC_API_BASE_URL` pointe vers la racine précédant `/v1`. Pour une API publique sous `/api/v1`, utiliser par exemple :
 
 ```text
-EXPO_PUBLIC_API_BASE_URL=https://neptunebusiness.com/api
-EXPO_PUBLIC_REALTIME_URL=https://neptunebusiness.com
+EXPO_PUBLIC_API_BASE_URL=https://api.neptunebusiness.com/api
+EXPO_PUBLIC_REALTIME_URL=https://api.neptunebusiness.com
+EXPO_PUBLIC_BACKEND_CONTRACT=connexio-v1
 EXPO_PUBLIC_BUSINESS_WEB_BASE_URL=https://neptunebusiness.com
 EXPO_PUBLIC_MOCK_MODE=false
 ```
@@ -19,6 +35,7 @@ EXPO_PUBLIC_MOCK_MODE=false
 |---|---|---|
 | `POST` | `/v1/auth/login` | email et mot de passe Neptune |
 | `GET` | `/v1/auth/me` | restauration de la session cookie |
+| `POST` | `/v1/auth/refresh` | renouvellement des cookies HttpOnly |
 | `POST` | `/v1/auth/logout` | révocation de la session |
 
 Les requêtes d’authentification utilisent `credentials: include`. Le mot de passe n’est jamais persisté dans Connexio. Le backend normalise `role`, `special_role` et `statut`.
@@ -72,7 +89,7 @@ Le client autorise au maximum **10 contenus** et **120 Mo cumulés** par message
 - vidéo : 80 Mo maximum ;
 - document ou fichier : 50 Mo maximum.
 
-Flux attendu : préparation d’upload, URL pré-signée, envoi vers le stockage privé, finalisation, puis message contenant les identifiants de fichiers. La réponse doit fournir `download_url` et, pour les médias, `thumbnail_url` temporaires.
+Flux attendu : préparation d’upload, URL pré-signée, envoi vers le stockage privé, finalisation, puis message contenant les identifiants de fichiers. La préparation fournit `expires_at`. La finalisation fournit `download_url`, `download_expires_at` et, pour les médias, `thumbnail_url` temporaires. Le client RC/production refuse les URLs non HTTPS, avec identifiants intégrés, sans expiration ou déjà proches de l’expiration.
 
 Le serveur revérifie nombre, taille, MIME réel, droits d’accès et antivirus.
 
@@ -232,3 +249,9 @@ La recherche de lieu est exécutée côté backend afin de ne jamais exposer la 
 8. tests d’autorisation par statut ;
 9. tests sur au moins deux Android et un iPhone ;
 10. appels entre Wi-Fi, 4G/5G et NAT restrictifs.
+
+### Attestation consommée par la CI
+
+Le backend expose également `GET /v1/connexio/readiness`. Cette route publique ne contient aucun secret : elle atteste le SHA déployé, l’environnement, les capacités, les dépendances critiques et les contrôles d’exploitation. Son schéma exact et les règles bloquantes figurent dans `PRODUCTION_BACKEND_READINESS.md`.
+
+Les workflows natifs interrogent cette route puis vérifient qu’une requête anonyme reçoit `401`/`403` (ou `429` sous limitation anti-abus) sur `/v1/auth/me`, `/v1/conversations`, `/v1/realtime/ticket`, `/v1/coworking` et `/v1/devices/push-tokens`. Une validation `400`/`422` ne suffit pas : elle pourrait être exécutée avant le contrôle d’accès. Un simple changement de variable vers `connexio-v1` ne suffit donc plus à déclencher un build.

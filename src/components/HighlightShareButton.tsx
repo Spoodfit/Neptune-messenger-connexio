@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, Share, StyleSheet } from "react-native";
+import { Pressable, Share, StyleSheet } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { env } from "../config/env";
 import { useSession } from "../providers/SessionProvider";
@@ -13,7 +14,10 @@ interface HighlightShareButtonProps {
   post: HighlightPost;
 }
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export function HighlightShareButton({ post }: HighlightShareButtonProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { accessToken } = useSession();
   const api = useMemo(
     () => (env.mockMode ? null : new NeptuneExperienceApi(accessToken)),
@@ -37,7 +41,7 @@ export function HighlightShareButton({ post }: HighlightShareButtonProps) {
         url: result.url
       });
     } catch (error) {
-      Alert.alert(
+      AppAlert.alert(
         "Partage impossible",
         error instanceof Error ? error.message : "Réessayez ultérieurement."
       );
@@ -58,13 +62,13 @@ export function HighlightShareButton({ post }: HighlightShareButtonProps) {
       <Ionicons
         name={sharing ? "hourglass-outline" : "share-outline"}
         size={22}
-        color={colors.text}
+        color={theme.pageText}
       />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
   button: {
     width: 48,
     height: 48,

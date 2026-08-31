@@ -1,54 +1,52 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { StyleSheet, Text, View } from "react-native";
+import { createElement } from "react";
+import { Image, Platform, StyleSheet, View } from "react-native";
 
-import { colors, gradients } from "../theme";
+import { NEPTUNE_LOGO_DATA_URI } from "../assets/neptuneLogo";
 
 interface NeptuneMarkProps {
   size?: number;
 }
 
 export function NeptuneMark({ size = 56 }: NeptuneMarkProps) {
-  const radius = Math.round(size * 0.34);
   return (
-    <LinearGradient
-      colors={gradients.primaryWarm}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[
-        styles.shell,
-        { width: size, height: size, borderRadius: radius }
-      ]}
+    <View
+      style={[styles.container, { width: size, height: size }]}
       accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
     >
-      <View style={[styles.inner, { borderRadius: Math.max(8, radius - 3) }]}>
-        <Text style={[styles.letter, { fontSize: Math.round(size * 0.48) }]}>N</Text>
-      </View>
-    </LinearGradient>
+      {Platform.OS === "web"
+        ? createElement("img", {
+            src: NEPTUNE_LOGO_DATA_URI,
+            alt: "",
+            draggable: false,
+            "aria-hidden": true,
+            style: {
+              width: "100%",
+              height: "100%",
+              display: "block",
+              objectFit: "contain",
+              userSelect: "none",
+              pointerEvents: "none"
+            }
+          })
+        : (
+            <Image
+              source={{ uri: NEPTUNE_LOGO_DATA_URI }}
+              resizeMode="contain"
+              style={styles.logo}
+            />
+          )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: {
-    padding: 3,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.violet,
-    shadowOpacity: 0.32,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 }
-  },
-  inner: {
-    flex: 1,
-    width: "100%",
-    backgroundColor: colors.surfaceStrong,
-    borderWidth: 2,
-    borderColor: colors.surface,
+  container: {
     alignItems: "center",
     justifyContent: "center"
   },
-  letter: {
-    color: colors.white,
-    fontWeight: "900",
-    lineHeight: undefined
+  logo: {
+    width: "100%",
+    height: "100%"
   }
 });

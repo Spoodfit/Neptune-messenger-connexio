@@ -1,4 +1,5 @@
 export const colors = {
+  transparent: "transparent",
   navy: "#020713",
   navyLight: "#071127",
   primary: "#0048BA",
@@ -73,13 +74,13 @@ export const typography = {
     fontWeight: "800" as const
   },
   body: {
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: "400" as const
   },
   bodySmall: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: "400" as const
   },
   caption: {

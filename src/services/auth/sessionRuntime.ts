@@ -1,6 +1,7 @@
 export interface SessionRuntimeHandlers {
   getAccessToken: () => Promise<string | null>;
   refreshAccessToken: () => Promise<string | null>;
+  refreshCookieSession: () => Promise<boolean>;
 }
 
 let activeHandlers: SessionRuntimeHandlers | null = null;
@@ -24,6 +25,11 @@ export async function resolveSessionAccessToken(
 export async function refreshSessionAccessToken(): Promise<string | null> {
   if (!activeHandlers) return null;
   return activeHandlers.refreshAccessToken();
+}
+
+export async function refreshSessionCookie(): Promise<boolean> {
+  if (!activeHandlers) return false;
+  return activeHandlers.refreshCookieSession();
 }
 
 export function resetSessionRuntimeForTests(): void {

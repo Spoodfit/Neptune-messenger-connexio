@@ -134,7 +134,7 @@ Ne jamais mettre de données sensibles dans le push : elles peuvent apparaître 
 }
 ```
 
-En production, privilégier un ticket WebSocket à courte durée plutôt qu’un JWT long dans l’URL.
+En production, le ticket temps réel est court, à usage unique et transmis dans la trame d'authentification Socket.IO. Aucun JWT ni ticket ne doit apparaître dans l'URL ou la query string WebSocket.
 
 ## Règles d’accès
 

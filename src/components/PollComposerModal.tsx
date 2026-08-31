@@ -1,16 +1,19 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { Text } from "@/components/LocalizedText";
+import { TextInput } from "@/components/LocalizedTextInput";
 import {
-  Alert,
+  useMemo } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useEffect,
+  useState } from "react";
+import {
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
-  TextInput,
   View
 } from "react-native";
+import { AppAlert } from "@/services/ui/AppAlert";
 
 import { colors, radii, spacing, typography } from "../theme";
 import type { CreatePollInput } from "../types/messaging";
@@ -23,14 +26,17 @@ interface PollComposerModalProps {
 
 const EMPTY_OPTIONS = ["", ""];
 
+import { useAppTheme } from "@/providers/ThemeProvider";
 export function PollComposerModal({
   visible,
   onClose,
   onCreate
 }: PollComposerModalProps) {
+  const theme = useAppTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState<string[]>(EMPTY_OPTIONS);
-  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [allowMultiple, setAllowMultiple] = useState(true);
   const [anonymous, setAnonymous] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -38,7 +44,7 @@ export function PollComposerModal({
     if (!visible) return;
     setQuestion("");
     setOptions(EMPTY_OPTIONS);
-    setAllowMultiple(false);
+    setAllowMultiple(true);
     setAnonymous(false);
     setCreating(false);
   }, [visible]);
@@ -56,15 +62,18 @@ export function PollComposerModal({
     const cleanQuestion = question.trim();
     const cleanOptions = options.map((option) => option.trim()).filter(Boolean);
     if (cleanQuestion.length < 3) {
-      Alert.alert("Question requise", "Ajoutez une question de sondage claire.");
+      AppAlert.alert("Question requise", "Ajoutez une question de sondage claire.");
       return;
     }
     if (cleanOptions.length < 2) {
-      Alert.alert("Réponses requises", "Ajoutez au moins deux choix.");
+      AppAlert.alert("Réponses requises", "Ajoutez au moins deux choix.");
       return;
     }
-    if (new Set(cleanOptions.map((item) => item.toLocaleLowerCase("fr"))).size !== cleanOptions.length) {
-      Alert.alert("Choix en double", "Chaque réponse doit être différente.");
+    if (
+      new Set(cleanOptions.map((item) => item.toLocaleLowerCase("fr"))).size !==
+      cleanOptions.length
+    ) {
+      AppAlert.alert("Choix en double", "Chaque réponse doit être différente.");
       return;
     }
     setCreating(true);
@@ -104,7 +113,7 @@ export function PollComposerModal({
               onPress={onClose}
               style={styles.close}
             >
-              <Ionicons name="close" size={21} color={colors.textMuted} />
+              <Ionicons name="close" size={21} color={theme.pageTextMuted} />
             </Pressable>
           </View>
 
@@ -118,7 +127,7 @@ export function PollComposerModal({
               value={question}
               onChangeText={setQuestion}
               placeholder="Quel créneau préférez-vous ?"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={theme.pageTextMuted}
               maxLength={240}
               multiline
               style={[styles.input, styles.question]}
@@ -134,7 +143,7 @@ export function PollComposerModal({
                   value={option}
                   onChangeText={(value) => updateOption(index, value)}
                   placeholder={`Choix ${index + 1}`}
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={theme.pageTextMuted}
                   maxLength={120}
                   style={styles.optionInput}
                 />
@@ -149,7 +158,11 @@ export function PollComposerModal({
                     }
                     style={styles.remove}
                   >
-                    <Ionicons name="remove-circle-outline" size={21} color={colors.danger} />
+                    <Ionicons
+                      name="remove-circle-outline"
+                      size={21}
+                      color={theme.danger}
+                    />
                   </Pressable>
                 ) : null}
               </View>
@@ -161,23 +174,24 @@ export function PollComposerModal({
                 onPress={() => setOptions((previous) => [...previous, ""])}
                 style={styles.addOption}
               >
-                <Ionicons name="add-circle-outline" size={20} color={colors.orange} />
+                <Ionicons name="add-circle-outline" size={20} color={theme.orange} />
                 <Text style={styles.addOptionText}>Ajouter une réponse</Text>
               </Pressable>
             ) : null}
 
             <View style={styles.settingRow}>
               <View style={styles.settingText}>
-                <Text style={styles.settingTitle}>Choix multiples</Text>
+                <Text style={styles.settingTitle}>Plusieurs réponses possibles</Text>
                 <Text style={styles.settingSubtitle}>
-                  Un membre peut voter pour plusieurs réponses.
+                  Activé par défaut pour laisser chaque membre sélectionner tous les
+                  choix pertinents.
                 </Text>
               </View>
               <Switch
-                accessibilityLabel="Autoriser les choix multiples"
+                accessibilityLabel="Autoriser plusieurs réponses"
                 value={allowMultiple}
                 onValueChange={setAllowMultiple}
-                trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
+                trackColor={{ false: theme.surfaceMuted, true: colors.primary }}
                 thumbColor={colors.white}
               />
             </View>
@@ -193,7 +207,7 @@ export function PollComposerModal({
                 accessibilityLabel="Rendre les votes anonymes"
                 value={anonymous}
                 onValueChange={setAnonymous}
-                trackColor={{ false: colors.surfaceMuted, true: colors.primary }}
+                trackColor={{ false: theme.surfaceMuted, true: colors.primary }}
                 thumbColor={colors.white}
               />
             </View>
@@ -218,8 +232,12 @@ export function PollComposerModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.68)" },
+const createStyles = (theme: ReturnType<typeof useAppTheme>) => StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.68)"
+  },
   sheet: {
     width: "100%",
     maxWidth: 680,
@@ -231,31 +249,114 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     borderWidth: 1,
     borderBottomWidth: 0,
-    borderColor: colors.border,
-    backgroundColor: colors.surface
+    borderColor: theme.border,
+    backgroundColor: theme.surface
   },
-  handle: { width: 42, height: 4, borderRadius: 2, alignSelf: "center", backgroundColor: colors.textMuted, marginBottom: 10 },
-  header: { minHeight: 52, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  handle: {
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    backgroundColor: theme.pageTextMuted,
+    marginBottom: 10
+  },
+  header: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm
+  },
   headerText: { flex: 1, minWidth: 0 },
-  title: { ...typography.heading3, color: colors.text },
-  subtitle: { ...typography.caption, color: colors.textMuted, marginTop: 3 },
-  close: { width: 44, height: 44, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceStrong },
+  title: { ...typography.heading3, color: theme.pageText },
+  subtitle: { ...typography.caption, color: theme.pageTextMuted, marginTop: 3 },
+  close: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.surfaceStrong
+  },
   content: { paddingBottom: spacing.md },
-  label: { color: colors.textSecondary, fontSize: 10, fontWeight: "900", marginTop: 12, marginBottom: 6 },
-  input: { borderRadius: radii.lg, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, paddingHorizontal: 12, paddingVertical: 10 },
+  label: {
+    color: theme.pageTextSecondary,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 12,
+    marginBottom: 6
+  },
+  input: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surfaceStrong,
+    color: theme.pageText,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
   question: { minHeight: 72, textAlignVertical: "top" },
-  optionRow: { minHeight: 50, marginBottom: 7, flexDirection: "row", alignItems: "center", gap: 8 },
-  optionNumber: { width: 31, height: 31, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: colors.primarySoft },
-  optionNumberText: { color: colors.orange, fontSize: 11, fontWeight: "900" },
-  optionInput: { flex: 1, minWidth: 0, minHeight: 48, borderRadius: 15, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: colors.surfaceStrong, color: colors.text, paddingHorizontal: 12 },
-  remove: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
-  addOption: { minHeight: 46, borderRadius: 15, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
-  addOptionText: { color: colors.orange, fontSize: 11, fontWeight: "800" },
-  settingRow: { minHeight: 66, marginTop: 8, paddingHorizontal: 10, borderRadius: 17, backgroundColor: colors.surfaceStrong, flexDirection: "row", alignItems: "center", gap: 12 },
+  optionRow: {
+    minHeight: 50,
+    marginBottom: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  optionNumber: {
+    width: 31,
+    height: 31,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.accentSoft
+  },
+  optionNumberText: { color: theme.orange, fontSize: 11, fontWeight: "900" },
+  optionInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: theme.borderSoft,
+    backgroundColor: theme.surfaceStrong,
+    color: theme.pageText,
+    paddingHorizontal: 12
+  },
+  remove: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+  addOption: {
+    minHeight: 48,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: theme.border,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
+  addOptionText: { color: theme.orange, fontSize: 11, fontWeight: "800" },
+  settingRow: {
+    minHeight: 66,
+    marginTop: 8,
+    paddingHorizontal: 10,
+    borderRadius: 17,
+    backgroundColor: theme.surfaceStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
   settingText: { flex: 1, minWidth: 0 },
-  settingTitle: { color: colors.text, fontSize: 12, fontWeight: "900" },
-  settingSubtitle: { color: colors.textMuted, fontSize: 9.5, marginTop: 3 },
-  submit: { minHeight: 52, borderRadius: 18, backgroundColor: colors.primary, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  settingTitle: { color: theme.pageText, fontSize: 14, fontWeight: "900" },
+  settingSubtitle: { color: theme.pageTextMuted, fontSize: 11, marginTop: 3 },
+  submit: {
+    minHeight: 52,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8
+  },
   submitText: { color: colors.white, fontSize: 14, fontWeight: "900" },
   disabled: { opacity: 0.5 }
 });

@@ -12,7 +12,7 @@ Connexio ne crée ni backend, ni base utilisateurs, ni système de permissions p
 
 Le dépôt contient un noyau mobile Expo / React Native / TypeScript durci pour la préproduction :
 
-- connexion par code Neptune à usage unique ;
+- connexion Neptune par email/mot de passe sans persistance du mot de passe, avec échange mobile par code à usage unique également pris en charge ;
 - access token court et refresh token stocké dans SecureStore ;
 - rafraîchissement proactif et nouvelle tentative unique après HTTP 401 ;
 - client API authentifié avec erreurs structurées ;
@@ -50,9 +50,11 @@ Les notifications push distantes nécessitent un development build ou une build 
 
 ```bash
 npx eas login
-npx eas init
+npx eas-cli@21.7.1 project:info
 npm run build:preview
 ```
+
+Le dépôt est déjà relié au projet EAS Connexio canonique : ne pas relancer `eas init`.
 
 ## Modes d’exécution
 
@@ -68,12 +70,23 @@ L’application utilise alors les données locales de `src/data/mockData.ts`.
 
 ```env
 EXPO_PUBLIC_MOCK_MODE=false
-EXPO_PUBLIC_API_BASE_URL=https://api.votre-domaine.fr
-EXPO_PUBLIC_REALTIME_URL=wss://api.votre-domaine.fr/v1/realtime
-EXPO_PUBLIC_EAS_PROJECT_ID=identifiant-eas
+EXPO_PUBLIC_BACKEND_CONTRACT=connexio-v1
+EXPO_PUBLIC_API_BASE_URL=https://api.neptunebusiness.com/api
+EXPO_PUBLIC_REALTIME_URL=https://api.neptunebusiness.com
+EXPO_PUBLIC_COWORKING_ENABLED=true
+EXPO_PUBLIC_EAS_PROJECT_ID=1e85dc3a-4114-4387-8e15-2463a82e68fd
 ```
 
-Une build EAS `production` échoue si une de ces valeurs manque, si le mock est actif ou si les transports ne sont pas chiffrés.
+Une build EAS `release-candidate` ou `production` échoue si une de ces valeurs manque, si le mock est actif, si le contrat n’est pas `connexio-v1` ou si les transports ne sont pas chiffrés. Le profil `backend-smoke` conserve séparément le périmètre réduit du backend Neptune historique.
+
+Avant de déclencher un build natif connecté :
+
+```bash
+npm run verify:rc
+npm run smoke:production
+```
+
+Le second contrôle exige l’attestation serveur décrite dans [`docs/PRODUCTION_BACKEND_READINESS.md`](docs/PRODUCTION_BACKEND_READINESS.md) et refuse le build avant toute consommation de quota EAS.
 
 ## Architecture
 
@@ -110,7 +123,7 @@ Le code ne suffit pas à valider ces points :
 9. pilote mesuré avec crash-free sessions ≥ 99,5 % ;
 10. restauration backend et procédure de rollback exercées.
 
-Les pièces jointes, vocaux, appels, Map et Story Time restent hors du noyau publiable tant que permissions, stockage, confidentialité, modération et tests physiques ne sont pas terminés.
+Les pièces jointes, vocaux, appels, Map et Temps forts sont inclus dans le candidat, mais leur activation publique reste bloquée tant que stockage privé, TURN, notifications, modération et tests physiques n’ont pas fourni les preuves listées ci-dessus.
 
 ## Documentation
 
@@ -119,4 +132,5 @@ Les pièces jointes, vocaux, appels, Map et Story Time restent hors du noyau pub
 - [Stratégie de synchronisation](docs/SYNC_STRATEGY.md)
 - [Modèle de menace](docs/THREAT_MODEL.md)
 - [Critères de production](docs/PRODUCTION_READINESS.md)
+- [Attestation backend de production](docs/PRODUCTION_BACKEND_READINESS.md)
 - [Publication iOS et Android](docs/STORE_RELEASE.md)

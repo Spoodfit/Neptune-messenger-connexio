@@ -1,4 +1,4 @@
-# Connexio V14 — matrice d’acceptation fonctionnelle
+# Connexio V26 — matrice d’acceptation fonctionnelle
 
 Cette matrice reprend les exigences produit validées pour la remise frontend. **Opérationnelle côté client** signifie que l’écran, l’interaction, les états de chargement/erreur et le contrat API existent. Les fonctions multi-utilisateurs exigent naturellement le déploiement des routes Express, modèles Prisma, stockage et évènements Socket.IO documentés dans `FRONTEND_HANDOFF.md`.
 

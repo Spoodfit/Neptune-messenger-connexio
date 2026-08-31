@@ -1,4 +1,4 @@
-# Connexio V14 — statut de validation
+# Connexio V26 — statut de validation
 
 ## Règle de lecture
 
@@ -28,10 +28,13 @@
 | Profils et modération | Validé frontend | profil web, sourdine, signalement et blocage |
 | Temps réel | Validé frontend | Engine.IO 4 / Socket.IO, ticket, heartbeat et reconnexion |
 | Appels intégrés | Validé frontend | WebRTC, contrôles internes et signalisation Socket.IO, sans Jitsi |
+| Transport appels/Coworking | Validé frontend | RC/production refusent signalisation non chiffrée, absence de TURN et jeton média expiré |
 | Temps forts | Validé frontend | texte, photo, vidéo, mentions, localisation, réactions et commentaires |
 | Besoins et Offres | Validé frontend | contrats de synchronisation Neptune Business / Comité Avantage |
 | Feed deux colonnes | Validé frontend | appariement sans trou et publicité Comité Avantage en case orpheline |
 | Map | Validé frontend | Leaflet, géolocalisation, clusters, avatars pulsants et actions rapides |
+| Secret temps réel | Validé frontend | ticket éphémère transmis dans l’auth Socket.IO, jamais dans l’URL journalisable |
+| Configuration Store | Validé frontend | profils RC/production `connexio-v1`, projet EAS canonique et préflight backend bloquant |
 
 ## À valider en intégration Neptune
 
@@ -62,3 +65,5 @@ Aucune publication store ou ouverture multi-utilisateur avant :
 8. réseau faible, hors-ligne prolongé et reprise ;
 9. observabilité, sauvegardes et politique de conservation ;
 10. Product Audit et CI verts sur le commit livré.
+
+Le déclenchement manuel d’un build RC ou production ajoute une onzième barrière : l’attestation récente `GET /v1/connexio/readiness` doit être complète et les routes sensibles doivent refuser les accès anonymes avant l’appel à EAS.

@@ -1,6 +1,7 @@
+import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 
 import { env } from "../config/env";
 import { colors, gradients, typography } from "../theme";
@@ -35,12 +36,39 @@ export function AdvantageAdCard() {
 }
 
 const styles = StyleSheet.create({
-  pressable: { width: "100%", minHeight: 205 },
-  card: { flex: 1, minHeight: 205, padding: 14, borderRadius: 22, borderWidth: 1, borderColor: "rgba(255,255,255,0.16)", justifyContent: "flex-end" },
-  icon: { width: 46, height: 46, borderRadius: 16, marginBottom: "auto", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(2,7,19,0.24)" },
-  eyebrow: { color: colors.whiteMuted, fontSize: 8.5, fontWeight: "900", letterSpacing: 0.8 },
+  pressable: { width: "100%", minHeight: 205, flex: 1, alignSelf: "stretch" },
+  card: {
+    flex: 1,
+    minHeight: 205,
+    padding: 14,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    justifyContent: "flex-end"
+  },
+  icon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    marginBottom: "auto",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(2,7,19,0.24)"
+  },
+  eyebrow: {
+    color: colors.whiteMuted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8
+  },
   title: { ...typography.heading3, color: colors.white, marginTop: 6, lineHeight: 19 },
-  cta: { minHeight: 34, marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6 },
-  ctaText: { color: colors.white, fontSize: 10.5, fontWeight: "900" },
+  cta: {
+    minHeight: 34,
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8
+  },
+  ctaText: { color: colors.white, fontSize: 11, fontWeight: "900" },
   pressed: { opacity: 0.8, transform: [{ scale: 0.987 }] }
 });
