@@ -51,13 +51,13 @@ jobs:
           test -f dist/account-deletion.html
 
       - name: Upload GitHub Pages artifact
-        if: (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
+        if: (github.event_name == 'push' && github.ref_name == 'release/connexio-rc1') || (github.event_name == 'workflow_dispatch' && github.ref_name == 'release/connexio-rc1')
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    if: (github.event_name == 'push' && github.ref_name == 'main') || (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
+    if: (github.event_name == 'push' && github.ref_name == 'release/connexio-rc1') || (github.event_name == 'workflow_dispatch' && github.ref_name == 'release/connexio-rc1')
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
