@@ -884,7 +884,7 @@ export default function UnifiedMapScreenV24() {
 const styles = StyleSheet.create({
   screen: { flex: 1, position: "relative", overflow: "hidden" },
   topBar: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
-  circleButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  circleButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   titlePill: { flex: 1, minHeight: 48, maxWidth: 260, paddingLeft: 11, paddingRight: 4, borderRadius: 19, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 5 },
   titleCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 15, lineHeight: 18, fontWeight: "900" },
