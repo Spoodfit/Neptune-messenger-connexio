@@ -2,7 +2,7 @@ import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, LayoutAnimation, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CoworkingGeographicMap from "../components/CoworkingGeographicMap";
@@ -24,6 +24,7 @@ import {
 } from "../domain/discoveryEvents";
 import { coworkingAvailability, coworkingMapPrimaryAction, coworkingSpaceHostId, participantPresence } from "../domain/coworking";
 import { isFreeRole } from "../domain/accessPolicy";
+import { radarPulseItemCount, selectRadarPulseEvent } from "../domain/radarPulse";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
 import { useAppLanguage } from "../providers/LanguageProvider";
@@ -344,13 +345,12 @@ export default function UnifiedMapScreenV24() {
     }
     return [...ids].map((id) => allMembers.find((member) => member.id === id)).filter((member): member is AppUser => Boolean(member));
   }, [allMembers, currentUser.id, markers]);
-  const liveEvents = visibleEvents.filter((event) => getDiscoveryEventState(event, eventClock) === "live");
-  const upcomingEvents = visibleEvents.filter((event) => {
-    const state = getDiscoveryEventState(event, eventClock);
-    return state !== "recent" && state !== "live";
-  });
-  const nextEvent = upcomingEvents[0] ?? liveEvents[0];
-  const priorityEvent = liveEvents[0] ?? nextEvent;
+  const pulseEvent = selectRadarPulseEvent(visibleEvents, eventClock);
+  const pulseItemCount = radarPulseItemCount(availableMembers.length, pulseEvent);
+
+  useEffect(() => {
+    if (pulseItemCount === 0 && opportunityExpanded) setOpportunityExpanded(false);
+  }, [opportunityExpanded, pulseItemCount]);
   const clusterMarkers = selectedCluster
     ? markers.filter((marker) => selectedCluster.markerIds.includes(marker.id))
     : [];
@@ -537,18 +537,18 @@ export default function UnifiedMapScreenV24() {
       ? `${visibleEvents.length} évènements à découvrir`
       : `${eligibleMemberCount} membres · ${visibleEvents.length} évènements`;
   const availableLabel = t(availableMembers.length === 1 ? "personne disponible maintenant" : "personnes disponibles maintenant");
-  const liveEventLabel = t(liveEvents.length === 1 ? "évènement en cours" : "évènements en cours");
-  const upcomingLabel = t(upcomingEvents.length === 1 ? "évènement à venir" : "évènements à venir");
-  const compactOpportunitySummary = availableMembers.length > 0 && liveEvents.length > 0
-    ? availableMembers.length + " " + availableLabel + " · " + liveEvents.length + " " + liveEventLabel
+  const pulseEventLabel = pulseEvent ? t(eventStatusLabel(pulseEvent, eventClock)) : null;
+  const compactOpportunitySummary = availableMembers.length > 0 && pulseEventLabel
+    ? availableMembers.length + " " + availableLabel + " · " + pulseEventLabel
     : availableMembers.length > 0
       ? availableMembers.length + " " + availableLabel
-      : liveEvents.length > 0
-        ? liveEvents.length + " " + liveEventLabel
-        : upcomingEvents.length > 0
-          ? upcomingEvents.length + " " + upcomingLabel
-          : t("Rien d’urgent maintenant");
+      : pulseEventLabel ?? "";
   const controlsTop = Math.max(insets.top, 10) + 118;
+
+  const toggleOpportunityDock = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpportunityExpanded((value) => !value);
+  };
 
   const applyAvailability = async (next: "available" | "busy") => {
     if (actionBusy) return;
@@ -813,8 +813,9 @@ export default function UnifiedMapScreenV24() {
         </View>
       ) : null}
 
-      {!selection && !selectedEvent && !selectedCluster && radarMode === "all" ? (
+      {!selection && !selectedEvent && !selectedCluster && radarMode === "all" && pulseItemCount > 0 ? (
         <View
+          testID={opportunityExpanded ? "radar-opportunity-panel" : "radar-opportunity-pulse"}
           style={[
             styles.smartDock,
             opportunityExpanded ? styles.smartDockExpanded : styles.smartDockCompact,
@@ -824,11 +825,13 @@ export default function UnifiedMapScreenV24() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t(opportunityExpanded ? "Réduire ce panneau" : "Ouvrir ce panneau")}
-            onPress={() => setOpportunityExpanded((value) => !value)}
+            accessibilityHint={compactOpportunitySummary}
+            accessibilityState={{ expanded: opportunityExpanded }}
+            onPress={toggleOpportunityDock}
             style={({ pressed }) => [styles.smartDockToggle, pressed && styles.pressed]}
           >
             <View style={styles.smartDockSignal}>
-              <View style={[styles.liveDot, { backgroundColor: availableMembers.length > 0 || liveEvents.length > 0 ? theme.success : theme.pageTextMuted }]} />
+              <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
               <Text numberOfLines={1} style={[styles.smartDockTitle, { color: theme.pageText }]}>
                 {opportunityExpanded ? t("Maintenant autour de vous") : compactOpportunitySummary}
               </Text>
@@ -851,37 +854,18 @@ export default function UnifiedMapScreenV24() {
                 </Pressable>
               ) : null}
 
-              {priorityEvent ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={t("Sélectionner l’évènement") + " " + priorityEvent.title} onPress={() => selectEvent(priorityEvent.id)} style={[styles.opportunityCard, styles.eventOpportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
-                  <View style={[styles.dateTile, { backgroundColor: theme.accentSoft, borderColor: getDiscoveryEventState(priorityEvent, eventClock) === "live" ? theme.success : theme.accent }]}>
-                    <Text style={[styles.dateDay, { color: theme.pageText }]}>{new Date(priorityEvent.startsAt).getDate().toString().padStart(2, "0")}</Text>
-                    <Text style={[styles.dateMonth, { color: theme.pageTextMuted }]}>{new Date(priorityEvent.startsAt).toLocaleString(localeTag, { month: "short" }).replace(".", "")}</Text>
+              {pulseEvent ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={t("Sélectionner l’évènement") + " " + pulseEvent.title} onPress={() => selectEvent(pulseEvent.id)} style={[styles.opportunityCard, styles.eventOpportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+                  <View style={[styles.dateTile, { backgroundColor: theme.accentSoft, borderColor: getDiscoveryEventState(pulseEvent, eventClock) === "live" ? theme.success : theme.accent }]}>
+                    <Text style={[styles.dateDay, { color: theme.pageText }]}>{new Date(pulseEvent.startsAt).getDate().toString().padStart(2, "0")}</Text>
+                    <Text style={[styles.dateMonth, { color: theme.pageTextMuted }]}>{new Date(pulseEvent.startsAt).toLocaleString(localeTag, { month: "short" }).replace(".", "")}</Text>
                   </View>
                   <View style={styles.opportunityCopy}>
-                    <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{priorityEvent.title}</Text>
-                    <Text numberOfLines={1} style={[styles.opportunityMeta, { color: getDiscoveryEventState(priorityEvent, eventClock) === "live" ? theme.success : theme.pageTextMuted }]}>{eventStatusLabel(priorityEvent, eventClock)}{priorityEvent.city ? " · " + priorityEvent.city : ""}</Text>
+                    <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{pulseEvent.title}</Text>
+                    <Text numberOfLines={1} style={[styles.opportunityMeta, { color: getDiscoveryEventState(pulseEvent, eventClock) === "live" ? theme.success : theme.pageTextMuted }]}>{eventStatusLabel(pulseEvent, eventClock)}{pulseEvent.city ? " · " + pulseEvent.city : ""}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={17} color={theme.pageTextMuted} />
                 </Pressable>
-              ) : null}
-
-              {visibleEvents.length > 0 ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={t("Voir tous les évènements")} onPress={() => changeRadarMode("events")} style={[styles.allEventsButton, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
-                  <View style={styles.allEventsCopy}>
-                    <Ionicons name="calendar-outline" size={17} color={theme.pageText} />
-                    <Text numberOfLines={1} style={[styles.allEventsText, { color: theme.pageText }]}>{t("Voir tous les évènements")}</Text>
-                  </View>
-                  <View style={[styles.countBadge, { backgroundColor: theme.violetSoft }]}>
-                    <Text style={[styles.countBadgeText, { color: theme.violet }]}>{visibleEvents.length}</Text>
-                  </View>
-                </Pressable>
-              ) : null}
-
-              {availableMembers.length === 0 && !priorityEvent && visibleEvents.length === 0 ? (
-                <View style={styles.emptyDockRow}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color={theme.pageTextMuted} />
-                  <Text style={[styles.emptyDockText, { color: theme.pageTextMuted }]}>{t("Rien d’urgent maintenant")}</Text>
-                </View>
               ) : null}
             </View>
           ) : null}
@@ -905,7 +889,7 @@ const styles = StyleSheet.create({
   titleCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 15, lineHeight: 18, fontWeight: "900" },
   subtitle: { marginTop: 1, fontSize: 9, lineHeight: 12, fontWeight: "700" },
-  ownStatus: { minWidth: 70, minHeight: 42, borderRadius: 16, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  ownStatus: { minWidth: 70, minHeight: 48, borderRadius: 17, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   ownStatusDot: { width: 8, height: 8, borderRadius: 4 },
   ownStatusText: { maxWidth: 62, fontSize: 8, lineHeight: 11, fontWeight: "900" },
   modeRail: { position: "absolute", left: 12, right: 12, minHeight: 52, borderRadius: 19, borderWidth: 1, padding: 3, flexDirection: "row", alignItems: "center", gap: 3 },
@@ -958,7 +942,7 @@ const styles = StyleSheet.create({
   smartDock: { position: "absolute", left: 10, right: 10, borderRadius: 21, borderWidth: 1, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 14 },
   smartDockCompact: { paddingHorizontal: 12, paddingVertical: 7 },
   smartDockExpanded: { padding: 10, gap: 8 },
-  smartDockToggle: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  smartDockToggle: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   smartDockSignal: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 7 },
   smartDockTitle: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 14, fontWeight: "900" },
   liveDot: { width: 8, height: 8, borderRadius: 4 },
@@ -967,17 +951,9 @@ const styles = StyleSheet.create({
   eventOpportunityCard: { minHeight: 58 },
   avatarPreview: { minWidth: 48, flexDirection: "row", alignItems: "center" },
   stackedAvatar: { marginLeft: -14 },
-  emptyPreview: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   opportunityCopy: { flex: 1, minWidth: 0 },
   opportunityTitle: { fontSize: 11, lineHeight: 14, fontWeight: "900" },
   opportunityMeta: { marginTop: 3, fontSize: 9, lineHeight: 12, fontWeight: "800" },
-  allEventsButton: { minHeight: 42, borderRadius: 15, borderWidth: 1, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  allEventsCopy: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 7 },
-  allEventsText: { flex: 1, minWidth: 0, fontSize: 10, lineHeight: 13, fontWeight: "900" },
-  countBadge: { minWidth: 26, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  countBadgeText: { fontSize: 9, lineHeight: 12, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  emptyDockRow: { minHeight: 42, borderRadius: 15, paddingHorizontal: 10, flexDirection: "row", alignItems: "center", gap: 8 },
-  emptyDockText: { flex: 1, minWidth: 0, fontSize: 10, lineHeight: 13, fontWeight: "800" },
   dateTile: { width: 44, height: 48, borderRadius: 14, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   dateDay: { fontSize: 16, lineHeight: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
   dateMonth: { fontSize: 8, lineHeight: 10, fontWeight: "900", textTransform: "uppercase" },

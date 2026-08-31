@@ -40,12 +40,13 @@ export function translateCoworkingUiPattern(value: string, language: SupportedLa
     return `${members} members · ${events} events`;
   }
 
-  const availableNow = value.match(/^(\d+) disponibles(?: maintenant)?$/u);
+  const availableNow = value.match(/^(\d+) disponibles?(?: maintenant)?$/u);
   if (availableNow) {
-    if (locale === "es") return `${availableNow[1]} disponibles ahora`;
+    const count = Number(availableNow[1]);
+    if (locale === "es") return `${availableNow[1]} ${count === 1 ? "disponible" : "disponibles"} ahora`;
     if (locale === "de") return `${availableNow[1]} jetzt verfügbar`;
-    if (locale === "it") return `${availableNow[1]} disponibili ora`;
-    if (locale === "pt") return `${availableNow[1]} disponíveis agora`;
+    if (locale === "it") return `${availableNow[1]} ${count === 1 ? "disponibile" : "disponibili"} ora`;
+    if (locale === "pt") return `${availableNow[1]} ${count === 1 ? "disponível" : "disponíveis"} agora`;
     return `${availableNow[1]} available now`;
   }
 
@@ -58,13 +59,14 @@ export function translateCoworkingUiPattern(value: string, language: SupportedLa
     return `${eventsToDiscover[1]} events to discover`;
   }
 
-  const opportunities = value.match(/^(\d+) opportunités$/u);
+  const opportunities = value.match(/^(\d+) opportunités?$/u);
   if (opportunities) {
-    if (locale === "es") return `${opportunities[1]} oportunidades`;
-    if (locale === "de") return `${opportunities[1]} Möglichkeiten`;
+    const count = Number(opportunities[1]);
+    if (locale === "es") return `${opportunities[1]} ${count === 1 ? "oportunidad" : "oportunidades"}`;
+    if (locale === "de") return `${opportunities[1]} ${count === 1 ? "Möglichkeit" : "Möglichkeiten"}`;
     if (locale === "it") return `${opportunities[1]} opportunità`;
-    if (locale === "pt") return `${opportunities[1]} oportunidades`;
-    return `${opportunities[1]} opportunities`;
+    if (locale === "pt") return `${opportunities[1]} ${count === 1 ? "oportunidade" : "oportunidades"}`;
+    return `${opportunities[1]} ${count === 1 ? "opportunity" : "opportunities"}`;
   }
 
   const videoPeople = value.match(/^Visio en cours · (\d+) personnes$/u);

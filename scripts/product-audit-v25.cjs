@@ -159,6 +159,8 @@ async function auditMap(page, label, interactive = false) {
   }
   if (await page.getByText("Salle générale", { exact: true }).count()) failures.push(`${label}: Salle générale encore visible`);
   if (await page.getByLabel("Rejoindre la salle générale", { exact: true }).count()) failures.push(`${label}: action Salle générale encore accessible`);
+  await expectVisible(page.getByTestId("radar-opportunity-pulse"), `${label} Pulse compact par défaut`);
+  if (await page.getByTestId("radar-opportunity-panel").count()) failures.push(`${label}: panneau d’opportunités encore déployé par défaut`);
   await checkGeometry(page, `${label} écran Map`);
 
   const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
@@ -211,6 +213,21 @@ async function auditMap(page, label, interactive = false) {
 
   if (!interactive) return;
 
+  const pulse = page.getByTestId("radar-opportunity-pulse");
+  if (await pulse.isVisible().catch(() => false)) {
+    await pulse.click();
+    await expectVisible(page.getByTestId("radar-opportunity-panel"), "Pulse: développement à la demande");
+    await page.getByLabel("Réduire ce panneau", { exact: true }).click();
+    await expectVisible(pulse, "Pulse: réduction explicite");
+
+    await pulse.click();
+    const recenter = page.getByLabel("Recentrer la carte", { exact: true });
+    if (await recenter.isVisible().catch(() => false)) {
+      await recenter.click();
+      await expectVisible(pulse, "Pulse: réduction automatique pendant une manipulation de carte");
+    }
+  }
+
   const initialAvailabilityLabel = await availability.getAttribute("aria-label").catch(() => null);
   if (initialAvailabilityLabel) {
     await availability.click();
@@ -251,6 +268,7 @@ async function auditMap(page, label, interactive = false) {
     await event.click();
     await expectVisible(page.getByLabel("Voir l’évènement", { exact: true }), "Évènement: fiche et CTA");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await expectVisible(page.getByTestId("radar-opportunity-pulse"), "Évènement: retour au Pulse compact");
   }
 
   await expandVisibleMapClusters(frame, 10);

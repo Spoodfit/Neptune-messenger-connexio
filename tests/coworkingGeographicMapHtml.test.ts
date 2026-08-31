@@ -141,3 +141,7 @@ test("le Radar s’ouvre sur le bassin local avant de proposer toute la communau
   match(html, /function fitInitial\(\)/);
   match(html, /if\(data\?\.type==='fit-all'\)fitAll\(\)/);
 });
+
+test("la carte signale toute manipulation pour replier les opportunités", () => {
+  match(html, /map\.on\('movestart zoomstart dragstart',\(\)=>post\(\{type:'map-interaction'\}\)\)/);
+});

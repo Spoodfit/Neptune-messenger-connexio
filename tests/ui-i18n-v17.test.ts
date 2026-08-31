@@ -21,6 +21,9 @@ test("V17 traduit les libellés dynamiques sans altérer les noms", () => {
     translateConnexioUiText("Carte du Coworking, 3 groupes ou personnes et 2 évènements", "de"),
     "Coworking-Karte, 3 Gruppen oder Personen und 2 Veranstaltungen"
   );
+  assert.equal(translateConnexioUiText("1 disponible maintenant", "en"), "1 available now");
+  assert.equal(translateConnexioUiText("1 opportunité", "en"), "1 opportunity");
+  assert.equal(translateConnexioUiText("2 opportunités", "en"), "2 opportunities");
 });
 
 test("V17 ne traduit jamais une donnée utilisateur inconnue", () => {
