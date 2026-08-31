@@ -22,6 +22,7 @@ export default function CoworkingGeographicMap({
   onSelectMarker,
   onSelectEvent,
   onSelectCluster,
+  onInteraction,
   onLocationUnavailable
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
@@ -88,6 +89,7 @@ export default function CoworkingGeographicMap({
         markerIds?: unknown;
         eventIds?: unknown;
       };
+      if (payload.type === "map-interaction") onInteraction?.();
       if (payload.type === "marker-selected" && payload.id) onSelectMarker(payload.id);
       if (payload.type === "event-selected" && payload.id) onSelectEvent?.(payload.id);
       if (payload.type === "cluster-selected") {

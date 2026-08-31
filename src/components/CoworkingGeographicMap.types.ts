@@ -55,5 +55,6 @@ export interface CoworkingGeographicMapProps {
   onSelectMarker: (markerId: string) => void;
   onSelectEvent?: (eventId: string) => void;
   onSelectCluster?: (selection: CoworkingMapClusterSelection) => void;
+  onInteraction?: () => void;
   onLocationUnavailable?: () => void;
 }

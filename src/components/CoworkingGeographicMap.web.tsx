@@ -18,6 +18,7 @@ export default function CoworkingGeographicMap({
   onSelectMarker,
   onSelectEvent,
   onSelectCluster,
+  onInteraction,
   onLocationUnavailable
 }: CoworkingGeographicMapProps) {
   const theme = useAppTheme();
@@ -27,18 +28,21 @@ export default function CoworkingGeographicMap({
   const onSelectMarkerRef = useRef(onSelectMarker);
   const onSelectEventRef = useRef(onSelectEvent);
   const onSelectClusterRef = useRef(onSelectCluster);
+  const onInteractionRef = useRef(onInteraction);
 
   useEffect(() => {
     onSelectMarkerRef.current = onSelectMarker;
     onSelectEventRef.current = onSelectEvent;
     onSelectClusterRef.current = onSelectCluster;
-  }, [onSelectCluster, onSelectEvent, onSelectMarker]);
+    onInteractionRef.current = onInteraction;
+  }, [onInteraction, onSelectCluster, onSelectEvent, onSelectMarker]);
 
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       if (event.origin !== window.location.origin) return;
       if (event.data?.source !== "connexio-coworking-map") return;
+      if (event.data?.type === "map-interaction") onInteractionRef.current?.();
       if (event.data?.type === "marker-selected" && typeof event.data.id === "string") {
         onSelectMarkerRef.current(event.data.id);
       }
