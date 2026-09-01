@@ -40,12 +40,12 @@ jobs:
           EXPO_PUBLIC_EAS_PROJECT_ID: ""
           EXPO_PUBLIC_GITHUB_PAGES: "false"
         run: npx expo export --platform web --output-dir web-product-audit-dist
-      - name: Run dedicated Map product audit
-        run: node scripts/product-audit-v25.cjs
       - name: Run full multilingual audit
         run: node scripts/i18n-product-audit.cjs
       - name: Capture dedicated Map render review
         run: node scripts/v25-render-capture.cjs
+      - name: Run dedicated Map product audit
+        run: node scripts/product-audit-v25.cjs
       - name: Upload V26 render review
         uses: actions/upload-artifact@v4
         with:
