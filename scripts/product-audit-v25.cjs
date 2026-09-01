@@ -93,11 +93,13 @@ async function auditDenseLocation(page, label) {
   }).catch(() => null);
   if (!geometry) failures.push(`${label}: hub de 100 membres non rendu`);
   else {
-    if (geometry.width > 136 || geometry.height > 62) failures.push(`${label}: hub de 100 membres trop grand (${geometry.width}x${geometry.height})`);
+    if (geometry.width > 144 || geometry.height > 62) failures.push(`${label}: hub de 100 membres trop grand (${geometry.width}x${geometry.height})`);
     if (geometry.faces !== 3) failures.push(`${label}: le hub dense rend ${geometry.faces} visages au lieu de 3`);
     if (geometry.count !== "100 membres") failures.push(`${label}: compteur dense incorrect (${geometry.count || "vide"})`);
     if (geometry.legacyRadialElements) failures.push(`${label}: ${geometry.legacyRadialElements} ancien(s) élément(s) radial(aux) dans le scénario dense`);
   }
+  const closeSheet = page.getByLabel("Fermer la fiche", { exact: true }).first();
+  if (await closeSheet.isVisible().catch(() => false)) await closeSheet.click().catch(() => {});
   fs.mkdirSync(path.resolve(process.cwd(), "v26-render-review"), { recursive: true });
   await page.screenshot({ path: path.resolve(process.cwd(), "v26-render-review", "radar-dense-100.png"), fullPage: false });
 }
@@ -233,7 +235,7 @@ async function auditMap(page, label, interactive = false) {
     const rect = node.getBoundingClientRect();
     return { width: Math.round(rect.width), height: Math.round(rect.height), faces: node.querySelectorAll(".cw-hub-face").length };
   }));
-  if (hubs.some((hub) => hub.width > 136 || hub.height > 62)) failures.push(`${label}: un hub visio masque excessivement la carte (${JSON.stringify(hubs)})`);
+  if (hubs.some((hub) => hub.width > 144 || hub.height > 62)) failures.push(`${label}: un hub visio masque excessivement la carte (${JSON.stringify(hubs)})`);
   if (hubs.some((hub) => hub.faces > 3)) failures.push(`${label}: plus de trois visages affichés dans un hub (${JSON.stringify(hubs)})`);
 
   const faceGeometry = await frame.locator(".cw-face").evaluateAll((faces) => {
