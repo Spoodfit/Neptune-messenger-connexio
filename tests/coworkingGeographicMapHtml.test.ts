@@ -1,7 +1,7 @@
-import { doesNotThrow, match, ok } from "node:assert";
+import { doesNotThrow, match, ok, strictEqual } from "node:assert";
 import { test } from "node:test";
 
-import { buildCoworkingGeographicMapHtml } from "../src/services/coworking/geographicMapHtml";
+import { buildCoworkingGeographicMapHtml, prepareCoworkingMapMarkers } from "../src/services/coworking/geographicMapHtml";
 
 const html = buildCoworkingGeographicMapHtml({
   bridge: "web",
@@ -90,10 +90,36 @@ test("le fond cartographique ne dépend plus de CARTO ni d’une clé API", () =
   ok(!html.includes("API KEY REQUIRED"));
 });
 
-test("les personnes réunies en visio partagent une zone discrète identifiable", () => {
-  match(html, /cw-room-zone/);
-  match(html, /cw-room-label.*item\.members\.length/);
-  match(html, /cw-marker\.busy \.cw-room-zone/);
+test("les personnes réunies en visio utilisent un hub compact sans explosion radiale", () => {
+  match(html, /cw-hub/);
+  match(html, /cw-hub-faces/);
+  match(html, /item\.memberCount/);
+  match(html, /clusterCopy\.videoShort/);
+  ok(!html.includes("cw-room-zone"));
+  ok(!html.includes("cw-satellite"));
+  ok(!html.includes("zoom-split"));
+});
+
+test("le hub reste visuellement borné de 1 à 100 personnes", () => {
+  for (const memberCount of [1, 2, 5, 10, 25, 50, 100]) {
+    const [prepared] = prepareCoworkingMapMarkers([{
+      id: `space:${memberCount}`,
+      latitude: 43.21,
+      longitude: 2.35,
+      availability: "busy",
+      spaceId: `space:${memberCount}`,
+      members: Array.from({ length: memberCount }, (_, index) => ({
+        id: `member:${memberCount}:${index}`,
+        name: `Membre ${index}`,
+        initials: `M${index}`,
+        cameraOn: index < 3
+      }))
+    }]);
+
+    ok(prepared);
+    strictEqual(prepared.memberCount, memberCount);
+    strictEqual(prepared.members.length, memberCount === 1 ? 1 : Math.min(3, memberCount));
+  }
 });
 
 test("les dates d’évènement restent géographiquement ancrées et explicites", () => {
@@ -129,9 +155,12 @@ test("le regroupement régional nomme les contenus et ouvre la sélection de zon
   match(html, /clusterCopy\.eventShort/);
   match(html, /zoomToBoundsOnClick:false/);
   match(html, /type:'cluster-selected',markerIds,eventIds/);
-  match(html, /disableClusteringAtZoom:13/);
-  match(html, /Math\.min\(13\.5,map\.getZoom\(\)\+3\)/);
+  match(html, /disableClusteringAtZoom:19/);
+  match(html, /const samePoint=/);
+  match(html, /if\(!samePoint\)map\.fitBounds/);
+  match(html, /Math\.min\(16,map\.getZoom\(\)\+2\)/);
   match(html, /connexioMarkerId:item\.id/);
+  match(html, /connexioAvailableCount/);
   ok(!html.includes("const total=counts.people+counts.events"));
 });
 
