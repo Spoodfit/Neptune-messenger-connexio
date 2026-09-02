@@ -912,7 +912,7 @@ const styles = StyleSheet.create({
   titleCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 15, lineHeight: 18, fontWeight: "900" },
   subtitle: { marginTop: 1, fontSize: 9, lineHeight: 12, fontWeight: "700" },
-  ownStatus: { minWidth: 70, minHeight: 42, borderRadius: 16, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  ownStatus: { minWidth: 70, minHeight: 44, borderRadius: 16, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   ownStatusDot: { width: 8, height: 8, borderRadius: 4 },
   ownStatusText: { maxWidth: 62, fontSize: 8, lineHeight: 11, fontWeight: "900" },
   filterDock: { position: "absolute", left: 12, alignItems: "flex-start", zIndex: 30 },
