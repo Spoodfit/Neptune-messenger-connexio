@@ -16,6 +16,7 @@ const html = buildCoworkingGeographicMapHtml({
       name: "Ava Business",
       initials: "AB",
       avatarUrl: "https://example.com/avatar.jpg",
+      mapAvatarUrl: "https://example.com/character.webp",
       cameraOn: true
     }, {
       id: "member:guest",
@@ -55,11 +56,15 @@ const html = buildCoworkingGeographicMapHtml({
   }
 });
 
-test("la Map garde les initiales tant que l’avatar distant n’est pas prêt", () => {
+test("la Map préfère le personnage Connexio puis garde photo et initiales en repli", () => {
   match(html, /const fallback='<span class="cw-fallback">'\+escapeText\(member\.initials\|\|'\?'\)\+'<\/span>';/);
-  match(html, /\.cw-face img,[^}]+opacity:0/);
-  match(html, /onload="this\.parentElement\.classList\.add\(&quot;avatar-ready&quot;\)"/);
+  match(html, /member\.mapAvatarUrl/);
+  match(html, /class="cw-character"/);
+  match(html, /class="cw-photo-frame"/);
+  match(html, /onload="this\.parentElement\.classList\.add\(&quot;character-ready&quot;\)"/);
+  match(html, /classList\.add\(&quot;photo-ready&quot;\)/);
   match(html, /onerror="this\.remove\(\)"/);
+  match(html, /\.cw-face\.character-ready \.cw-photo-frame,\.cw-face\.character-ready \.cw-fallback\{opacity:0\}/);
 });
 
 test("une caméra déclarée active ne masque jamais l’avatar sans flux vidéo", () => {
@@ -98,6 +103,14 @@ test("les personnes réunies en visio utilisent un hub compact sans explosion ra
   ok(!html.includes("cw-room-zone"));
   ok(!html.includes("cw-satellite"));
   ok(!html.includes("zoom-split"));
+});
+
+test("un membre seul est une silhouette debout avec un statut lisible sans la couleur", () => {
+  match(html, /cw-avatar-stage/);
+  match(html, /cw-ground/);
+  match(html, /cw-status-cue/);
+  match(html, /item\.availability==='busy'\?'▶':item\.availability==='offline'\?'–':'✓'/);
+  ok(!html.includes('<div class="cw-core">'));
 });
 
 test("le hub reste visuellement borné de 1 à 100 personnes", () => {
@@ -149,16 +162,18 @@ test("les événements et les membres superposés sont visuellement séparés et
 
 test("le regroupement régional nomme les contenus et ouvre la sélection de zone", () => {
   match(html, /getAllChildMarkers\(\)/);
-  match(html, /cluster-part/);
+  match(html, /cluster-people/);
+  match(html, /cluster-count/);
+  match(html, /cluster-badge cluster-available/);
   match(html, /cluster-events/);
   match(html, /clusterCopy\.members/);
-  match(html, /clusterCopy\.eventShort/);
   match(html, /zoomToBoundsOnClick:false/);
   match(html, /type:'cluster-selected',markerIds,eventIds/);
-  match(html, /disableClusteringAtZoom:19/);
+  match(html, /disableClusteringAtZoom:17/);
   match(html, /const samePoint=/);
-  match(html, /if\(!samePoint\)map\.fitBounds/);
-  match(html, /Math\.min\(16,map\.getZoom\(\)\+2\)/);
+  match(html, /if\(samePoint\)post\(\{type:'cluster-selected',markerIds,eventIds\}\)/);
+  match(html, /else map\.fitBounds/);
+  match(html, /Math\.min\(17,map\.getZoom\(\)\+2\)/);
   match(html, /connexioMarkerId:item\.id/);
   match(html, /connexioAvailableCount/);
   ok(!html.includes("const total=counts.people+counts.events"));

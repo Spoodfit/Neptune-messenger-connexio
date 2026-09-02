@@ -4,6 +4,9 @@ import { normalizeUiLanguageCode, type SupportedUiLanguage } from "./uiTranslati
 type TranslationSet = Partial<Record<Exclude<SupportedUiLanguage, "fr">, string>>;
 
 export const UI_TRANSLATIONS_V27: Record<string, TranslationSet> = {
+  "Filtrer la carte": { en: "Filter the map", es: "Filtrar el mapa", de: "Karte filtern", it: "Filtra la mappa", pt: "Filtrar o mapa" },
+  "Ouvre les options d’affichage de la carte": { en: "Opens map display options", es: "Abre las opciones de visualización del mapa", de: "Öffnet die Anzeigeoptionen der Karte", it: "Apre le opzioni di visualizzazione della mappa", pt: "Abre as opções de visualização do mapa" },
+  "Sélectionner": { en: "Select", es: "Seleccionar", de: "Auswählen", it: "Seleziona", pt: "Selecionar" },
   "Maintenant autour de vous": { en: "Now around you", es: "Ahora a tu alrededor", de: "Jetzt in deiner Nähe", it: "Ora intorno a te", pt: "Agora à sua volta" },
   "Rien d’urgent maintenant": { en: "Nothing urgent right now", es: "Nada urgente ahora", de: "Gerade nichts Dringendes", it: "Niente di urgente ora", pt: "Nada urgente agora" },
   "Voir tous les évènements": { en: "See all events", es: "Ver todos los eventos", de: "Alle Veranstaltungen ansehen", it: "Vedi tutti gli eventi", pt: "Ver todos os eventos" },

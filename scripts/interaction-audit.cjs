@@ -120,9 +120,14 @@ async function auditMap(page) {
   await waitRoute(page, "/coworking", "Map : ouverture en un tap");
 
   check(await page.getByText("Radar Connexio", { exact: true }).first().isVisible().catch(() => false), "Map : titre orienté usage visible");
-  check(await page.getByLabel("Afficher tous les membres et évènements", { exact: true }).isVisible().catch(() => false), "Map : filtre Tout visible");
-  check(await page.getByLabel("Afficher les membres disponibles", { exact: true }).isVisible().catch(() => false), "Map : filtre Disponibles visible");
-  check(await page.getByLabel("Afficher les évènements", { exact: true }).isVisible().catch(() => false), "Map : filtre Évènements visible");
+  const filterTrigger = page.getByTestId("radar-filter-trigger");
+  check(await filterTrigger.isVisible().catch(() => false), "Map : filtre compact visible");
+  check((await page.getByTestId("radar-filter-menu").count()) === 0, "Map : menu de filtres fermé par défaut");
+  await filterTrigger.click();
+  check(await page.getByLabel("Afficher tous les membres et évènements", { exact: true }).isVisible().catch(() => false), "Map : filtre Tout accessible à la demande");
+  check(await page.getByLabel("Afficher les membres disponibles", { exact: true }).isVisible().catch(() => false), "Map : filtre Disponibles accessible à la demande");
+  check(await page.getByLabel("Afficher les évènements", { exact: true }).isVisible().catch(() => false), "Map : filtre Évènements accessible à la demande");
+  await filterTrigger.click();
   check((await page.getByText("Salle générale", { exact: true }).count()) === 0, "Map V25 : aucune Salle générale");
   check((await page.getByLabel("Rejoindre la salle générale", { exact: true }).count()) === 0, "Map V25 : aucune action Salle générale");
   await checkTarget(page.getByLabel("Fermer la Map", { exact: true }), "Map : fermeture tactile");
