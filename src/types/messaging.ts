@@ -79,6 +79,8 @@ export interface AppUser {
   roleLabel: string;
   online: boolean;
   avatarUrl?: string;
+  /** Original Connexio character used on the geographic map. */
+  mapAvatarUrl?: string;
   phone?: string;
   videoCallEnabled?: boolean;
   lastSeenAt?: string;

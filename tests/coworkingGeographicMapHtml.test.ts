@@ -1,7 +1,7 @@
-import { doesNotThrow, match, ok } from "node:assert";
+import { doesNotThrow, match, ok, strictEqual } from "node:assert";
 import { test } from "node:test";
 
-import { buildCoworkingGeographicMapHtml } from "../src/services/coworking/geographicMapHtml";
+import { buildCoworkingGeographicMapHtml, prepareCoworkingMapMarkers } from "../src/services/coworking/geographicMapHtml";
 
 const html = buildCoworkingGeographicMapHtml({
   bridge: "web",
@@ -16,6 +16,7 @@ const html = buildCoworkingGeographicMapHtml({
       name: "Ava Business",
       initials: "AB",
       avatarUrl: "https://example.com/avatar.jpg",
+      mapAvatarUrl: "https://example.com/character.webp",
       cameraOn: true
     }, {
       id: "member:guest",
@@ -55,11 +56,15 @@ const html = buildCoworkingGeographicMapHtml({
   }
 });
 
-test("la Map garde les initiales tant que l’avatar distant n’est pas prêt", () => {
+test("la Map préfère le personnage Connexio puis garde photo et initiales en repli", () => {
   match(html, /const fallback='<span class="cw-fallback">'\+escapeText\(member\.initials\|\|'\?'\)\+'<\/span>';/);
-  match(html, /\.cw-face img,[^}]+opacity:0/);
-  match(html, /onload="this\.parentElement\.classList\.add\(&quot;avatar-ready&quot;\)"/);
+  match(html, /member\.mapAvatarUrl/);
+  match(html, /class="cw-character"/);
+  match(html, /class="cw-photo-frame"/);
+  match(html, /onload="this\.parentElement\.classList\.add\(&quot;character-ready&quot;\)"/);
+  match(html, /classList\.add\(&quot;photo-ready&quot;\)/);
   match(html, /onerror="this\.remove\(\)"/);
+  match(html, /\.cw-face\.character-ready \.cw-photo-frame,\.cw-face\.character-ready \.cw-fallback\{opacity:0\}/);
 });
 
 test("une caméra déclarée active ne masque jamais l’avatar sans flux vidéo", () => {
@@ -90,10 +95,44 @@ test("le fond cartographique ne dépend plus de CARTO ni d’une clé API", () =
   ok(!html.includes("API KEY REQUIRED"));
 });
 
-test("les personnes réunies en visio partagent une zone discrète identifiable", () => {
-  match(html, /cw-room-zone/);
-  match(html, /cw-room-label.*item\.members\.length/);
-  match(html, /cw-marker\.busy \.cw-room-zone/);
+test("les personnes réunies en visio utilisent un hub compact sans explosion radiale", () => {
+  match(html, /cw-hub/);
+  match(html, /cw-hub-faces/);
+  match(html, /item\.memberCount/);
+  match(html, /clusterCopy\.videoShort/);
+  ok(!html.includes("cw-room-zone"));
+  ok(!html.includes("cw-satellite"));
+  ok(!html.includes("zoom-split"));
+});
+
+test("un membre seul est une silhouette debout avec un statut lisible sans la couleur", () => {
+  match(html, /cw-avatar-stage/);
+  match(html, /cw-ground/);
+  match(html, /cw-status-cue/);
+  match(html, /item\.availability==='busy'\?'▶':item\.availability==='offline'\?'–':'✓'/);
+  ok(!html.includes('<div class="cw-core">'));
+});
+
+test("le hub reste visuellement borné de 1 à 100 personnes", () => {
+  for (const memberCount of [1, 2, 5, 10, 25, 50, 100]) {
+    const [prepared] = prepareCoworkingMapMarkers([{
+      id: `space:${memberCount}`,
+      latitude: 43.21,
+      longitude: 2.35,
+      availability: "busy",
+      spaceId: `space:${memberCount}`,
+      members: Array.from({ length: memberCount }, (_, index) => ({
+        id: `member:${memberCount}:${index}`,
+        name: `Membre ${index}`,
+        initials: `M${index}`,
+        cameraOn: index < 3
+      }))
+    }]);
+
+    ok(prepared);
+    strictEqual(prepared.memberCount, memberCount);
+    strictEqual(prepared.members.length, memberCount === 1 ? 1 : Math.min(3, memberCount));
+  }
 });
 
 test("les dates d’évènement restent géographiquement ancrées et explicites", () => {
@@ -123,15 +162,20 @@ test("les événements et les membres superposés sont visuellement séparés et
 
 test("le regroupement régional nomme les contenus et ouvre la sélection de zone", () => {
   match(html, /getAllChildMarkers\(\)/);
-  match(html, /cluster-part/);
+  match(html, /cluster-people/);
+  match(html, /cluster-count/);
+  match(html, /cluster-badge cluster-available/);
   match(html, /cluster-events/);
   match(html, /clusterCopy\.members/);
-  match(html, /clusterCopy\.eventShort/);
   match(html, /zoomToBoundsOnClick:false/);
   match(html, /type:'cluster-selected',markerIds,eventIds/);
-  match(html, /disableClusteringAtZoom:13/);
-  match(html, /Math\.min\(13\.5,map\.getZoom\(\)\+3\)/);
+  match(html, /disableClusteringAtZoom:17/);
+  match(html, /const samePoint=/);
+  match(html, /if\(samePoint\)post\(\{type:'cluster-selected',markerIds,eventIds\}\)/);
+  match(html, /else map\.fitBounds/);
+  match(html, /Math\.min\(17,map\.getZoom\(\)\+2\)/);
   match(html, /connexioMarkerId:item\.id/);
+  match(html, /connexioAvailableCount/);
   ok(!html.includes("const total=counts.people+counts.events"));
 });
 
@@ -140,4 +184,8 @@ test("le Radar s’ouvre sur le bassin local avant de proposer toute la communau
   match(html, /map\.distance\(focus,point\)<=230000/);
   match(html, /function fitInitial\(\)/);
   match(html, /if\(data\?\.type==='fit-all'\)fitAll\(\)/);
+});
+
+test("la carte signale toute manipulation pour replier les opportunités", () => {
+  match(html, /map\.on\('movestart zoomstart dragstart',\(\)=>post\(\{type:'map-interaction'\}\)\)/);
 });

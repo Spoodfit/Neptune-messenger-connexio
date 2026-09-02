@@ -54,7 +54,7 @@ export default function CoworkingGeographicMap({
   const accessibilityTargets = useMemo(() => [
     ...markers.map((marker, index) => ({
       name: `marker-${index}`,
-      label: t(`Sélectionner ${marker.members.map((member) => member.name).join(", ")}`),
+      label: `${t("Sélectionner")} ${marker.members.map((member) => member.name).join(", ")} · ${t(marker.availability === "available" ? "Disponible" : marker.availability === "busy" ? "Occupé" : "Hors ligne")}`,
       id: marker.id,
       kind: "marker" as const
     })),

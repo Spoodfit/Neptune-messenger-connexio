@@ -2,7 +2,7 @@ import { Text } from "@/components/LocalizedText";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, LayoutAnimation, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CoworkingGeographicMap from "../components/CoworkingGeographicMap";
@@ -24,6 +24,8 @@ import {
 } from "../domain/discoveryEvents";
 import { coworkingAvailability, coworkingMapPrimaryAction, coworkingSpaceHostId, participantPresence } from "../domain/coworking";
 import { isFreeRole } from "../domain/accessPolicy";
+import { mapAvatarUrl } from "../domain/mapAvatars";
+import { radarPulseItemCount, selectRadarPulseEvent } from "../domain/radarPulse";
 import { useCoworking } from "../providers/CoworkingProvider";
 import { useExperience } from "../providers/ExperienceProvider";
 import { useAppLanguage } from "../providers/LanguageProvider";
@@ -151,6 +153,7 @@ export default function UnifiedMapScreenV24() {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<CoworkingMapClusterSelection | null>(null);
   const [radarMode, setRadarMode] = useState<RadarMode>("all");
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState<"hello" | "invite" | "knock" | "presence" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [localMotion, setLocalMotion] = useState<CoworkingActionFeedback | null>(null);
@@ -266,6 +269,7 @@ export default function UnifiedMapScreenV24() {
           name: member.name,
           initials: member.initials,
           avatarUrl: member.avatarUrl,
+          mapAvatarUrl: mapAvatarUrl(member),
           cameraOn: member.id === currentUser.id ? mapCameraActive : Boolean(presence?.cameraOn),
           isCurrentUser: member.id === currentUser.id
         }]
@@ -299,6 +303,7 @@ export default function UnifiedMapScreenV24() {
             name: member.name,
             initials: member.initials,
             avatarUrl: member.avatarUrl,
+            mapAvatarUrl: mapAvatarUrl(member),
             cameraOn: member.id === currentUser.id ? mapCameraActive : Boolean(presence?.cameraOn),
             isCurrentUser: member.id === currentUser.id
           };
@@ -344,13 +349,12 @@ export default function UnifiedMapScreenV24() {
     }
     return [...ids].map((id) => allMembers.find((member) => member.id === id)).filter((member): member is AppUser => Boolean(member));
   }, [allMembers, currentUser.id, markers]);
-  const liveEvents = visibleEvents.filter((event) => getDiscoveryEventState(event, eventClock) === "live");
-  const upcomingEvents = visibleEvents.filter((event) => {
-    const state = getDiscoveryEventState(event, eventClock);
-    return state !== "recent" && state !== "live";
-  });
-  const nextEvent = upcomingEvents[0] ?? liveEvents[0];
-  const priorityEvent = liveEvents[0] ?? nextEvent;
+  const pulseEvent = selectRadarPulseEvent(visibleEvents, eventClock);
+  const pulseItemCount = radarPulseItemCount(availableMembers.length, pulseEvent);
+
+  useEffect(() => {
+    if (pulseItemCount === 0 && opportunityExpanded) setOpportunityExpanded(false);
+  }, [opportunityExpanded, pulseItemCount]);
   const clusterMarkers = selectedCluster
     ? markers.filter((marker) => selectedCluster.markerIds.includes(marker.id))
     : [];
@@ -377,6 +381,7 @@ export default function UnifiedMapScreenV24() {
 
   const selectMarker = (markerId: string) => {
     setOpportunityExpanded(false);
+    setFilterMenuOpen(false);
     const marker = markers.find((item) => item.id === markerId);
     setSelectedCluster(null);
     setSelectedEventId(null);
@@ -386,6 +391,7 @@ export default function UnifiedMapScreenV24() {
 
   const selectEvent = (eventId: string) => {
     setOpportunityExpanded(false);
+    setFilterMenuOpen(false);
     setSelectedCluster(null);
     setSelectedMarkerId(null);
     setSelectedMemberId(null);
@@ -394,6 +400,7 @@ export default function UnifiedMapScreenV24() {
 
   const closeSelection = () => {
     setOpportunityExpanded(false);
+    setFilterMenuOpen(false);
     setSelectedCluster(null);
     setSelectedMarkerId(null);
     setSelectedMemberId(null);
@@ -402,6 +409,7 @@ export default function UnifiedMapScreenV24() {
 
   const selectCluster = (clusterSelection: CoworkingMapClusterSelection) => {
     setOpportunityExpanded(false);
+    setFilterMenuOpen(false);
     setSelectedMarkerId(null);
     setSelectedMemberId(null);
     setSelectedEventId(null);
@@ -411,6 +419,7 @@ export default function UnifiedMapScreenV24() {
   const changeRadarMode = (mode: RadarMode) => {
     closeSelection();
     setRadarMode(mode);
+    setFilterMenuOpen(false);
   };
 
   const sayHello = async () => {
@@ -536,19 +545,21 @@ export default function UnifiedMapScreenV24() {
     : radarMode === "events"
       ? `${visibleEvents.length} évènements à découvrir`
       : `${eligibleMemberCount} membres · ${visibleEvents.length} évènements`;
+  const activeRadarMode = RADAR_MODES.find((mode) => mode.value === radarMode) ?? RADAR_MODES[0]!;
+  const activeRadarCount = radarMode === "available" ? availableMembers.length : radarMode === "events" ? visibleEvents.length : null;
   const availableLabel = t(availableMembers.length === 1 ? "personne disponible maintenant" : "personnes disponibles maintenant");
-  const liveEventLabel = t(liveEvents.length === 1 ? "évènement en cours" : "évènements en cours");
-  const upcomingLabel = t(upcomingEvents.length === 1 ? "évènement à venir" : "évènements à venir");
-  const compactOpportunitySummary = availableMembers.length > 0 && liveEvents.length > 0
-    ? availableMembers.length + " " + availableLabel + " · " + liveEvents.length + " " + liveEventLabel
+  const pulseEventLabel = pulseEvent ? t(eventStatusLabel(pulseEvent, eventClock)) : null;
+  const compactOpportunitySummary = availableMembers.length > 0 && pulseEventLabel
+    ? availableMembers.length + " " + availableLabel + " · " + pulseEventLabel
     : availableMembers.length > 0
       ? availableMembers.length + " " + availableLabel
-      : liveEvents.length > 0
-        ? liveEvents.length + " " + liveEventLabel
-        : upcomingEvents.length > 0
-          ? upcomingEvents.length + " " + upcomingLabel
-          : t("Rien d’urgent maintenant");
-  const controlsTop = Math.max(insets.top, 10) + 118;
+      : pulseEventLabel ?? "";
+  const controlsTop = Math.max(insets.top, 10) + 62;
+
+  const toggleOpportunityDock = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setOpportunityExpanded((value) => !value);
+  };
 
   const applyAvailability = async (next: "available" | "busy") => {
     if (actionBusy) return;
@@ -602,7 +613,10 @@ export default function UnifiedMapScreenV24() {
         onSelectMarker={selectMarker}
         onSelectEvent={selectEvent}
         onSelectCluster={selectCluster}
-        onInteraction={() => setOpportunityExpanded(false)}
+        onInteraction={() => {
+          setOpportunityExpanded(false);
+          setFilterMenuOpen(false);
+        }}
         onLocationUnavailable={() => AppAlert.alert("Localisation indisponible", "Activez la localisation pour recentrer la carte autour de vous.")}
       />
 
@@ -637,35 +651,44 @@ export default function UnifiedMapScreenV24() {
         </Pressable>
       </View>
 
-      <View
-        accessibilityRole="tablist"
-        style={[styles.modeRail, { top: Math.max(insets.top, 10) + 62, backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}
-      >
-        {RADAR_MODES.map((mode) => {
-          const active = radarMode === mode.value;
-          return (
-            <Pressable
-              key={mode.value}
-              accessibilityRole="tab"
-              accessibilityLabel={t(mode.value === "all" ? "Afficher tous les membres et évènements" : mode.value === "available" ? "Afficher les membres disponibles" : "Afficher les évènements")}
-              accessibilityState={{ selected: active }}
-              onPress={() => changeRadarMode(mode.value)}
-              style={({ pressed }) => [
-                styles.modeButton,
-                active && { backgroundColor: mode.value === "available" ? theme.success : theme.violet },
-                pressed && styles.pressed
-              ]}
-            >
-              {!compactHeader ? <Ionicons name={mode.icon} size={16} color={active ? "#FFFFFF" : theme.pageTextMuted} /> : null}
-              <Text numberOfLines={1} style={[styles.modeLabel, { color: active ? "#FFFFFF" : theme.pageText }]}>{mode.label}</Text>
-              {mode.value !== "all" && !compactHeader ? (
-                <Text style={[styles.modeCount, { color: active ? "#FFFFFF" : theme.pageTextMuted }]}>
-                  {mode.value === "available" ? availableMembers.length : visibleEvents.length}
-                </Text>
-              ) : null}
-            </Pressable>
-          );
-        })}
+      <View style={[styles.filterDock, { top: Math.max(insets.top, 10) + 62 }]} pointerEvents="box-none">
+        <Pressable
+          testID="radar-filter-trigger"
+          accessibilityRole="button"
+          accessibilityLabel={`${t("Filtrer la carte")} : ${t(activeRadarMode.label)}`}
+          accessibilityHint={t("Ouvre les options d’affichage de la carte")}
+          accessibilityState={{ expanded: filterMenuOpen }}
+          onPress={() => setFilterMenuOpen((open) => !open)}
+          style={({ pressed }) => [styles.filterTrigger, { backgroundColor: theme.shellBackground, borderColor: radarMode === "all" ? theme.borderSoft : theme.violet }, pressed && styles.pressed]}
+        >
+          <Ionicons name={activeRadarMode.icon} size={18} color={radarMode === "available" ? theme.success : radarMode === "events" ? theme.violet : theme.pageText} />
+          <Text numberOfLines={1} style={[styles.filterTriggerLabel, { color: theme.pageText }]}>{t(activeRadarMode.label)}{activeRadarCount === null ? "" : ` · ${activeRadarCount}`}</Text>
+          <Ionicons name={filterMenuOpen ? "chevron-up" : "chevron-down"} size={15} color={theme.pageTextMuted} />
+        </Pressable>
+
+        {filterMenuOpen ? (
+          <View testID="radar-filter-menu" style={[styles.filterMenu, { backgroundColor: theme.shellBackground, borderColor: theme.borderSoft }]}>
+            {RADAR_MODES.map((mode) => {
+              const active = radarMode === mode.value;
+              const count = mode.value === "available" ? availableMembers.length : mode.value === "events" ? visibleEvents.length : null;
+              return (
+                <Pressable
+                  key={mode.value}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(mode.value === "all" ? "Afficher tous les membres et évènements" : mode.value === "available" ? "Afficher les membres disponibles" : "Afficher les évènements")}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => changeRadarMode(mode.value)}
+                  style={({ pressed }) => [styles.filterOption, active && { backgroundColor: mode.value === "available" ? theme.successSoft : theme.violetSoft }, pressed && styles.pressed]}
+                >
+                  <View style={[styles.filterOptionIcon, { backgroundColor: theme.surfaceStrong }]}><Ionicons name={mode.icon} size={18} color={active ? (mode.value === "available" ? theme.success : theme.violet) : theme.pageTextMuted} /></View>
+                  <Text numberOfLines={1} style={[styles.filterOptionLabel, { color: theme.pageText }]}>{t(mode.label)}</Text>
+                  {count === null ? null : <Text style={[styles.filterOptionCount, { color: theme.pageTextMuted }]}>{count}</Text>}
+                  {active ? <Ionicons name="checkmark-circle" size={19} color={mode.value === "available" ? theme.success : theme.violet} /> : null}
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
 
       {selection ? (
@@ -813,8 +836,9 @@ export default function UnifiedMapScreenV24() {
         </View>
       ) : null}
 
-      {!selection && !selectedEvent && !selectedCluster && radarMode === "all" ? (
+      {!selection && !selectedEvent && !selectedCluster && radarMode === "all" && pulseItemCount > 0 ? (
         <View
+          testID={opportunityExpanded ? "radar-opportunity-panel" : "radar-opportunity-pulse"}
           style={[
             styles.smartDock,
             opportunityExpanded ? styles.smartDockExpanded : styles.smartDockCompact,
@@ -824,11 +848,13 @@ export default function UnifiedMapScreenV24() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t(opportunityExpanded ? "Réduire ce panneau" : "Ouvrir ce panneau")}
-            onPress={() => setOpportunityExpanded((value) => !value)}
+            accessibilityHint={compactOpportunitySummary}
+            accessibilityState={{ expanded: opportunityExpanded }}
+            onPress={toggleOpportunityDock}
             style={({ pressed }) => [styles.smartDockToggle, pressed && styles.pressed]}
           >
             <View style={styles.smartDockSignal}>
-              <View style={[styles.liveDot, { backgroundColor: availableMembers.length > 0 || liveEvents.length > 0 ? theme.success : theme.pageTextMuted }]} />
+              <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
               <Text numberOfLines={1} style={[styles.smartDockTitle, { color: theme.pageText }]}>
                 {opportunityExpanded ? t("Maintenant autour de vous") : compactOpportunitySummary}
               </Text>
@@ -851,37 +877,18 @@ export default function UnifiedMapScreenV24() {
                 </Pressable>
               ) : null}
 
-              {priorityEvent ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={t("Sélectionner l’évènement") + " " + priorityEvent.title} onPress={() => selectEvent(priorityEvent.id)} style={[styles.opportunityCard, styles.eventOpportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
-                  <View style={[styles.dateTile, { backgroundColor: theme.accentSoft, borderColor: getDiscoveryEventState(priorityEvent, eventClock) === "live" ? theme.success : theme.accent }]}>
-                    <Text style={[styles.dateDay, { color: theme.pageText }]}>{new Date(priorityEvent.startsAt).getDate().toString().padStart(2, "0")}</Text>
-                    <Text style={[styles.dateMonth, { color: theme.pageTextMuted }]}>{new Date(priorityEvent.startsAt).toLocaleString(localeTag, { month: "short" }).replace(".", "")}</Text>
+              {pulseEvent ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={t("Sélectionner l’évènement") + " " + pulseEvent.title} onPress={() => selectEvent(pulseEvent.id)} style={[styles.opportunityCard, styles.eventOpportunityCard, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
+                  <View style={[styles.dateTile, { backgroundColor: theme.accentSoft, borderColor: getDiscoveryEventState(pulseEvent, eventClock) === "live" ? theme.success : theme.accent }]}>
+                    <Text style={[styles.dateDay, { color: theme.pageText }]}>{new Date(pulseEvent.startsAt).getDate().toString().padStart(2, "0")}</Text>
+                    <Text style={[styles.dateMonth, { color: theme.pageTextMuted }]}>{new Date(pulseEvent.startsAt).toLocaleString(localeTag, { month: "short" }).replace(".", "")}</Text>
                   </View>
                   <View style={styles.opportunityCopy}>
-                    <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{priorityEvent.title}</Text>
-                    <Text numberOfLines={1} style={[styles.opportunityMeta, { color: getDiscoveryEventState(priorityEvent, eventClock) === "live" ? theme.success : theme.pageTextMuted }]}>{eventStatusLabel(priorityEvent, eventClock)}{priorityEvent.city ? " · " + priorityEvent.city : ""}</Text>
+                    <Text numberOfLines={1} style={[styles.opportunityTitle, { color: theme.pageText }]}>{pulseEvent.title}</Text>
+                    <Text numberOfLines={1} style={[styles.opportunityMeta, { color: getDiscoveryEventState(pulseEvent, eventClock) === "live" ? theme.success : theme.pageTextMuted }]}>{eventStatusLabel(pulseEvent, eventClock)}{pulseEvent.city ? " · " + pulseEvent.city : ""}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={17} color={theme.pageTextMuted} />
                 </Pressable>
-              ) : null}
-
-              {visibleEvents.length > 0 ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={t("Voir tous les évènements")} onPress={() => changeRadarMode("events")} style={[styles.allEventsButton, { backgroundColor: theme.surfaceStrong, borderColor: theme.borderSoft }]}>
-                  <View style={styles.allEventsCopy}>
-                    <Ionicons name="calendar-outline" size={17} color={theme.pageText} />
-                    <Text numberOfLines={1} style={[styles.allEventsText, { color: theme.pageText }]}>{t("Voir tous les évènements")}</Text>
-                  </View>
-                  <View style={[styles.countBadge, { backgroundColor: theme.violetSoft }]}>
-                    <Text style={[styles.countBadgeText, { color: theme.violet }]}>{visibleEvents.length}</Text>
-                  </View>
-                </Pressable>
-              ) : null}
-
-              {availableMembers.length === 0 && !priorityEvent && visibleEvents.length === 0 ? (
-                <View style={styles.emptyDockRow}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color={theme.pageTextMuted} />
-                  <Text style={[styles.emptyDockText, { color: theme.pageTextMuted }]}>{t("Rien d’urgent maintenant")}</Text>
-                </View>
               ) : null}
             </View>
           ) : null}
@@ -900,18 +907,22 @@ export default function UnifiedMapScreenV24() {
 const styles = StyleSheet.create({
   screen: { flex: 1, position: "relative", overflow: "hidden" },
   topBar: { position: "absolute", left: 0, right: 0, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 8 },
-  circleButton: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  circleButton: { width: 48, height: 48, borderRadius: 24, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   titlePill: { flex: 1, minHeight: 48, maxWidth: 260, paddingLeft: 11, paddingRight: 4, borderRadius: 19, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 5 },
   titleCopy: { flex: 1, minWidth: 0 },
   title: { fontSize: 15, lineHeight: 18, fontWeight: "900" },
   subtitle: { marginTop: 1, fontSize: 9, lineHeight: 12, fontWeight: "700" },
-  ownStatus: { minWidth: 70, minHeight: 42, borderRadius: 16, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  ownStatus: { minWidth: 70, minHeight: 48, borderRadius: 16, borderWidth: 1, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   ownStatusDot: { width: 8, height: 8, borderRadius: 4 },
   ownStatusText: { maxWidth: 62, fontSize: 8, lineHeight: 11, fontWeight: "900" },
-  modeRail: { position: "absolute", left: 12, right: 12, minHeight: 52, borderRadius: 19, borderWidth: 1, padding: 3, flexDirection: "row", alignItems: "center", gap: 3 },
-  modeButton: { flex: 1, minWidth: 0, minHeight: 44, borderRadius: 15, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
-  modeLabel: { flexShrink: 1, fontSize: 10, lineHeight: 13, fontWeight: "900" },
-  modeCount: { fontSize: 9, lineHeight: 12, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  filterDock: { position: "absolute", left: 12, alignItems: "flex-start", zIndex: 30 },
+  filterTrigger: { minWidth: 112, maxWidth: 190, height: 48, borderRadius: 17, borderWidth: 1, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 7, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 12 },
+  filterTriggerLabel: { flexShrink: 1, fontSize: 11, lineHeight: 14, fontWeight: "900" },
+  filterMenu: { width: 222, marginTop: 7, padding: 5, borderRadius: 20, borderWidth: 1, gap: 2, shadowColor: "#000", shadowOpacity: 0.24, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 18 },
+  filterOption: { minHeight: 50, borderRadius: 15, paddingHorizontal: 7, flexDirection: "row", alignItems: "center", gap: 8 },
+  filterOptionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  filterOptionLabel: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 14, fontWeight: "900" },
+  filterOptionCount: { fontSize: 10, lineHeight: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
   sheet: { position: "absolute", left: 10, right: 10, borderRadius: 24, borderWidth: 1, padding: 11, gap: 10, shadowColor: "#000", shadowOpacity: 0.24, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 15 },
   sheetTop: { minHeight: 54, flexDirection: "row", alignItems: "center", gap: 8 },
@@ -958,7 +969,7 @@ const styles = StyleSheet.create({
   smartDock: { position: "absolute", left: 10, right: 10, borderRadius: 21, borderWidth: 1, shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 16, shadowOffset: { width: 0, height: 7 }, elevation: 14 },
   smartDockCompact: { paddingHorizontal: 12, paddingVertical: 7 },
   smartDockExpanded: { padding: 10, gap: 8 },
-  smartDockToggle: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  smartDockToggle: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   smartDockSignal: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 7 },
   smartDockTitle: { flex: 1, minWidth: 0, fontSize: 11, lineHeight: 14, fontWeight: "900" },
   liveDot: { width: 8, height: 8, borderRadius: 4 },
@@ -967,7 +978,6 @@ const styles = StyleSheet.create({
   eventOpportunityCard: { minHeight: 58 },
   avatarPreview: { minWidth: 48, flexDirection: "row", alignItems: "center" },
   stackedAvatar: { marginLeft: -14 },
-  emptyPreview: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   opportunityCopy: { flex: 1, minWidth: 0 },
   opportunityTitle: { fontSize: 11, lineHeight: 14, fontWeight: "900" },
   opportunityMeta: { marginTop: 3, fontSize: 9, lineHeight: 12, fontWeight: "800" },

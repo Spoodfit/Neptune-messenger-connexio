@@ -43,6 +43,16 @@ requireIn(
   "la publication doit utiliser un artefact Pages immuable"
 );
 requireIn(
+  "web-preview.yml",
+  /cp dist\/index\.html dist\/404\.html[\s\S]*touch dist\/\.nojekyll/,
+  "la publication Pages doit fournir un fallback SPA et préserver les assets Expo"
+);
+requireIn(
+  "web-preview.yml",
+  /route_url="\$\{PAGE_URL%\/\}\/coworking"[\s\S]*SPA deep link available/,
+  "le déploiement doit vérifier un lien applicatif direct"
+);
+requireIn(
   "native-release-candidate.yml",
   /ref:\s*release\/connexio-rc1/,
   "la source RC doit être verrouillée sur la branche de release"

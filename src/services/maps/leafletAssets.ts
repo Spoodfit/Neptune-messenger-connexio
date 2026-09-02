@@ -38,7 +38,7 @@ export function leafletSecurityMeta(additionalScriptOrConnectUrls: readonly stri
     `script-src 'unsafe-inline' ${MAP_DOCUMENT_ORIGIN}${scriptOrigins ? ` ${scriptOrigins}` : ""}`,
     `style-src 'unsafe-inline' ${MAP_DOCUMENT_ORIGIN}`,
     `connect-src ${connectionOrigins || "'none'"}`,
-    "img-src https: data: blob:",
+    "img-src 'self' https: data: blob:",
     "media-src blob:",
     "object-src 'none'",
     "base-uri 'none'",
