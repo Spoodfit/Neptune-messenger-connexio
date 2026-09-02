@@ -8,10 +8,10 @@ export interface CoworkingMapMemberCell {
   name: string;
   initials: string;
   avatarUrl?: string;
+  mapAvatarUrl?: string;
   cameraOn: boolean;
   isCurrentUser?: boolean;
 }
-
 export interface CoworkingMapMarker {
   id: string;
   latitude: number;

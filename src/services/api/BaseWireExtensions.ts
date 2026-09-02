@@ -192,6 +192,7 @@ export function normalizeAppUser(value: unknown): AppUser {
   if (!isRecord(value)) return user;
   return {
     ...user,
+    mapAvatarUrl: safeHttpsUrl(first(value, "mapAvatarUrl", "map_avatar_url", "character_avatar_url")),
     webProfileUrl: safeHttpsUrl(first(value, "webProfileUrl", "web_profile_url", "profile_url"))
   };
 }

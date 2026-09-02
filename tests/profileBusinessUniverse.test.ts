@@ -43,3 +43,21 @@ test("préserve les données métier Neptune utiles au profil Connexio", () => {
     ["product", "Kit identité visuelle"]
   ]);
 });
+
+test("accepte uniquement un avatar de carte propriétaire servi en HTTPS", () => {
+  const safe = normalizeAppUser({
+    id: "member-map-safe",
+    name: "Ava Neptune",
+    role: "member",
+    map_avatar_url: "https://cdn.example.com/characters/ava.webp"
+  });
+  const unsafe = normalizeAppUser({
+    id: "member-map-unsafe",
+    name: "Noé Neptune",
+    role: "member",
+    map_avatar_url: "http://cdn.example.com/characters/noe.webp"
+  });
+
+  assert.equal(safe.mapAvatarUrl, "https://cdn.example.com/characters/ava.webp");
+  assert.equal(unsafe.mapAvatarUrl, undefined);
+});

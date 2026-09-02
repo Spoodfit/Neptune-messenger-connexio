@@ -49,6 +49,61 @@ async function expandVisibleMapClusters(frame, attempts = 8) {
   }
 }
 
+async function auditDenseLocation(page, label) {
+  const iframe = page.locator("iframe[title='Carte géographique du Coworking Connexio']");
+  const source = await iframe.getAttribute("srcdoc");
+  const markerMatch = source?.match(/const markerData=([\s\S]*?);\n  const eventData=/);
+  if (!source || !markerMatch) {
+    failures.push(`${label}: source de carte indisponible pour le scénario dense`);
+    return;
+  }
+  const currentMarkers = JSON.parse(markerMatch[1]);
+  const anchor = currentMarkers[0];
+  if (!anchor) {
+    failures.push(`${label}: aucun point d’ancrage pour le scénario dense`);
+    return;
+  }
+  const denseMarker = {
+    ...anchor,
+    id: "product-audit:dense-100",
+    availability: "busy",
+    memberCount: 100,
+    members: Array.from({ length: 3 }, (_, index) => ({
+      id: `product-audit:member-${index}`,
+      name: `Membre ${index + 1}`,
+      initials: `M${index + 1}`,
+      cameraOn: false
+    }))
+  };
+  const denseSource = source
+    .replace(/const markerData=[\s\S]*?;\n  const eventData=/, `const markerData=${JSON.stringify([denseMarker])};\n  const eventData=`)
+    .replace(/const eventData=[\s\S]*?;\n  const focusLocation=/, "const eventData=[];\n  const focusLocation=");
+  await iframe.evaluate((node, srcdoc) => { node.srcdoc = srcdoc; }, denseSource);
+  const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
+  await frame.locator(".cw-hub").waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+  const geometry = await frame.locator(".cw-hub").evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      faces: node.querySelectorAll(".cw-hub-face").length,
+      count: node.querySelector(".cw-hub-count")?.textContent?.trim() ?? "",
+      legacyRadialElements: document.querySelectorAll(".cw-room-zone,.cw-satellite,.zoom-split").length
+    };
+  }).catch(() => null);
+  if (!geometry) failures.push(`${label}: hub de 100 membres non rendu`);
+  else {
+    if (geometry.width > 136 || geometry.height > 62) failures.push(`${label}: hub de 100 membres trop grand (${geometry.width}x${geometry.height})`);
+    if (geometry.faces !== 3) failures.push(`${label}: le hub dense rend ${geometry.faces} visages au lieu de 3`);
+    if (geometry.count !== "100") failures.push(`${label}: compteur dense incorrect (${geometry.count || "vide"})`);
+    if (geometry.legacyRadialElements) failures.push(`${label}: ${geometry.legacyRadialElements} ancien(s) élément(s) radial(aux) dans le scénario dense`);
+  }
+  const closeSheet = page.getByLabel("Fermer la fiche", { exact: true }).first();
+  if (await closeSheet.isVisible().catch(() => false)) await closeSheet.click().catch(() => {});
+  fs.mkdirSync(path.resolve(process.cwd(), "v26-render-review"), { recursive: true });
+  await page.screenshot({ path: path.resolve(process.cwd(), "v26-render-review", "radar-dense-100.png"), fullPage: false });
+}
+
 async function checkGeometry(page, label, minimum = 44) {
   const result = await page.evaluate(({ minimum }) => {
     const viewport = { width: window.innerWidth, height: window.innerHeight };
@@ -159,6 +214,10 @@ async function auditMap(page, label, interactive = false) {
   }
   if (await page.getByText("Salle générale", { exact: true }).count()) failures.push(`${label}: Salle générale encore visible`);
   if (await page.getByLabel("Rejoindre la salle générale", { exact: true }).count()) failures.push(`${label}: action Salle générale encore accessible`);
+  await expectVisible(page.getByTestId("radar-opportunity-pulse"), `${label} Pulse compact par défaut`);
+  if (await page.getByTestId("radar-opportunity-panel").count()) failures.push(`${label}: panneau d’opportunités encore déployé par défaut`);
+  await expectVisible(page.getByTestId("radar-filter-trigger"), `${label} filtre compact`);
+  if (await page.getByTestId("radar-filter-menu").count()) failures.push(`${label}: menu de filtres ouvert par défaut`);
   await checkGeometry(page, `${label} écran Map`);
 
   const frame = page.frameLocator("iframe[title='Carte géographique du Coworking Connexio']");
@@ -167,12 +226,19 @@ async function auditMap(page, label, interactive = false) {
   await expandVisibleMapClusters(frame);
   if ((await frame.locator(".cw-marker.available").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: aucun utilisateur disponible ni cluster régional`);
   if ((await frame.locator(".cw-marker.busy").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: aucune visio occupée ni cluster régional`);
-  if ((await frame.locator(".cw-group .cw-satellite").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: groupe visio absent du cluster régional`);
+  if ((await frame.locator(".cw-group .cw-hub").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: hub visio absent du cluster régional`);
   if ((await frame.locator(".event-marker .event-calendar").count()) === 0 && initialClusterCount === 0) failures.push(`${label}: événements datés absents du cluster régional`);
   if ((await frame.locator(".cw-status,.cw-camera,.cw-media").count()) > 0) failures.push(`${label}: anciens badges/rectangles visio encore présents`);
 
-  const sizes = await frame.locator(".cw-core").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().width)).filter(Boolean));
-  if (sizes.some((size) => size < 27 || size > 50)) failures.push(`${label}: taille adaptative des cercles hors bornes (${sizes.join(",")})`);
+  const sizes = await frame.locator(".cw-avatar-stage").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().height)).filter(Boolean));
+  if (sizes.some((size) => size < 52 || size > 78)) failures.push(`${label}: taille adaptative des personnages hors bornes (${sizes.join(",")})`);
+
+  const hubs = await frame.locator(".cw-hub").evaluateAll((nodes) => nodes.map((node) => {
+    const rect = node.getBoundingClientRect();
+    return { width: Math.round(rect.width), height: Math.round(rect.height), faces: node.querySelectorAll(".cw-hub-face").length };
+  }));
+  if (hubs.some((hub) => hub.width > 136 || hub.height > 62)) failures.push(`${label}: un hub visio masque excessivement la carte (${JSON.stringify(hubs)})`);
+  if (hubs.some((hub) => hub.faces > 3)) failures.push(`${label}: plus de trois visages affichés dans un hub (${JSON.stringify(hubs)})`);
 
   const faceGeometry = await frame.locator(".cw-face").evaluateAll((faces) => {
     const inViewport = (rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
@@ -183,24 +249,24 @@ async function auditMap(page, label, interactive = false) {
       if (!inViewport(rect)) continue;
       visible += 1;
       const fallback = face.querySelector(".cw-fallback");
-      const image = face.querySelector("img");
+      const images = [...face.querySelectorAll("img")];
       const video = face.querySelector("video.video-ready");
       const fallbackVisible = Boolean(fallback && fallback.textContent?.trim() && Number(getComputedStyle(fallback).opacity) > .2);
-      const imageVisible = Boolean(image && image.complete && image.naturalWidth > 0 && Number(getComputedStyle(image).opacity) > .2);
+      const imageVisible = images.some((image) => image.complete && image.naturalWidth > 0 && Number(getComputedStyle(image).opacity) > .2);
       const videoVisible = Boolean(video && Number(getComputedStyle(video).opacity) > .2);
       if (!fallbackVisible && !imageVisible && !videoVisible) blank += 1;
     }
     return { visible, blank };
   });
   if (faceGeometry.visible === 0 && initialClusterCount === 0) failures.push(`${label}: aucun visage ni cluster régional visible`);
-  if (faceGeometry.blank > 0) failures.push(`${label}: ${faceGeometry.blank} cercle(s) membre visuellement vide(s)`);
+  if (faceGeometry.blank > 0) failures.push(`${label}: ${faceGeometry.blank} personnage(s) membre visuellement vide(s)`);
 
   const eventProfileCollisions = await frame.locator("body").evaluate(() => {
     const visibleRects = (selector) => [...document.querySelectorAll(selector)]
       .map((node) => node.getBoundingClientRect())
       .filter((rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight);
     const events = visibleRects(".event-visual");
-    const people = visibleRects(".cw-core,.cw-satellite");
+    const people = visibleRects(".cw-avatar-stage,.cw-hub");
     return events.reduce((total, eventRect) => total + people.filter((personRect) => {
       const width = Math.max(0, Math.min(eventRect.right, personRect.right) - Math.max(eventRect.left, personRect.left));
       const height = Math.max(0, Math.min(eventRect.bottom, personRect.bottom) - Math.max(eventRect.top, personRect.top));
@@ -210,6 +276,21 @@ async function auditMap(page, label, interactive = false) {
   if (eventProfileCollisions > 0) failures.push(`${label}: ${eventProfileCollisions} superposition(s) visible(s) entre date d’évènement et profil`);
 
   if (!interactive) return;
+
+  const pulse = page.getByTestId("radar-opportunity-pulse");
+  if (await pulse.isVisible().catch(() => false)) {
+    await pulse.click();
+    await expectVisible(page.getByTestId("radar-opportunity-panel"), "Pulse: développement à la demande");
+    await page.getByLabel("Réduire ce panneau", { exact: true }).click();
+    await expectVisible(pulse, "Pulse: réduction explicite");
+
+    await pulse.click();
+    const recenter = page.getByLabel("Recentrer la carte", { exact: true });
+    if (await recenter.isVisible().catch(() => false)) {
+      await recenter.click();
+      await expectVisible(pulse, "Pulse: réduction automatique pendant une manipulation de carte");
+    }
+  }
 
   const initialAvailabilityLabel = await availability.getAttribute("aria-label").catch(() => null);
   if (initialAvailabilityLabel) {
@@ -251,43 +332,18 @@ async function auditMap(page, label, interactive = false) {
     await event.click();
     await expectVisible(page.getByLabel("Voir l’évènement", { exact: true }), "Évènement: fiche et CTA");
     await page.getByLabel("Fermer la fiche", { exact: true }).click();
+    await expectVisible(page.getByTestId("radar-opportunity-pulse"), "Évènement: retour au Pulse compact");
   }
 
   await expandVisibleMapClusters(frame, 10);
   await page.waitForTimeout(650);
-  const visibleClusters = await frame.locator(".cluster-core").evaluateAll((nodes) => nodes.filter((node) => {
-    const r = node.getBoundingClientRect(); const s = getComputedStyle(node);
-    return r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight && s.display !== "none" && s.visibility !== "hidden";
-  }).length);
-  if (visibleClusters > 0) failures.push("Map zoomée: clusters encore visibles alors que l’espace permet le dégroupage automatique");
+  const visibleClusters = await frame.locator(".cluster-core").evaluateAll((nodes) => nodes.map((node) => {
+    const rect = node.getBoundingClientRect(); const style = getComputedStyle(node);
+    return { visible: rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight && style.display !== "none" && style.visibility !== "hidden", width: Math.round(rect.width), height: Math.round(rect.height) };
+  }).filter((cluster) => cluster.visible));
+  if (visibleClusters.some((cluster) => cluster.width > 210 || cluster.height > 48)) failures.push(`Map zoomée: agrégat trop encombrant (${JSON.stringify(visibleClusters)})`);
 
-  const splitGeometry = await frame.locator(".cw-group.zoom-split").evaluateAll((groups) => {
-    let visiblePeople = 0;
-    let splitGroups = 0;
-    let minimumGap = Infinity;
-    const inViewport = (rect) => rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
-    for (const group of groups) {
-      const core = group.querySelector(".cw-core");
-      if (!core) continue;
-      const coreRect = core.getBoundingClientRect();
-      if (!inViewport(coreRect)) continue;
-      splitGroups += 1;
-      visiblePeople += 1;
-      const coreCenter = { x: coreRect.left + coreRect.width / 2, y: coreRect.top + coreRect.height / 2 };
-      for (const person of group.querySelectorAll(".cw-person-marker")) {
-        const rect = person.getBoundingClientRect();
-        if (!inViewport(rect)) continue;
-        visiblePeople += 1;
-        const distance = Math.hypot(rect.left + rect.width / 2 - coreCenter.x, rect.top + rect.height / 2 - coreCenter.y);
-        minimumGap = Math.min(minimumGap, distance);
-      }
-    }
-    return { splitGroups, visiblePeople, minimumGap: Number.isFinite(minimumGap) ? minimumGap : 0 };
-  });
-  if (splitGeometry.splitGroups > 0 && splitGeometry.visiblePeople < 2) failures.push("Map zoomée: groupe visio visible mais utilisateurs non dégroupés");
-  if (splitGeometry.splitGroups > 0 && splitGeometry.minimumGap < 42) failures.push(`Map zoomée: séparation des personnes insuffisante (${Math.round(splitGeometry.minimumGap)}px)`);
-
-  const hostCollisions = await frame.locator(".cw-core").evaluateAll((nodes) => {
+  const hostCollisions = await frame.locator(".cw-avatar-stage,.cw-hub").evaluateAll((nodes) => {
     const rects = nodes.map((node) => node.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < window.innerWidth && r.top < window.innerHeight);
     let collisions = 0;
     for (let i = 0; i < rects.length; i += 1) for (let j = i + 1; j < rects.length; j += 1) {
@@ -298,7 +354,9 @@ async function auditMap(page, label, interactive = false) {
     }
     return collisions;
   });
-  if (hostCollisions > 0) failures.push(`Map zoomée: ${hostCollisions} chevauchement(s) important(s) entre cercles principaux`);
+  if (hostCollisions > 0) failures.push(`Map zoomée: ${hostCollisions} chevauchement(s) important(s) entre personnages principaux`);
+
+  await auditDenseLocation(page, `${label} dense`);
 }
 
 async function auditPrivateRoom(page) {
@@ -377,7 +435,7 @@ async function run() {
     console.error("Product Audit V25 failed:\n" + failures.map((failure) => `- ${failure}`).join("\n"));
     process.exitCode = 1;
   } else {
-    console.log("Product Audit V26 passed: anchored event flags, one-touch availability, space-wide hello/knock, centered private video, circular overview, clean scheduling, and core-route geometry.");
+    console.log("Product Audit V26 passed: compact dense-location hubs, anchored event dates, one-touch availability, space-wide hello/knock, centered private video, and core-route geometry.");
   }
 }
 
