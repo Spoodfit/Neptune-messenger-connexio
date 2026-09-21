@@ -1,0 +1,172 @@
+name: Build Neptune Business V3 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/neptune-business-v3
+    paths:
+      - .github/workflows/neptune-business-v3-standalone.yml
+      - neptune-v3-build.tar.gz.b64
+
+permissions:
+  contents: write
+
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+jobs:
+  build-android:
+    name: Neptune V3 Android standalone
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: build/neptune-business-v3
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Decode Neptune V3 source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf neptune-v3
+          mkdir -p neptune-v3
+          base64 -d neptune-v3-build.tar.gz.b64 > /tmp/neptune-v3.tar.gz
+          tar -xzf /tmp/neptune-v3.tar.gz -C neptune-v3
+          test -f neptune-v3/package.json
+          test -f neptune-v3/app.json
+          test -f neptune-v3/eas.json
+
+      - name: Install Neptune dependencies
+        working-directory: neptune-v3
+        run: npm install --no-audit --no-fund
+
+      - name: Verify Expo source
+        working-directory: neptune-v3
+        run: |
+          npm run verify
+          npx expo install --check
+
+      - name: Authenticate EAS
+        working-directory: neptune-v3
+        run: |
+          test -n "$EXPO_TOKEN"
+          npx --yes eas-cli@21.7.1 whoami
+
+      - name: Link Neptune Business Expo project
+        working-directory: neptune-v3
+        run: |
+          npx --yes eas-cli@21.7.1 init \
+            --account johanzambellis-team \
+            --non-interactive \
+            --force
+          npx --yes eas-cli@21.7.1 project:info --json | tee eas-project-info.json
+
+      - name: Verify Android native generation
+        working-directory: neptune-v3
+        env:
+          EXPO_DEBUG: "1"
+          EXPO_CONFIG_PLUGIN_VERBOSE_ERRORS: "1"
+        run: |
+          rm -rf android
+          npx expo prebuild --platform android --clean --no-install
+          test -x android/gradlew
+          test -f android/app/build.gradle
+          rm -rf android
+
+      - name: Build installable APK on EAS Cloud
+        id: eas
+        working-directory: neptune-v3
+        shell: bash
+        run: |
+          set +e
+          npx --yes eas-cli@21.7.1 build \
+            --profile standalone \
+            --platform android \
+            --non-interactive \
+            --wait \
+            --clear-cache \
+            --json > eas-build-android.json 2> eas-build-android.stderr
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          cat eas-build-android.stderr || true
+          cat eas-build-android.json || true
+
+      - name: Create permanent build report
+        if: always()
+        shell: bash
+        env:
+          EAS_CODE: ${{ steps.eas.outputs.code }}
+        run: |
+          mkdir -p builds
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = fs.existsSync('neptune-v3/eas-build-android.json')
+            ? fs.readFileSync('neptune-v3/eas-build-android.json', 'utf8')
+            : '';
+          let parsed = null;
+          let parseError = null;
+          try { parsed = raw.trim() ? JSON.parse(raw) : null; }
+          catch (error) { parseError = String(error); }
+          const build = Array.isArray(parsed) ? parsed[0] : parsed;
+          let projectInfo = null;
+          try {
+            projectInfo = JSON.parse(fs.readFileSync('neptune-v3/eas-project-info.json', 'utf8'));
+          } catch (_) {}
+          const report = {
+            easCode: process.env.EAS_CODE === '' || process.env.EAS_CODE == null ? null : Number(process.env.EAS_CODE),
+            expoProject: projectInfo,
+            sourceCommit: process.env.GITHUB_SHA || null,
+            buildId: build?.id || null,
+            status: build?.status || null,
+            platform: build?.platform || 'ANDROID',
+            buildProfile: build?.buildProfile || 'standalone',
+            gitCommitHash: build?.gitCommitHash || null,
+            appVersion: build?.appVersion || null,
+            appBuildVersion: build?.appBuildVersion || null,
+            createdAt: build?.createdAt || null,
+            completedAt: build?.completedAt || null,
+            artifactUrl: build?.artifacts?.buildUrl || build?.artifacts?.applicationArchiveUrl || null,
+            buildDetailsUrl: build?.buildDetailsPageUrl || null,
+            parseError
+          };
+          fs.writeFileSync('builds/neptune-v3-latest.json', JSON.stringify(report, null, 2) + '\n');
+          console.log(JSON.stringify(report, null, 2));
+          NODE
+
+      - name: Upload immutable build report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neptune-v3-android-build-report
+          path: builds/neptune-v3-latest.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish latest build link to branch
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds/neptune-v3-latest.json
+          git commit -m "build(neptune): record latest EAS APK" || true
+          git push origin HEAD:build/neptune-business-v3
+
+      - name: Fail if EAS build failed
+        if: always()
+        shell: bash
+        env:
+          EAS_CODE: ${{ steps.eas.outputs.code }}
+        run: test "${EAS_CODE:-1}" = "0"
