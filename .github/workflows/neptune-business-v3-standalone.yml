@@ -51,7 +51,7 @@ jobs:
         working-directory: neptune-v3
         run: npm install --no-audit --no-fund
 
-      - name: Verify TypeScript and Expo dependencies
+      - name: Align Expo dependencies and verify TypeScript
         working-directory: neptune-v3
         run: |
           npm run typecheck
