@@ -7,10 +7,9 @@ on:
       - build/neptune-business-v3
     paths:
       - .github/workflows/neptune-business-v3-standalone.yml
-      - neptune-v3-build.tar.gz.b64
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -22,57 +21,55 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Checkout source
+      - name: Checkout build branch
         uses: actions/checkout@v4
         with:
           ref: build/neptune-business-v3
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "22.13"
-          cache: npm
-          cache-dependency-path: package-lock.json
 
-      - name: Decode Neptune V3 source bundle
+      - name: Download exact Neptune V3 source
         shell: bash
         run: |
           set -euo pipefail
           rm -rf neptune-v3
           mkdir -p neptune-v3
-          base64 -d neptune-v3-build.tar.gz.b64 > /tmp/neptune-v3.tar.gz
+          curl -fL --retry 3 \
+            'https://d2ol7oe51mr4n9.cloudfront.net/user_3EZW6TPL6PWjv4UXWqjVzgkha48/8d928331-a834-468c-b931-8dd1036e6e1a.gz' \
+            -o /tmp/neptune-v3.tar.gz
+          test "$(wc -c < /tmp/neptune-v3.tar.gz)" = "2734466"
           tar -xzf /tmp/neptune-v3.tar.gz -C neptune-v3
           test -f neptune-v3/package.json
           test -f neptune-v3/app.json
           test -f neptune-v3/eas.json
 
-      - name: Install Neptune dependencies
+      - name: Install dependencies
         working-directory: neptune-v3
         run: npm install --no-audit --no-fund
 
-      - name: Verify Expo source
+      - name: Verify TypeScript and Expo dependencies
         working-directory: neptune-v3
         run: |
-          npm run verify
+          npm run typecheck
           npx expo install --check
 
-      - name: Authenticate EAS
+      - name: Authenticate Expo
         working-directory: neptune-v3
         run: |
           test -n "$EXPO_TOKEN"
           npx --yes eas-cli@21.7.1 whoami
 
-      - name: Link Neptune Business Expo project
+      - name: Link existing Neptune Business Expo project
         working-directory: neptune-v3
         run: |
-          npx --yes eas-cli@21.7.1 init \
-            --account johanzambellis-team \
-            --non-interactive \
-            --force
+          npx --yes eas-cli@21.7.1 init --non-interactive --force
           npx --yes eas-cli@21.7.1 project:info --json | tee eas-project-info.json
 
-      - name: Verify Android native generation
+      - name: Verify Android native prebuild
         working-directory: neptune-v3
         env:
           EXPO_DEBUG: "1"
@@ -103,7 +100,7 @@ jobs:
           cat eas-build-android.stderr || true
           cat eas-build-android.json || true
 
-      - name: Create permanent build report
+      - name: Create build report
         if: always()
         shell: bash
         env:
@@ -120,19 +117,12 @@ jobs:
           try { parsed = raw.trim() ? JSON.parse(raw) : null; }
           catch (error) { parseError = String(error); }
           const build = Array.isArray(parsed) ? parsed[0] : parsed;
-          let projectInfo = null;
-          try {
-            projectInfo = JSON.parse(fs.readFileSync('neptune-v3/eas-project-info.json', 'utf8'));
-          } catch (_) {}
           const report = {
             easCode: process.env.EAS_CODE === '' || process.env.EAS_CODE == null ? null : Number(process.env.EAS_CODE),
-            expoProject: projectInfo,
-            sourceCommit: process.env.GITHUB_SHA || null,
             buildId: build?.id || null,
             status: build?.status || null,
             platform: build?.platform || 'ANDROID',
             buildProfile: build?.buildProfile || 'standalone',
-            gitCommitHash: build?.gitCommitHash || null,
             appVersion: build?.appVersion || null,
             appBuildVersion: build?.appBuildVersion || null,
             createdAt: build?.createdAt || null,
@@ -145,7 +135,7 @@ jobs:
           console.log(JSON.stringify(report, null, 2));
           NODE
 
-      - name: Upload immutable build report
+      - name: Upload build report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -153,16 +143,6 @@ jobs:
           path: builds/neptune-v3-latest.json
           if-no-files-found: error
           retention-days: 30
-
-      - name: Publish latest build link to branch
-        if: always()
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add builds/neptune-v3-latest.json
-          git commit -m "build(neptune): record latest EAS APK" || true
-          git push origin HEAD:build/neptune-business-v3
 
       - name: Fail if EAS build failed
         if: always()
