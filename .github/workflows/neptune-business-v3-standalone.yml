@@ -54,8 +54,8 @@ jobs:
       - name: Align Expo dependencies and verify TypeScript
         working-directory: neptune-v3
         run: |
+          npx expo install --fix
           npm run typecheck
-          npx expo install --check
 
       - name: Authenticate Expo
         working-directory: neptune-v3
