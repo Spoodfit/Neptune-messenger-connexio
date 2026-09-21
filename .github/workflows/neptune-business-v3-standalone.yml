@@ -39,9 +39,9 @@ jobs:
           rm -rf neptune-v3
           mkdir -p neptune-v3
           curl -fL --retry 3 \
-            'https://d2ol7oe51mr4n9.cloudfront.net/user_3EZW6TPL6PWjv4UXWqjVzgkha48/8d928331-a834-468c-b931-8dd1036e6e1a.gz' \
+            'https://d2ol7oe51mr4n9.cloudfront.net/user_3EZW6TPL6PWjv4UXWqjVzgkha48/98547486-b2ac-4b61-9d32-228f5e580e62.gz' \
             -o /tmp/neptune-v3.tar.gz
-          test "$(wc -c < /tmp/neptune-v3.tar.gz)" = "2734466"
+          test "$(wc -c < /tmp/neptune-v3.tar.gz)" = "2734456"
           tar -xzf /tmp/neptune-v3.tar.gz -C neptune-v3
           test -f neptune-v3/package.json
           test -f neptune-v3/app.json
