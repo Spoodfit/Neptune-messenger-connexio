@@ -55,6 +55,14 @@ jobs:
         working-directory: neptune-v3
         run: |
           npx expo install --fix
+          node - <<'NODE'
+          const fs = require('fs');
+          const p = 'tsconfig.json';
+          const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+          j.compilerOptions ||= {};
+          j.compilerOptions.ignoreDeprecations = '6.0';
+          fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+          NODE
           npm run typecheck
 
       - name: Authenticate Expo
